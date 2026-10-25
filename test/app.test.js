@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { afterEach, describe, test } from 'node:test';
 import { parseHTML } from 'linkedom';
-import { SKILLS, JOBS, canTakeJob, chooseEducation, offeredJobs, needsEducationChoice, createGame, advanceYear, haveChild, takeJob, successionInfo, validateSave } from '../engine.js';
+import { SKILLS, JOBS, EVENTS, resolveEventChoice, eventOdds, canTakeJob, chooseEducation, offeredJobs, needsEducationChoice, createGame, advanceYear, haveChild, takeJob, successionInfo, validateSave } from '../engine.js';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
@@ -14,10 +14,100 @@ const originalGlobals = new Map(['document', 'window', 'localStorage', 'setTimeo
 const timers = new Set();
 let importId = 0;
 
+test('event decisions show consequences, block time, and persist across navigation and reloads', async () => {
+  const fixture = pendingFixture(2);
+  let ui = await mount(fixture);
+  const first = EVENTS.find(event=>event.id===fixture.pendingEvents[0].eventId);
+  assert.equal(ui.query('.event-decision').dataset.eventId,first.id);
+  assert.equal(ui.all('[data-action="advance"]').length,0);
+  assert.equal(ui.all('[data-action="event-choice"]').length,first.choices.length);
+  for (const choice of first.choices) {
+    const button=ui.query(`[data-action="event-choice"][data-choice="${choice.id}"]`);
+    assert.match(button.textContent,new RegExp(choice.label.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')));
+    assert.ok(button.querySelector('.event-consequences').textContent.length>0);
+  }
+  assertNoMoneyDisplay(ui.query('.event-decision'),'event consequences');
+  for(const tab of ['career','family','character','year']) {
+    ui.click(`.nav-list [data-tab="${tab}"]`);
+    assert.equal(ui.query('.event-decision').dataset.eventId,first.id);
+    assert.deepEqual(ui.saved(),fixture,'reading sections must not reroll pending events');
+  }
+  assert.ok(ui.all('[data-action="focus"]').every(button=>button.disabled));
+  ui.click('[data-action="event-choice"]');
+  assert.equal(ui.saved().age,fixture.age);
+  assert.equal(ui.saved().pendingEvents.length,1);
+  assert.notEqual(ui.query('.event-decision').dataset.eventId,first.id);
+  const persisted=ui.saved();
+  ui=await mount(persisted);
+  assert.deepEqual(ui.saved(),persisted);
+  assert.equal(ui.query('.event-decision').dataset.eventId,persisted.pendingEvents[0].eventId);
+  ui.click('[data-action="event-choice"]');
+  assert.equal(ui.saved().pendingEvents.length,0);
+  assert.equal(ui.all('.event-decision').length,0);
+  assert.equal(ui.all('.bottom-dock [data-action="advance"]').length,1);
+  assert.equal(validateSave(ui.saved()),true);
+});
+
+test('every displayed option applies its own lasting consequences without advancing time', async () => {
+  const fixture=pendingFixture();
+  const event=EVENTS.find(event=>event.id===fixture.pendingEvents[0].eventId);
+  for(const choice of event.choices) {
+    const ui=await mount(fixture);
+    ui.click(`[data-action="event-choice"][data-choice="${choice.id}"]`);
+    const saved=ui.saved();
+    assert.equal(saved.age,fixture.age);
+    assert.equal(saved.pendingEvents.length,0);
+    for(const [key,change] of Object.entries(choice.statChanges||{})) {
+      const expected=Math.round(Math.max(1,Math.min(10,fixture.stats[key]+change))*100)/100;
+      assert.equal(saved.stats[key],expected);
+    }
+    assert.ok(saved.history.some(memory=>memory.text.includes(choice.label)));
+    assert.equal(validateSave(saved),true);
+  }
+});
+
+test('odds show independent quiet-year probability and only eligible events', async () => {
+  const fixture=ageTo(createGame({seed:991}),10);
+  const odds=eventOdds(fixture).filter(event=>event.chance>0);
+  const quiet=odds.reduce((chance,event)=>chance*(1-event.chance),1);
+  const ui=await mount(fixture);
+  ui.click('[data-action="menu"]'); ui.click('.menu-list [data-action="odds"]');
+  assert.equal(ui.all('.odds-row').length,odds.length);
+  assert.match(ui.query('.chance-summary').textContent,new RegExp((quiet*100).toFixed(1).replace('.', '\\.')));
+  assert.match(ui.query('.modal-body').textContent,/at most five/i);
+  assert.doesNotMatch(ui.query('.modal-body').textContent,/discipline|relaxation/i);
+  const impossible=EVENTS.filter(event=>!odds.some(candidate=>candidate.id===event.id));
+  const titles=ui.all('.odds-row > span').map(element=>element.firstChild.textContent);
+  for(const event of impossible) assert.ok(!titles.includes(event.name));
+});
+
+function resolvePending(state) {
+  while (state.pendingEvents.length) {
+    const event = EVENTS.find(event=>event.id===state.pendingEvents[0].eventId);
+    assert.equal(resolveEventChoice(state,event.choices[0].id,event.id).ok,true);
+  }
+}
+function resolveUIEvents(ui) {
+  while (ui.saved().pendingEvents.length) ui.click('[data-action="event-choice"]');
+}
+
+function pendingFixture(count = 1) {
+  const state = ageTo(createGame({name:'Taylor Reed',seed:908}),25);
+  const previousYear = {...state,age:state.age-1};
+  const eligible = new Set(eventOdds(previousYear).filter(event=>event.chance>0).map(event=>event.id));
+  const choices = EVENTS.filter(event=>event.choices?.length && eligible.has(event.id)).slice(0,count);
+  assert.equal(choices.length,count,'need enough eligible choice events for this fixture');
+  state.pendingEvents=choices.map(event=>({eventId:event.id,age:state.age}));
+  state.lastYearEvents=choices.map(event=>event.id);
+  assert.equal(validateSave(state),true);
+  return state;
+}
 function ageTo(state, age) {
+  resolvePending(state);
   while (state.age < age) {
     if (needsEducationChoice(state)) assert.equal(chooseEducation(state, 'work').ok, true);
     assert.equal(advanceYear(state).ok, true);
+    resolvePending(state);
   }
   assert.equal(validateSave(state), true, 'fixture must be a valid loadable save');
   return state;
@@ -67,12 +157,18 @@ function legacySave(state) {
   legacy.version = 1;
   delete legacy.education;
   delete legacy.jobOffers;
+  delete legacy.pendingEvents;
+  delete legacy.lastYearEvents;
   for (const person of [legacy, ...legacy.parents, ...legacy.children, ...legacy.siblings, ...legacy.lineage]) {
+    person.stats.discipline = 5;
+    person.stats.relaxation = 7;
+    person.aptitudes.discipline = 0;
     person.stats.instability = Math.round((11 - person.stats.stability) * 100) / 100;
     delete person.stats.stability;
     if (person !== legacy && !legacy.lineage.includes(person)) delete person.lifestyle;
   }
   for (const effect of legacy.effects) {
+    delete effect.lifestyle;
     if ('stability' in effect.modifiers) {
       effect.modifiers.instability = -effect.modifiers.stability;
       delete effect.modifiers.stability;
@@ -166,6 +262,7 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     assert.equal(ui.all('[data-action="advance"]').length, 1);
     assert.deepEqual(ui.saved().focus, fixture.focus);
     ui.click('.bottom-dock [data-action="advance"]');
+    resolveUIEvents(ui);
     assert.equal(ui.saved().age, 13);
     assert.equal(ui.all('[data-action="advance"]').length, 1);
     assert.equal(validateSave(ui.saved()), true);
@@ -206,8 +303,8 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     assert.equal(ui.query('.person-name').textContent, 'Jamie Reed');
     assert.equal(ui.all('.choice-card').length, 2);
     assert.equal(ui.all('.stat-list .stat-row').length, 0, 'detailed skills belong on the You screen');
-    assert.equal(ui.all('.birth-skills .birth-skill').length, 6, 'all adult skills must be visible from birth');
-    assert.equal(ui.all('.birth-skills .aptitude').length, 6, 'every newborn skill needs its growth affinity');
+    assert.equal(ui.all('.birth-skills .birth-skill').length, 5, 'all adult skills must be visible from birth');
+    assert.equal(ui.all('.birth-skills .aptitude').length, 5, 'every newborn skill needs its growth affinity');
     for (const [index, skill] of SKILLS.entries()) {
       assert.ok(initial.stats[skill.key] >= 1 && initial.stats[skill.key] <= 1.5, `${skill.label} should begin very low`);
       const cell = ui.all('.birth-skills .birth-skill')[index];
@@ -223,6 +320,7 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     assert.equal(ui.query('[data-choice="cry"]').getAttribute('aria-pressed'), 'true');
     for (let year = 1; year <= 3; year += 1) {
       ui.click('[data-action="advance"]');
+    resolveUIEvents(ui);
       assert.equal(ui.saved().age, year, 'one click advances exactly one year');
     }
     assert.equal(ui.all('.choice-card').length, 0);
@@ -234,8 +332,8 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     assert.equal(validateSave(ui.saved()), true);
     assert.doesNotMatch(ui.query('#app').textContent, /undefined|NaN/);
     ui.click('.nav-list [data-tab="character"]');
-    assert.equal(ui.all('.stat-list .stat-row').length, 6);
-    assert.equal(ui.all('.stat-list .aptitude').length, 6);
+    assert.equal(ui.all('.stat-list .stat-row').length, 5);
+    assert.equal(ui.all('.stat-list .aptitude').length, 5);
     assert.equal(ui.saved().age, 3, 'viewing detailed skills must not advance the year');
   });
 
@@ -274,6 +372,7 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
         ui.click('.nav-list [data-tab="year"]');
       }
       ui.click('.bottom-dock [data-action="advance"]');
+    resolveUIEvents(ui);
     }
     assert.equal(ui.saved().age, 18);
     assert.equal(ui.saved().lifestyle, 1, 'an adult with no career or reserves starts supporting their own lifestyle');
@@ -282,7 +381,7 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
 
   test('Stability replaces Instability throughout character, family, effects, and help', async () => {
     const fixture = ageTo(createGame({ name: 'Quinn Reed', seed: 212 }), 26);
-    fixture.effects = [{ id: 'burnout', name: 'Running on empty', description: 'A difficult stretch.', years: 2, modifiers: { stability: -1.2, discipline: -.6 }, kind: 'negative' }];
+    fixture.effects = [{ id: 'burnout', name: 'Running on empty', description: 'A difficult stretch.', years: 2, modifiers: { stability: -1.2, intelligence: -.6 }, kind: 'negative' }];
     const ui = await mount(fixture);
     for (const tab of ['year', 'career', 'family', 'character']) {
       ui.click(`.nav-list [data-tab="${tab}"]`);
@@ -303,6 +402,7 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     startOfferedJob(fixture);
     assert.equal(haveChild(fixture).ok, true);
     advanceYear(fixture);
+    resolvePending(fixture);
     fixture.focus = { work: 4, social: 2, family: 3, self: 3 };
     fixture.effects = [{ id: 'burnout', name: 'Running on empty', description: 'A difficult stretch.', years: 2, modifiers: { stability: -1.2 }, kind: 'negative' }];
     const legacy = legacySave(fixture);
@@ -326,6 +426,7 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     assert.match(ui.query('.profile-age').textContent, /29/);
     assert.doesNotMatch(ui.query('#app').textContent, /instability|undefined|NaN/i);
     ui.click('.bottom-dock [data-action="advance"]');
+    resolveUIEvents(ui);
     assert.equal(ui.saved().age, 30, 'the migrated life must remain playable');
   });
 
@@ -364,7 +465,7 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     assert.equal(ui.all('.family-card').length, 2);
     assert.equal(ui.query('[data-action="child"]').disabled, true);
     ui.click('[data-action="tab"][data-tab="character"]');
-    assert.equal(ui.all('.stat-list .stat-row').length, 6);
+    assert.equal(ui.all('.stat-list .stat-row').length, 5);
     ui.click('[data-action="menu"]');
     assert.ok(ui.query('.menu-list [data-action="export"]'));
     ui.click('.menu-list [data-action="help"]');
@@ -409,6 +510,7 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     assertCareerOffers(ui, 10);
     ui.click('[data-action="tab"][data-tab="year"]');
     ui.click('[data-action="advance"]');
+    resolveUIEvents(ui);
     assert.equal(ui.saved().age, 19);
     assert.ok(ui.saved().income > 0);
     assert.equal(ui.saved().jobYears, 1);
@@ -426,6 +528,7 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
   test('turning eighteen requires a choice between college and ten personal career offers', async () => {
     const ui = await mount(ageTo(createGame({ name: 'Rowan Ellis', seed: 216 }), 17));
     ui.click('.bottom-dock [data-action="advance"]');
+    resolveUIEvents(ui);
     assert.equal(ui.saved().age, 18);
     assert.equal(ui.saved().education.status, 'undecided');
     assert.equal(ui.all('[data-action="advance"]').length, 0, 'the next year must wait for a path');
@@ -460,6 +563,7 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
       ui.click('.nav-list [data-tab="year"]');
       assert.match(ui.query('.focus-row').textContent, /College/);
       ui.click('.bottom-dock [data-action="advance"]');
+    resolveUIEvents(ui);
       assert.equal(ui.saved().age, 18 + year);
       assert.equal(ui.saved().education.years, year);
       assert.equal(validateSave(ui.saved()), true);
@@ -496,8 +600,13 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     const fixture = ageTo(createGame({ name: 'Emery Quinn', seed: 218 }), 29);
     startOfferedJob(fixture);
     assert.equal(advanceYear(fixture).ok, true);
+    resolvePending(fixture);
     const legacy = structuredClone(fixture);
     legacy.version = 2;
+    for (const person of [legacy, ...legacy.parents, ...legacy.children, ...legacy.siblings, ...legacy.lineage]) {
+      person.stats.discipline=5; person.stats.relaxation=7; person.aptitudes.discipline=0;
+    }
+    delete legacy.pendingEvents; delete legacy.lastYearEvents;
     delete legacy.education;
     delete legacy.jobOffers;
     const ui = await mount(legacy);
@@ -662,6 +771,7 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     assert.equal(ui.query('[data-action="advance"]').disabled, false);
     assert.match(ui.query('#toast-root').textContent, /could not be read/);
     ui.click('[data-action="advance"]');
+    resolveUIEvents(ui);
     assert.equal(ui.saved().age, 1);
   });
 });

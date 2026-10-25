@@ -6,19 +6,20 @@ A small, generational life simulator about how you spend your years and what you
 
 ## Designed for phones
 
-The game uses a single-column layout with four bottom tabs: **Year**, **Career**, **Family**, and **You**. The **Next year** control stays within reach at the bottom of the Year screen. Full character stats live in You; health, stability, and lifestyle remain visible at a glance. Babies also show all six skills and their affinities on the Year screen.
+The game uses a single-column layout with four bottom tabs: **Year**, **Career**, **Family**, and **You**. The **Next year** control stays within reach at the bottom of the Year screen. Full character stats live in You; health, stability, and lifestyle remain visible at a glance. Babies also show all five skills and their affinities on the Year screen.
 
 Tap **More** (the three dots) for help, event odds, save export/import, or a new life. These menus open as bottom sheets. Focus controls have 44-pixel touch targets, inputs use 16-pixel text to avoid automatic zoom, and the layout reserves room for phone safe areas. Larger screens display the same centered phone layout. Existing browser saves are preserved.
 
 ## The first playable framework
 
 - Begin at age 0 with randomized parents, inherited growth affinities, and a growing height.
-- Babies and adults share six skills: intelligence, strength, attractiveness, social ability, creativity, and discipline. Each starts at 1.0–1.5 out of 10 at birth, with a permanent growth affinity from −3 to +3. Positive affinity speeds up development; negative affinity takes more practice.
-- Health, mental stability, and relaxation also run from 1–10. Higher stability means calmer and more resilient; low stability increases the chances of burnout and mental-health setbacks. Wellbeing meters begin healthy/calm rather than using the low skill baseline.
+- Babies and adults share five skills: intelligence, strength, attractiveness, social ability, and creativity. Each starts at 1.0–1.5 out of 10 at birth, with a permanent growth affinity from −3 to +3. Positive affinity speeds up development; negative affinity takes more practice.
+- Health and mental stability also run from 1–10. Higher stability means calmer and more resilient; low stability increases the chances of impulsive behavior, conflict, and distress. Wellbeing meters begin healthy/calm rather than using the low skill baseline.
 - Until age 18, lifestyle matches the parent household. Both initial parents share a randomized household lifestyle, and children you raise share yours. At 18, career success and personal resources determine lifestyle.
 - Ages 0–2: cry for faster development and lower parent stability, or stay quiet for gentler growth and calmer parents.
 - From age 3: assign 0–5 focus to school/career, friends, family, and yourself, sharing a 12-point budget. Unused energy contributes to rest.
-- Advance exactly one year per click. Choices affect skill growth and the probabilities of 10 possible random events. At most one random event happens per year; a quiet year is always possible. Temporary effects expire.
+- Advance exactly one year per click. 136 random events each roll independently, with a maximum of five per year. Typical lives average roughly one event every year or two; quiet years remain common. Your age, school/college status, career, focus, and effective stats shape which events can happen and their odds.
+- 32 events pause play for a decision. Each option shows its lasting stat changes and temporary buffs, setbacks, or lifestyle changes. Choices and outcomes persist through reloads and appear in the journal. No yearly advance or career/family change can skip a pending choice.
 - A pool of 100 distinct careers spans 10 fields. Every job has skill affinities, a base lifestyle (1–10), and age/skill requirements. This is the only financial number shown: no salary, income, spending, savings, or inheritance amounts appear in the game.
 - At 18, choose college or take a job from 10 offers. Choosing a job starts the workforce path; advancing is paused until the choice is made.
 - College takes four yearly turns. College focus develops skills while studying; graduating opens a new list of 15 offers, including degree-based careers. The game remembers each list rather than rerolling it when a menu opens.
@@ -41,9 +42,13 @@ child share = floor(estate / number of living children)
 
 Rounding remainder is not distributed. Handoff closes the previous playable chapter, even when chosen before 85. A descendant begins with no job or children of their own; their developed stats and personal savings persist. Adult heirs make their own college-or-work choice. College is a single four-year program; majors, tuition, partners, housing, and detailed relationship systems are not modeled yet.
 
+In a 300-life simulation (25,500 annual turns), default focus with mixed college/work paths averaged 0.644 events per year; 53.3% of years were quiet. This is a balance check, not a guaranteed rhythm for an individual life.
+
+Event risks are fictional game rules. Higher social focus brings more social opportunities and complications; athlete and physical careers raise injury risk. Low intelligence sharply raises scam risk, while high intelligence supports academic opportunities. Each retained stat and each focus influences multiple events. Temporary lifestyle modifiers apply to adult comfort and flow through to dependent children. Event rolls use the stats and age at the start of the year; outcomes appear after that year passes. The odds menu shows each eligible event and computes quiet-year probability as the product of all missed rolls.
+
 Job skill affinities run from +1 (useful) to +3 (central), and their relative weights determine skill fit and job-related development. These describe what a role uses; a character’s own −3 to +3 affinity determines how quickly that skill grows. Job lifestyle ratings and education requirements are fictional balancing values for this framework.
 
-Existing saves and JSON backups are upgraded automatically to schema v3. Old instability scores convert to `11 - instability`, and temporary effect signs are inverted. Existing careers and progress are preserved while education and job offers are initialized. The browser storage key stays `lifelines.save.v1` so existing players keep their saves.
+Existing saves and JSON backups are upgraded automatically to schema v4. Discipline and relaxation are removed from player and family stats, affinities, careers, and active effects. Old instability scores convert to `11 - instability`, and temporary effect signs are inverted. Existing careers, college progress, and job offers are preserved; older saves receive missing education data. The browser storage key stays `lifelines.save.v1` so existing players keep their saves.
 
 ## Run locally
 
@@ -68,6 +73,7 @@ The engine tests cover deterministic progression, probabilities, temporary effec
 
 - `engine.js`: deterministic simulation, college, job offers, events, saves, and succession.
 - `jobs.js`: 100 career titles, skill affinities, lifestyle ratings, and entry requirements.
+- `events.js`: age/context eligibility, choice outcomes, and independent event probabilities.
 - `app.js`: UI, actions, local persistence, and import/export.
 - `styles.css`: responsive layout and visual design.
 - `index.html` and `favicon.svg`: static entry point and branding.
@@ -76,7 +82,7 @@ The engine tests cover deterministic progression, probabilities, temporary effec
 This uses the same deployment pattern as **Depths**: a separate public GitHub repository, GitHub Pages serving the root of `main`, and `.nojekyll`. Pushes to `main` automatically redeploy.
 
 ```sh
-git add app.js engine.js jobs.js styles.css index.html favicon.svg README.md test package.json package-lock.json .gitignore .nojekyll server.mjs
+git add app.js engine.js jobs.js events.js styles.css index.html favicon.svg README.md test package.json package-lock.json .gitignore .nojekyll server.mjs
 git commit -m "Describe the change"
 git push origin main
 ```
