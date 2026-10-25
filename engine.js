@@ -10,7 +10,7 @@ export const SKILLS = [
   { key: 'discipline', label: 'Discipline', color: '#91cebf' },
 ];
 const CORE = SKILLS.map(s => s.key);
-const STAT_KEYS = [...CORE, 'health', 'instability', 'relaxation'];
+const STAT_KEYS = [...CORE, 'health', 'stability', 'relaxation'];
 const FOCUS_KEYS = ['work', 'social', 'family', 'self'];
 const FIRST_NAMES = ['Alex', 'Jamie', 'Rowan', 'Sage', 'Riley', 'Morgan', 'Avery', 'Jordan', 'Taylor', 'Quinn', 'Casey', 'Robin', 'Sam', 'Ellis', 'Charlie', 'Reese'];
 const LAST_NAMES = ['Bennett', 'Park', 'Rivera', 'Morgan', 'Reed', 'Patel', 'Santos', 'Chen', 'Walker', 'Brooks'];
@@ -38,11 +38,11 @@ export const JOBS = [
 export const EVENTS = [
   { id: 'injury', name: 'An unexpected injury', kind: 'negative', minAge: 3, years: 2, modifiers: { strength: -1.4, health: -1 }, description: 'An awkward fall slows you down. Recovery will take some time.' },
   { id: 'illness', name: 'Under the weather', kind: 'negative', minAge: 0, years: 1, modifiers: { health: -1.4, relaxation: -.6 }, description: 'A lingering illness makes ordinary days harder. Rest helps you through it.' },
-  { id: 'burnout', name: 'Running on empty', kind: 'negative', minAge: 13, years: 2, modifiers: { discipline: -1.2, intelligence: -.6, instability: 1.2 }, description: 'The pressure catches up with you. You need time and space to recover.' },
-  { id: 'crisis', name: 'A difficult mental health year', kind: 'negative', minAge: 13, years: 2, modifiers: { social: -1.3, discipline: -1.2, instability: 1.5 }, description: 'Distress disrupts your routines and relationships. Support and self-care matter more this year.' },
-  { id: 'conflict', name: 'A strained friendship', kind: 'negative', minAge: 6, years: 1, modifiers: { social: -.8, instability: .7 }, description: 'A misunderstanding creates distance. Rebuilding trust will take attention.' },
+  { id: 'burnout', name: 'Running on empty', kind: 'negative', minAge: 13, years: 2, modifiers: { discipline: -1.2, intelligence: -.6, stability: -1.2 }, description: 'The pressure catches up with you. You need time and space to recover.' },
+  { id: 'crisis', name: 'A difficult mental health year', kind: 'negative', minAge: 13, years: 2, modifiers: { social: -1.3, discipline: -1.2, stability: -1.5 }, description: 'Distress disrupts your routines and relationships. Support and self-care matter more this year.' },
+  { id: 'conflict', name: 'A strained friendship', kind: 'negative', minAge: 6, years: 1, modifiers: { social: -.8, stability: -.7 }, description: 'A misunderstanding creates distance. Rebuilding trust will take attention.' },
   { id: 'mentor', name: 'Someone believes in you', kind: 'positive', minAge: 3, years: 3, modifiers: { intelligence: .8, discipline: .7 }, description: 'A patient mentor notices your potential and helps you find your footing.' },
-  { id: 'friendship', name: 'A real connection', kind: 'positive', minAge: 3, years: 2, modifiers: { social: .8, instability: -.8, relaxation: .6 }, description: 'A new friendship makes life feel a little lighter.' },
+  { id: 'friendship', name: 'A real connection', kind: 'positive', minAge: 3, years: 2, modifiers: { social: .8, stability: .8, relaxation: .6 }, description: 'A new friendship makes life feel a little lighter.' },
   { id: 'windfall', name: 'A little good fortune', kind: 'positive', minAge: 18, years: 0, modifiers: {}, description: 'An unexpected turn of good fortune gives your family\'s security a welcome boost.' },
   { id: 'inspiration', name: 'A spark of inspiration', kind: 'positive', minAge: 3, years: 2, modifiers: { creativity: 1.2, relaxation: .7 }, description: 'Time for yourself leads to a new interest that lights you up.' },
   { id: 'breakthrough', name: 'Your work pays off', kind: 'positive', minAge: 6, years: 2, modifiers: { discipline: .7, intelligence: .6 }, description: 'A challenge finally clicks. Your confidence grows with the result.' },
@@ -67,8 +67,8 @@ function log(state, title, text, kind = 'neutral') {
 function addStat(person, key, amount) { person.stats[key] = round(clamp(person.stats[key] + amount, 1, 10)); }
 function grow(person, key, amount) { addStat(person, key, amount * (1 + person.aptitudes[key] * .18)); }
 function randomStats(state, baby = false) {
-  const result = Object.fromEntries(CORE.map(key => [key, round(baby ? 1.5 + random(state) * 2 : 3 + random(state) * 5)]));
-  return { ...result, health: round(7 + random(state) * 2.5), instability: round(1 + random(state) * 2), relaxation: round(6 + random(state) * 3) };
+  const result = Object.fromEntries(CORE.map(key => [key, round(baby ? 1 + random(state) * .5 : 3 + random(state) * 5)]));
+  return { ...result, health: round(7 + random(state) * 2.5), stability: round(10 - random(state) * 2), relaxation: round(6 + random(state) * 3) };
 }
 function randomAptitudes(state) { return Object.fromEntries(CORE.map(key => [key, integer(state, -3, 3)])); }
 function heightAt(age, adultHeight) {
@@ -89,7 +89,7 @@ function active(state) {
 
 export function createGame({ name, seed } = {}) {
   const initialSeed = Number.isFinite(seed) ? seed >>> 0 : (Date.now() ^ Math.floor(Math.random() * 0xFFFFFFFF)) >>> 0;
-  const state = { version: 1, seed: initialSeed, rng: initialSeed, nextId: 0, id: `life-${initialSeed}`, age: 0, generation: 1,
+  const state = { version: 2, seed: initialSeed, rng: initialSeed, nextId: 0, id: `life-${initialSeed}`, age: 0, generation: 1,
     name: '', stats: {}, aptitudes: {}, height: 50, adultHeight: 170,
     focus: { work: 3, social: 3, family: 3, self: 3 }, babyChoice: 'quiet',
     parents: [], children: [], siblings: [], money: 0, income: 0, expenses: 0, lifestyle: 1,
@@ -97,6 +97,9 @@ export function createGame({ name, seed } = {}) {
     effects: [], history: [], lineage: [], ended: false, needsSuccession: false };
   state.name = typeof name === 'string' && name.trim() ? name.trim().slice(0, 50) : personName(state);
   state.parents = [makeParent(state, surname(state.name)), makeParent(state, surname(state.name))];
+  const homeLifestyle = integer(state, 2, 8);
+  state.parents.forEach(parent => { parent.lifestyle = homeLifestyle; });
+  state.lifestyle = homeLifestyle;
   state.stats = randomStats(state, true);
   state.aptitudes = Object.fromEntries(CORE.map(key => [key, clamp(Math.round((state.parents[0].aptitudes[key] + state.parents[1].aptitudes[key]) / 2) + integer(state, -1, 1), -3, 3)]));
   state.adultHeight = clamp(Math.round((state.parents[0].height + state.parents[1].height) / 2) + integer(state, -9, 9), 145, 205);
@@ -171,9 +174,9 @@ export function eventOdds(state) {
   const chances = {
     injury: .018 + (10 - s.health) * .004 + (5 - self) * .003,
     illness: .025 + (10 - s.health) * .006,
-    burnout: .008 + Math.max(0, work - 2) * .015 + (s.instability - 1) * .006 + (5 - self) * .004,
-    crisis: .003 + Math.max(0, s.instability - 3) ** 2 * .004 + Math.max(0, 2 - self) * .005,
-    conflict: .018 + (5 - f.social) * .006 + (s.instability - 1) * .003,
+    burnout: .008 + Math.max(0, work - 2) * .015 + (10 - s.stability) * .006 + (5 - self) * .004,
+    crisis: .003 + Math.max(0, 8 - s.stability) ** 2 * .004 + Math.max(0, 2 - self) * .005,
+    conflict: .018 + (5 - f.social) * .006 + (10 - s.stability) * .003,
     mentor: .018 + work * .012 + f.social * .004,
     friendship: .01 + f.social * .017,
     windfall: .022 + f.social * .003,
@@ -192,12 +195,12 @@ function growYear(state) {
     for (const key of CORE) grow(state, key, crying ? .32 : .13);
     addStat(state, 'health', crying ? .12 : .06);
     addStat(state, 'relaxation', crying ? -.1 : .25);
-    for (const parent of state.parents.filter(p => p.alive !== false)) addStat(parent, 'instability', crying ? .7 : -.2);
+    for (const parent of state.parents.filter(p => p.alive !== false)) addStat(parent, 'stability', crying ? -.7 : .2);
     return;
   }
   const f = state.focus;
   const childhood = state.age < 18;
-  const base = childhood ? .045 : state.age < 60 ? .008 : -.018;
+  const base = childhood ? .1 : state.age < 60 ? .008 : -.018;
   for (const key of CORE) grow(state, key, base);
   grow(state, 'intelligence', f.self * .027 + (childhood ? f.work * .055 : f.work * .008));
   grow(state, 'discipline', f.work * .04 + f.self * .012);
@@ -211,10 +214,10 @@ function growYear(state) {
   }
   const spare = 12 - Object.values(f).reduce((sum, value) => sum + value, 0);
   addStat(state, 'relaxation', .16 * (f.self - 2) + spare * .06 - Math.max(0, f.work - 3) * .12);
-  addStat(state, 'instability', .1 * (f.work - 2) - f.self * .07 - f.family * .025 - f.social * .018 + (state.stats.relaxation < 4 ? .25 : 0));
+  addStat(state, 'stability', -.1 * (f.work - 2) + f.self * .07 + f.family * .025 + f.social * .018 - (state.stats.relaxation < 4 ? .25 : 0));
   addStat(state, 'health', (f.self - 2) * .035 - (state.age >= 65 ? .1 : 0));
   if (childhood) state.schoolProgress = round(clamp(state.schoolProgress + f.work * .9, 0, 100));
-  for (const parent of state.parents.filter(p => p.alive !== false)) addStat(parent, 'instability', .04 - f.family * .025);
+  for (const parent of state.parents.filter(p => p.alive !== false)) addStat(parent, 'stability', -.04 + f.family * .025);
 }
 // Money remains internal: the player sees only a 1–10 lifestyle score.
 // Earnings support one tier per 22,000; reserves support logarithmic tiers,
@@ -226,19 +229,27 @@ export function lifestyleFromResources(income = 0, money = 0) {
   const reserveTier = 1 + Math.floor(Math.log2(1 + reserves / 25000));
   return clamp(Math.max(earnedTier, reserveTier), 1, 10);
 }
+export function householdLifestyle(state) {
+  // Both original parents share one household. A young heir keeps that
+  // household's support through guardianship if their parent has died.
+  const parent = state.parents.find(person => person.alive !== false) || state.parents[0];
+  return Number.isInteger(parent?.lifestyle) ? clamp(parent.lifestyle, 1, 10) : clamp(state.lifestyle, 1, 10);
+}
+function syncFamilyLifestyles(state) {
+  state.lifestyle = state.age < 18 ? householdLifestyle(state) : lifestyleFromResources(state.income, state.money);
+  for (const child of state.children) if (child.alive !== false) child.lifestyle = child.age < 18 ? state.lifestyle : lifestyleFromResources(0, child.money);
+  for (const sibling of state.siblings) if (sibling.alive !== false) sibling.lifestyle = sibling.age < 18 ? householdLifestyle(state) : lifestyleFromResources(0, sibling.money);
+}
 function annualFinances(state) {
   if (state.age < 18) {
     state.income = 0;
-    // Essential childhood care is covered; inherited comfort draws modestly
-    // on family reserves rather than resetting a young heir to lifestyle 1.
-    state.expenses = (lifestyleFromResources(0, state.money) - 1) * 1800;
-    state.money = Math.max(0, Math.round(state.money - state.expenses));
-    state.lifestyle = lifestyleFromResources(0, state.money);
+    state.expenses = 0;
+    state.lifestyle = householdLifestyle(state);
     return;
   }
   const job = JOBS.find(candidate => candidate.id === state.jobId);
   if (job) {
-    state.performance = round(clamp(jobFit(state, job) * .7 + state.focus.work * .055 + Math.min(state.jobYears, 20) * .004 - Math.max(0, effectiveStats(state).instability - 5) * .02, .1, 1));
+    state.performance = round(clamp(jobFit(state, job) * .7 + state.focus.work * .055 + Math.min(state.jobYears, 20) * .004 - Math.max(0, 6 - effectiveStats(state).stability) * .02, .1, 1));
     state.income = Math.round(job.baseSalary * (.55 + .95 * state.performance) * (1 + Math.min(state.jobYears, 25) * .024));
     state.jobYears += 1;
   } else { state.income = 0; state.performance = 0; }
@@ -250,7 +261,7 @@ function annualFinances(state) {
   state.expenses = Math.round(9000 + state.income * (.32 + state.lifestyle * .025) + dependents * 2500 + reserveUpkeep);
   state.money = Math.max(0, Math.round(state.money + state.income - state.expenses));
   state.lifestyle = lifestyleFromResources(state.income, state.money);
-  if (!job && state.focus.work >= 3) addStat(state, 'instability', .15);
+  if (!job && state.focus.work >= 3) addStat(state, 'stability', -.15);
 }
 function ageFamily(state) {
   for (const parent of state.parents) {
@@ -264,7 +275,7 @@ function ageFamily(state) {
     child.height = heightAt(child.age, child.adultHeight);
     const learning = child.age < 18 ? .06 : .012;
     for (const key of CORE) grow(child, key, learning + state.focus.family * (child.age < 18 ? .045 : .018));
-    addStat(child, 'instability', .08 - state.focus.family * .045);
+    addStat(child, 'stability', -.08 + state.focus.family * .045);
     addStat(child, 'health', (state.focus.family - 2) * .02);
     addStat(child, 'relaxation', (state.focus.family - 2) * .04);
     if (child.age >= 18) child.money += Math.round(1500 + child.stats.discipline * 250);
@@ -303,6 +314,7 @@ export function advanceYear(state) {
   state.height = heightAt(state.age, state.adultHeight);
   if (selected) applyEvent(state, selected);
   else log(state, 'A quiet year', previousStage === 'baby' ? `A year of small discoveries. ${state.babyChoice === 'cry' ? 'Your cries bring attention and growth, while your parents feel the strain.' : 'Quiet moments give your parents a little breathing room.'}` : 'No major surprises this year. Your everyday choices still shape who you become.', 'quiet');
+  syncFamilyLifestyles(state);
   if (state.age === 3) log(state, 'A bigger little world', 'You can now choose how to spend your year. Divide up to 12 focus points between school, friends, family, and yourself.', 'milestone');
   if (state.age === 18) log(state, 'Your own way', 'Adulthood opens careers and parenthood. Choose a career to support your lifestyle next year.', 'milestone');
   if (state.age === 65) log(state, 'The next chapter', 'You may continue your own life or pass the story to one of your children.', 'milestone');
@@ -324,7 +336,7 @@ export function haveChild(state) {
   const otherAptitudes = randomAptitudes(state);
   const aptitudes = adopted ? otherAptitudes : Object.fromEntries(CORE.map(key => [key, clamp(Math.round((state.aptitudes[key] + otherAptitudes[key]) / 2) + integer(state, -1, 1), -3, 3)]));
   const adultHeight = adopted ? integer(state, 150, 200) : clamp(Math.round((state.adultHeight + integer(state, 155, 190)) / 2) + integer(state, -7, 7), 145, 205);
-  const child = { id: uid(state, 'child'), name: personName(state, surname(state.name)), age: 0, stats: randomStats(state, true), aptitudes, height: 50, adultHeight, money: 0, alive: true, adopted };
+  const child = { id: uid(state, 'child'), name: personName(state, surname(state.name)), age: 0, stats: randomStats(state, true), aptitudes, height: 50, adultHeight, money: 0, lifestyle: state.lifestyle, alive: true, adopted };
   state.children.push(child); state.lastChildAge = state.age;
   log(state, adopted ? 'A new beginning' : 'A new branch', `${adopted ? `You adopt ${child.name}, welcoming a new child into your family.` : `${child.name} joins your family.`} Family focus will help their abilities grow, and your family legacy will be divided equally among your surviving children.`, 'family');
   return { ok: true, childId: child.id };
@@ -351,23 +363,26 @@ export function succeed(state, childId) {
   state.id = heir.id; state.name = heir.name; state.age = heir.age; state.generation += 1;
   state.stats = heir.stats; state.aptitudes = heir.aptitudes; state.height = heir.height; state.adultHeight = heir.adultHeight;
   state.money = heir.money + info.share;
-  state.parents = [{ id: previous.id, name: previous.name, age: previous.age, stats: previous.stats, aptitudes: previous.aptitudes, height: previous.height, alive: previous.alive }];
+  state.parents = [{ id: previous.id, name: previous.name, age: previous.age, stats: previous.stats, aptitudes: previous.aptitudes, height: previous.height, lifestyle: previous.lifestyle, alive: previous.alive }];
   state.children = []; state.effects = []; state.focus = { work: 3, social: 3, family: 3, self: 3 };
   state.jobId = null; state.jobYears = 0; state.performance = 0; state.income = 0; state.expenses = 0; state.lifestyle = lifestyleFromResources(0, state.money);
   state.babyChoice = 'quiet'; state.schoolProgress = 0; state.lastChildAge = -1; state.ended = false; state.needsSuccession = false;
-  log(state, 'The story continues', `You are now ${state.name}, age ${state.age}. You receive an equal share of the family legacy. Your abilities and aptitude carry over.`, 'milestone');
+  syncFamilyLifestyles(state);
+  log(state, 'The story continues', `You are now ${state.name}, age ${state.age}. You receive an equal share of the family legacy. Your abilities and affinities carry over.`, 'milestone');
   return ok();
 }
 
-export function validateSave(raw) {
+function validSchema(raw, version) {
   try {
-    if (!raw || typeof raw !== 'object' || raw.version !== 1) return false;
+    if (!raw || typeof raw !== 'object' || raw.version !== version) return false;
     const finite = (n, min, max) => typeof n === 'number' && Number.isFinite(n) && n >= min && n <= max;
     const text = (s, max = 1000) => typeof s === 'string' && s.length > 0 && s.length <= max;
-    const validStats = stats => stats && STAT_KEYS.every(key => finite(stats[key], 1, 10));
+    const statKeys = version === 1 ? [...CORE, 'health', 'instability', 'relaxation'] : STAT_KEYS;
+    const validStats = stats => stats && !((version === 1 ? 'stability' : 'instability') in stats) && statKeys.every(key => finite(stats[key], 1, 10));
+    const validLifestyle = value => Number.isInteger(value) && finite(value, 1, 10);
     const validAptitudes = aptitude => aptitude && CORE.every(key => Number.isInteger(aptitude[key]) && finite(aptitude[key], -3, 3));
     const validGeneration = value => Number.isInteger(value) && finite(value, 1, 100000);
-    const validPerson = person => person && text(person.id, 100) && text(person.name, 50) && Number.isInteger(person.age) && finite(person.age, 0, 120) && finite(person.height, 40, 210) && validStats(person.stats) && validAptitudes(person.aptitudes) && (person.adopted === undefined || typeof person.adopted === 'boolean');
+    const validPerson = person => person && text(person.id, 100) && text(person.name, 50) && Number.isInteger(person.age) && finite(person.age, 0, 120) && finite(person.height, 40, 210) && validStats(person.stats) && validAptitudes(person.aptitudes) && (version === 1 || validLifestyle(person.lifestyle)) && (person.adopted === undefined || typeof person.adopted === 'boolean');
     if (!validPerson(raw) || raw.age > 85 || !Number.isInteger(raw.generation) || !finite(raw.generation, 1, 100000)) return false;
     if (![raw.seed, raw.rng, raw.nextId].every(value => Number.isInteger(value) && finite(value, 0, Number.MAX_SAFE_INTEGER))) return false;
     if (!finite(raw.height, 40, 210) || !finite(raw.adultHeight, 145, 205)) return false;
@@ -382,7 +397,7 @@ export function validateSave(raw) {
     if (![raw.money, raw.income, raw.expenses].every(value => finite(value, 0, 1e15)) || !Number.isInteger(raw.lifestyle) || !finite(raw.lifestyle, 1, 10)) return false;
     if (raw.jobId !== null && !JOBS.some(job => job.id === raw.jobId)) return false;
     if (!Number.isInteger(raw.jobYears) || !finite(raw.jobYears, 0, 100) || !finite(raw.performance, 0, 1) || !finite(raw.schoolProgress, 0, 100) || !finite(raw.lastChildAge, -1, 85)) return false;
-    if (!Array.isArray(raw.effects) || raw.effects.length > 10 || !raw.effects.every(effect => text(effect.id, 100) && text(effect.name, 100) && typeof effect.description === 'string' && Number.isInteger(effect.years) && finite(effect.years, 1, 3) && effect.modifiers && Object.entries(effect.modifiers).every(([key, value]) => STAT_KEYS.includes(key) && finite(value, -10, 10)))) return false;
+    if (!Array.isArray(raw.effects) || raw.effects.length > 10 || !raw.effects.every(effect => text(effect.id, 100) && text(effect.name, 100) && typeof effect.description === 'string' && Number.isInteger(effect.years) && finite(effect.years, 1, 3) && effect.modifiers && Object.entries(effect.modifiers).every(([key, value]) => statKeys.includes(key) && finite(value, -10, 10)))) return false;
     if (!Array.isArray(raw.history) || raw.history.length > 500 || !raw.history.every(memory => text(memory.id, 100) && finite(memory.age, 0, 85) && finite(memory.generation, 1, 100000) && text(memory.title, 200) && text(memory.text, 2000) && text(memory.kind, 50))) return false;
     if (!Array.isArray(raw.lineage) || !raw.lineage.every(person => validPerson(person) && validGeneration(person.generation) && typeof person.alive === 'boolean' && Number.isInteger(person.lifestyle) && finite(person.lifestyle, 1, 10) && finite(person.money, 0, 1e15) && finite(person.estate, 0, 1e15) && finite(person.share, 0, 1e15) && Array.isArray(person.children) && person.children.length <= 6 && person.children.every(child => child && text(child.id, 100) && text(child.name, 50) && finite(child.inheritance, 0, 1e15)))) return false;
     if (raw.needsSuccession && (raw.age < 85 || raw.ended || !raw.children.some(child => child.alive !== false && child.age < 85))) return false;
@@ -390,4 +405,36 @@ export function validateSave(raw) {
     if (raw.age === 85 && !raw.ended && !raw.needsSuccession) return false;
     return true;
   } catch { return false; }
+}
+
+export function validateSave(raw) { return validSchema(raw, 2); }
+
+export function migrateSave(raw) {
+  try {
+    if (validateSave(raw)) return clone(raw);
+    if (!validSchema(raw, 1)) return null;
+    const state = clone(raw);
+    const convertStats = person => {
+      person.stats.stability = round(11 - person.stats.instability);
+      delete person.stats.instability;
+    };
+    [state, ...state.parents, ...state.children, ...state.siblings, ...state.lineage].forEach(convertStats);
+    for (const effect of state.effects) {
+      if (Object.hasOwn(effect.modifiers, 'instability')) {
+        effect.modifiers.stability = -effect.modifiers.instability;
+        delete effect.modifiers.instability;
+      }
+    }
+    // Older saves did not store the original parents' lifestyle. Use a
+    // recorded ancestor's household where available, otherwise a modest 4/10.
+    for (const parent of state.parents) {
+      const ancestor = state.lineage.find(person => person.id === parent.id);
+      parent.lifestyle = ancestor?.lifestyle ?? 4;
+    }
+    for (const child of state.children) child.lifestyle = child.age < 18 ? state.lifestyle : lifestyleFromResources(0, child.money);
+    for (const sibling of state.siblings) sibling.lifestyle = sibling.age < 18 ? householdLifestyle(state) : lifestyleFromResources(0, sibling.money);
+    if (state.age < 18) state.lifestyle = householdLifestyle(state);
+    state.version = 2;
+    return validateSave(state) ? state : null;
+  } catch { return null; }
 }

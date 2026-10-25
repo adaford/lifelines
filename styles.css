@@ -175,6 +175,14 @@ button svg { pointer-events: none; }
 .aptitude.negative { background: #f5e9df; color: #9f6f4d; }
 .trait-legend { font-size: 12px; color: var(--muted); margin-top: 19px; padding-top: 14px; border-top: 1px solid var(--line); }
 .trait-legend .aptitude { margin: 0 2px; }
+.birth-skill-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.birth-skill { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-soft); }
+.birth-skill > span:first-child { grid-column: 1 / -1; font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+.birth-skill > strong { font-size: 18px; font-weight: 600; }
+.birth-skill small { font-size: 11px; font-weight: 400; color: var(--muted); }
+.birth-skills > .button { margin-top: 10px; width: 100%; }
+.family-lifestyle { font-size: 13px; color: var(--muted); margin: -3px 0 12px; }
+.family-lifestyle strong { color: var(--green); }
 .vitals-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 17px; }
 .vital { padding: 13px; background: #f0f1e7; border: 1px solid #e4e7d8; border-radius: 9px; min-width: 0; }
 .vital-label { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
