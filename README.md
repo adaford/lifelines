@@ -12,7 +12,7 @@ Tap **More** (the three dots) for help, event odds, save export/import, or a new
 
 ## The first playable framework
 
-- Begin at age 0 with randomized parents, inherited growth affinities, and a growing height.
+- Begin by entering a family surname; its first letter is capitalized automatically. A first name is optional. The story starts at age 0 with randomized parents, inherited growth affinities, and a growing height. Sons and daughters keep the whole family surname, including multiword names.
 - Babies and adults share five skills: intelligence, strength, attractiveness, social ability, and creativity. Each starts at 1.0–1.5 out of 10 at birth, with a permanent growth affinity from −3 to +3. Positive affinity speeds up development; negative affinity takes more practice.
 - Health and mental stability also run from 1–10. Higher stability means calmer and more resilient; low stability increases the chances of impulsive behavior, conflict, and distress. Wellbeing meters begin healthy/calm rather than using the low skill baseline.
 - Until age 18, lifestyle matches the parent household. Both initial parents share a randomized household lifestyle, and children you raise share yours. At 18, career success and personal resources determine lifestyle.
@@ -28,8 +28,9 @@ Tap **More** (the three dots) for help, event odds, save export/import, or a new
 - Dating has a low annual pregnancy chance; marriage raises it substantially. Pregnancy is saved, and a baby arrives on the next yearly turn. A one-night stand also has a small pregnancy chance. Adults can adopt, with a maximum of six children and one arrival per year. An expected baby reserves a place in the family.
 - Each living child adds social ability +0.2 (up to +1.2), and each dependent child costs one lifestyle level. Children have their own 1–10 bond, stats, and affinities. Family focus improves their bond and abilities. Partners and children have personal events and decisions with clearly labeled consequences for them and for you.
 - Attractiveness naturally peaks at an individual age between 27 and 33, then gradually declines. Events can still change it.
-- Voluntary succession opens at 65. At 85, the current life closes and the player chooses a living child, or starts another life if no heir exists. An heir retains their current age, skills, affinity, height, and personal savings.
-- The estate is divided equally among living children. Inheritance supports an heir’s lifestyle; siblings keep their shares. The history records previous generations.
+- Retirement opens at 65. Choose any eligible child; if there are no eligible children, choose a sibling. With neither, give the legacy to a random child aged 6–12 with low stats and a different surname. At 85, this handoff is required, so a childless life can still continue. The preview stays the same across menu visits and reloads.
+- Heirs keep their age, stats, affinity, height, identity, and personal resources. Child and sibling heirs keep your family surname regardless of gender. A sibling handoff preserves the existing parents and remaining siblings; a previously played character cannot receive another handoff.
+- The entire estate is divided equally among eligible living children, including those not selected as the next player. With no children, the chosen sibling or unrelated child receives the whole estate. Inheritance supports their lifestyle, and the history records previous chapters.
 - Automatic local browser saves, JSON export/import, keyboard-accessible controls, and responsive layouts.
 
 ## Deliberately simple rules
@@ -41,10 +42,10 @@ For adults, the internal lifestyle calculation starts with the higher of the car
 ```text
 legacy rate = clamp(0.95 - 0.05 × lifestyle, 0.45, 0.90)
 estate      = floor(savings × legacy rate)
-child share = floor(estate / number of living children)
+child share = estate / number of living children
 ```
 
-Rounding remainder is not distributed. Handoff closes the previous playable chapter, even when chosen before 85. A descendant begins with no job or children of their own; their developed stats and personal savings persist. Adult heirs make their own college-or-work choice. College is a single four-year program; majors, tuition, housing, and detailed custody or divorce finances are not modeled. An active pregnancy must finish before voluntary succession. Ending a relationship preserves children and any expected baby.
+Child shares are equal fractional amounts internally, so there is no discarded remainder. Handoff closes the previous playable chapter, even when chosen before 85. A descendant begins with no job or children of their own; their developed stats and personal savings persist. Adult heirs make their own college-or-work choice. College is a single four-year program; majors, tuition, housing, and detailed custody or divorce finances are not modeled. An active pregnancy and pending event decisions must finish before retirement. Ending a relationship preserves children and any expected baby.
 
 The original 136-event catalog averaged about 0.64 events per year in a 300-life balance check. Household events add small independent chances based on each family member’s traits, age, relationship, and your focus. Personal and household events share the five-event annual limit; dating encounters use a separate roll.
 
@@ -56,7 +57,7 @@ Actor identity, attraction preferences, and pregnancy capability are separate fi
 
 Job skill affinities run from +1 (useful) to +3 (central), and their relative weights determine skill fit and job-related development. These describe what a role uses; a character’s own −3 to +3 affinity determines how quickly that skill grows. Job lifestyle ratings and education requirements are fictional balancing values for this framework.
 
-Existing saves and JSON backups are upgraded automatically to schema v5. Discipline and relaxation are removed from player and family stats, affinities, careers, and active effects. Old instability scores convert to `11 - instability`, and temporary effect signs are inverted. Existing careers, college progress, and job offers are preserved; older saves receive missing education data. Pending v4 event decisions are preserved, and new relationship/identity fields are initialized without rerolling the existing life. The browser storage key stays `lifelines.save.v1` so existing players keep their saves.
+Existing saves and JSON backups are upgraded automatically to schema v6. Discipline and relaxation are removed from player and family stats, affinities, careers, and active effects. Old instability scores convert to `11 - instability`, and temporary effect signs are inverted. Existing careers, college progress, and job offers are preserved; older saves receive missing education data. Pending event decisions, partners, pregnancies, encounters, and relationship meters are preserved. A family surname is inferred for old saves without rerolling the life. Previously finished age-85 saves reopen retirement selection. The browser storage key stays `lifelines.save.v1` so existing players keep their saves.
 
 ## Run locally
 
@@ -79,7 +80,7 @@ The engine tests cover deterministic progression, probabilities, temporary effec
 
 ## Source and deployment
 
-- `engine.js`: deterministic simulation, college, job offers, events, saves, and succession.
+- `engine.js`: deterministic simulation, surnames, college, job offers, events, saves, and retirement inheritance.
 - `jobs.js`: 100 career titles, skill affinities, lifestyle ratings, and entry requirements.
 - `events.js`: 136 personal events, age/context eligibility, and independent probabilities.
 - `family-events.js`: 32 partner/child events with person-specific odds and choices.

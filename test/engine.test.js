@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SKILLS, JOBS, EVENTS, createGame, stage, advanceYear as advanceYearAction, setBabyChoice, setFocus, effectiveStats, currentEffects, eventOdds, jobFit, canTakeJob, takeJob, quitJob, haveChild, successionInfo, succeed, lifestyleFromResources, householdLifestyle, validateSave, migrateSave, chooseEducation, needsEducationChoice, offeredJobs, resolveEventChoice, respondToEncounter, proposeMarriage, endRelationship, relationshipOdds, oneNightChance, meetingChances, proposalChance, pregnancyChance, pendingEventSubject } from '../engine.js';
+import { SKILLS, JOBS, EVENTS, createGame, stage, advanceYear as advanceYearAction, setBabyChoice, setFocus, effectiveStats, currentEffects, eventOdds, jobFit, canTakeJob, takeJob, quitJob, haveChild, successionInfo, succeed, lifestyleFromResources, householdLifestyle, validateSave, migrateSave, chooseEducation, needsEducationChoice, offeredJobs, resolveEventChoice, respondToEncounter, proposeMarriage, endRelationship, relationshipOdds, oneNightChance, meetingChances, proposalChance, pregnancyChance, pendingEventSubject, normalizeSurname } from '../engine.js';
 
 const copy = value => JSON.parse(JSON.stringify(value));
 const finishChoices = state => {
@@ -70,7 +70,7 @@ test('all five adult skills exist at birth, start very low, and use their indivi
   for (let seed = 1; seed <= 40; seed++) {
     const baby = createGame({ seed });
     for (const { key } of SKILLS) assert.ok(baby.stats[key] >= 1 && baby.stats[key] <= 1.5, `${key} at birth`);
-    assert.equal(baby.version, 5);
+    assert.equal(baby.version, 6);
     assert.ok(baby.stats.health >= 7);
     assert.ok(baby.stats.stability >= 8);
     assert.deepEqual(Object.keys(baby.stats).sort(), Object.keys(adult(seed).stats).sort());
@@ -400,7 +400,7 @@ test('v2 upgrades preserve school, current careers, and adults without consuming
       const snapshot = copy(old);
       const upgraded = migrateSave(old);
       assert.equal(validateSave(upgraded), true);
-      assert.equal(upgraded.version, 5);
+      assert.equal(upgraded.version, 6);
       assert.equal(upgraded.education.status, status);
       assert.equal(upgraded.education.years, status === 'graduate' ? 4 : 0);
       assert.equal(upgraded.jobOffers.length, count);
@@ -443,7 +443,7 @@ test('education import validation rejects impossible progress or malformed caree
   assert.equal(validateSave(minor), false);
 });
 
-test('succession resets education for young and adult heirs and an ended life still takes precedence', () => {
+test('succession resets education for heirs and mandatory retirement takes precedence', () => {
   const parent = adult(608); haveChild(parent);
   while (parent.age < 65) advanceYear(parent);
   const childId = parent.children[0].id;
@@ -471,7 +471,7 @@ test('succession resets education for young and adult heirs and an ended life st
   while (ended.age < 85) advanceYear(ended);
   assert.equal(needsEducationChoice(ended), false);
   assert.equal(chooseEducation(ended, 'college').ok, false);
-  assert.match(advanceYearRaw(ended).reason, /life has ended/);
+  assert.match(advanceYearRaw(ended).reason, /Choose an heir/);
 });
 
 test('family focus improves children, and arrivals are limited to one per year', () => {
@@ -601,10 +601,10 @@ test('an unemployed adult\'s reserve-supported lifestyle declines as resources a
   assert.equal(state.lifestyle, lifestyleFromResources(state.income, state.money));
 });
 
-test('age 85 ends a childless life and pauses a parent for mandatory succession', () => {
+test('age 85 pauses every life for mandatory succession including childless lives', () => {
   const childless = createGame({ seed: 16 });
   for (let i = 0; i < 85; i++) advanceYear(childless);
-  assert.equal(childless.ended, true); assert.equal(advanceYear(childless).ok, false); assert.equal(childless.age, 85);
+  assert.equal(childless.ended, false); assert.equal(childless.needsSuccession, true); assert.equal(advanceYear(childless).ok, false); assert.equal(childless.age, 85);
   assert.equal(validateSave(childless), true);
   const parent = adult(17); haveChild(parent);
   for (let i = parent.age; i < 85; i++) advanceYear(parent);
@@ -1223,4 +1223,160 @@ test('v4 migration keeps unresolved choices and lifestyle-only effects without c
   assert.equal(converted.partner,null); assert.deepEqual(converted.encounters,[]);
   const event=EVENTS.find(event=>event.id==='investment_pitch');
   assert.equal(resolveEventChoice(converted,event.choices[0].id,event.id).ok,true);
+});
+
+test('typed surnames are capitalized and carried by descendants of every gender', () => {
+  assert.equal(normalizeSurname('  van   buren  '), 'Van buren');
+  assert.equal(normalizeSurname("o'neal"), "O'neal");
+  assert.equal(normalizeSurname('étoile'), 'Étoile');
+  assert.equal(normalizeSurname(''), '');
+  for (const surname of ['ß'+'a'.repeat(29), 'a'.repeat(29)+' z']) {
+    const state=createGame({surname,seed:3110});
+    assert.ok(state.familyName.length<=30);
+    assert.equal(validateSave(state),true,'capitalization and truncation must retain valid surname bounds');
+  }
+  for (const gender of ['male', 'female', 'nonbinary']) {
+    const state=createGame({surname:' van buren ',firstName:'Alex',gender,seed:3100});
+    assert.equal(state.name,'Alex Van buren');
+    assert.equal(state.familyName,'Van buren');
+    for(const parent of state.parents) {
+      assert.equal(parent.familyName,'Van buren');
+      assert.ok(parent.name.endsWith(' Van buren'));
+    }
+    while(state.age<18) advanceYear(state);
+    assert.equal(haveChild(state).ok,true);
+    assert.equal(state.children[0].familyName,'Van buren');
+    assert.ok(state.children[0].name.endsWith(' Van buren'));
+    assert.equal(validateSave(state),true);
+  }
+});
+
+test('retirement divides the entire estate equally and children take priority over siblings', () => {
+  const state=adult(3101);
+  while(state.age<61) advanceYear(state);
+  for(let child=0;child<3;child++) { haveChild(state); advanceYear(state); }
+  advanceYear(state);
+  state.money=100003; state.lifestyle=4;
+  const info=successionInfo(state);
+  assert.equal(info.route,'children'); assert.equal(info.candidates.length,3);
+  assert.equal(info.share,info.estate/3);
+  assert.ok(Math.abs(info.share*3-info.estate)<1e-9);
+  const chosen=copy(info.children[1]);
+  const expectedOthers=info.children.filter(person=>person.id!==chosen.id).map(person=>({id:person.id,money:person.money+info.share}));
+  assert.equal(succeed(state,chosen.id).ok,true);
+  assert.equal(state.name,chosen.name); assert.equal(state.familyName,chosen.familyName);
+  assert.deepEqual(state.stats,chosen.stats); assert.deepEqual(state.aptitudes,chosen.aptitudes);
+  assert.equal(state.gender,chosen.gender); assert.equal(state.money,chosen.money+info.share);
+  assert.deepEqual(state.siblings.map(person=>({id:person.id,money:person.money})),expectedOthers);
+  assert.ok(state.lineage.at(-1).children.every(person=>person.inheritance===info.share));
+  assert.equal(validateSave(state),true);
+  while(state.age<18) advanceYear(state);
+  haveChild(state);
+  const snapshot=copy(state);
+  state.age=65;
+  assert.equal(successionInfo(state).route,'children');
+  assert.equal(succeed(state,state.siblings[0].id).ok,false,'a sibling cannot bypass a surviving child');
+  state.age=snapshot.age;
+});
+
+test('a sibling receives the legacy without becoming a child or duplicating other siblings assets', () => {
+  const state=adult(3102);
+  haveChild(state); advanceYear(state); haveChild(state); advanceYear(state); haveChild(state);
+  while(state.age<65) advanceYear(state);
+  succeed(state,state.children[0].id);
+  while(state.age<65) advanceYear(state);
+  const info=successionInfo(state);
+  assert.equal(info.route,'siblings'); assert.equal(info.candidates.length,2);
+  const chosen=copy(info.candidates[0]), parents=copy(state.parents);
+  const untouched=copy(info.candidates[1]);
+  const retiredId=state.id, familyName=state.familyName;
+  assert.equal(succeed(state,chosen.id).ok,true);
+  assert.equal(state.money,chosen.money+info.estate);
+  assert.equal(state.familyName,familyName);
+  assert.deepEqual(state.parents,parents,'a retired sibling is not the new players parent');
+  assert.deepEqual(state.siblings,[untouched]);
+  assert.ok(!state.siblings.some(person=>person.id===retiredId));
+  assert.equal(state.lineage.at(-1).successor.route,'siblings');
+  assert.equal(validateSave(state),true);
+  while(state.age<65) advanceYear(state);
+  assert.equal(succeed(state,state.siblings[0].id).ok,true);
+  assert.equal(successionInfo(state).route,'beneficiary','retired chapters cannot be selected again');
+  assert.equal(validateSave(state),true);
+});
+
+test('childless retirement offers a stable low-stat beneficiary with a different surname', () => {
+  const state=createGame({surname:'Bennett',seed:3103});
+  while(state.age<65) advanceYear(state);
+  state.money=230000; state.lifestyle=5;
+  const snapshot=copy(state), info=successionInfo(state);
+  assert.equal(info.eligible,true); assert.equal(info.route,'beneficiary');
+  assert.equal(info.candidates.length,1); assert.deepEqual(info.beneficiary,info.candidates[0]);
+  assert.deepEqual(successionInfo(state),info); assert.deepEqual(state,snapshot);
+  const kid=info.beneficiary;
+  assert.notEqual(kid.familyName,state.familyName);
+  assert.ok(kid.age>=6&&kid.age<=12);
+  for(const {key} of SKILLS) assert.ok(kid.stats[key]>=1&&kid.stats[key]<=3);
+  for(const key of ['health','stability']) assert.ok(kid.stats[key]>=2&&kid.stats[key]<=4);
+  const restored=migrateSave(copy(state));
+  assert.deepEqual(successionInfo(restored).beneficiary,kid);
+  assert.equal(succeed(state,kid.id).ok,true);
+  assert.equal(state.id,kid.id); assert.equal(state.familyName,kid.familyName); assert.equal(state.name,kid.name);
+  assert.equal(state.money,info.estate); assert.deepEqual(state.parents,[]); assert.deepEqual(state.siblings,[]);
+  assert.equal(state.lifestyle,lifestyleFromResources(0,info.estate));
+  assert.deepEqual(state.stats,kid.stats); assert.deepEqual(state.education,{status:'school',years:0});
+  assert.equal(validateSave(state),true);
+});
+
+test('retirement gates never mutate state and dead children fall through to the available route', () => {
+  const state=adult(3104);
+  const candidate=successionInfo(state).beneficiary;
+  const snapshot=copy(state);
+  assert.equal(succeed(state,candidate.id).ok,false);
+  assert.deepEqual(state,snapshot);
+  haveChild(state);
+  while(state.age<65) advanceYear(state);
+  state.children[0].alive=false;
+  assert.equal(successionInfo(state).route,'beneficiary');
+  const event=EVENTS.find(event=>!event.subjectType&&event.choices?.length&&event.minAge<=64&&(event.maxAge??85)>=64);
+  state.pendingEvents=[{eventId:event.id,age:65}]; state.lastYearEvents=[event.id];
+  const waiting=copy(state), fallback=successionInfo(state).beneficiary;
+  assert.equal(successionInfo(state).eligible,false);
+  assert.equal(succeed(state,fallback.id).ok,false); assert.deepEqual(state,waiting);
+  resolveEventChoice(state,event.choices[0].id,event.id);
+  assert.equal(succeed(state,fallback.id).ok,true);
+  assert.equal(validateSave(state),true);
+});
+
+test('old childless endings become valid retirement choices without resetting the saved story', () => {
+  const state=createGame({seed:3105});
+  while(state.age<85) advanceYear(state);
+  const previous=copy(state); previous.version=5; previous.ended=true; previous.needsSuccession=false;
+  for(const person of [previous,...previous.parents,...previous.children,...previous.siblings,...previous.lineage,...previous.encounters,previous.partner,previous.pregnancy?.otherParent].filter(Boolean)) delete person.familyName;
+  const migrated=migrateSave(previous);
+  assert.equal(validateSave(migrated),true); assert.equal(migrated.version,6);
+  assert.equal(migrated.ended,false); assert.equal(migrated.needsSuccession,true);
+  for(const key of ['id','name','age','rng','nextId','stats','aptitudes','history','money','education','jobOffers','effects','pendingEvents']) assert.deepEqual(migrated[key],previous[key]);
+  const info=successionInfo(migrated);
+  assert.equal(info.route,'beneficiary'); assert.equal(info.eligible,true);
+  assert.equal(succeed(migrated,info.beneficiary.id).ok,true);
+  assert.equal(validateSave(migrated),true);
+});
+
+test('v5 family migration preserves partnership, pregnancy, offers, and future surname inheritance', () => {
+  const state=coupledLife(3106);
+  state.partner.married=true;
+  while(!state.pregnancy&&state.age<42) advanceYear(state);
+  assert.ok(state.pregnancy);
+  const previous=copy(state); previous.version=5;
+  for(const person of [previous,...previous.parents,...previous.children,...previous.siblings,...previous.lineage,...previous.encounters,previous.partner,previous.pregnancy.otherParent]) delete person.familyName;
+  const migrated=migrateSave(previous);
+  assert.equal(validateSave(migrated),true);
+  for(const key of ['rng','nextId','id','name','age','stats','education','jobOffers','history','pendingEvents']) assert.deepEqual(migrated[key],previous[key]);
+  assert.equal(migrated.partner.id,previous.partner.id); assert.equal(migrated.partner.relationship,previous.partner.relationship);
+  assert.equal(migrated.pregnancy.carrierId,previous.pregnancy.carrierId); assert.equal(migrated.pregnancy.dueAge,previous.pregnancy.dueAge);
+  const familyName=migrated.familyName;
+  advanceYear(migrated);
+  assert.equal(migrated.children.at(-1).familyName,familyName);
+  assert.ok(migrated.children.at(-1).name.endsWith(' '+familyName));
+  assert.equal(validateSave(migrated),true);
 });

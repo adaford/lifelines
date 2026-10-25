@@ -4,8 +4,8 @@ import {
   effectiveStats, eventOdds, stage, migrateSave, chooseEducation,
   offeredJobs, needsEducationChoice, pendingEventSubject,
   relationshipOdds, meetingChances, proposalChance, pregnancyChance, oneNightChance,
-  respondToEncounter, proposeMarriage, endRelationship
-} from './engine.js?v=family-1';
+  respondToEncounter, proposeMarriage, endRelationship, normalizeSurname
+} from './engine.js?v=legacy-1';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const app = document.querySelector('#app');
@@ -17,6 +17,8 @@ let saveAvailable = true;
 let loadNotice = '';
 let modalReturnFocus = null;
 let toastTimer;
+let mustNameFamily = false;
+let modalLocked = false;
 let state = loadGame();
 
 const icons = {
@@ -60,10 +62,12 @@ function loadGame() {
       loadNotice = 'Your saved game could not be read. A fresh life is ready.';
     }
   } catch { saveAvailable = false; loadNotice = 'Browser saving is unavailable. You can still play and export a save.'; }
+  mustNameFamily = true;
   return createGame();
 }
 
 function save() {
+  if (mustNameFamily) return;
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); saveAvailable = true; }
   catch { saveAvailable = false; }
 }
@@ -150,7 +154,7 @@ function effectsView() {
 }
 
 function yearView() {
-  if (needsEducationChoice(state)) return `<section class="panel education-prompt"><div class="panel-heading"><h3>Your next chapter</h3><span class="tag">A NEW CHOICE</span></div><p class="section-description">Go to college, or start working. Choose your path before your next year begins.</p><button class="button primary" data-action="tab" data-tab="career">College or career? ${icon('arrow')}</button></section>${connectionNotice()}${journalView()}`;
+  if (needsEducationChoice(state)) return `<section class="panel education-prompt"><div class="panel-heading"><h3>Your next chapter</h3><span class="tag">A NEW CHOICE</span></div><p class="section-description">Go to college, or start working. Choose your path before your next year begins.</p><button class="button primary" data-action="tab" data-tab="career">College or career? ${icon('arrow')}</button></section>${retirementNotice()}${connectionNotice()}${journalView()}`;
   const baby = state.age < 3;
   const disabled = state.ended || state.needsSuccession || state.pendingEvents.length>0;
   return `${state.education.status==='college'?collegeProgressView():''}<section class="panel focus-panel"><div class="panel-heading"><h3>${baby ? 'Ask for attention' : 'Your focus'}</h3><span class="tag">${baby ? 'AGES 0–2' : `${focusUsed()} / 12 POINTS`}</span></div><p class="section-description">${baby ? 'More attention helps you grow, but strains your parents.' : 'Share 12 points. Each focus takes 0–5.'}</p>
@@ -158,7 +162,7 @@ function yearView() {
     </section>
     ${baby?birthSkillsView():''}
     ${state.effects.length?`<button class="effect-summary button secondary" data-action="tab" data-tab="character">${icon('spark')} ${state.effects.length} active life effect${state.effects.length===1?'':'s'} · View ${icon('arrow')}</button>`:''}
-    ${connectionNotice()}${journalView()}`;
+    ${retirementNotice()}${connectionNotice()}${journalView()}`;
 }
 
 function birthSkillsView() {
@@ -249,18 +253,39 @@ function connectionNotice() {
   return '';
 }
 
-function personCard(person, role, child = false) {
+function retirementNotice() {
+  if (state.age<65 || state.needsSuccession || state.ended) return '';
+  return `<button class="retirement-notice button secondary" data-action="tab" data-tab="family">${icon('family')} Ready for your next chapter? Retire ${icon('arrow')}</button>`;
+}
+
+function retirementView() {
   const info = successionInfo(state);
-  const canSelect = child && info.eligible && info.children.some(c=>c.id===person.id);
-  return `<article class="family-card"><div class="family-header"><div class="family-avatar">${avatar(person,true)}</div><div class="family-meta"><span class="eyebrow">${role}</span><h3>${esc(person.name)}</h3><p>${person.age} years old${person.age>=85?' · Remembered':` · Stability ${number(person.stats.stability)}/10`}</p></div></div><p class="family-lifestyle">Lifestyle <strong>${person.lifestyle}/10</strong>${person.age<18?' · Shares your household':''}</p>${child?relationshipMeter(person):''}<details class="family-details"><summary>Skills & wellbeing</summary>${miniStats(person)}</details>${child?`<div class="family-card-footer"><span>${person.alive!==false?'An equal share of your legacy':'Remembered with love'}</span>${canSelect?`<button class="button primary small" data-action="heir" data-id="${esc(person.id)}">Continue as ${esc(person.name.split(' ')[0])} ${icon('arrow')}</button>`:''}</div>`:''}</article>`;
+  const explain = 'From age 65, retire and continue as any eligible child. If there are no children, choose a sibling. If neither is available, give your legacy to a child from another family and begin their story.';
+  if (state.age<65) return `<section class="panel retirement-panel"><div class="panel-heading"><h3>What carries forward</h3><span class="tag">AGE 65</span></div><p class="section-description">${explain}</p>${lifestyleView()}<p class="form-note">All living children share your inheritance equally, whichever child you play next. Your surname stays in the family through both sons and daughters.</p></section>`;
+  const titles = {children:'Retire into the next generation',siblings:'Keep the story in your family',beneficiary:'A new family, your legacy'};
+  const descriptions = {
+    children:'Choose any eligible child. All living children receive an equal share of the inheritance, including the ones you do not choose.',
+    siblings:'With no eligible children, you can continue as one of your siblings. Your chosen sibling receives the whole inheritance; the others keep their own resources.',
+    beneficiary:'With no eligible children or siblings, give your whole inheritance to this child. They begin with low stats and a different surname.'
+  };
+  return `<section class="panel retirement-panel" data-route="${info.route}"><div class="panel-heading"><h3>${titles[info.route]}</h3><span class="tag">${state.age>=85?'NEXT CHAPTER':'RETIREMENT'}</span></div><p class="section-description">${descriptions[info.route]}</p>${!info.eligible?`<p class="form-note retirement-blocked">${esc(info.reason)}</p>`:''}<div class="heir-list">${info.candidates.map(person=>`<article class="heir-candidate ${info.route==='beneficiary'?'beneficiary-preview':''}" data-person-id="${esc(person.id)}"><div class="family-header"><div class="family-avatar">${avatar(person,true)}</div><div class="family-meta"><span class="eyebrow">${info.route==='children'?'YOUR CHILD':info.route==='siblings'?'YOUR SIBLING':'A NEW BEGINNING'}</span><h3>${esc(person.name)}</h3><p>${person.age} years old · ${esc(person.familyName)} family</p></div></div>${info.route==='beneficiary'?profileStats(person):`<details class="family-details"><summary>Skills & wellbeing</summary>${miniStats(person)}</details>`}<button class="button primary" data-action="heir" data-id="${esc(person.id)}" ${info.eligible?'':'disabled'}>Retire & play as ${esc(person.name.split(' ')[0])} ${icon('arrow')}</button></article>`).join('')}</div><p class="form-note">This closes your current playable chapter. Your heir keeps their own age, stats, and growth affinities. ${info.route==='beneficiary'?'A different surname starts a new family line.':'The family surname stays yours, regardless of gender.'}</p></section>`;
+}
+
+function personCard(person, role, child = false) {
+  return `<article class="family-card"><div class="family-header"><div class="family-avatar">${avatar(person,true)}</div><div class="family-meta"><span class="eyebrow">${role}</span><h3>${esc(person.name)}</h3><p>${person.age} years old${person.age>=85?' · Remembered':` · Stability ${number(person.stats.stability)}/10`}</p></div></div><p class="family-lifestyle">Lifestyle <strong>${person.lifestyle}/10</strong>${person.age<18?' · Family household':''}</p>${child?relationshipMeter(person):''}<details class="family-details"><summary>Skills & wellbeing</summary>${miniStats(person)}</details>${child?`<div class="family-card-footer"><span>${person.alive!==false?'An equal share of your legacy':'Remembered with love'}</span></div>`:''}</article>`;
+}
+
+function parentsView() {
+  if (!state.parents.length) return '';
+  return `<details class="panel roots-panel" ${state.age<18?'open':''}><summary>The people who raised you</summary><p class="section-description">${state.age<3?'Crying brings more attention and more growth. It also lowers both parents’ mental stability.':'Family focus supports your parents and gives your children a stronger start.'}</p><div class="family-grid">${state.parents.map((p,i)=>personCard(p,i===0?'PARENT ONE':'PARENT TWO')).join('')}</div></details>`;
 }
 
 function familyView() {
-  const info = successionInfo(state);
   const childAllowed = !state.pendingEvents.length && state.age>=18 && state.children.length<(state.pregnancy?5:6) && state.lastChildAge!==state.age && !state.ended && !state.needsSuccession;
-  return `${loveView()}<details class="panel roots-panel" ${state.age<18?'open':''}><summary>The people who raised you</summary><p class="section-description">${state.age<3?'Crying brings more attention and more growth. It also lowers both parents’ mental stability.':'Family focus supports your parents and gives your children a stronger start.'}</p><div class="family-grid">${state.parents.map((p,i)=>personCard(p,i===0?'PARENT ONE':'PARENT TWO')).join('')}</div></details>
+  return `${state.age>=65?retirementView():''}${loveView()}${parentsView()}
     <section class="panel"><div class="panel-heading"><h3>The next generation</h3><button class="button secondary small" data-action="child" ${childAllowed?'':'disabled'}>${icon('plus')} Adopt a child</button></div><p class="section-description">${state.age<18?'Parenthood opens at age 18. Until then, there’s a whole childhood to live.':state.lastChildAge===state.age?'A new arrival this year. You can welcome another child next year.':'Welcome up to six children through pregnancy or adoption. Each dependent child costs one lifestyle level; every living child adds a small social boost. Family focus improves their skills and your bond.'}</p>${state.children.length?`<div class="family-grid child-grid">${state.children.map(c=>personCard(c,'YOUR CHILD',true)).join('')}</div>`:`<div class="empty-state">${icon('family')}<h4>A branch yet to grow</h4><p>Your children will appear here. Build their skills,<br>then carry the story forward through them.</p></div>`}</section>
-    <section class="panel"><div class="panel-heading"><h3>What carries forward</h3><span class="tag">YOUR LEGACY</span></div><p class="section-description">You can pass the story to a child at 65; at 85, this chapter closes. Older heirs can adopt to keep the family growing. Your heir keeps their age, skills, and skill affinities.</p>${lifestyleView()}<p class="form-note">Your lifestyle shapes what you leave behind. All living children receive an equal share of the family legacy, helping support their own lifestyle. More children means a smaller share for each.</p>${state.age>=65&&!info.eligible?`<p class="form-note">${esc(info.reason)}</p>`:''}</section>
+    ${state.age<65?retirementView():''}
+    ${state.siblings.length?`<section class="panel"><div class="panel-heading"><h3>Your siblings</h3><span class="tag">FAMILY</span></div><p class="section-description">When you retire without children, an eligible sibling can continue your story.</p><div class="family-grid sibling-grid">${state.siblings.map(person=>personCard(person,'YOUR SIBLING')).join('')}</div></section>`:''}
     ${state.lineage.length?`<section class="panel"><div class="panel-heading"><h3>Those who came before</h3><span class="tag">${state.lineage.length} CHAPTERS</span></div><div class="legacy-list">${state.lineage.map(p=>`<div class="legacy-card"><strong>${esc(p.name)}</strong><span>Generation ${esc(p.generation ?? '—')} · Age ${esc(p.age ?? '—')}</span></div>`).join('')}</div></section>`:''}`;
 }
 
@@ -270,11 +295,11 @@ function characterView() {
 }
 
 function endPanel() {
-  return `<section class="panel"><div class="panel-heading"><h3>A life, fully lived.</h3><span class="tag">AGE ${state.age}</span></div><p class="section-description">${esc(state.name)}’s story has come to a close. There is no eligible child to continue as. Your journal is still here to explore.</p><button class="button primary" data-action="new">Begin another story ${icon('arrow')}</button></section>`;
+  return `<section class="panel"><div class="panel-heading"><h3>A life, fully lived.</h3><span class="tag">AGE ${state.age}</span></div><p class="section-description">${esc(state.name)}’s story has come to a close. Your legacy can continue through a child, sibling, or a child from another family.</p><button class="button primary" data-action="new">Begin another story ${icon('arrow')}</button></section>`;
 }
 
 function successionPanel() {
-  return `<section class="panel"><div class="panel-heading"><h3>The story goes on.</h3><span class="tag">NEXT GENERATION</span></div><p class="section-description">This chapter closes at age 85. Choose a child in Family to inherit their share and continue with the person they’ve become.</p><button class="button primary" data-action="tab" data-tab="family">Choose your heir ${icon('arrow')}</button></section>`;
+  return `<section class="panel"><div class="panel-heading"><h3>The story goes on.</h3><span class="tag">NEXT GENERATION</span></div><p class="section-description">This chapter closes at age 85. Visit Family to choose your next character: a child, a sibling if you have no children, or a child from another family if neither is available.</p><button class="button primary" data-action="tab" data-tab="family">Choose your heir ${icon('arrow')}</button></section>`;
 }
 
 function toast(message, error = false) {
@@ -283,15 +308,17 @@ function toast(message, error = false) {
   toastTimer = setTimeout(()=>{document.querySelector('#toast-root').innerHTML='';},4500);
 }
 
-function openModal(title, body, actions = '') {
+function openModal(title, body, actions = '', locked = false) {
+  modalLocked = locked;
   if (!modalRoot.firstElementChild) modalReturnFocus = document.activeElement;
-  modalRoot.innerHTML = `<div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div class="modal-header"><h2 id="modal-title">${title}</h2><button class="icon-button" data-action="close" aria-label="Close dialog">${icon('close')}</button></div><div class="modal-body">${body}</div>${actions?`<div class="modal-actions">${actions}</div>`:''}</section></div>`;
+  modalRoot.innerHTML = `<div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div class="modal-header"><h2 id="modal-title">${title}</h2>${locked?'':`<button class="icon-button" data-action="close" aria-label="Close dialog">${icon('close')}</button>`}</div><div class="modal-body">${body}</div>${actions?`<div class="modal-actions">${actions}</div>`:''}</section></div>`;
   document.body.style.overflow='hidden';
   app.setAttribute('inert', '');
   (modalRoot.querySelector('input') || modalRoot.querySelector('button'))?.focus();
 }
 
 function closeModal() {
+  if (modalLocked) return;
   modalRoot.innerHTML='';
   document.body.style.overflow='';
   app.removeAttribute('inert');
@@ -300,6 +327,10 @@ function closeModal() {
 
 function menuModal() {
   openModal('Your story', `<div class="menu-list"><button data-action="help">${icon('help')} How to play ${icon('arrow')}</button><button data-action="odds">${icon('spark')} This year’s odds ${icon('arrow')}</button><button data-action="export">${icon('download')} Export save ${icon('arrow')}</button><button data-action="import">${icon('year')} Import save ${icon('arrow')}</button><button data-action="new">${icon('plus')} Start a new life ${icon('arrow')}</button></div><p class="menu-note">${saveAvailable?'Your life saves automatically on this device. Export a backup to move it to another phone.':'Browser saving is unavailable. Export your story before leaving.'}</p>`);
+}
+
+function newLifeModal(initial = false) {
+  openModal(initial?'Name your family.':'Begin a new family?', `<p class="section-description">${initial?'Your story begins with a surname. Sons and daughters will carry it through the generations.':'This starts a new family and replaces your current saved life when you confirm.'}</p><label class="field-label" for="new-surname">Family surname</label><input class="text-input" id="new-surname" maxlength="30" required aria-required="true" placeholder="Your family name" autocomplete="family-name" autocapitalize="words"><p class="form-note">The first letter is capitalized automatically.</p><label class="field-label" for="new-name">First name <span class="muted">(optional)</span></label><input class="text-input" id="new-name" maxlength="19" placeholder="Leave blank for a surprise" autocomplete="given-name" autocapitalize="words"><p class="form-note">You begin at age 0 with randomized parents, stats, and skill affinities.</p>`, `${initial?'':'<button class="button secondary" data-action="close">Keep my story</button>'}<button class="button primary" data-action="confirm-new">Begin this family ${icon('arrow')}</button>`, initial);
 }
 
 function navigate(tab) {
@@ -312,7 +343,7 @@ function navigate(tab) {
 }
 
 function helpModal() {
-  openModal('A life, one year at a time.', `<div class="help-grid"><div class="help-item"><h4>01 · Start small</h4><p>At ages 0–2, cry for extra growth at the cost of your parents’ calm, or stay quiet for gentler development.</p></div><div class="help-item"><h4>02 · Spend your time</h4><p>From age 3, share 12 focus points across school or career, friends, family, and yourself. Each takes 0–5. Press Next year when you’re ready.</p></div><div class="help-item"><h4>03 · Work with your nature</h4><p>Skills range from 1–10. The −3 to +3 rating is growth affinity. Your choices determine where you improve; affinity changes how fast.</p></div><div class="help-item"><h4>04 · Leave room for life</h4><p>There are ${EVENTS.length} possible events. Each has a small, independent yearly chance based on your age, focus, career, and stats. Up to five can happen; ordinary lives average roughly one every year or two. Some events ask you to choose, with consequences shown before you decide.</p></div><div class="help-item"><h4>05 · Find your path</h4><p>At 18, choose a job from 10 offers or attend college for four years. Graduates receive 15 offers. There are 100 careers, each with skill affinities and a base lifestyle from 1 to 10.</p></div><div class="help-item"><h4>06 · Grow a legacy</h4><p>Meet people from 18, build a relationship, and propose once a year. Pregnancy is rare while dating and much more likely in marriage; a baby arrives the following year. Adults can also adopt. Family focus develops children’s skills and strengthens everyone’s bonds. Pass the story on at 65+, or choose an heir when your life closes at 85. All living children share the estate equally.</p></div></div><p class="form-note">This is a first playable framework: fictional annual probabilities, simple careers and family systems, and local browser saves.</p>`, '<button class="button primary" data-action="close">Let’s live a little</button>');
+  openModal('A life, one year at a time.', `<div class="help-grid"><div class="help-item"><h4>01 · Start small</h4><p>At ages 0–2, cry for extra growth at the cost of your parents’ calm, or stay quiet for gentler development.</p></div><div class="help-item"><h4>02 · Spend your time</h4><p>From age 3, share 12 focus points across school or career, friends, family, and yourself. Each takes 0–5. Press Next year when you’re ready.</p></div><div class="help-item"><h4>03 · Work with your nature</h4><p>Skills range from 1–10. The −3 to +3 rating is growth affinity. Your choices determine where you improve; affinity changes how fast.</p></div><div class="help-item"><h4>04 · Leave room for life</h4><p>There are ${EVENTS.length} possible events. Each has a small, independent yearly chance based on your age, focus, career, and stats. Up to five can happen; ordinary lives average roughly one every year or two. Some events ask you to choose, with consequences shown before you decide.</p></div><div class="help-item"><h4>05 · Find your path</h4><p>At 18, choose a job from 10 offers or attend college for four years. Graduates receive 15 offers. There are 100 careers, each with skill affinities and a base lifestyle from 1 to 10.</p></div><div class="help-item"><h4>06 · Grow a legacy</h4><p>Meet people from 18, build a relationship, and propose once a year. Pregnancy is rare while dating and much more likely in marriage; a baby arrives the following year. Adults can also adopt. Family focus develops children’s skills and strengthens everyone’s bonds. Retire from 65 and play as a child. With no children, choose a sibling; with neither, give your legacy to a low-stat child with a different surname. At 85, choose the next chapter. All living children share the inheritance equally.</p></div></div><p class="form-note">This is a first playable framework: fictional annual probabilities, simple careers and family systems, and local browser saves.</p>`, '<button class="button primary" data-action="close">Let’s live a little</button>');
 }
 
 function oddsModal() {
@@ -335,6 +366,7 @@ document.addEventListener('click', event => {
   if (!button || button.disabled) return;
   event.preventDefault();
   const {action} = button.dataset;
+  if (mustNameFamily && action!=='confirm-new') return;
   if (action==='tab') navigate(button.dataset.tab);
   if (action==='menu') menuModal();
   if (action==='review-event') focusEventDecision();
@@ -384,19 +416,24 @@ document.addEventListener('click', event => {
   if (action==='quit') update(()=>quitJob(state),'You’ve made room for a new path.');
   if (action==='child') update(()=>haveChild(state),'Welcome to the family, little one.');
   if (action==='heir') {
-    const child = state.children.find(c=>c.id===button.dataset.id);
     const info = successionInfo(state);
-    openModal('Pass the story forward?', `<p>Continue as <strong>${esc(child.name)}</strong>, age ${child.age}, with their own skills and affinities.</p><p>They’ll receive <strong>an equal share of your family legacy</strong>, alongside ${info.children.length-1} other heir${info.children.length===2?'':'s'}. Their inheritance helps support their lifestyle. This closes ${esc(state.name)}’s playable chapter.</p>`, `<button class="button secondary" data-action="close">Keep living this chapter</button><button class="button primary" data-action="confirm-heir" data-id="${esc(child.id)}">Continue the story ${icon('arrow')}</button>`);
+    const child = info.candidates.find(person=>person.id===button.dataset.id);
+    if (!child || !info.eligible) return;
+    const inheritance = info.route==='children'?'All living children receive equal shares of the inheritance, including those you do not play.':info.route==='siblings'?'With no eligible children, your chosen sibling receives the whole inheritance.':'You give this child the whole inheritance and continue with a different surname: '+esc(child.familyName)+'.';
+    openModal('Retire and continue?', `<p>Play as <strong>${esc(child.name)}</strong>, age ${child.age}, with their own stats and affinities.</p><p>${inheritance}</p><p>This closes ${esc(state.name)}’s playable chapter.</p>`, `<button class="button secondary" data-action="close">Keep living this chapter</button><button class="button primary" data-action="confirm-heir" data-id="${esc(child.id)}">Retire & continue ${icon('arrow')}</button>`);
   }
   if (action==='confirm-heir') { closeModal(); activeTab='year'; update(()=>succeed(state,button.dataset.id),'A new generation. The same story.'); }
   if (action==='history') { showAllHistory=!showAllHistory; render(); }
   if (action==='help') helpModal();
   if (action==='odds') oddsModal();
   if (action==='close') closeModal();
-  if (action==='new') openModal('Every life starts somewhere.', `<p class="section-description">A new person, a new set of possibilities. This replaces your current saved life.</p><label class="field-label" for="new-name">What’s your name?</label><input class="text-input" id="new-name" maxlength="40" placeholder="Leave blank for a surprise" autocomplete="off"><p class="form-note">Your parents, traits, and skill affinities are randomized. You’ll begin at age 0.</p>`, '<button class="button secondary" data-action="close">Keep my story</button><button class="button primary" data-action="confirm-new">Begin a life '+icon('arrow')+'</button>');
+  if (action==='new') newLifeModal();
   if (action==='confirm-new') {
-    const name = modalRoot.querySelector('#new-name').value.trim();
-    state = createGame(name?{name}:{}); activeTab='year'; showAllHistory=false; closeModal(); save(); render(); toast('Welcome to the world.');
+    const surname=normalizeSurname(modalRoot.querySelector('#new-surname').value);
+    const firstName=modalRoot.querySelector('#new-name').value.trim();
+    if (!surname) { modalRoot.querySelector('#new-surname').setAttribute('aria-invalid','true'); modalRoot.querySelector('#new-surname').focus(); toast('Enter a family surname to begin.',true); return; }
+    state=createGame({surname,firstName}); mustNameFamily=false; modalLocked=false;
+    activeTab='year'; showAllHistory=false; encounterIndex=0; closeModal(); save(); render(); toast('Welcome to the '+state.familyName+' family.');
   }
   if (action==='export') {
     closeModal();
@@ -412,6 +449,7 @@ document.addEventListener('click', event => {
 });
 
 document.addEventListener('change', async event => {
+  if (event.target.id==='new-surname') { event.target.value=normalizeSurname(event.target.value); event.target.removeAttribute('aria-invalid'); return; }
   if (event.target.id!=='import-file') return;
   const file = event.target.files[0]; if (!file) return;
   if (file.size>2_000_000) { toast('That save is too large. Choose a Lifelines JSON export.',true); return; }
@@ -426,7 +464,7 @@ document.addEventListener('change', async event => {
 document.addEventListener('keydown', event => {
   if (!modalRoot.firstElementChild) return;
   if (event.key==='Escape') closeModal();
-  if (event.key==='Enter' && event.target.id==='new-name') modalRoot.querySelector('[data-action="confirm-new"]')?.click();
+  if (event.key==='Enter' && ['new-name','new-surname'].includes(event.target.id)) modalRoot.querySelector('[data-action="confirm-new"]')?.click();
   if (event.key==='Tab') {
     const items = [...modalRoot.querySelectorAll('button:not(:disabled),input,a[href]')];
     const first = items[0], last = items.at(-1);
@@ -437,4 +475,5 @@ document.addEventListener('keydown', event => {
 
 save();
 render();
+if (mustNameFamily) newLifeModal(true);
 if (loadNotice) toast(loadNotice,true);

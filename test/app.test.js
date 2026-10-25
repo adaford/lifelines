@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { afterEach, describe, test } from 'node:test';
 import { parseHTML } from 'linkedom';
-import { SKILLS, JOBS, EVENTS, resolveEventChoice, eventOdds, canTakeJob, chooseEducation, offeredJobs, needsEducationChoice, createGame, advanceYear, haveChild, takeJob, successionInfo, validateSave, respondToEncounter, proposeMarriage, effectiveStats, relationshipOdds, proposalChance } from '../engine.js';
+import { SKILLS, JOBS, EVENTS, resolveEventChoice, eventOdds, canTakeJob, chooseEducation, offeredJobs, needsEducationChoice, createGame, advanceYear, haveChild, takeJob, successionInfo, succeed, validateSave, respondToEncounter, proposeMarriage, effectiveStats, relationshipOdds, proposalChance } from '../engine.js';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
@@ -13,6 +13,151 @@ const nativeClearTimeout = globalThis.clearTimeout;
 const originalGlobals = new Map(['document', 'window', 'localStorage', 'setTimeout'].map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
 const timers = new Set();
 let importId = 0;
+
+test('first launch requires a surname, capitalizes its first letter, and preserves multiword names', async () => {
+  let ui=await mount(null);
+  assert.equal(ui.storage.has(SAVE_KEY),false,'an unnamed provisional life must not overwrite storage');
+  assert.ok(ui.query('#new-surname').hasAttribute('required'));
+  assert.equal(ui.all('.modal [data-action="close"]').length,0);
+  ui.key('#new-surname','Escape');
+  assert.equal(ui.all('[role="dialog"]').length,1,'the surname prompt cannot be dismissed on first launch');
+  ui.query('#new-surname').value='   ';
+  ui.click('[data-action="confirm-new"]');
+  assert.equal(ui.storage.has(SAVE_KEY),false);
+  assert.equal(ui.all('[role="dialog"]').length,1);
+  ui.query('#new-surname').value='  van buren  ';
+  ui.query('#new-name').value='Alex';
+  ui.click('[data-action="confirm-new"]');
+  const saved=ui.saved();
+  assert.equal(saved.familyName,'Van buren');
+  assert.equal(saved.name,'Alex Van buren');
+  assert.ok(saved.parents.every(parent=>parent.name.endsWith(' Van buren')));
+  assert.equal(validateSave(saved),true);
+  assert.equal(ui.all('[role="dialog"]').length,0);
+  assert.equal(ui.query('#app').hasAttribute('inert'),false);
+  ui=await mount(saved);
+  assert.deepEqual(ui.saved(),saved);
+  assert.equal(ui.all('#new-surname').length,0,'an existing family must not be asked to start over');
+});
+
+test('a blank surname cannot replace an existing life', async () => {
+  const fixture=ageTo(createGame({name:'Riley Reed',seed:2091}),20);
+  const ui=await mount(fixture);
+  ui.click('[data-action="menu"]'); ui.click('.menu-list [data-action="new"]');
+  ui.query('#new-surname').value='';
+  ui.query('#new-name').value='Jamie';
+  ui.click('[data-action="confirm-new"]');
+  assert.deepEqual(ui.saved(),fixture);
+  assert.equal(ui.all('[role="dialog"]').length,1);
+  ui.click('.modal [data-action="close"]');
+  assert.deepEqual(ui.saved(),fixture);
+});
+
+function siblingRetirementFixture() {
+  const state=ageTo(createGame({surname:'rivera',firstName:'Alex',seed:2092}),18);
+  assert.equal(haveChild(state).ok,true);
+  ageTo(state,19); assert.equal(haveChild(state).ok,true);
+  ageTo(state,65);
+  assert.equal(succeed(state,state.children[0].id).ok,true);
+  ageTo(state,65);
+  state.money=51001; state.lifestyle=5;
+  assert.equal(validateSave(state),true);
+  assert.equal(successionInfo(state).route,'siblings');
+  return state;
+}
+
+test('retirement can continue as a sibling while preserving actual parents and the family name', async () => {
+  const fixture=siblingRetirementFixture();
+  const parents=structuredClone(fixture.parents);
+  const info=successionInfo(fixture), selected=info.candidates[0];
+  const ui=await mount(fixture);
+  assert.ok(ui.query('.retirement-notice'));
+  ui.click('.retirement-notice');
+  assert.match(ui.query('.retirement-panel').textContent,/sibling/i);
+  assert.ok(ui.query('.sibling-grid'));
+  ui.click(`[data-action="heir"][data-id="${selected.id}"]`);
+  assert.equal(ui.saved().id,fixture.id);
+  assertNoMoneyDisplay(ui.query('.modal'),'sibling retirement confirmation');
+  ui.click('[data-action="confirm-heir"]');
+  const next=ui.saved();
+  assert.equal(next.id,selected.id);
+  assert.equal(next.name,selected.name);
+  assert.equal(next.familyName,fixture.familyName);
+  assert.equal(next.money,selected.money+info.estate);
+  assert.deepEqual(next.parents,parents,'a retired sibling must not become the new player’s parent');
+  assert.ok(!next.parents.some(parent=>parent.id===fixture.id));
+  assert.equal(validateSave(next),true);
+});
+
+test('children have priority over siblings and male and female heirs keep the typed surname', async () => {
+  const fixture=siblingRetirementFixture();
+  assert.equal(haveChild(fixture).ok,true);
+  const child=fixture.children[0];
+  for(const gender of ['male','female']) {
+    const branch=structuredClone(fixture);
+    Object.assign(branch.children[0],{gender,canGestate:gender==='female',attractedTo:[gender==='female'?'male':'female']});
+    const ui=await mount(branch);
+    ui.click('.nav-list [data-tab="family"]');
+    const info=successionInfo(branch);
+    assert.equal(info.route,'children');
+    assert.deepEqual(ui.all('.retirement-panel .heir-candidate').map(card=>card.dataset.personId),[child.id]);
+    assert.equal(ui.all(`[data-action="heir"][data-id="${branch.siblings[0].id}"]`).length,0);
+    ui.click(`[data-action="heir"][data-id="${child.id}"]`);
+    ui.click('[data-action="confirm-heir"]');
+    assert.equal(ui.saved().gender,gender);
+    assert.equal(ui.saved().familyName,'Rivera');
+    assert.ok(ui.saved().name.endsWith(' Rivera'));
+    assert.equal(validateSave(ui.saved()),true);
+  }
+});
+
+test('a childless retirement previews one stable low-stat beneficiary with a different surname', async () => {
+  const fixture=ageTo(createGame({surname:'reed',firstName:'Sam',seed:2093}),65);
+  fixture.money=82000; fixture.lifestyle=4;
+  const info=successionInfo(fixture), candidate=info.candidates[0];
+  assert.equal(info.route,'beneficiary');
+  assert.notEqual(candidate.familyName.toLowerCase(),fixture.familyName.toLowerCase());
+  for(const skill of SKILLS) assert.ok(candidate.stats[skill.key]<=3);
+  let ui=await mount(fixture);
+  ui.click('.retirement-notice');
+  assert.match(ui.query('.beneficiary-preview').textContent,new RegExp(candidate.name));
+  for(const skill of SKILLS) assert.match(ui.query('.beneficiary-preview').textContent,new RegExp(skill.label));
+  assert.deepEqual(ui.saved(),fixture,'previewing a beneficiary must not reroll or spend the legacy');
+  ui=await mount(ui.saved()); ui.click('.nav-list [data-tab="family"]');
+  assert.equal(ui.query('.beneficiary-preview').dataset.personId,candidate.id);
+  ui.click(`[data-action="heir"][data-id="${candidate.id}"]`);
+  assertNoMoneyDisplay(ui.query('.modal'),'beneficiary confirmation');
+  assert.equal(ui.saved().familyName,fixture.familyName);
+  ui.click('[data-action="confirm-heir"]');
+  const next=ui.saved();
+  assert.equal(next.id,candidate.id);
+  assert.equal(next.name,candidate.name);
+  assert.equal(next.familyName,candidate.familyName);
+  assert.deepEqual(next.stats,candidate.stats);
+  assert.equal(next.money,candidate.money+info.estate);
+  assert.equal(next.needsSuccession,false);
+  assert.equal(validateSave(next),true);
+});
+
+test('a previously finished v5 childless life can continue through a beneficiary at age85', async () => {
+  const old=ageTo(createGame({name:'Morgan Brooks',seed:2094}),85);
+  old.version=5; old.ended=true; old.needsSuccession=false;
+  for(const person of [old,...old.parents,...old.children,...old.siblings,...old.lineage]) delete person.familyName;
+  const ui=await mount(old);
+  assert.equal(ui.saved().age,85);
+  assert.equal(ui.saved().ended,false);
+  assert.equal(ui.saved().needsSuccession,true);
+  assert.equal(ui.all('[data-action="advance"]').length,0);
+  assert.match(ui.query('.bottom-dock .advance-button').textContent,/Choose your heir/i);
+  ui.click('.bottom-dock .advance-button');
+  const candidate=successionInfo(ui.saved()).candidates[0];
+  assert.ok(ui.query('.beneficiary-preview'));
+  ui.click(`[data-action="heir"][data-id="${candidate.id}"]`);
+  ui.click('[data-action="confirm-heir"]');
+  assert.equal(ui.saved().id,candidate.id);
+  assert.equal(validateSave(ui.saved()),true);
+  assert.equal(ui.all('.bottom-dock [data-action="advance"]').length,1);
+});
 
 test('event decisions show consequences, block time, and persist across navigation and reloads', async () => {
   const fixture = pendingFixture(2);
@@ -137,7 +282,7 @@ function beforeFamilySave(state) {
   const old=structuredClone(state);old.version=4;
   for(const key of ['partner','encounters','encounterYear','pregnancy']) delete old[key];
   for(const person of [old,...old.parents,...old.children,...old.siblings,...old.lineage]) {
-    for(const key of ['gender','canGestate','attractedTo','appearancePeakAge','relationship']) delete person[key];
+    for(const key of ['gender','canGestate','attractedTo','appearancePeakAge','relationship','familyName']) delete person[key];
   }
   return old;
 }
@@ -252,6 +397,11 @@ async function mount(initial = createGame({ name: 'Jamie Reed', seed: 121 })) {
     click: selector => {
       const element = query(selector);
       element.dispatchEvent(new window.Event('click', { bubbles: true, cancelable: true }));
+    },
+    key: (selector, key) => {
+      const event = new window.Event('keydown', {bubbles:true,cancelable:true});
+      Object.defineProperty(event,'key',{value:key});
+      query(selector).dispatchEvent(event);
     },
     change: async (selector, file) => {
       const element = query(selector);
@@ -455,8 +605,8 @@ describe('Dating and family DOM integration', {concurrency:false},()=>{
     const fixture=pendingFixture(2),legacy=beforeFamilySave(fixture);
     let ui=await mount(legacy);
     const restored=ui.saved();
-    assert.equal(restored.version,5);
-    for(const key of ['id','name','age','rng','nextId','education','jobOffers','stats','aptitudes','history','pendingEvents','lastYearEvents']) assert.deepEqual(restored[key],fixture[key],`${key} must survive migration`);
+    assert.equal(restored.version,fixture.version);
+    for(const key of ['id','name','familyName','age','rng','nextId','education','jobOffers','stats','aptitudes','history','pendingEvents','lastYearEvents']) assert.deepEqual(restored[key],fixture[key],`${key} must survive migration`);
     assert.equal(restored.partner,null);assert.deepEqual(restored.encounters,[]);
     assert.equal(ui.query('.event-decision').dataset.eventId,fixture.pendingEvents[0].eventId);
     assert.equal(validateSave(restored),true);
@@ -515,6 +665,7 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     ui.click('.menu-list [data-action="new"]');
     assert.equal(ui.all('[role="dialog"]').length, 1, 'a new-life prompt must replace the utility sheet');
     assert.ok(ui.query('#new-name'));
+    assert.ok(ui.query('#new-surname'));
     assert.ok(ui.query('[data-action="confirm-new"]'));
     assert.deepEqual(ui.saved(), originalSave, 'opening the restart prompt must not discard progress');
     ui.click('.modal [data-action="close"]');
@@ -717,13 +868,16 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     const ui = await mount(ageTo(createGame({ seed: 98 }), 7));
     ui.click('[data-action="menu"]');
     ui.click('.menu-list [data-action="new"]');
-    const chosenName = '<img src=x onerror=1> & Lee';
+    const chosenName = '<img>';
+    const fullName = '<img> Reed';
+    ui.query('#new-surname').value = 'reed';
     ui.query('#new-name').value = chosenName;
     ui.click('[data-action="confirm-new"]');
-    assert.equal(ui.saved().name, chosenName);
+    assert.equal(ui.saved().name, fullName);
+    assert.equal(ui.saved().familyName, 'Reed');
     assert.equal(ui.saved().age, 0);
     assert.equal(ui.saved().generation, 1);
-    assert.equal(ui.query('.person-name').textContent, chosenName);
+    assert.equal(ui.query('.person-name').textContent, fullName);
     assert.equal(ui.all('#app img').length, 0, 'name must never become executable HTML');
     assert.equal(ui.all('[role="dialog"]').length, 0);
     assert.equal(validateSave(ui.saved()), true);
@@ -997,12 +1151,17 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     assert.equal(ui.all('[role="dialog"]').length, 0);
   });
 
-  test('a malformed saved life recovers into a playable new game', async () => {
-    const ui = await mount('{"version":1,"age":10}');
+  test('a malformed saved life asks for a surname before replacing the unreadable save', async () => {
+    const unreadable='{"version":1,"age":10}';
+    const ui = await mount(unreadable);
+    assert.equal(ui.storage.get(SAVE_KEY), unreadable);
+    assert.ok(ui.query('#new-surname'));
+    assert.match(ui.query('#toast-root').textContent, /could not be read/);
+    ui.query('#new-surname').value='newman';
+    ui.click('[data-action="confirm-new"]');
     assert.equal(validateSave(ui.saved()), true);
     assert.equal(ui.saved().age, 0);
     assert.equal(ui.query('[data-action="advance"]').disabled, false);
-    assert.match(ui.query('#toast-root').textContent, /could not be read/);
     ui.click('[data-action="advance"]');
     resolveUIEvents(ui);
     assert.equal(ui.saved().age, 1);
