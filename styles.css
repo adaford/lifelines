@@ -218,6 +218,15 @@ button svg { pointer-events: none; }
 .job-actions { margin-top: 13px; }
 .job-actions .button { width: 100%; }
 .job-actions > .muted { display: block; margin-top: 7px; font-size: 12px; }
+.career-offer-heading { margin-top: 24px; }
+.job-lifestyle { flex-shrink: 0; color: var(--green); font-size: 17px; font-weight: 650; }
+.job-lifestyle small { color: var(--muted); font-size: 12px; font-weight: 400; }
+.job-affinities { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 15px; }
+.job-affinity { display: inline-flex; align-items: center; gap: 6px; background: #eaf0e3; border-radius: 6px; color: #5a704e; padding: 6px 8px; font-size: 12px; }
+.job-affinity strong { color: var(--green); }
+.current-role { align-self: flex-start; margin-top: 7px; }
+.education-choice > .button, .education-prompt > .button { width: 100%; }
+.college-progress .budget-track { margin-top: 0; height: 8px; }
 .family-card { min-width: 0; padding: 15px; border: 1px solid var(--line); border-radius: 11px; background: #f8faf2; }
 .family-header { display: flex; align-items: center; gap: 11px; margin-bottom: 16px; }
 .family-avatar { flex: 0 0 44px; width: 44px; height: 44px; border-radius: 50%; overflow: hidden; background: #e5e9db; }

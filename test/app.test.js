@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { afterEach, describe, test } from 'node:test';
 import { parseHTML } from 'linkedom';
-import { SKILLS, createGame, advanceYear, haveChild, takeJob, successionInfo, validateSave } from '../engine.js';
+import { SKILLS, JOBS, canTakeJob, chooseEducation, offeredJobs, needsEducationChoice, createGame, advanceYear, haveChild, takeJob, successionInfo, validateSave } from '../engine.js';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
@@ -15,9 +15,43 @@ const timers = new Set();
 let importId = 0;
 
 function ageTo(state, age) {
-  while (state.age < age) assert.equal(advanceYear(state).ok, true);
+  while (state.age < age) {
+    if (needsEducationChoice(state)) assert.equal(chooseEducation(state, 'work').ok, true);
+    assert.equal(advanceYear(state).ok, true);
+  }
   assert.equal(validateSave(state), true, 'fixture must be a valid loadable save');
   return state;
+}
+
+function startOfferedJob(state) {
+  const job = offeredJobs(state).find(candidate => canTakeJob(state, candidate).ok);
+  assert.ok(job, 'fixture must have a reachable offered career');
+  assert.equal(takeJob(state, job.id).ok, true);
+  return job;
+}
+
+function assertCareerOffers(ui, count) {
+  const cards = ui.all('.job-card');
+  assert.equal(cards.length, count);
+  assert.equal(new Set(cards.map(card => card.dataset.jobId)).size, count);
+  assert.deepEqual(cards.map(card => card.dataset.jobId), offeredJobs(ui.saved()).map(job => job.id));
+  for (const card of cards) {
+    const job = JOBS.find(candidate => candidate.id === card.dataset.jobId);
+    assert.ok(job, 'every offered career belongs to the catalog');
+    assert.equal(card.querySelector('h3').textContent.trim(), job.name);
+    const lifestyle = card.querySelector('.job-lifestyle');
+    assert.ok(lifestyle, 'every role must show its lifestyle, including the selected role');
+    assert.match(lifestyle.textContent, new RegExp(`${job.baseLifestyle}\\s*\\/\\s*10`));
+    const affinities = [...card.querySelectorAll('.job-affinities .job-affinity')];
+    assert.equal(affinities.length, Object.keys(job.affinities).length);
+    for (const [key, affinity] of Object.entries(job.affinities)) {
+      const badge = affinities.find(element => element.dataset.skill === key);
+      assert.ok(badge, `${job.name} must display its ${key} affinity`);
+      assert.match(badge.textContent, new RegExp(SKILLS.find(skill => skill.key === key).label));
+      assert.match(badge.textContent, new RegExp(`\\+${affinity}\\b`));
+    }
+    assertNoMoneyDisplay(card, job.name);
+  }
 }
 
 function assertNoMoneyDisplay(element, context) {
@@ -31,6 +65,8 @@ function assertNoMoneyDisplay(element, context) {
 function legacySave(state) {
   const legacy = structuredClone(state);
   legacy.version = 1;
+  delete legacy.education;
+  delete legacy.jobOffers;
   for (const person of [legacy, ...legacy.parents, ...legacy.children, ...legacy.siblings, ...legacy.lineage]) {
     person.stats.instability = Math.round((11 - person.stats.stability) * 100) / 100;
     delete person.stats.stability;
@@ -264,7 +300,7 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
 
   test('an existing v1 life upgrades its stability without resetting progress', async () => {
     const fixture = ageTo(createGame({ name: 'Jordan Chen', seed: 213 }), 28);
-    assert.equal(takeJob(fixture, 'retail').ok, true);
+    startOfferedJob(fixture);
     assert.equal(haveChild(fixture).ok, true);
     advanceYear(fixture);
     fixture.focus = { work: 4, social: 2, family: 3, self: 3 };
@@ -274,7 +310,7 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     assert.ok('instability' in legacy.stats);
     const ui = await mount(legacy);
     const restored = ui.saved();
-    assert.equal(restored.version, 2);
+    assert.equal(restored.version, fixture.version);
     for (const key of ['id', 'name', 'age', 'generation', 'rng', 'nextId', 'jobId', 'jobYears', 'money']) {
       assert.equal(restored[key], fixture[key], `${key} must survive upgrading an existing save`);
     }
@@ -308,7 +344,7 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     assert.match(ui.query('.modal-body').textContent, /Ellis Brooks/);
     ui.click('#restore-save');
     const restored = ui.saved();
-    assert.equal(restored.version, 2);
+    assert.equal(restored.version, incoming.version);
     assert.equal(restored.name, incoming.name);
     assert.equal(restored.age, incoming.age);
     assert.equal(restored.stats.stability, 6.25);
@@ -319,11 +355,11 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     assert.equal(ui.all('[role="dialog"]').length, 0);
   });
 
-  test('all sections render, childhood careers stay locked, and dialogs close', async () => {
+  test('all sections render, childhood has no career offers, and dialogs close', async () => {
     const ui = await mount();
     ui.click('[data-action="tab"][data-tab="career"]');
-    assert.equal(ui.all('.job-card').length, 10);
-    assert.ok(ui.all('[data-action="job"]').every(button => button.disabled));
+    assert.equal(ui.all('.job-card').length, 0, 'career offers begin at adulthood');
+    assert.equal(ui.all('[data-action="job"]').length, 0);
     ui.click('[data-action="tab"][data-tab="family"]');
     assert.equal(ui.all('.family-card').length, 2);
     assert.equal(ui.query('[data-action="child"]').disabled, true);
@@ -362,11 +398,15 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
   test('an adult can choose a job, earn income, and welcome one child per year', async () => {
     const ui = await mount(ageTo(createGame({ name: 'Morgan Park', seed: 76 }), 18));
     ui.click('[data-action="tab"][data-tab="career"]');
-    const retail = '[data-action="job"][data-id="retail"]';
-    assert.equal(ui.query(retail).disabled, false);
-    ui.click(retail);
-    assert.equal(ui.saved().jobId, 'retail');
-    assert.equal(ui.query(retail).disabled, true);
+    const offered = ui.all('[data-action="job"]').find(button => !button.disabled);
+    assert.ok(offered, 'a new adult must have at least one reachable career');
+    const jobId = offered.dataset.id;
+    const jobButton = `[data-action="job"][data-id="${jobId}"]`;
+    ui.click(jobButton);
+    assert.equal(ui.saved().jobId, jobId);
+    assert.equal(ui.saved().education.status, 'workforce');
+    assert.equal(ui.query(jobButton).disabled, true);
+    assertCareerOffers(ui, 10);
     ui.click('[data-action="tab"][data-tab="year"]');
     ui.click('[data-action="advance"]');
     assert.equal(ui.saved().age, 19);
@@ -383,10 +423,105 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     assert.equal(validateSave(ui.saved()), true);
   });
 
+  test('turning eighteen requires a choice between college and ten personal career offers', async () => {
+    const ui = await mount(ageTo(createGame({ name: 'Rowan Ellis', seed: 216 }), 17));
+    ui.click('.bottom-dock [data-action="advance"]');
+    assert.equal(ui.saved().age, 18);
+    assert.equal(ui.saved().education.status, 'undecided');
+    assert.equal(ui.all('[data-action="advance"]').length, 0, 'the next year must wait for a path');
+    assert.match(ui.query('.bottom-dock .advance-button').textContent, /Choose your path/i);
+    assert.match(ui.query('#main-content').textContent, /college/i);
+    const beforeNavigation = ui.saved();
+    ui.click('.bottom-dock .advance-button');
+    assert.equal(ui.query('.nav-list [data-tab="career"]').getAttribute('aria-current'), 'page');
+    assert.deepEqual(ui.saved(), beforeNavigation, 'opening the choices must preserve the life');
+    assert.ok(ui.query('.education-choice [data-action="education"][data-path="college"]'));
+    assert.equal(ui.all('[data-action="education"][data-path="work"]').length, 0, 'starting work means choosing an actual offered job');
+    assert.equal(ui.all('#career-search, #career-category, [data-action="career-more"]').length, 0, 'the shortlist is the complete choice screen');
+    assertCareerOffers(ui, 10);
+    assertNoMoneyDisplay(ui.query('#app'), 'the college or career decision');
+    ui.click('.nav-list [data-tab="year"]');
+    assert.equal(ui.all('[data-action="advance"]').length, 0, 'changing tabs must not bypass the decision');
+    assert.equal(ui.saved().age, 18);
+  });
+
+  test('four college years persist across reloads and unlock fifteen career offers', async () => {
+    let ui = await mount(ageTo(createGame({ name: 'Avery Vale', seed: 217 }), 18));
+    ui.click('.nav-list [data-tab="career"]');
+    assertCareerOffers(ui, 10);
+    ui.click('[data-action="education"][data-path="college"]');
+    assert.equal(ui.saved().age, 18, 'enrolling does not spend a year');
+    assert.deepEqual(ui.saved().education, { status: 'college', years: 0 });
+    assert.equal(ui.saved().jobId, null);
+    assert.equal(ui.all('.job-card').length, 0, 'college students cannot choose a full-time career');
+    assert.match(ui.query('.college-progress').textContent, /0\s*\/\s*4/);
+    assertNoMoneyDisplay(ui.query('#app'), 'college progress');
+    for (let year = 1; year <= 4; year += 1) {
+      ui.click('.nav-list [data-tab="year"]');
+      assert.match(ui.query('.focus-row').textContent, /College/);
+      ui.click('.bottom-dock [data-action="advance"]');
+      assert.equal(ui.saved().age, 18 + year);
+      assert.equal(ui.saved().education.years, year);
+      assert.equal(validateSave(ui.saved()), true);
+      ui.click('.nav-list [data-tab="career"]');
+      if (year < 4) {
+        assert.equal(ui.saved().education.status, 'college');
+        assert.equal(ui.all('.job-card').length, 0);
+        assert.match(ui.query('.college-progress').textContent, new RegExp(`${year}\\s*\\/\\s*4`));
+      } else {
+        assert.equal(ui.saved().education.status, 'graduate');
+        assertCareerOffers(ui, 15);
+      }
+      if (year === 2) {
+        const persisted = ui.saved();
+        ui = await mount(persisted);
+        assert.deepEqual(ui.saved(), persisted, 'reloading must preserve the exact college progress');
+      }
+    }
+    const graduate = ui.saved();
+    ui = await mount(graduate);
+    ui.click('.nav-list [data-tab="career"]');
+    assertCareerOffers(ui, 15);
+    assert.deepEqual(ui.saved().jobOffers, graduate.jobOffers, 'reloading must not reroll the graduate shortlist');
+    const choice = ui.all('[data-action="job"]').find(button => !button.disabled);
+    assert.ok(choice, 'a graduate must have an attainable offered role');
+    ui.click(`[data-action="job"][data-id="${choice.dataset.id}"]`);
+    assert.equal(ui.saved().education.status, 'graduate', 'taking a role must preserve graduation');
+    assert.equal(ui.saved().jobId, choice.dataset.id);
+    assertCareerOffers(ui, 15);
+    assertNoMoneyDisplay(ui.query('#app'), 'a graduate career');
+  });
+
+  test('an existing v2 career survives the education update without reopening the age-eighteen decision', async () => {
+    const fixture = ageTo(createGame({ name: 'Emery Quinn', seed: 218 }), 29);
+    startOfferedJob(fixture);
+    assert.equal(advanceYear(fixture).ok, true);
+    const legacy = structuredClone(fixture);
+    legacy.version = 2;
+    delete legacy.education;
+    delete legacy.jobOffers;
+    const ui = await mount(legacy);
+    const restored = ui.saved();
+    assert.equal(restored.version, fixture.version);
+    assert.equal(restored.education.status, 'workforce');
+    for (const key of ['id', 'name', 'age', 'rng', 'jobId', 'jobYears', 'money', 'lifestyle']) {
+      assert.equal(restored[key], fixture[key], `${key} must survive the education migration`);
+    }
+    assert.deepEqual(restored.stats, fixture.stats);
+    assert.deepEqual(restored.history, fixture.history);
+    assert.equal(validateSave(restored), true);
+    assert.equal(ui.all('.bottom-dock [data-action="advance"]').length, 1);
+    ui.click('.nav-list [data-tab="career"]');
+    assertCareerOffers(ui, 10);
+    assert.ok(ui.query(`.job-card[data-job-id="${fixture.jobId}"]`), 'an existing career stays in the shortlist');
+    assert.equal(ui.query(`[data-action="job"][data-id="${fixture.jobId}"]`).disabled, true);
+    assert.equal(ui.all('[data-action="education"]').length, 0);
+  });
+
   test('choosing an heir requires confirmation and transfers skills and an equal share', async () => {
     const elder = ageTo(createGame({ name: 'Alex Bennett', seed: 55 }), 18);
     assert.equal(haveChild(elder).ok, true);
-    advanceYear(elder);
+    ageTo(elder, 19);
     assert.equal(haveChild(elder).ok, true);
     ageTo(elder, 65);
     elder.money = 100000;
@@ -448,13 +583,15 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     assert.equal(ui.saved().name, child.name);
     assert.equal(ui.saved().age, child.age);
     assert.equal(ui.saved().needsSuccession, false);
-    assert.equal(ui.all('.bottom-dock [data-action="advance"]').length, 1);
+    assert.equal(ui.saved().education.status, 'undecided', 'an adult heir gets their own college or career decision');
+    assert.equal(ui.all('.bottom-dock [data-action="advance"]').length, 0);
+    assert.match(ui.query('.bottom-dock .advance-button').textContent, /Choose your path/i);
     assert.equal(ui.query('#app').hasAttribute('inert'), false);
   });
 
   test('all views and succession show lifestyle without money or annual cash-flow metrics', async () => {
     const elder = ageTo(createGame({ name: 'Robin Reed', seed: 47 }), 18);
-    assert.equal(takeJob(elder, 'retail').ok, true);
+    startOfferedJob(elder);
     assert.equal(haveChild(elder).ok, true);
     ageTo(elder, 65);
     elder.money = 125000;

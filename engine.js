@@ -1,5 +1,7 @@
 // Lifelines: deterministic, browser-independent simulation rules.
 // All public actions mutate their state and return { ok, reason? }.
+import { JOBS } from './jobs.js?v=careers-100';
+export { JOBS, JOB_CATEGORIES } from './jobs.js?v=careers-100';
 
 export const SKILLS = [
   { key: 'intelligence', label: 'Intelligence', color: '#9cb9ff' },
@@ -19,19 +21,6 @@ const round = n => Math.round(n * 100) / 100;
 const ok = () => ({ ok: true });
 const fail = reason => ({ ok: false, reason });
 const clone = value => JSON.parse(JSON.stringify(value));
-
-export const JOBS = [
-  { id: 'retail', name: 'Retail associate', description: 'Read people, stay organized, and build a reliable start.', baseSalary: 29000, minAge: 18, weights: { social: .65, discipline: .35 }, requirements: {} },
-  { id: 'chef', name: 'Chef', description: 'Turn creativity and steady hands into a busy kitchen career.', baseSalary: 42000, minAge: 18, weights: { creativity: .5, discipline: .3, strength: .2 }, requirements: { creativity: 3 } },
-  { id: 'builder', name: 'Construction worker', description: 'Physical strength and discipline make demanding work pay.', baseSalary: 46000, minAge: 18, weights: { strength: .7, discipline: .3 }, requirements: { strength: 3 } },
-  { id: 'designer', name: 'Designer', description: 'Create useful, beautiful things and explain why they matter.', baseSalary: 58000, minAge: 18, weights: { creativity: .65, intelligence: .2, social: .15 }, requirements: { creativity: 4 } },
-  { id: 'sales', name: 'Sales representative', description: 'Confidence, connection, and presentation open doors.', baseSalary: 54000, minAge: 18, weights: { social: .6, attractiveness: .25, discipline: .15 }, requirements: { social: 4 } },
-  { id: 'athlete', name: 'Professional athlete', description: 'Build a career around physical ability and consistent practice.', baseSalary: 75000, minAge: 18, weights: { strength: .65, discipline: .25, attractiveness: .1 }, requirements: { strength: 6, discipline: 4 } },
-  { id: 'teacher', name: 'Teacher', description: 'Make difficult ideas feel possible for the next generation.', baseSalary: 52000, minAge: 21, weights: { intelligence: .45, social: .35, discipline: .2 }, requirements: { intelligence: 4, social: 4 } },
-  { id: 'engineer', name: 'Software engineer', description: 'Solve complicated problems with patience and imagination.', baseSalary: 88000, minAge: 21, weights: { intelligence: .65, discipline: .25, creativity: .1 }, requirements: { intelligence: 6, discipline: 4 } },
-  { id: 'performer', name: 'Performer', description: 'Make an impression with creativity, presence, and connection.', baseSalary: 68000, minAge: 18, weights: { creativity: .4, attractiveness: .35, social: .25 }, requirements: { creativity: 5, attractiveness: 4 } },
-  { id: 'doctor', name: 'Doctor', description: 'Careful thinking and commitment support a demanding vocation.', baseSalary: 120000, minAge: 25, weights: { intelligence: .6, discipline: .3, social: .1 }, requirements: { intelligence: 7, discipline: 6 } },
-];
 
 // These ten events are mutually exclusive within a year. Their displayed
 // chances are absolute probabilities, leaving the remainder for a quiet year.
@@ -89,11 +78,12 @@ function active(state) {
 
 export function createGame({ name, seed } = {}) {
   const initialSeed = Number.isFinite(seed) ? seed >>> 0 : (Date.now() ^ Math.floor(Math.random() * 0xFFFFFFFF)) >>> 0;
-  const state = { version: 2, seed: initialSeed, rng: initialSeed, nextId: 0, id: `life-${initialSeed}`, age: 0, generation: 1,
+  const state = { version: 3, seed: initialSeed, rng: initialSeed, nextId: 0, id: `life-${initialSeed}`, age: 0, generation: 1,
     name: '', stats: {}, aptitudes: {}, height: 50, adultHeight: 170,
     focus: { work: 3, social: 3, family: 3, self: 3 }, babyChoice: 'quiet',
     parents: [], children: [], siblings: [], money: 0, income: 0, expenses: 0, lifestyle: 1,
     jobId: null, jobYears: 0, performance: 0, schoolProgress: 0, lastChildAge: -1,
+    education: { status: 'school', years: 0 }, jobOffers: [],
     effects: [], history: [], lineage: [], ended: false, needsSuccession: false };
   state.name = typeof name === 'string' && name.trim() ? name.trim().slice(0, 50) : personName(state);
   state.parents = [makeParent(state, surname(state.name)), makeParent(state, surname(state.name))];
@@ -140,11 +130,61 @@ export function jobFit(state, job) {
   const totalWeight = Object.values(job.weights).reduce((a, b) => a + b, 0);
   return clamp(Object.entries(job.weights).reduce((sum, [key, weight]) => sum + stats[key] / 10 * weight, 0) / totalWeight, 0, 1);
 }
+
+function meetsJobRequirements(state, job) {
+  const stats = effectiveStats(state);
+  return state.age >= job.minAge && Object.entries(job.requirements).every(([key, value]) => stats[key] >= value);
+}
+// Offers use a separate hash, leaving the simulation's random sequence intact.
+// They are generated once at each decision and then saved with the character.
+function offerScore(state, job, graduate) {
+  const key = `${state.seed}:${state.id}:${state.generation}:${graduate ? 'graduate' : 'work'}:${job.id}`;
+  let hash = 2166136261;
+  for (let index = 0; index < key.length; index++) hash = Math.imul(hash ^ key.charCodeAt(index), 16777619);
+  return (hash >>> 0) / 4294967296 + jobFit(state, job) * .4 + (meetsJobRequirements(state, job) ? .35 : 0);
+}
+function makeJobOffers(state, graduate = false) {
+  const count = graduate ? 15 : 10;
+  const pool = JOBS.filter(job => graduate || !job.requiresCollege)
+    .sort((a, b) => offerScore(state, b, graduate) - offerScore(state, a, graduate) || a.id.localeCompare(b.id));
+  const offers = [];
+  const add = job => { if (job && !offers.includes(job.id) && offers.length < count) offers.push(job.id); };
+  add(pool.find(job => job.id === state.jobId));
+  add(pool.find(job => job.id === 'retail'));
+  // A graduate sees a mix of degree careers and other paths. Entry-level
+  // work is always available, while some offers remain goals to develop for.
+  if (graduate) pool.filter(job => job.requiresCollege).slice(0, 8).forEach(add);
+  else pool.filter(job => meetsJobRequirements(state, job)).slice(0, 5).forEach(add);
+  pool.forEach(add);
+  return offers;
+}
+export function offeredJobs(state) {
+  if (state.age < 18 || state.education.status === 'college') return [];
+  return state.jobOffers.map(id => JOBS.find(job => job.id === id)).filter(Boolean);
+}
+export function needsEducationChoice(state) {
+  return state.age >= 18 && state.education.status === 'undecided' && !state.ended && !state.needsSuccession;
+}
+export function chooseEducation(state, path) {
+  const status = active(state); if (!status.ok) return status;
+  if (!needsEducationChoice(state)) return fail('Choose your education path when adulthood begins.');
+  if (path !== 'college' && path !== 'work') return fail('Choose college or work.');
+  state.education = { status: path === 'college' ? 'college' : 'workforce', years: 0 };
+  if (path === 'college') {
+    state.jobOffers = [];
+    state.jobId = null; state.jobYears = 0; state.performance = 0;
+    log(state, 'A place to learn', 'You begin four years of college. Study focus develops your abilities, and graduation brings 15 career options.', 'milestone');
+  } else log(state, 'Ready for work', 'You choose to begin your working life. Explore your 10 career options and build your skills along the way.', 'career');
+  return ok();
+}
 export function canTakeJob(state, job) {
   const status = active(state); if (!status.ok) return status;
-  if (typeof job === 'string') job = JOBS.find(candidate => candidate.id === job);
+  job = JOBS.find(candidate => candidate.id === (typeof job === 'string' ? job : job?.id));
   if (!job) return fail('That career does not exist.');
   if (state.age < job.minAge) return fail(`Available at age ${job.minAge}.`);
+  if (state.education.status === 'college') return fail('Finish your four years of college before choosing a career.');
+  if (job.requiresCollege && state.education.status !== 'graduate') return fail('A college degree is required for this career.');
+  if (!state.jobOffers.includes(job.id)) return fail('Choose a career from your current offers.');
   const stats = effectiveStats(state);
   const missing = Object.entries(job.requirements).filter(([key, value]) => stats[key] < value);
   if (missing.length) return fail(`Needs ${missing.map(([key, value]) => `${SKILLS.find(s => s.key === key).label.toLowerCase()} ${value}`).join(' and ')}.`);
@@ -154,6 +194,7 @@ export function canTakeJob(state, job) {
 export function takeJob(state, id) {
   const job = JOBS.find(candidate => candidate.id === id);
   const status = canTakeJob(state, job); if (!status.ok) return status;
+  if (needsEducationChoice(state)) chooseEducation(state, 'work');
   state.jobId = id; state.jobYears = 0; state.performance = round(jobFit(state, job));
   log(state, 'A new direction', `You start work as a ${job.name.toLowerCase()}. Your skills and career focus will help support your lifestyle.`, 'career');
   return ok();
@@ -199,10 +240,10 @@ function growYear(state) {
     return;
   }
   const f = state.focus;
-  const childhood = state.age < 18;
-  const base = childhood ? .1 : state.age < 60 ? .008 : -.018;
+  const studying = state.age < 18 || state.education.status === 'college';
+  const base = studying ? .1 : state.age < 60 ? .008 : -.018;
   for (const key of CORE) grow(state, key, base);
-  grow(state, 'intelligence', f.self * .027 + (childhood ? f.work * .055 : f.work * .008));
+  grow(state, 'intelligence', f.self * .027 + (studying ? f.work * .055 : f.work * .008));
   grow(state, 'discipline', f.work * .04 + f.self * .012);
   grow(state, 'social', f.social * .055 + f.family * .012);
   grow(state, 'creativity', f.self * .045 + f.social * .009);
@@ -216,7 +257,7 @@ function growYear(state) {
   addStat(state, 'relaxation', .16 * (f.self - 2) + spare * .06 - Math.max(0, f.work - 3) * .12);
   addStat(state, 'stability', -.1 * (f.work - 2) + f.self * .07 + f.family * .025 + f.social * .018 - (state.stats.relaxation < 4 ? .25 : 0));
   addStat(state, 'health', (f.self - 2) * .035 - (state.age >= 65 ? .1 : 0));
-  if (childhood) state.schoolProgress = round(clamp(state.schoolProgress + f.work * .9, 0, 100));
+  if (studying) state.schoolProgress = round(clamp(state.schoolProgress + f.work * .9, 0, 100));
   for (const parent of state.parents.filter(p => p.alive !== false)) addStat(parent, 'stability', -.04 + f.family * .025);
 }
 // Money remains internal: the player sees only a 1–10 lifestyle score.
@@ -261,7 +302,7 @@ function annualFinances(state) {
   state.expenses = Math.round(9000 + state.income * (.32 + state.lifestyle * .025) + dependents * 2500 + reserveUpkeep);
   state.money = Math.max(0, Math.round(state.money + state.income - state.expenses));
   state.lifestyle = lifestyleFromResources(state.income, state.money);
-  if (!job && state.focus.work >= 3) addStat(state, 'stability', -.15);
+  if (!job && state.education.status !== 'college' && state.focus.work >= 3) addStat(state, 'stability', -.15);
 }
 function ageFamily(state) {
   for (const parent of state.parents) {
@@ -300,6 +341,7 @@ function applyEvent(state, event) {
 
 export function advanceYear(state) {
   const status = active(state); if (!status.ok) return status;
+  if (needsEducationChoice(state)) return fail('Choose college or a career before advancing the year.');
   const previousStage = stage(state);
   const odds = eventOdds(state);
   const roll = random(state);
@@ -316,7 +358,18 @@ export function advanceYear(state) {
   else log(state, 'A quiet year', previousStage === 'baby' ? `A year of small discoveries. ${state.babyChoice === 'cry' ? 'Your cries bring attention and growth, while your parents feel the strain.' : 'Quiet moments give your parents a little breathing room.'}` : 'No major surprises this year. Your everyday choices still shape who you become.', 'quiet');
   syncFamilyLifestyles(state);
   if (state.age === 3) log(state, 'A bigger little world', 'You can now choose how to spend your year. Divide up to 12 focus points between school, friends, family, and yourself.', 'milestone');
-  if (state.age === 18) log(state, 'Your own way', 'Adulthood opens careers and parenthood. Choose a career to support your lifestyle next year.', 'milestone');
+  if (state.age === 18) {
+    state.education = { status: 'undecided', years: 0 };
+    state.jobOffers = makeJobOffers(state);
+    log(state, 'Your own way', 'Choose four years of college or begin work from a list of 10 career options.', 'milestone');
+  } else if (state.education.status === 'college') {
+    state.education.years += 1;
+    if (state.education.years === 4) {
+      state.education.status = 'graduate';
+      state.jobOffers = makeJobOffers(state, true);
+      log(state, 'Graduation day', 'Four years of college are complete. Explore 15 career options, including roles that require a degree.', 'milestone');
+    }
+  }
   if (state.age === 65) log(state, 'The next chapter', 'You may continue your own life or pass the story to one of your children.', 'milestone');
   if (state.age >= 85) {
     const heirs = state.children.filter(child => child.alive !== false && child.age < 85);
@@ -367,6 +420,8 @@ export function succeed(state, childId) {
   state.children = []; state.effects = []; state.focus = { work: 3, social: 3, family: 3, self: 3 };
   state.jobId = null; state.jobYears = 0; state.performance = 0; state.income = 0; state.expenses = 0; state.lifestyle = lifestyleFromResources(0, state.money);
   state.babyChoice = 'quiet'; state.schoolProgress = 0; state.lastChildAge = -1; state.ended = false; state.needsSuccession = false;
+  state.education = { status: state.age < 18 ? 'school' : 'undecided', years: 0 };
+  state.jobOffers = state.age < 18 ? [] : makeJobOffers(state);
   syncFamilyLifestyles(state);
   log(state, 'The story continues', `You are now ${state.name}, age ${state.age}. You receive an equal share of the family legacy. Your abilities and affinities carry over.`, 'milestone');
   return ok();
@@ -396,6 +451,21 @@ function validSchema(raw, version) {
     if (new Set(familyIds).size !== familyIds.length) return false;
     if (![raw.money, raw.income, raw.expenses].every(value => finite(value, 0, 1e15)) || !Number.isInteger(raw.lifestyle) || !finite(raw.lifestyle, 1, 10)) return false;
     if (raw.jobId !== null && !JOBS.some(job => job.id === raw.jobId)) return false;
+    if (version >= 3) {
+      const education = raw.education;
+      if (!education || !['school', 'undecided', 'workforce', 'college', 'graduate'].includes(education.status) || !Number.isInteger(education.years)) return false;
+      const studying = education.status === 'college';
+      const graduate = education.status === 'graduate';
+      if (studying ? !finite(education.years, 0, 3) : education.years !== (graduate ? 4 : 0)) return false;
+      if ((education.status === 'school') !== (raw.age < 18)) return false;
+      const offers = raw.jobOffers;
+      const expectedCount = raw.age < 18 || studying ? 0 : graduate ? 15 : 10;
+      if (!Array.isArray(offers) || offers.length !== expectedCount || new Set(offers).size !== offers.length) return false;
+      if (!offers.every(id => JOBS.some(job => job.id === id && (graduate || !job.requiresCollege)))) return false;
+      if (expectedCount && !offers.includes('retail')) return false;
+      if ((education.status === 'school' || education.status === 'undecided' || studying) && raw.jobId !== null) return false;
+      if (raw.jobId !== null && !offers.includes(raw.jobId)) return false;
+    }
     if (!Number.isInteger(raw.jobYears) || !finite(raw.jobYears, 0, 100) || !finite(raw.performance, 0, 1) || !finite(raw.schoolProgress, 0, 100) || !finite(raw.lastChildAge, -1, 85)) return false;
     if (!Array.isArray(raw.effects) || raw.effects.length > 10 || !raw.effects.every(effect => text(effect.id, 100) && text(effect.name, 100) && typeof effect.description === 'string' && Number.isInteger(effect.years) && finite(effect.years, 1, 3) && effect.modifiers && Object.entries(effect.modifiers).every(([key, value]) => statKeys.includes(key) && finite(value, -10, 10)))) return false;
     if (!Array.isArray(raw.history) || raw.history.length > 500 || !raw.history.every(memory => text(memory.id, 100) && finite(memory.age, 0, 85) && finite(memory.generation, 1, 100000) && text(memory.title, 200) && text(memory.text, 2000) && text(memory.kind, 50))) return false;
@@ -407,34 +477,40 @@ function validSchema(raw, version) {
   } catch { return false; }
 }
 
-export function validateSave(raw) { return validSchema(raw, 2); }
+export function validateSave(raw) { return validSchema(raw, 3); }
 
 export function migrateSave(raw) {
   try {
     if (validateSave(raw)) return clone(raw);
-    if (!validSchema(raw, 1)) return null;
+    if (!validSchema(raw, 1) && !validSchema(raw, 2)) return null;
     const state = clone(raw);
-    const convertStats = person => {
-      person.stats.stability = round(11 - person.stats.instability);
-      delete person.stats.instability;
-    };
-    [state, ...state.parents, ...state.children, ...state.siblings, ...state.lineage].forEach(convertStats);
-    for (const effect of state.effects) {
-      if (Object.hasOwn(effect.modifiers, 'instability')) {
-        effect.modifiers.stability = -effect.modifiers.instability;
-        delete effect.modifiers.instability;
+    if (state.version === 1) {
+      const convertStats = person => {
+        person.stats.stability = round(11 - person.stats.instability);
+        delete person.stats.instability;
+      };
+      [state, ...state.parents, ...state.children, ...state.siblings, ...state.lineage].forEach(convertStats);
+      for (const effect of state.effects) {
+        if (Object.hasOwn(effect.modifiers, 'instability')) {
+          effect.modifiers.stability = -effect.modifiers.instability;
+          delete effect.modifiers.instability;
+        }
       }
+      // Original saves did not store parents' lifestyle. Prefer a recorded
+      // ancestor's household, otherwise use a modest 4/10.
+      for (const parent of state.parents) {
+        const ancestor = state.lineage.find(person => person.id === parent.id);
+        parent.lifestyle = ancestor?.lifestyle ?? 4;
+      }
+      for (const child of state.children) child.lifestyle = child.age < 18 ? state.lifestyle : lifestyleFromResources(0, child.money);
+      for (const sibling of state.siblings) sibling.lifestyle = sibling.age < 18 ? householdLifestyle(state) : lifestyleFromResources(0, sibling.money);
+      if (state.age < 18) state.lifestyle = householdLifestyle(state);
     }
-    // Older saves did not store the original parents' lifestyle. Use a
-    // recorded ancestor's household where available, otherwise a modest 4/10.
-    for (const parent of state.parents) {
-      const ancestor = state.lineage.find(person => person.id === parent.id);
-      parent.lifestyle = ancestor?.lifestyle ?? 4;
-    }
-    for (const child of state.children) child.lifestyle = child.age < 18 ? state.lifestyle : lifestyleFromResources(0, child.money);
-    for (const sibling of state.siblings) sibling.lifestyle = sibling.age < 18 ? householdLifestyle(state) : lifestyleFromResources(0, sibling.money);
-    if (state.age < 18) state.lifestyle = householdLifestyle(state);
-    state.version = 2;
+    const currentJob = JOBS.find(job => job.id === state.jobId);
+    const status = state.age < 18 ? 'school' : currentJob?.requiresCollege ? 'graduate' : state.age === 18 && !currentJob ? 'undecided' : 'workforce';
+    state.education = { status, years: status === 'graduate' ? 4 : 0 };
+    state.jobOffers = state.age < 18 ? [] : makeJobOffers(state, status === 'graduate');
+    state.version = 3;
     return validateSave(state) ? state : null;
   } catch { return null; }
 }

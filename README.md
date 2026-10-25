@@ -19,7 +19,9 @@ Tap **More** (the three dots) for help, event odds, save export/import, or a new
 - Ages 0–2: cry for faster development and lower parent stability, or stay quiet for gentler growth and calmer parents.
 - From age 3: assign 0–5 focus to school/career, friends, family, and yourself, sharing a 12-point budget. Unused energy contributes to rest.
 - Advance exactly one year per click. Choices affect skill growth and the probabilities of 10 possible random events. At most one random event happens per year; a quiet year is always possible. Temporary effects expire.
-- Ten careers begin opening at 18, with some requiring age 21 or 25 and skill thresholds. Job fit, career focus, and experience determine lifestyle (1–10). This is the only financial number shown: no salary, income, spending, savings, or inheritance amounts appear in the game.
+- A pool of 100 distinct careers spans 10 fields. Every job has skill affinities, a base lifestyle (1–10), and age/skill requirements. This is the only financial number shown: no salary, income, spending, savings, or inheritance amounts appear in the game.
+- At 18, choose college or take a job from 10 offers. Choosing a job starts the workforce path; advancing is paused until the choice is made.
+- College takes four yearly turns. College focus develops skills while studying; graduating opens a new list of 15 offers, including degree-based careers. The game remembers each list rather than rerolling it when a menu opens.
 - Welcome up to six children, one per year. Births are available from 18–60; older characters can adopt. Family focus improves children’s skills. Adoption lets older heirs continue the family line.
 - Voluntary succession opens at 65. At 85, the current life closes and the player chooses a living child, or starts another life if no heir exists. An heir retains their current age, skills, affinity, height, and personal savings.
 - The estate is divided equally among living children. Inheritance supports an heir’s lifestyle; siblings keep their shares. The history records previous generations.
@@ -37,9 +39,11 @@ estate      = floor(savings × legacy rate)
 child share = floor(estate / number of living children)
 ```
 
-Rounding remainder is not distributed. Handoff closes the previous playable chapter, even when chosen before 85. A descendant begins with no job or children of their own; their developed stats and personal savings persist. There are no partner, housing, education-degree, or relationship subsystems yet.
+Rounding remainder is not distributed. Handoff closes the previous playable chapter, even when chosen before 85. A descendant begins with no job or children of their own; their developed stats and personal savings persist. Adult heirs make their own college-or-work choice. College is a single four-year program; majors, tuition, partners, housing, and detailed relationship systems are not modeled yet.
 
-Existing saves and JSON backups are upgraded automatically to schema v2. Old instability scores convert to `11 - instability`, and temporary effect signs are inverted. Progress, skills, ages, careers, and family history are preserved. The browser storage key stays `lifelines.save.v1` so existing players keep their saves.
+Job skill affinities run from +1 (useful) to +3 (central), and their relative weights determine skill fit and job-related development. These describe what a role uses; a character’s own −3 to +3 affinity determines how quickly that skill grows. Job lifestyle ratings and education requirements are fictional balancing values for this framework.
+
+Existing saves and JSON backups are upgraded automatically to schema v3. Old instability scores convert to `11 - instability`, and temporary effect signs are inverted. Existing careers and progress are preserved while education and job offers are initialized. The browser storage key stays `lifelines.save.v1` so existing players keep their saves.
 
 ## Run locally
 
@@ -62,7 +66,8 @@ The engine tests cover deterministic progression, probabilities, temporary effec
 
 ## Source and deployment
 
-- `engine.js`: deterministic simulation, jobs, events, saves, and succession.
+- `engine.js`: deterministic simulation, college, job offers, events, saves, and succession.
+- `jobs.js`: 100 career titles, skill affinities, lifestyle ratings, and entry requirements.
 - `app.js`: UI, actions, local persistence, and import/export.
 - `styles.css`: responsive layout and visual design.
 - `index.html` and `favicon.svg`: static entry point and branding.
@@ -71,7 +76,7 @@ The engine tests cover deterministic progression, probabilities, temporary effec
 This uses the same deployment pattern as **Depths**: a separate public GitHub repository, GitHub Pages serving the root of `main`, and `.nojekyll`. Pushes to `main` automatically redeploy.
 
 ```sh
-git add app.js engine.js styles.css index.html favicon.svg README.md test package.json package-lock.json .gitignore .nojekyll server.mjs
+git add app.js engine.js jobs.js styles.css index.html favicon.svg README.md test package.json package-lock.json .gitignore .nojekyll server.mjs
 git commit -m "Describe the change"
 git push origin main
 ```

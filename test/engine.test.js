@@ -1,12 +1,30 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SKILLS, JOBS, EVENTS, createGame, stage, advanceYear, setBabyChoice, setFocus, effectiveStats, currentEffects, eventOdds, jobFit, canTakeJob, takeJob, quitJob, haveChild, successionInfo, succeed, lifestyleFromResources, householdLifestyle, validateSave, migrateSave } from '../engine.js';
+import { SKILLS, JOBS, EVENTS, createGame, stage, advanceYear as advanceYearRaw, setBabyChoice, setFocus, effectiveStats, currentEffects, eventOdds, jobFit, canTakeJob, takeJob, quitJob, haveChild, successionInfo, succeed, lifestyleFromResources, householdLifestyle, validateSave, migrateSave, chooseEducation, needsEducationChoice, offeredJobs } from '../engine.js';
 
 const copy = value => JSON.parse(JSON.stringify(value));
-const adult = (seed = 22) => { const s = createGame({ seed }); for (let i = 0; i < 18; i++) advanceYear(s); return s; };
+// Existing long-life scenarios choose work automatically at each adult handoff.
+// Education tests call the actual action directly to exercise the choice gate.
+const advanceYear = state => {
+  if (needsEducationChoice(state)) chooseEducation(state, 'work');
+  return advanceYearRaw(state);
+};
+const decision = (seed = 22) => { const s = createGame({ seed }); for (let i = 0; i < 18; i++) advanceYearRaw(s); return s; };
+const adult = (seed = 22) => { const s = decision(seed); chooseEducation(s, 'work'); return s; };
+const offerJob = (state, job) => {
+  state.education = { status: job.requiresCollege ? 'graduate' : 'workforce', years: job.requiresCollege ? 4 : 0 };
+  state.jobOffers = [...new Set(['retail', job.id, ...JOBS.filter(candidate => job.requiresCollege || !candidate.requiresCollege).map(candidate => candidate.id)])].slice(0, job.requiresCollege ? 15 : 10);
+};
+const v2Save = state => {
+  const previous = copy(state);
+  previous.version = 2;
+  delete previous.education; delete previous.jobOffers;
+  return previous;
+};
 const legacySave = state => {
   const legacy = copy(state);
   legacy.version = 1;
+  delete legacy.education; delete legacy.jobOffers;
   for (const person of [legacy, ...legacy.parents, ...legacy.children, ...legacy.siblings, ...legacy.lineage]) {
     person.stats.instability = Math.round((11 - person.stats.stability) * 100) / 100;
     delete person.stats.stability;
@@ -23,7 +41,7 @@ test('a new life starts at zero with complete, bounded inherited traits and pare
   const state = createGame({ name: 'Test Family', seed: 12 });
   assert.equal(state.age, 0); assert.equal(state.height, 50); assert.equal(state.parents.length, 2);
   assert.equal(stage(state), 'baby'); assert.equal(validateSave(state), true);
-  assert.equal(JOBS.length, 10); assert.equal(EVENTS.length, 10);
+  assert.equal(JOBS.length, 100); assert.equal(EVENTS.length, 10);
   for (const skill of SKILLS) assert.ok(state.aptitudes[skill.key] >= -3 && state.aptitudes[skill.key] <= 3);
   assert.deepEqual(createGame({ seed: 12 }), createGame({ seed: 12 }));
 });
@@ -32,7 +50,7 @@ test('all six adult skills exist at birth, start very low, and use their individ
   for (let seed = 1; seed <= 40; seed++) {
     const baby = createGame({ seed });
     for (const { key } of SKILLS) assert.ok(baby.stats[key] >= 1 && baby.stats[key] <= 1.5, `${key} at birth`);
-    assert.equal(baby.version, 2);
+    assert.equal(baby.version, 3);
     assert.ok(baby.stats.health >= 7);
     assert.ok(baby.stats.stability >= 8);
     assert.deepEqual(Object.keys(baby.stats).sort(), Object.keys(adult(seed).stats).sort());
@@ -152,6 +170,7 @@ test('jobs respect age and requirements; fit and focus influence earnings and li
   assert.equal(canTakeJob(state, JOBS[0]).ok, false);
   state.age = 25;
   for (const skill of SKILLS) state.stats[skill.key] = 8;
+  offerJob(state, JOBS.find(job => job.id === 'doctor'));
   assert.equal(takeJob(state, 'doctor').ok, true);
   const stronger = copy(state), weaker = copy(state);
   stronger.focus = { work: 5, social: 2, family: 2, self: 3 };
@@ -161,6 +180,277 @@ test('jobs respect age and requirements; fit and focus influence earnings and li
   advanceYear(stronger); advanceYear(weaker);
   assert.ok(stronger.income > weaker.income); assert.ok(stronger.money > 0); assert.ok(stronger.lifestyle > 1);
   assert.equal(quitJob(stronger).ok, true); advanceYear(stronger); assert.equal(stronger.income, 0);
+});
+
+test('the hundred careers have distinct titles, valid skill affinities, and lifestyle ratings', () => {
+  assert.equal(JOBS.length, 100);
+  assert.equal(new Set(JOBS.map(job => job.id)).size, 100);
+  assert.equal(new Set(JOBS.map(job => job.name.toLowerCase())).size, 100);
+  const categories = new Map();
+  const knownSkills = new Set(SKILLS.map(skill => skill.key));
+  for (const job of JOBS) {
+    assert.match(job.id, /^[a-z][a-z0-9_-]*$/, `${job.name} must have a stable save identifier`);
+    assert.ok(job.name.trim() && job.description.trim() && job.category.trim());
+    categories.set(job.category, (categories.get(job.category) || 0) + 1);
+    assert.ok(Number.isInteger(job.minAge) && job.minAge >= 18 && job.minAge <= 35);
+    assert.equal(typeof job.requiresCollege, 'boolean');
+    assert.ok(Number.isInteger(job.baseLifestyle) && job.baseLifestyle >= 1 && job.baseLifestyle <= 10);
+    assert.ok(Number.isFinite(job.baseSalary) && job.baseSalary > 0);
+    assert.equal(job.baseLifestyle, lifestyleFromResources(job.baseSalary, 0), `${job.name} lifestyle matches its base resources`);
+    const entries = Object.entries(job.affinities);
+    assert.ok(entries.length >= 2 && entries.length <= 4, `${job.name} needs meaningful skill emphases`);
+    assert.deepEqual(Object.keys(job.weights).sort(), entries.map(([key]) => key).sort());
+    const totalAffinity = entries.reduce((sum, [, value]) => sum + value, 0);
+    for (const [key, value] of entries) {
+      assert.ok(knownSkills.has(key), `${job.name} references a supported skill`);
+      assert.ok(Number.isInteger(value) && value >= 1 && value <= 3, `${job.name} has a 1–3 job affinity`);
+      assert.ok(Math.abs(job.weights[key] - value / totalAffinity) < 1e-10, `${job.name} skill weighting follows its affinities`);
+    }
+    assert.ok(Math.abs(Object.values(job.weights).reduce((sum, value) => sum + value, 0) - 1) < 1e-10);
+    for (const [key, value] of Object.entries(job.requirements)) {
+      assert.ok(knownSkills.has(key));
+      assert.ok(Number.isFinite(value) && value >= 1 && value <= 10);
+    }
+  }
+  assert.equal(categories.size, 10);
+  assert.ok([...categories.values()].every(count => count === 10));
+  assert.ok(new Set(JOBS.map(job => job.baseLifestyle)).size >= 8, 'career rewards span a broad lifestyle range');
+  for (const id of ['retail', 'chef', 'builder', 'designer', 'sales', 'athlete', 'teacher', 'engineer', 'performer', 'doctor']) {
+    assert.ok(JOBS.some(job => job.id === id), `existing ${id} saves must retain their career`);
+  }
+});
+
+test('every career can be entered, simulated, and restored with a qualified adult', () => {
+  const qualified = createGame({ seed: 404 });
+  while (qualified.age < 35) advanceYear(qualified);
+  for (const skill of SKILLS) qualified.stats[skill.key] = 10;
+  qualified.effects = [];
+  qualified.focus = { work: 5, social: 2, family: 2, self: 3 };
+  for (const job of JOBS) {
+    const state = copy(qualified);
+    offerJob(state, job);
+    assert.equal(canTakeJob(state, job).ok, true, `${job.name} should be reachable`);
+    assert.equal(takeJob(state, job.id).ok, true);
+    assert.ok(Math.abs(jobFit(state, job) - 1) < 1e-10);
+    assert.equal(advanceYear(state).ok, true);
+    assert.equal(state.jobId, job.id);
+    assert.equal(state.jobYears, 1);
+    assert.ok(Number.isFinite(state.income) && state.income > 0);
+    assert.ok(Number.isInteger(state.lifestyle) && state.lifestyle >= 1 && state.lifestyle <= 10);
+    assert.equal(validateSave(state), true, `${job.name} leaves a valid save`);
+    const restored = migrateSave(copy(state));
+    assert.equal(restored.jobId, job.id);
+    assert.deepEqual(restored, state);
+  }
+});
+
+test('turning eighteen pauses for college or one of ten persistent career offers', () => {
+  const state = createGame({ seed: 501 });
+  assert.deepEqual(offeredJobs(state), []);
+  assert.equal(chooseEducation(state, 'college').ok, false);
+  while (state.age < 17) assert.equal(advanceYearRaw(state).ok, true);
+  assert.equal(needsEducationChoice(state), false);
+  assert.equal(advanceYearRaw(state).ok, true);
+  assert.equal(state.age, 18);
+  assert.deepEqual(state.education, { status: 'undecided', years: 0 });
+  assert.equal(needsEducationChoice(state), true);
+  assert.equal(state.jobOffers.length, 10);
+  assert.equal(new Set(state.jobOffers).size, 10);
+  assert.ok(offeredJobs(state).every(job => !job.requiresCollege));
+  assert.ok(offeredJobs(state).some(job => canTakeJob(state, job).ok));
+  const snapshot = copy(state);
+  assert.equal(advanceYearRaw(state).ok, false);
+  assert.equal(advanceYearRaw(state).ok, false);
+  assert.deepEqual(state, snapshot, 'a blocked advance never consumes a year or randomness');
+  assert.equal(chooseEducation(state, 'unknown').ok, false);
+  assert.deepEqual(state, snapshot);
+  assert.equal(validateSave(state), true);
+  assert.deepEqual(migrateSave(state), state);
+});
+
+test('choosing an offered career starts work directly and restricts changes to the saved shortlist', () => {
+  const state = decision(502);
+  const originalOffers = [...state.jobOffers];
+  const unlisted = JOBS.find(job => !job.requiresCollege && !state.jobOffers.includes(job.id));
+  for (const { key } of SKILLS) state.stats[key] = 10;
+  assert.equal(takeJob(state, unlisted.id).ok, false);
+  assert.equal(needsEducationChoice(state), true);
+  assert.equal(takeJob(state, 'retail').ok, true);
+  assert.equal(state.education.status, 'workforce');
+  assert.equal(needsEducationChoice(state), false);
+  assert.deepEqual(state.jobOffers, originalOffers);
+  assert.equal(chooseEducation(state, 'college').ok, false);
+  assert.equal(advanceYearRaw(state).ok, true);
+  assert.equal(state.age, 19);
+  assert.equal(state.jobYears, 1);
+  assert.deepEqual(state.jobOffers, originalOffers);
+  assert.deepEqual(migrateSave(state).jobOffers, originalOffers);
+});
+
+test('college lasts four years, develops skills, and then offers fifteen careers with degree options', () => {
+  const state = decision(503);
+  const intelligence = state.stats.intelligence;
+  assert.equal(chooseEducation(state, 'college').ok, true);
+  assert.deepEqual(state.education, { status: 'college', years: 0 });
+  assert.deepEqual(state.jobOffers, []);
+  assert.deepEqual(offeredJobs(state), []);
+  assert.equal(takeJob(state, 'retail').ok, false);
+  assert.equal(chooseEducation(state, 'work').ok, false);
+  for (let year = 1; year <= 4; year++) {
+    assert.equal(advanceYearRaw(state).ok, true);
+    assert.equal(state.age, 18 + year);
+    assert.equal(state.education.years, year);
+    assert.equal(state.education.status, year < 4 ? 'college' : 'graduate');
+    assert.equal(state.jobOffers.length, year < 4 ? 0 : 15);
+    assert.equal(state.income, 0);
+    assert.equal(state.jobId, null);
+    assert.equal(validateSave(state), true);
+    assert.deepEqual(migrateSave(state), state);
+  }
+  assert.ok(state.stats.intelligence > intelligence);
+  const jobs = offeredJobs(state);
+  assert.equal(new Set(jobs.map(job => job.id)).size, 15);
+  assert.ok(jobs.some(job => job.requiresCollege));
+  assert.ok(jobs.some(job => !job.requiresCollege));
+  assert.ok(jobs.some(job => canTakeJob(state, job).ok));
+  const offers = [...state.jobOffers];
+  takeJob(state, 'retail'); advanceYearRaw(state);
+  assert.deepEqual(state.jobOffers, offers);
+  assert.equal(state.education.years, 4);
+});
+
+test('study focus and skill affinity affect development during college', () => {
+  const studying = decision(504);
+  chooseEducation(studying, 'college');
+  studying.stats.intelligence = 3;
+  studying.aptitudes.intelligence = 3;
+  studying.focus = { work: 5, social: 1, family: 3, self: 3 };
+  const distracted = copy(studying), lowAffinity = copy(studying);
+  distracted.focus.work = 0;
+  lowAffinity.aptitudes.intelligence = -3;
+  advanceYearRaw(studying); advanceYearRaw(distracted); advanceYearRaw(lowAffinity);
+  assert.ok(studying.stats.intelligence > distracted.stats.intelligence);
+  assert.ok(studying.stats.intelligence > lowAffinity.stats.intelligence);
+});
+
+test('degree careers require graduation even with sufficient age and skills', () => {
+  const state = adult(505);
+  while (state.age < 35) advanceYearRaw(state);
+  for (const { key } of SKILLS) state.stats[key] = 10;
+  state.jobOffers[state.jobOffers.length - 1] = 'doctor';
+  assert.equal(canTakeJob(state, 'doctor').ok, false);
+  assert.match(canTakeJob(state, 'doctor').reason, /college degree/);
+  offerJob(state, JOBS.find(job => job.id === 'doctor'));
+  assert.equal(takeJob(state, 'doctor').ok, true);
+});
+
+test('shortlists vary between families while guaranteeing an accessible first career', () => {
+  const shortlists = new Set();
+  const available = new Set();
+  for (let seed = 510; seed < 570; seed++) {
+    const state = decision(seed);
+    shortlists.add(state.jobOffers.join(','));
+    state.jobOffers.forEach(id => available.add(id));
+    assert.equal(canTakeJob(state, 'retail').ok, true);
+    const rng = state.rng;
+    const snapshot = copy(state);
+    offeredJobs(state); offeredJobs(state);
+    assert.equal(state.rng, rng);
+    assert.deepEqual(state, snapshot);
+    assert.deepEqual(state, decision(seed));
+  }
+  assert.ok(shortlists.size > 50);
+  assert.ok(available.size > 35, 'the pool spans many careers across characters');
+});
+
+test('v2 upgrades preserve school, current careers, and adults without consuming randomness', () => {
+  const young = createGame({ seed: 601 });
+  const eighteen = decision(602);
+  const unemployed = adult(603); advanceYear(unemployed);
+  const worker = adult(604); takeJob(worker, 'retail'); advanceYear(worker);
+  const professional = adult(605);
+  while (professional.age < 35) advanceYear(professional);
+  for (const { key } of SKILLS) professional.stats[key] = 9;
+  offerJob(professional, JOBS.find(job => job.id === 'doctor'));
+  takeJob(professional, 'doctor'); advanceYear(professional);
+  const examples = [[young, 'school', 0], [eighteen, 'undecided', 10], [unemployed, 'workforce', 10], [worker, 'workforce', 10], [professional, 'graduate', 15]];
+  for (const [state, status, count] of examples) {
+    for (const old of [v2Save(state), legacySave(state)]) {
+      const snapshot = copy(old);
+      const upgraded = migrateSave(old);
+      assert.equal(validateSave(upgraded), true);
+      assert.equal(upgraded.version, 3);
+      assert.equal(upgraded.education.status, status);
+      assert.equal(upgraded.education.years, status === 'graduate' ? 4 : 0);
+      assert.equal(upgraded.jobOffers.length, count);
+      assert.deepEqual(old, snapshot);
+      for (const key of ['age', 'rng', 'seed', 'id', 'nextId', 'jobId', 'jobYears', 'performance', 'schoolProgress', 'money']) assert.equal(upgraded[key], state[key]);
+      for (const key of ['stats', 'aptitudes', 'history', 'effects']) assert.deepEqual(upgraded[key], state[key]);
+      if (old.version === 2) for (const key of ['parents', 'children', 'siblings', 'lineage']) assert.deepEqual(upgraded[key], state[key]);
+      if (upgraded.jobId) assert.ok(upgraded.jobOffers.includes(upgraded.jobId));
+      assert.deepEqual(migrateSave(old), upgraded);
+      assert.deepEqual(migrateSave(upgraded), upgraded);
+    }
+  }
+});
+
+test('education import validation rejects impossible progress or malformed career offers', () => {
+  const state = decision(606);
+  for (const mutate of [
+    s => { delete s.education; },
+    s => { s.education.status = 'hacked'; },
+    s => { s.education.years = 2; },
+    s => { s.education.status = 'school'; },
+    s => { s.education.status = 'college'; },
+    s => { s.education.status = 'graduate'; s.education.years = 4; },
+    s => { s.jobOffers.pop(); },
+    s => { s.jobOffers[1] = s.jobOffers[0]; },
+    s => { s.jobOffers[1] = 'unknown'; },
+    s => { s.jobOffers[1] = 'doctor'; },
+    s => { s.jobId = 'retail'; },
+  ]) {
+    const bad = copy(state); mutate(bad);
+    assert.equal(validateSave(bad), false);
+    assert.equal(migrateSave(bad), null);
+  }
+  const college = copy(state); chooseEducation(college, 'college');
+  college.education.years = 4;
+  assert.equal(validateSave(college), false);
+  const minor = createGame({ seed: 607 });
+  minor.education.status = 'undecided';
+  minor.jobOffers = [...state.jobOffers];
+  assert.equal(validateSave(minor), false);
+});
+
+test('succession resets education for young and adult heirs and an ended life still takes precedence', () => {
+  const parent = adult(608); haveChild(parent);
+  while (parent.age < 65) advanceYear(parent);
+  const childId = parent.children[0].id;
+  assert.equal(succeed(parent, childId).ok, true);
+  assert.equal(parent.age, 47);
+  assert.equal(parent.education.status, 'undecided');
+  assert.equal(parent.jobOffers.length, 10);
+  assert.equal(advanceYearRaw(parent).ok, false);
+  assert.equal(chooseEducation(parent, 'college').ok, true);
+  for (let index = 0; index < 4; index++) advanceYearRaw(parent);
+  assert.equal(parent.education.status, 'graduate');
+  assert.equal(parent.jobOffers.length, 15);
+  assert.equal(validateSave(parent), true);
+
+  const young = adult(609);
+  while (young.age < 64) advanceYear(young);
+  haveChild(young); advanceYear(young);
+  succeed(young, young.children[0].id);
+  assert.equal(young.age, 1);
+  assert.deepEqual(young.education, { status: 'school', years: 0 });
+  assert.deepEqual(young.jobOffers, []);
+  assert.equal(validateSave(young), true);
+
+  const ended = adult(610);
+  while (ended.age < 85) advanceYear(ended);
+  assert.equal(needsEducationChoice(ended), false);
+  assert.equal(chooseEducation(ended, 'college').ok, false);
+  assert.match(advanceYearRaw(ended).reason, /life has ended/);
 });
 
 test('family focus improves children, and births are limited to one per year', () => {
