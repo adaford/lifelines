@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { afterEach, describe, test } from 'node:test';
 import { parseHTML } from 'linkedom';
-import { SKILLS, JOBS, EVENTS, resolveEventChoice, eventOdds, canTakeJob, chooseEducation, offeredJobs, needsEducationChoice, createGame, advanceYear, haveChild, takeJob, successionInfo, validateSave } from '../engine.js';
+import { SKILLS, JOBS, EVENTS, resolveEventChoice, eventOdds, canTakeJob, chooseEducation, offeredJobs, needsEducationChoice, createGame, advanceYear, haveChild, takeJob, successionInfo, validateSave, respondToEncounter, proposeMarriage, effectiveStats, relationshipOdds, proposalChance } from '../engine.js';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
@@ -84,7 +84,7 @@ test('odds show independent quiet-year probability and only eligible events', as
 function resolvePending(state) {
   while (state.pendingEvents.length) {
     const event = EVENTS.find(event=>event.id===state.pendingEvents[0].eventId);
-    assert.equal(resolveEventChoice(state,event.choices[0].id,event.id).ok,true);
+    assert.equal(resolveEventChoice(state,event.choices[0].id,event.id,state.pendingEvents[0].subjectId).ok,true);
   }
 }
 function resolveUIEvents(ui) {
@@ -102,6 +102,46 @@ function pendingFixture(count = 1) {
   assert.equal(validateSave(state),true);
   return state;
 }
+
+function encounterFixture() {
+  const state=ageTo(createGame({name:'Jordan Reed',seed:1447}),24);
+  state.stats.attractiveness=10; state.stats.social=10;
+  state.money=100000000; state.lifestyle=10;
+  state.focus={work:2,social:5,family:2,self:3};
+  state.effects=[];
+  for(let attempt=0;attempt<5;attempt++) {
+    assert.equal(advanceYear(state).ok,true); resolvePending(state);
+    if(state.encounters.length>=2) break;
+  }
+  assert.ok(state.encounters.length>=2 && state.encounters.length<=5);
+  assert.equal(validateSave(state),true);
+  return state;
+}
+
+function actionOutcome(fixture,action,predicate) {
+  for(let rng=0;rng<2000;rng++) {
+    const before=structuredClone(fixture);before.rng=rng;
+    const after=structuredClone(before),result=action(after);
+    if(result.ok && predicate(after,result)) return {before,after,result};
+  }
+  assert.fail('Could not find the required deterministic branch');
+}
+
+function partnerFixture() {
+  const state=encounterFixture();
+  state.stats.social=5; state.stats.stability=5; state.effects=[];
+  return actionOutcome(state,s=>respondToEncounter(s,s.encounters[0].id,'relationship'),(s,result)=>result.accepted).after;
+}
+
+function beforeFamilySave(state) {
+  const old=structuredClone(state);old.version=4;
+  for(const key of ['partner','encounters','encounterYear','pregnancy']) delete old[key];
+  for(const person of [old,...old.parents,...old.children,...old.siblings,...old.lineage]) {
+    for(const key of ['gender','canGestate','attractedTo','appearancePeakAge','relationship']) delete person[key];
+  }
+  return old;
+}
+
 function ageTo(state, age) {
   resolvePending(state);
   while (state.age < age) {
@@ -231,6 +271,199 @@ afterEach(() => {
     if (descriptor) Object.defineProperty(globalThis, key, descriptor);
     else delete globalThis[key];
   }
+});
+
+describe('Dating and family DOM integration', {concurrency:false},()=>{
+  test('adult encounters show one complete profile at a time and ignoring persists',async()=>{
+    let ui=await mount(ageTo(createGame({seed:1201}),17));
+    ui.click('.nav-list [data-tab="family"]');
+    assert.equal(ui.all('.encounter-card,[data-action="encounter"]').length,0);
+    const fixture=encounterFixture();
+    ui=await mount(fixture);
+    assert.ok(ui.query('.connection-notice'));
+    ui.click('.connection-notice');
+    assert.equal(ui.query('.nav-list [data-tab="family"]').getAttribute('aria-current'),'page');
+    assert.equal(ui.query('.encounter-list').dataset.total,String(fixture.encounters.length));
+    for(let index=0;index<fixture.encounters.length;index++) {
+      const person=fixture.encounters[index],card=ui.query('.encounter-card');
+      assert.equal(ui.all('.encounter-card').length,1,'phone profiles must not become a long list');
+      assert.equal(card.dataset.personId,person.id);
+      assert.match(card.textContent,new RegExp(person.name));
+      assert.ok(person.age>=18);
+      assert.equal(card.querySelectorAll('.profile-stat[data-skill]').length,7);
+      assert.equal(card.querySelectorAll('.profile-stat .aptitude').length,5);
+      for(const skill of [...SKILLS.map(s=>s.key),'health','stability']) assert.ok(card.querySelector(`[data-skill="${skill}"]`));
+      for(const label of ['Lifestyle','Height']) assert.match(card.textContent,new RegExp(label));
+      assert.equal(card.querySelectorAll('[data-action="encounter"]').length,3);
+      assertNoMoneyDisplay(card,'dating profile');
+      assert.deepEqual(ui.saved(),fixture,'browsing must not reroll or consume a profile');
+      if(index<fixture.encounters.length-1) ui.click('[data-action="prospect-page"][data-delta="1"]');
+    }
+    const ignored=ui.query('.encounter-card').dataset.personId;
+    ui.click('[data-action="encounter"][data-choice="ignore"]');
+    assert.equal(ui.saved().encounters.length,fixture.encounters.length-1);
+    assert.ok(!ui.saved().encounters.some(person=>person.id===ignored));
+    assert.equal(ui.saved().age,fixture.age);
+    const persisted=ui.saved();ui=await mount(persisted);
+    ui.click('.nav-list [data-tab="family"]');
+    assert.deepEqual(ui.saved(),persisted);
+    assert.ok(!ui.saved().encounters.some(person=>person.id===ignored));
+    assert.equal(ui.all('.encounter-card').length,1);
+  });
+
+  test('pursuit can be declined or become a relationship with displayed bonuses',async()=>{
+    const fixture=encounterFixture();fixture.stats.social=5;fixture.stats.stability=5;fixture.effects=[];
+    for(const accepted of [false,true]) {
+      const branch=actionOutcome(fixture,s=>respondToEncounter(s,s.encounters[0].id,'relationship'),(s,result)=>result.accepted===accepted);
+      const prospect=branch.before.encounters[0];
+      const ui=await mount(branch.before);ui.click('.nav-list [data-tab="family"]');
+      const button=ui.query('[data-action="encounter"][data-choice="relationship"]');
+      assert.match(button.textContent,new RegExp(`${Math.round(relationshipOdds(branch.before,prospect)*100)}%`));
+      ui.click('[data-action="encounter"][data-choice="relationship"]');
+      assert.deepEqual(ui.saved(),branch.after,'UI must perform exactly one pursuit roll');
+      if(accepted) {
+        assert.equal(ui.saved().partner.id,prospect.id);
+        assert.equal(ui.saved().encounters.length,0);
+        assert.equal(ui.all('.encounter-card').length,0);
+        assert.ok(ui.saved().partner.relationship>=3 && ui.saved().partner.relationship<=7);
+        assert.equal(ui.query('.partner-panel .relationship-meter').getAttribute('aria-valuenow'),String(ui.saved().partner.relationship));
+        assert.ok(effectiveStats(ui.saved()).social>effectiveStats(branch.before).social);
+        assert.ok(effectiveStats(ui.saved()).stability>effectiveStats(branch.before).stability);
+        assert.equal(ui.saved().lifestyle,branch.before.lifestyle-1);
+        assert.match(ui.query('.partner-panel').textContent,/Girlfriend/i);
+      } else {
+        assert.equal(ui.saved().partner,null);
+        assert.equal(ui.saved().encounters.length,fixture.encounters.length-1);
+        assert.ok(!ui.saved().encounters.some(person=>person.id===prospect.id));
+        assert.match(ui.query('#toast-root').textContent,/not mutual/i);
+      }
+      assert.equal(validateSave(ui.saved()),true);
+    }
+  });
+
+  test('a one-night stand can be accepted without starting a relationship',async()=>{
+    const fixture=encounterFixture();fixture.stats.social=5;fixture.stats.stability=5;fixture.effects=[];
+    const branch=actionOutcome(fixture,s=>respondToEncounter(s,s.encounters[0].id,'casual'),(s,result)=>result.accepted && !s.pregnancy);
+    const ui=await mount(branch.before);ui.click('.nav-list [data-tab="family"]');
+    ui.click('[data-action="encounter"][data-choice="casual"]');
+    assert.deepEqual(ui.saved(),branch.after);
+    assert.equal(ui.saved().partner,null);
+    assert.equal(ui.saved().stats.social,5.25);
+    assert.equal(ui.saved().stats.stability,4.9);
+    assert.equal(ui.saved().encounters.length,fixture.encounters.length-1);
+    assert.equal(ui.saved().age,fixture.age);
+  });
+
+  test('proposal outcomes persist, a rejection cannot be retried, and breakup requires confirmation',async()=>{
+    const fixture=partnerFixture();fixture.partner.yearsTogether=3;
+    for(const accepted of [false,true]) {
+      const branch=actionOutcome(fixture,proposeMarriage,(s,result)=>result.accepted===accepted);
+      let ui=await mount(branch.before);ui.click('.nav-list [data-tab="family"]');
+      assert.match(ui.query('[data-action="propose"]').textContent,new RegExp(`${Math.round(proposalChance(branch.before)*100)}%`));
+      ui.click('[data-action="propose"]');
+      assert.deepEqual(ui.saved(),branch.after);
+      const persisted=ui.saved();ui=await mount(persisted);ui.click('.nav-list [data-tab="family"]');
+      assert.deepEqual(ui.saved(),persisted);
+      if(accepted) {
+        assert.match(ui.query('.partner-panel').textContent,/Wife|Married/);
+        assert.equal(ui.all('[data-action="propose"]').length,0);
+      } else {
+        assert.equal(ui.query('[data-action="propose"]').disabled,true);
+        ui.click('[data-action="propose"]');assert.deepEqual(ui.saved(),persisted);
+        assert.match(ui.query('.partner-panel').textContent,/already proposed this year/i);
+      }
+      ui.click('[data-action="breakup"]');
+      assert.deepEqual(ui.saved(),persisted);
+      ui.click('.modal [data-action="close"]');assert.deepEqual(ui.saved(),persisted);
+      ui.click('[data-action="breakup"]');ui.click('[data-action="confirm-breakup"]');
+      assert.equal(ui.saved().partner,null);
+      assert.equal(ui.saved().age,fixture.age);
+      assert.equal(ui.all('.partner-panel').length,0);
+      assert.equal(validateSave(ui.saved()),true);
+    }
+  });
+
+  test('a pregnancy survives reload and becomes a newborn with a relationship meter',async()=>{
+    const fixture=partnerFixture();fixture.partner.married=true;fixture.partner.yearsTogether=4;
+    const branch=actionOutcome(fixture,advanceYear,(s)=>Boolean(s.pregnancy));
+    resolvePending(branch.after);
+    let ui=await mount(branch.after);ui.click('.nav-list [data-tab="family"]');
+    assert.match(ui.query('.pregnancy-panel').textContent,new RegExp(branch.after.pregnancy.otherParent.name));
+    assert.match(ui.query('.pregnancy-panel').textContent,new RegExp(`age ${branch.after.pregnancy.dueAge}`));
+    assertNoMoneyDisplay(ui.query('.pregnancy-panel'),'pregnancy');
+    const persisted=ui.saved();ui=await mount(persisted);assert.deepEqual(ui.saved(),persisted);
+    ui.click('.bottom-dock [data-action="advance"]');resolveUIEvents(ui);
+    assert.equal(ui.saved().pregnancy,null);
+    assert.equal(ui.saved().children.length,1);
+    assert.equal(ui.saved().children[0].age,0);
+    assert.equal(ui.saved().children[0].adopted,false);
+    ui.click('.nav-list [data-tab="family"]');
+    assert.equal(ui.all('.pregnancy-panel').length,0);
+    assert.equal(ui.query('.child-grid .relationship-meter').getAttribute('aria-valuenow'),String(ui.saved().children[0].relationship));
+    assert.equal(validateSave(ui.saved()),true);
+  });
+
+  test('child decisions name the correct child and change that child, their bond, and the player',async()=>{
+    const fixture=ageTo(createGame({seed:1500}),25);
+    haveChild(fixture);ageTo(fixture,26);haveChild(fixture);ageTo(fixture,33);
+    fixture.stats.stability=5;
+    for(const child of fixture.children) {child.stats.intelligence=5;child.relationship=5;}
+    const event=EVENTS.find(event=>event.id==='household_child_school');
+    fixture.pendingEvents=fixture.children.map(child=>({eventId:event.id,age:fixture.age,subjectType:'child',subjectId:child.id}));
+    fixture.lastYearEvents=fixture.children.map(child=>`${event.id}:${child.id}`);
+    assert.equal(validateSave(fixture),true);
+    let ui=await mount(fixture);
+    for(let index=0;index<fixture.children.length;index++) {
+      const child=fixture.children[index];
+      assert.equal(ui.query('.event-decision').dataset.subjectId,child.id);
+      assert.match(ui.query('.event-decision').textContent,new RegExp(child.name));
+      assert.doesNotMatch(ui.query('.event-decision').textContent,/\{name\}/);
+      assert.equal(ui.all('[data-action="advance"]').length,0);
+      ui.click('[data-action="event-choice"][data-choice="home"]');
+      assert.equal(ui.saved().children[index].stats.intelligence,5.4);
+      assert.equal(ui.saved().children[index].relationship,5.4);
+      assert.equal(ui.saved().stats.stability,Math.round((5-.1*(index+1))*100)/100);
+      if(index===0) {
+        assert.equal(ui.saved().children[1].stats.intelligence,5);
+        const persisted=ui.saved();ui=await mount(persisted);assert.deepEqual(ui.saved(),persisted);
+      }
+    }
+    assert.equal(ui.saved().pendingEvents.length,0);
+    assert.equal(ui.all('.event-decision').length,0);
+    assert.equal(validateSave(ui.saved()),true);
+  });
+
+  test('partner decisions display personal and shared consequences and update the bond',async()=>{
+    const fixture=partnerFixture();fixture.stats.social=5;fixture.partner.stats.social=5;fixture.partner.relationship=5;
+    const event=EVENTS.find(event=>event.id==='household_partner_argument');
+    fixture.pendingEvents=[{eventId:event.id,age:fixture.age,subjectType:'partner',subjectId:fixture.partner.id}];
+    fixture.lastYearEvents=[`${event.id}:${fixture.partner.id}`];
+    assert.equal(validateSave(fixture),true);
+    const ui=await mount(fixture);
+    assert.equal(ui.query('.event-decision').dataset.subjectId,fixture.partner.id);
+    assert.match(ui.query('.event-decision').textContent,new RegExp(fixture.partner.name));
+    assert.match(ui.query('[data-choice="listen"] .event-consequences').textContent,/Bond.*\+0\.6/);
+    ui.click('[data-action="event-choice"][data-choice="listen"]');
+    assert.equal(ui.saved().stats.social,5.2);
+    assert.equal(ui.saved().partner.stats.social,5.2);
+    assert.equal(ui.saved().partner.relationship,5.6);
+    ui.click('.nav-list [data-tab="family"]');
+    assert.equal(ui.query('.partner-panel .relationship-meter').getAttribute('aria-valuenow'),'5.6');
+  });
+
+  test('a v4 save preserves pending decisions and progress through the family update',async()=>{
+    const fixture=pendingFixture(2),legacy=beforeFamilySave(fixture);
+    let ui=await mount(legacy);
+    const restored=ui.saved();
+    assert.equal(restored.version,5);
+    for(const key of ['id','name','age','rng','nextId','education','jobOffers','stats','aptitudes','history','pendingEvents','lastYearEvents']) assert.deepEqual(restored[key],fixture[key],`${key} must survive migration`);
+    assert.equal(restored.partner,null);assert.deepEqual(restored.encounters,[]);
+    assert.equal(ui.query('.event-decision').dataset.eventId,fixture.pendingEvents[0].eventId);
+    assert.equal(validateSave(restored),true);
+    ui=await mount(restored);assert.deepEqual(ui.saved(),restored);
+    resolveUIEvents(ui);assert.equal(ui.saved().pendingEvents.length,0);
+    assert.equal(ui.saved().age,fixture.age);
+  });
 });
 
 describe('Lifelines DOM integration', { concurrency: false }, () => {

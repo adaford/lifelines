@@ -2,14 +2,17 @@ import {
   SKILLS, JOBS, EVENTS, resolveEventChoice, createGame, advanceYear, setFocus, setBabyChoice, jobFit,
   canTakeJob, takeJob, quitJob, haveChild, successionInfo, succeed,
   effectiveStats, eventOdds, stage, migrateSave, chooseEducation,
-  offeredJobs, needsEducationChoice
-} from './engine.js?v=events-120';
+  offeredJobs, needsEducationChoice, pendingEventSubject,
+  relationshipOdds, meetingChances, proposalChance, pregnancyChance, oneNightChance,
+  respondToEncounter, proposeMarriage, endRelationship
+} from './engine.js?v=family-1';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const app = document.querySelector('#app');
 const modalRoot = document.querySelector('#modal-root');
 let activeTab = 'year';
 let showAllHistory = false;
+let encounterIndex = 0;
 let saveAvailable = true;
 let loadNotice = '';
 let modalReturnFocus = null;
@@ -116,8 +119,11 @@ function statsView() {
   }).join('')}</div><p class="trait-legend"><span class="aptitude positive">+3</span> to <span class="aptitude negative">−3</span> = growth affinity</p><div class="vitals-grid">${[['health','Health','heart'],['stability','Stability','spark']].map(([key,label,ico]) => `<div class="vital"><span class="vital-label">${icon(ico)}${label}</span><span class="vital-value">${number(stats[key])}<small>/10</small></span>${key==='stability'?'<span class="muted">Higher is calmer</span>':''}</div>`).join('')}<div class="vital"><span class="vital-label">Height</span><span class="vital-value">${Math.round(state.height)}<small> cm</small></span></div></div></section>`;
 }
 
-function outcomeSummary(outcome) {
+function outcomeSummary(outcome, subject) {
   const changes = Object.entries(outcome.statChanges || {}).map(([key,value]) => `${skillLabel(key)} ${value>0?'+':''}${value} permanently`);
+  for (const [key,value] of Object.entries(outcome.subjectChanges || {})) changes.push(`${subject?.name || 'Your loved one'}: ${skillLabel(key)} ${value>0?'+':''}${value}`);
+  for (const [key,value] of Object.entries(outcome.playerChanges || {})) changes.push(`You: ${skillLabel(key)} ${value>0?'+':''}${value}`);
+  if (outcome.relationship) changes.push(`Bond with ${subject?.name || 'your loved one'} ${outcome.relationship>0?'+':''}${outcome.relationship}`);
   const temporary = { ...outcome.modifiers, ...(outcome.lifestyle ? {lifestyle:outcome.lifestyle} : {}) };
   for (const [key,value] of Object.entries(temporary)) changes.push(`${skillLabel(key)} ${value>0?'+':''}${value} for ${outcome.years} year${outcome.years===1?'':'s'}`);
   return changes.join(' · ');
@@ -127,7 +133,9 @@ function eventDecisionView() {
   const pending = state.pendingEvents[0];
   if (!pending) return '';
   const event = EVENTS.find(event => event.id===pending.eventId);
-  return `<section class="panel event-decision" aria-labelledby="event-title" data-event-id="${esc(event.id)}"><div class="panel-heading"><span class="eyebrow">A TURN IN YOUR STORY</span><span class="tag">${state.pendingEvents.length} CHOICE${state.pendingEvents.length===1?'':'S'} LEFT</span></div><h3 id="event-title" tabindex="-1">${esc(event.name)}</h3><p class="event-context">Age ${pending.age} · Year in review</p><p class="section-description">${esc(event.description)}</p><div class="event-choices">${event.choices.map(choice=>`<button class="event-option" data-action="event-choice" data-event="${esc(event.id)}" data-choice="${esc(choice.id)}"><strong>${esc(choice.label)} ${icon('arrow')}</strong><span>${esc(choice.description)}</span><span class="event-consequences">${esc(outcomeSummary(choice))}</span></button>`).join('')}</div><p class="form-note">Choose before moving on. Your decision and its consequences will be saved.</p></section>`;
+  const subject = pendingEventSubject(state,pending);
+  const story = text => String(text).replaceAll('{name}',subject?.name || 'your loved one');
+  return `<section class="panel event-decision" aria-labelledby="event-title" data-event-id="${esc(event.id)}" data-subject-id="${esc(pending.subjectId || '')}"><div class="panel-heading"><span class="eyebrow">${pending.subjectId?'A FAMILY MOMENT':'A TURN IN YOUR STORY'}</span><span class="tag">${state.pendingEvents.length} CHOICE${state.pendingEvents.length===1?'':'S'} LEFT</span></div><h3 id="event-title" tabindex="-1">${esc(event.name)}</h3><p class="event-context">${pending.subjectId?`${esc(subject?.name)} · Age ${subject?.age} · Your age ${pending.age}`:`Age ${pending.age}`} · Year in review</p><p class="section-description">${esc(story(event.description))}</p><div class="event-choices">${event.choices.map(choice=>`<button class="event-option" data-action="event-choice" data-event="${esc(event.id)}" data-subject="${esc(pending.subjectId || '')}" data-choice="${esc(choice.id)}"><strong>${esc(choice.label)} ${icon('arrow')}</strong><span>${esc(story(choice.description))}</span><span class="event-consequences">${esc(outcomeSummary(choice,subject))}</span></button>`).join('')}</div><p class="form-note">Choose before moving on. Your decision and its consequences will be saved.</p></section>`;
 }
 
 function focusEventDecision() {
@@ -142,7 +150,7 @@ function effectsView() {
 }
 
 function yearView() {
-  if (needsEducationChoice(state)) return `<section class="panel education-prompt"><div class="panel-heading"><h3>Your next chapter</h3><span class="tag">A NEW CHOICE</span></div><p class="section-description">Go to college, or start working. Choose your path before your next year begins.</p><button class="button primary" data-action="tab" data-tab="career">College or career? ${icon('arrow')}</button></section>${journalView()}`;
+  if (needsEducationChoice(state)) return `<section class="panel education-prompt"><div class="panel-heading"><h3>Your next chapter</h3><span class="tag">A NEW CHOICE</span></div><p class="section-description">Go to college, or start working. Choose your path before your next year begins.</p><button class="button primary" data-action="tab" data-tab="career">College or career? ${icon('arrow')}</button></section>${connectionNotice()}${journalView()}`;
   const baby = state.age < 3;
   const disabled = state.ended || state.needsSuccession || state.pendingEvents.length>0;
   return `${state.education.status==='college'?collegeProgressView():''}<section class="panel focus-panel"><div class="panel-heading"><h3>${baby ? 'Ask for attention' : 'Your focus'}</h3><span class="tag">${baby ? 'AGES 0–2' : `${focusUsed()} / 12 POINTS`}</span></div><p class="section-description">${baby ? 'More attention helps you grow, but strains your parents.' : 'Share 12 points. Each focus takes 0–5.'}</p>
@@ -150,7 +158,7 @@ function yearView() {
     </section>
     ${baby?birthSkillsView():''}
     ${state.effects.length?`<button class="effect-summary button secondary" data-action="tab" data-tab="character">${icon('spark')} ${state.effects.length} active life effect${state.effects.length===1?'':'s'} · View ${icon('arrow')}</button>`:''}
-    ${journalView()}`;
+    ${connectionNotice()}${journalView()}`;
 }
 
 function birthSkillsView() {
@@ -165,7 +173,7 @@ function lifestyleView() {
 
 function focusView(disabled) {
   const studying = state.age<18 || state.education.status==='college';
-  const rows = [['work',state.age<18?'School':studying?'College':'Career',studying?'Learn & develop your mind':'Success & lifestyle',studying?'school':'career'],['social','Friends','Connection & confidence','social'],['family','Family','Care & help your kids grow','family'],['self','Yourself','Learn, grow & relax','self']];
+  const rows = [['work',state.age<18?'School':studying?'College':'Career',studying?'Learn & develop your mind':'Success & lifestyle',studying?'school':'career'],['social','Friends','Connection & confidence','social'],['family','Family','Build bonds & help your kids grow','family'],['self','Yourself','Learn, grow & relax','self']];
   return `<div class="focus-list">${rows.map(([key,label,description,ico]) => `<div class="focus-row"><span class="focus-icon">${icon(ico)}</span><div class="focus-copy"><h4>${label}</h4><p>${description}</p><div class="focus-scale" aria-hidden="true">${Array.from({length:5},(_,i)=>`<span class="${i<state.focus[key]?'filled':''}"></span>`).join('')}</div></div><div class="stepper" role="group" aria-label="${label} focus"><button data-action="focus" data-key="${key}" data-delta="-1" aria-label="Decrease ${label.toLowerCase()} focus" ${state.focus[key]<=0||disabled?'disabled':''}>${icon('minus')}</button><output aria-label="${label} focus level">${state.focus[key]}</output><button data-action="focus" data-key="${key}" data-delta="1" aria-label="Increase ${label.toLowerCase()} focus" ${state.focus[key]>=5||focusUsed()>=12||disabled?'disabled':''}>${icon('plus')}</button></div></div>`).join('')}</div><div class="budget-bar"><div class="budget-summary"><span>${focusUsed()===12?'All your energy has a place.':`${12-focusUsed()} focus point${12-focusUsed()===1?'':'s'} still available`}</span><strong>${focusUsed()} / 12</strong></div><div class="budget-track"><span style="width:${focusUsed()/12*100}%"></span></div></div>`;
 }
 
@@ -196,24 +204,69 @@ function miniStats(person) {
   return `<div class="mini-stats">${SKILLS.map(skill => `<span title="${esc(skill.label)}; growth affinity ${aptitude(person.aptitudes?.[skill.key]??0)}">${esc(skill.label)} <strong>${number(person.stats[skill.key])}</strong></span>`).join('')}<span>Health <strong>${number(person.stats.health)}</strong></span><span>Stability <strong>${number(person.stats.stability)}</strong></span></div>`;
 }
 
+function partnerLabel(person) {
+  if (person.gender==='female') return person.married?'Wife':'Girlfriend';
+  if (person.gender==='male') return person.married?'Husband':'Boyfriend';
+  return person.married?'Spouse':'Partner';
+}
+
+function relationshipMeter(person) {
+  return `<div class="relationship-summary"><span>Relationship</span><strong>${number(person.relationship)}<small>/10</small></strong></div><div class="relationship-meter" role="meter" aria-label="Relationship with ${esc(person.name)}" aria-valuemin="1" aria-valuemax="10" aria-valuenow="${person.relationship}"><span style="width:${person.relationship*10}%"></span></div>`;
+}
+
+function profileStats(person) {
+  return `<div class="profile-stats">${SKILLS.map(skill=>`<div class="profile-stat" data-skill="${skill.key}"><span>${esc(skill.label)}</span><strong>${number(person.stats[skill.key])}<small>/10</small></strong><span class="aptitude ${person.aptitudes[skill.key]>0?'positive':person.aptitudes[skill.key]<0?'negative':''}" aria-label="${esc(skill.label)} growth affinity ${aptitude(person.aptitudes[skill.key])}">${aptitude(person.aptitudes[skill.key])}</span></div>`).join('')}${[['health','Health'],['stability','Stability']].map(([key,label])=>`<div class="profile-stat" data-skill="${key}"><span>${label}</span><strong>${number(person.stats[key])}<small>/10</small></strong></div>`).join('')}<div class="profile-stat"><span>Lifestyle</span><strong>${person.lifestyle}<small>/10</small></strong></div><div class="profile-stat"><span>Height</span><strong>${Math.round(person.height)}<small> cm</small></strong></div></div><p class="profile-affinity-note">Small −3 to +3 ratings show growth affinity.</p>`;
+}
+
+function pregnancyView() {
+  if (!state.pregnancy) return '';
+  const carrierName = state.pregnancy.carrierId===state.id ? 'You are' : `${esc(state.pregnancy.otherParent.name)} is`;
+  return `<section class="panel pregnancy-panel"><div class="panel-heading"><h3>${icon('heart')} A new chapter on the way</h3><span class="tag">EXPECTING</span></div><p class="section-description">${carrierName} expecting a baby. Your family will welcome the new arrival when you reach age ${state.pregnancy.dueAge}.</p><p class="form-note">Family time builds your children’s abilities and your bond with them. Each dependent child reduces your lifestyle by one level and brings a social boost.</p></section>`;
+}
+
+function loveView() {
+  if (state.age<18) return '';
+  const blocked = state.pendingEvents.length>0 || state.ended || state.needsSuccession;
+  if (state.partner) {
+    const person = state.partner;
+    const proposal = proposalChance(state);
+    const pregnancy = pregnancyChance(state);
+    const living = person.alive!==false;
+    return `<section class="panel partner-panel" data-person-id="${esc(person.id)}"><div class="panel-heading"><h3>${icon('heart')} Your life together</h3><span class="tag">${living?partnerLabel(person).toUpperCase():'REMEMBERED'}</span></div><div class="family-header"><div class="family-avatar">${avatar(person,true)}</div><div class="family-meta"><h3>${esc(person.name)}</h3><p>${person.age} years old · ${person.yearsTogether} year${person.yearsTogether===1?'':'s'} together</p></div></div>${relationshipMeter(person)}<p class="form-note">Family focus strengthens your bond. ${living?`This relationship brings social ability +${person.married?'0.9':'0.7'}, stability +${person.married?'0.8':'0.6'}, and lifestyle −1.`:'Their place in your story remains.'}</p>${profileStats(person)}${living?`<div class="relationship-actions">${!person.married?`<button class="button primary" data-action="propose" ${blocked||!proposal?'disabled':''}>Propose marriage <span>${pct(proposal)} chance</span></button><p class="form-note">${person.lastProposalAge===state.age?'You have already proposed this year. You can try again next year.':'One proposal each year. A stronger bond and more years together improve the odds.'}</p>`:'<p class="married-note">Married · A shared chapter</p>'}<p class="form-note">${state.pregnancy?'Your family is expecting.':pregnancy?`Pregnancy chance this year: ${pct(pregnancy)}. Marriage makes pregnancy much more likely than dating.`:'No pregnancy chance this year.'}</p><button class="button ghost small" data-action="breakup" ${blocked?'disabled':''}>${person.married?'End marriage':'End relationship'}</button></div>`:''}</section>${pregnancyView()}`;
+  }
+  const chance = meetingChances(state);
+  const anyChance = 1-Math.pow(1-chance.chance,chance.slots);
+  const people = state.encounters;
+  encounterIndex = Math.max(0,Math.min(encounterIndex,people.length-1));
+  const person = people[encounterIndex];
+  return `${pregnancyView()}<section class="panel dating-panel"><div class="panel-heading"><h3>${icon('heart')} People you meet</h3><span class="tag">${people.length} AVAILABLE</span></div><p class="section-description">Attractiveness, social ability, and lifestyle shape how often you meet someone and the people you attract.</p><div class="dating-chances"><span>Chance of meeting someone next year <strong>${pct(anyChance)}</strong></span><span>Up to <strong>${chance.slots}</strong> people with your current appeal</span></div>${people.length?`<p class="form-note">Explore their stats before deciding. Unanswered invitations pass when you advance a year.</p><div class="encounter-list" data-total="${people.length}">${people.length>1?`<div class="encounter-pagination"><button class="button ghost small" data-action="prospect-page" data-delta="-1" aria-label="Previous person" ${encounterIndex===0?'disabled':''}>Back</button><span>${encounterIndex+1} of ${people.length}</span><button class="button ghost small" data-action="prospect-page" data-delta="1" aria-label="Next person" ${encounterIndex===people.length-1?'disabled':''}>Next</button></div>`:''}<article class="encounter-card" data-person-id="${esc(person.id)}"><div class="family-header"><div class="family-avatar">${avatar(person,true)}</div><div class="family-meta"><h3 tabindex="-1">${esc(person.name)}</h3><p>${person.age} years old</p></div></div>${profileStats(person)}<div class="encounter-actions"><button class="button primary" data-action="encounter" data-choice="relationship" data-id="${esc(person.id)}" ${blocked?'disabled':''}>Pursue a relationship <span>${pct(relationshipOdds(state,person))} chance</span></button><button class="button secondary" data-action="encounter" data-choice="casual" data-id="${esc(person.id)}" ${blocked?'disabled':''}>One-night stand <span>${pct(oneNightChance(state,person))} mutual interest</span></button><button class="button ghost" data-action="encounter" data-choice="ignore" data-id="${esc(person.id)}" ${blocked?'disabled':''}>Ignore</button></div><p class="form-note">Either approach can be declined. A one-night stand may lead to pregnancy. Starting a relationship closes the other invitations.</p></article></div>`:`<div class="empty-state">${icon('heart')}<h4>No new connection this year</h4><p>Some years are quiet. Keep building your life and see who you meet next year.</p></div>`}</section>`;
+}
+
+function connectionNotice() {
+  if (state.age<18 || state.ended || state.needsSuccession) return '';
+  if (state.pregnancy) return `<button class="connection-notice button secondary" data-action="tab" data-tab="family">${icon('heart')} A baby is on the way · Family ${icon('arrow')}</button>`;
+  if (state.encounters.length) return `<button class="connection-notice button secondary" data-action="tab" data-tab="family">${icon('heart')} ${state.encounters.length} new connection${state.encounters.length===1?'':'s'} · Meet them ${icon('arrow')}</button>`;
+  return '';
+}
+
 function personCard(person, role, child = false) {
   const info = successionInfo(state);
   const canSelect = child && info.eligible && info.children.some(c=>c.id===person.id);
-  return `<article class="family-card"><div class="family-header"><div class="family-avatar">${avatar(person,true)}</div><div class="family-meta"><span class="eyebrow">${role}</span><h3>${esc(person.name)}</h3><p>${person.age} years old${person.age>=85?' · Remembered':` · Stability ${number(person.stats.stability)}/10`}</p></div></div><p class="family-lifestyle">Lifestyle <strong>${person.lifestyle}/10</strong>${person.age<18?' · Shares your household':''}</p><details class="family-details"><summary>Skills & wellbeing</summary>${miniStats(person)}</details>${child?`<div class="family-card-footer"><span>${person.alive!==false?'An equal share of your legacy':'Remembered with love'}</span>${canSelect?`<button class="button primary small" data-action="heir" data-id="${esc(person.id)}">Continue as ${esc(person.name.split(' ')[0])} ${icon('arrow')}</button>`:''}</div>`:''}</article>`;
+  return `<article class="family-card"><div class="family-header"><div class="family-avatar">${avatar(person,true)}</div><div class="family-meta"><span class="eyebrow">${role}</span><h3>${esc(person.name)}</h3><p>${person.age} years old${person.age>=85?' · Remembered':` · Stability ${number(person.stats.stability)}/10`}</p></div></div><p class="family-lifestyle">Lifestyle <strong>${person.lifestyle}/10</strong>${person.age<18?' · Shares your household':''}</p>${child?relationshipMeter(person):''}<details class="family-details"><summary>Skills & wellbeing</summary>${miniStats(person)}</details>${child?`<div class="family-card-footer"><span>${person.alive!==false?'An equal share of your legacy':'Remembered with love'}</span>${canSelect?`<button class="button primary small" data-action="heir" data-id="${esc(person.id)}">Continue as ${esc(person.name.split(' ')[0])} ${icon('arrow')}</button>`:''}</div>`:''}</article>`;
 }
 
 function familyView() {
   const info = successionInfo(state);
-  const childAllowed = !state.pendingEvents.length && state.age>=18 && state.children.length<6 && state.lastChildAge!==state.age && !state.ended && !state.needsSuccession;
-  return `<section class="panel"><div class="panel-heading"><h3>The people who raised you</h3><span class="tag">ROOTS</span></div><p class="section-description">${state.age<3?'Crying brings more attention and more growth. It also lowers both parents’ mental stability.':'Family focus supports your parents and gives your children a stronger start.'}</p><div class="family-grid">${state.parents.map((p,i)=>personCard(p,i===0?'PARENT ONE':'PARENT TWO')).join('')}</div></section>
-    <section class="panel"><div class="panel-heading"><h3>The next generation</h3><button class="button secondary small" data-action="child" ${childAllowed?'':'disabled'}>${icon('plus')} ${state.age>60?'Adopt a child':'Have a child'}</button></div><p class="section-description">${state.age<18?'Parenthood opens at age 18. Until then, there’s a whole childhood to live.':state.age>60?'You can adopt a child in later life. Family focus helps them grow, and they can continue your story.':state.lastChildAge===state.age?'A new arrival this year. You can welcome another child next year.':'Welcome up to six children, one per year, from age 18. After 60, grow your family through adoption. Family focus improves their skills.'}</p>${state.children.length?`<div class="family-grid child-grid">${state.children.map(c=>personCard(c,'YOUR CHILD',true)).join('')}</div>`:`<div class="empty-state">${icon('family')}<h4>A branch yet to grow</h4><p>Your children will appear here. Build their skills,<br>then carry the story forward through them.</p></div>`}</section>
+  const childAllowed = !state.pendingEvents.length && state.age>=18 && state.children.length<(state.pregnancy?5:6) && state.lastChildAge!==state.age && !state.ended && !state.needsSuccession;
+  return `${loveView()}<details class="panel roots-panel" ${state.age<18?'open':''}><summary>The people who raised you</summary><p class="section-description">${state.age<3?'Crying brings more attention and more growth. It also lowers both parents’ mental stability.':'Family focus supports your parents and gives your children a stronger start.'}</p><div class="family-grid">${state.parents.map((p,i)=>personCard(p,i===0?'PARENT ONE':'PARENT TWO')).join('')}</div></details>
+    <section class="panel"><div class="panel-heading"><h3>The next generation</h3><button class="button secondary small" data-action="child" ${childAllowed?'':'disabled'}>${icon('plus')} Adopt a child</button></div><p class="section-description">${state.age<18?'Parenthood opens at age 18. Until then, there’s a whole childhood to live.':state.lastChildAge===state.age?'A new arrival this year. You can welcome another child next year.':'Welcome up to six children through pregnancy or adoption. Each dependent child costs one lifestyle level; every living child adds a small social boost. Family focus improves their skills and your bond.'}</p>${state.children.length?`<div class="family-grid child-grid">${state.children.map(c=>personCard(c,'YOUR CHILD',true)).join('')}</div>`:`<div class="empty-state">${icon('family')}<h4>A branch yet to grow</h4><p>Your children will appear here. Build their skills,<br>then carry the story forward through them.</p></div>`}</section>
     <section class="panel"><div class="panel-heading"><h3>What carries forward</h3><span class="tag">YOUR LEGACY</span></div><p class="section-description">You can pass the story to a child at 65; at 85, this chapter closes. Older heirs can adopt to keep the family growing. Your heir keeps their age, skills, and skill affinities.</p>${lifestyleView()}<p class="form-note">Your lifestyle shapes what you leave behind. All living children receive an equal share of the family legacy, helping support their own lifestyle. More children means a smaller share for each.</p>${state.age>=65&&!info.eligible?`<p class="form-note">${esc(info.reason)}</p>`:''}</section>
     ${state.lineage.length?`<section class="panel"><div class="panel-heading"><h3>Those who came before</h3><span class="tag">${state.lineage.length} CHAPTERS</span></div><div class="legacy-list">${state.lineage.map(p=>`<div class="legacy-card"><strong>${esc(p.name)}</strong><span>Generation ${esc(p.generation ?? '—')} · Age ${esc(p.age ?? '—')}</span></div>`).join('')}</div></section>`:''}`;
 }
 
 function characterView() {
   const stats = effectiveStats(state);
-  return `${statsView()}${effectsView()}<details class="panel character-guide"><summary>How your character grows</summary><div class="help-grid"><div class="help-item"><h4>Nature & nurture</h4><p>Skills run from 1–10. The −3 to +3 rating is your lifelong growth affinity: positive means faster growth, negative means more practice. Every skill can improve.</p></div><div class="help-item"><h4>Health · ${number(stats.health)}/10</h4><p>Self-care supports health. Injuries and illness can temporarily reduce it; it gradually declines in later life.</p></div><div class="help-item"><h4>Mental stability · ${number(stats.stability)}/10</h4><p>Higher means calmer and more resilient. Low stability raises the odds of impulsive decisions, conflict, and distress. Rest, friends, and family help. These are fictional game probabilities.</p></div><div class="help-item"><h4>Height · ${Math.round(state.height)} cm</h4><p>${state.age<18?'You are still growing. Your adult height will be reached at 18.':'You have reached your adult height.'}</p></div><div class="help-item"><h4>Lifestyle · ${state.lifestyle}/10</h4><p>${state.age<18?'Until age 18, you share the household lifestyle with your parents. Your own career and resources set it in adulthood.':'Your career success and family legacy support your comfort. Your legacy is shared equally among your children.'}</p></div></div></details>`;
+  return `${statsView()}${effectsView()}<details class="panel character-guide"><summary>How your character grows</summary><div class="help-grid"><div class="help-item"><h4>Nature & nurture</h4><p>Skills run from 1–10. The −3 to +3 rating is your lifelong growth affinity: positive means faster growth, negative means more practice. Every skill can improve.</p></div><div class="help-item"><h4>Health · ${number(stats.health)}/10</h4><p>Self-care supports health. Injuries and illness can temporarily reduce it; it gradually declines in later life.</p></div><div class="help-item"><h4>Mental stability · ${number(stats.stability)}/10</h4><p>Higher means calmer and more resilient. Low stability raises the odds of impulsive decisions, conflict, and distress. Rest, friends, and family help. These are fictional game probabilities.</p></div><div class="help-item"><h4>Attractiveness over time</h4><p>Your natural peak is around age ${state.appearancePeakAge}. Attractiveness slowly declines after that, with individual differences and life events shaping your story.</p></div><div class="help-item"><h4>Height · ${Math.round(state.height)} cm</h4><p>${state.age<18?'You are still growing. Your adult height will be reached at 18.':'You have reached your adult height.'}</p></div><div class="help-item"><h4>Lifestyle · ${state.lifestyle}/10</h4><p>${state.age<18?'Until age 18, you share the household lifestyle with your parents. Your own career and resources set it in adulthood.':'Your career success and family legacy support your comfort. Your legacy is shared equally among your children.'}</p></div></div></details>`;
 }
 
 function endPanel() {
@@ -259,14 +312,14 @@ function navigate(tab) {
 }
 
 function helpModal() {
-  openModal('A life, one year at a time.', `<div class="help-grid"><div class="help-item"><h4>01 · Start small</h4><p>At ages 0–2, cry for extra growth at the cost of your parents’ calm, or stay quiet for gentler development.</p></div><div class="help-item"><h4>02 · Spend your time</h4><p>From age 3, share 12 focus points across school or career, friends, family, and yourself. Each takes 0–5. Press Next year when you’re ready.</p></div><div class="help-item"><h4>03 · Work with your nature</h4><p>Skills range from 1–10. The −3 to +3 rating is growth affinity. Your choices determine where you improve; affinity changes how fast.</p></div><div class="help-item"><h4>04 · Leave room for life</h4><p>There are ${EVENTS.length} possible events. Each has a small, independent yearly chance based on your age, focus, career, and stats. Up to five can happen; ordinary lives average roughly one every year or two. Some events ask you to choose, with consequences shown before you decide.</p></div><div class="help-item"><h4>05 · Find your path</h4><p>At 18, choose a job from 10 offers or attend college for four years. Graduates receive 15 offers. There are 100 careers, each with skill affinities and a base lifestyle from 1 to 10.</p></div><div class="help-item"><h4>06 · Grow a legacy</h4><p>Have children from 18–60, or adopt after 60. Family time develops their skills. Pass the story on at 65+, or choose an heir when your life closes at 85. All living children share the estate equally.</p></div></div><p class="form-note">This is a first playable framework: fictional annual probabilities, simple careers and family systems, and local browser saves.</p>`, '<button class="button primary" data-action="close">Let’s live a little</button>');
+  openModal('A life, one year at a time.', `<div class="help-grid"><div class="help-item"><h4>01 · Start small</h4><p>At ages 0–2, cry for extra growth at the cost of your parents’ calm, or stay quiet for gentler development.</p></div><div class="help-item"><h4>02 · Spend your time</h4><p>From age 3, share 12 focus points across school or career, friends, family, and yourself. Each takes 0–5. Press Next year when you’re ready.</p></div><div class="help-item"><h4>03 · Work with your nature</h4><p>Skills range from 1–10. The −3 to +3 rating is growth affinity. Your choices determine where you improve; affinity changes how fast.</p></div><div class="help-item"><h4>04 · Leave room for life</h4><p>There are ${EVENTS.length} possible events. Each has a small, independent yearly chance based on your age, focus, career, and stats. Up to five can happen; ordinary lives average roughly one every year or two. Some events ask you to choose, with consequences shown before you decide.</p></div><div class="help-item"><h4>05 · Find your path</h4><p>At 18, choose a job from 10 offers or attend college for four years. Graduates receive 15 offers. There are 100 careers, each with skill affinities and a base lifestyle from 1 to 10.</p></div><div class="help-item"><h4>06 · Grow a legacy</h4><p>Meet people from 18, build a relationship, and propose once a year. Pregnancy is rare while dating and much more likely in marriage; a baby arrives the following year. Adults can also adopt. Family focus develops children’s skills and strengthens everyone’s bonds. Pass the story on at 65+, or choose an heir when your life closes at 85. All living children share the estate equally.</p></div></div><p class="form-note">This is a first playable framework: fictional annual probabilities, simple careers and family systems, and local browser saves.</p>`, '<button class="button primary" data-action="close">Let’s live a little</button>');
 }
 
 function oddsModal() {
   const odds = eventOdds(state).filter(event=>event.chance>0).sort((a,b)=>b.chance-a.chance);
   const quiet = odds.reduce((chance,event)=>chance*(1-event.chance),1);
   const waiting = state.pendingEvents.length || needsEducationChoice(state) || state.ended || state.needsSuccession;
-  openModal('A little room for chance.', `<p class="section-description">${waiting?'Finish your current decisions to continue. These chances describe your current age and condition.':'Your age, focus, career, and effective stats shape each event’s chance.'} Each event rolls separately, with at most five happening in a year.</p><div class="chance-summary"><span>A quiet year<strong>${(quiet*100).toFixed(1)}%</strong></span><span>At least one event<strong>${((1-quiet)*100).toFixed(1)}%</strong></span></div><p class="form-note">Ordinary lives average roughly one event every year or two. Risks can rise sharply with low stats. All chances are fictional game rules.</p><details class="event-odds"><summary>${odds.length} possible events this year</summary><div class="odds-list">${odds.map(event=>`<div class="odds-row"><span>${esc(event.name)}${EVENTS.find(candidate=>candidate.id===event.id)?.choices?'<small>Includes a choice</small>':''}</span><strong>${(event.chance*100).toFixed(2)}%</strong></div>`).join('')}</div></details><p class="form-note">Individual percentages are the roll chances before the five-event limit. They are checked when you press Next year, using your choices and stats for that year.</p>`);
+  openModal('A little room for chance.', `<p class="section-description">${waiting?'Finish your current decisions to continue. These chances describe your current age and condition.':'Your age, focus, career, and effective stats shape each event’s chance.'} Each event rolls separately, with at most five happening in a year.</p><div class="chance-summary"><span>A quiet year<strong>${(quiet*100).toFixed(1)}%</strong></span><span>At least one event<strong>${((1-quiet)*100).toFixed(1)}%</strong></span></div><p class="form-note">Ordinary lives average roughly one event every year or two. Risks can rise sharply with low stats. All chances are fictional game rules.</p><details class="event-odds"><summary>${odds.length} possible events this year</summary><div class="odds-list">${odds.map(event=>`<div class="odds-row"><span>${esc(event.name)}${EVENTS.find(candidate=>candidate.id===(event.eventId || event.id))?.choices?'<small>Includes a choice</small>':''}</span><strong>${(event.chance*100).toFixed(2)}%</strong></div>`).join('')}</div></details><p class="form-note">Individual percentages are the roll chances before the five-event limit. They are checked when you press Next year, using your choices and stats for that year.</p>`);
 }
 
 function update(action, successMessage) {
@@ -286,7 +339,7 @@ document.addEventListener('click', event => {
   if (action==='menu') menuModal();
   if (action==='review-event') focusEventDecision();
   if (action==='event-choice') {
-    const result = update(()=>resolveEventChoice(state,button.dataset.choice,button.dataset.event));
+    const result = update(()=>resolveEventChoice(state,button.dataset.choice,button.dataset.event,button.dataset.subject || undefined));
     if (result?.ok) {
       if (state.pendingEvents.length) focusEventDecision();
       else { navigate('year'); toast('Your choice becomes part of your story.'); }
@@ -303,12 +356,30 @@ document.addEventListener('click', event => {
     app.querySelector(`[data-action="focus"][data-key="${key}"][data-delta="${delta}"]`)?.focus({preventScroll:true});
   }
   if (action==='advance') {
+    encounterIndex=0;
     const result = update(()=>advanceYear(state));
     if (!result?.ok) return;
     if (state.pendingEvents.length) { focusEventDecision(); return; }
     if (!state.ended&&!state.needsSuccession) app.querySelector('[data-action="advance"]')?.focus({preventScroll:true});
     toast(state.ended?'A life complete. Your journal is saved.':state.needsSuccession?'It’s time to choose the next generation.':`Hello, ${state.age}. A new year begins.`);
   }
+  if (action==='prospect-page') {
+    encounterIndex+=Number(button.dataset.delta); render();
+    app.querySelector('.encounter-card h3')?.focus({preventScroll:true});
+  }
+  if (action==='encounter') {
+    const choice=button.dataset.choice;
+    const result=update(()=>respondToEncounter(state,button.dataset.id,choice));
+    if (result?.ok) toast(choice==='ignore'?'You leave that invitation behind.':result.accepted?choice==='relationship'?'A relationship begins.':'You share a brief connection.':'The interest is not mutual this time.');
+  }
+  if (action==='propose') {
+    const result=update(()=>proposeMarriage(state));
+    if (result?.ok) toast(result.accepted?'You are married. A new chapter together.':'Not yet. You can propose again next year.');
+  }
+  if (action==='breakup' && state.partner) {
+    openModal('End this relationship?', '<p>Close your chapter with <strong>'+esc(state.partner.name)+'</strong>? Your children and any pregnancy remain part of your story.</p>', '<button class="button secondary" data-action="close">Stay together</button><button class="button primary" data-action="confirm-breakup">End relationship</button>');
+  }
+  if (action==='confirm-breakup') { closeModal(); update(()=>endRelationship(state),'Your relationship has ended.'); }
   if (action==='job') update(()=>takeJob(state,button.dataset.id),'A new chapter in your career.');
   if (action==='quit') update(()=>quitJob(state),'You’ve made room for a new path.');
   if (action==='child') update(()=>haveChild(state),'Welcome to the family, little one.');

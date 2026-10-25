@@ -1,9 +1,11 @@
 // Lifelines: deterministic, browser-independent simulation rules.
 // All public actions mutate their state and return { ok, reason? }.
-import { JOBS } from './jobs.js?v=events-120';
-import { EVENTS, eventChances } from './events.js?v=events-120';
-export { JOBS, JOB_CATEGORIES } from './jobs.js?v=events-120';
-export { EVENTS } from './events.js?v=events-120';
+import { JOBS } from './jobs.js?v=family-1';
+import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=family-1';
+import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=family-1';
+import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange } from './relationships.js?v=family-1';
+export { JOBS, JOB_CATEGORIES } from './jobs.js?v=family-1';
+export const EVENTS = [...PERSONAL_EVENTS, ...FAMILY_EVENTS];
 
 export const SKILLS = [
   { key: 'intelligence', label: 'Intelligence', color: '#9cb9ff' },
@@ -46,6 +48,24 @@ function randomStats(state, baby = false) {
   return { ...result, health: round(7 + random(state) * 2.5), stability: round(10 - random(state) * 2) };
 }
 function randomAptitudes(state) { return Object.fromEntries(CORE.map(key => [key, integer(state, -3, 3)])); }
+function personHash(person) {
+  let hash = 2166136261;
+  for (const letter of `${person.id}:${person.name}`) hash = Math.imul(hash ^ letter.charCodeAt(0), 16777619);
+  return hash >>> 0;
+}
+function demographics(person, gender = person.gender) {
+  const hash = personHash(person);
+  person.gender = gender || (hash % 2 ? 'female' : 'male');
+  person.canGestate ??= person.gender === 'female';
+  person.attractedTo ??= [person.gender === 'female' ? 'male' : 'female'];
+  person.appearancePeakAge ??= 27 + hash % 7;
+  return person;
+}
+function datingHelpers(state) {
+  return { random: () => random(state), integer: (low, high) => integer(state, low, high), uid: prefix => uid(state, prefix), personName: () => personName(state), randomAptitudes: () => randomAptitudes(state) };
+}
+const livingPartner = state => state.partner?.alive !== false ? state.partner : null;
+const dependents = state => state.children.filter(child => child.alive !== false && child.age < 18);
 function heightAt(age, adultHeight) {
   if (age === 0) return 50;
   if (age === 1) return 75;
@@ -54,7 +74,7 @@ function heightAt(age, adultHeight) {
 }
 function makeParent(state, lastName) {
   const age = integer(state, 25, 40);
-  return { id: uid(state, 'parent'), name: personName(state, lastName), age, stats: randomStats(state), aptitudes: randomAptitudes(state), height: integer(state, 153, 193), alive: true };
+  return demographics({ id: uid(state, 'parent'), name: personName(state, lastName), age, stats: randomStats(state), aptitudes: randomAptitudes(state), height: integer(state, 153, 193), alive: true });
 }
 function active(state) {
   if (state.pendingEvents.length) return fail('Resolve your event choices before continuing.');
@@ -63,16 +83,20 @@ function active(state) {
   return ok();
 }
 
-export function createGame({ name, seed } = {}) {
+export function createGame({ name, seed, gender = 'male', canGestate, attractedTo } = {}) {
   const initialSeed = Number.isFinite(seed) ? seed >>> 0 : (Date.now() ^ Math.floor(Math.random() * 0xFFFFFFFF)) >>> 0;
-  const state = { version: 4, seed: initialSeed, rng: initialSeed, nextId: 0, id: `life-${initialSeed}`, age: 0, generation: 1,
+  const state = { version: 5, seed: initialSeed, rng: initialSeed, nextId: 0, id: `life-${initialSeed}`, age: 0, generation: 1,
     name: '', stats: {}, aptitudes: {}, height: 50, adultHeight: 170,
     focus: { work: 3, social: 3, family: 3, self: 3 }, babyChoice: 'quiet',
     parents: [], children: [], siblings: [], money: 0, income: 0, expenses: 0, lifestyle: 1,
     jobId: null, jobYears: 0, performance: 0, schoolProgress: 0, lastChildAge: -1,
     education: { status: 'school', years: 0 }, jobOffers: [],
+    partner: null, encounters: [], encounterYear: 0, pregnancy: null,
     effects: [], pendingEvents: [], lastYearEvents: [], history: [], lineage: [], ended: false, needsSuccession: false };
   state.name = typeof name === 'string' && name.trim() ? name.trim().slice(0, 50) : personName(state);
+  demographics(state, ['male', 'female', 'nonbinary'].includes(gender) ? gender : 'male');
+  if (typeof canGestate === 'boolean') state.canGestate = canGestate;
+  if (Array.isArray(attractedTo) && attractedTo.length && attractedTo.every(value => ['male', 'female', 'nonbinary'].includes(value))) state.attractedTo = [...new Set(attractedTo)];
   state.parents = [makeParent(state, surname(state.name)), makeParent(state, surname(state.name))];
   const homeLifestyle = integer(state, 2, 8);
   state.parents.forEach(parent => { parent.lifestyle = homeLifestyle; });
@@ -90,6 +114,9 @@ export function stage(state) {
 export function effectiveStats(state) {
   const result = { ...state.stats };
   for (const effect of state.effects) if (effect.years > 0) for (const [key, value] of Object.entries(effect.modifiers)) result[key] += value;
+  const partner = livingPartner(state);
+  if (partner) { result.social += partner.married ? .9 : .7; result.stability += partner.married ? .8 : .6; }
+  result.social += Math.min(1.2, dependents(state).length * .2);
   for (const key of STAT_KEYS) result[key] = round(clamp(result[key], 1, 10));
   return result;
 }
@@ -195,9 +222,89 @@ export function quitJob(state) {
   return ok();
 }
 
+export function meetingChances(state) { return meetingRules(state, effectiveStats(state)); }
+export function relationshipOdds(state, person) { return attractionRules(state, person, effectiveStats(state)); }
+export function oneNightChance(state, person) { return casualRules(state, person, effectiveStats(state)); }
+export function proposalChance(state) { return proposalRules(state); }
+export function pregnancyChance(state, person = livingPartner(state), options = {}) { return pregnancyRules(state, person, options); }
+
+function startPregnancy(state, otherParent, casual = false) {
+  const carrier = gestatingActor(state, otherParent);
+  if (!carrier || state.pregnancy || state.children.length >= 6 || state.age >= 84) return false;
+  state.pregnancy = { carrierId: carrier.id, carrierName: carrier.name, otherParent: clone(otherParent), dueAge: state.age + 1, startedAge: state.age, casual };
+  log(state, 'A baby on the way', `${carrier.id === state.id ? 'You are' : `${carrier.name} is`} expecting a child. The baby is due next year.`, 'family');
+  return true;
+}
+
+export function respondToEncounter(state, personId, decision) {
+  const status = active(state); if (!status.ok) return status;
+  if (state.age < 18) return fail('Dating begins at age 18.');
+  if (livingPartner(state)) return fail('You are already in a relationship.');
+  if (!['relationship', 'casual', 'ignore'].includes(decision)) return fail('Choose a relationship, a one-night stand, or ignore.');
+  const index = state.encounters.findIndex(person => person.id === personId);
+  if (index < 0 || state.encounterYear !== state.age) return fail('That opportunity has already passed.');
+  const person = state.encounters[index];
+  state.encounters.splice(index, 1);
+  if (decision === 'ignore') {
+    log(state, 'Paths pass by', `You decide not to pursue a connection with ${person.name}.`, 'relationship');
+    return { ok: true, ignored: true };
+  }
+  const chance = decision === 'relationship' ? relationshipOdds(state, person) : oneNightChance(state, person);
+  const accepted = random(state) < chance;
+  if (!accepted) {
+    addStat(state, 'stability', -.1);
+    log(state, 'Not the same spark', `${person.name} does not feel the same connection. You respect the answer and move on.`, 'relationship');
+    return { ok: true, accepted: false, chance };
+  }
+  if (decision === 'relationship') {
+    state.partner = { ...person, relationship: integer(state, 3, 7), yearsTogether: 0, married: false, lastProposalAge: -1 };
+    state.encounters = [];
+    syncFamilyLifestyles(state);
+    log(state, 'A connection becomes a relationship', `You and ${person.name} begin dating. Time together will shape your relationship.`, 'relationship');
+  } else {
+    addStat(state, 'social', .25); addStat(state, 'stability', -.1);
+    log(state, 'A brief connection', `You and ${person.name} choose to spend a night together, without starting a relationship. Social ability +0.25; stability -0.1.`, 'relationship');
+    if (random(state) < pregnancyChance(state, person, { casual: true })) startPregnancy(state, person, true);
+  }
+  return { ok: true, accepted: true, chance };
+}
+
+export function proposeMarriage(state) {
+  const status = active(state); if (!status.ok) return status;
+  const partner = livingPartner(state);
+  if (!partner) return fail('Start a relationship before proposing.');
+  if (partner.married) return fail('You are already married.');
+  if (partner.lastProposalAge === state.age) return fail('You can propose once each year.');
+  const chance = proposalChance(state);
+  partner.lastProposalAge = state.age;
+  const accepted = random(state) < chance;
+  if (accepted) {
+    partner.married = true; partner.relationship = round(clamp(partner.relationship + .5, 1, 10));
+    log(state, 'A life together', `${partner.name} accepts your proposal. You are married.`, 'relationship');
+  } else {
+    partner.relationship = round(clamp(partner.relationship - .3, 1, 10));
+    addStat(state, 'stability', -.2);
+    log(state, 'Not ready yet', `${partner.name} is not ready for marriage. Your relationship can continue to grow before another proposal next year.`, 'relationship');
+  }
+  syncFamilyLifestyles(state);
+  return { ok: true, accepted, chance };
+}
+
+export function endRelationship(state) {
+  const status = active(state); if (!status.ok) return status;
+  if (!state.partner) return fail('There is no relationship to end.');
+  const name = state.partner.name;
+  state.partner = null; state.encounters = [];
+  addStat(state, 'stability', -.4);
+  syncFamilyLifestyles(state);
+  log(state, 'Separate paths', `Your relationship with ${name} ends. Any expected child remains part of your family story.`, 'relationship');
+  return ok();
+}
+
 export function eventOdds(state) {
-  if (state.ended || state.needsSuccession) return EVENTS.map(event => ({ id: event.id, name: event.name, chance: 0 }));
-  return eventChances(state, effectiveStats(state), JOBS.find(job => job.id === state.jobId));
+  const own = eventChances(state, effectiveStats(state), JOBS.find(job => job.id === state.jobId));
+  const family = familyEventChances(state, effectiveStats(state));
+  return [...own, ...family];
 }
 
 function growYear(state) {
@@ -211,15 +318,17 @@ function growYear(state) {
   const f = state.focus;
   const studying = state.age < 18 || state.education.status === 'college';
   const base = studying ? .1 : state.age < 60 ? .008 : -.018;
-  for (const key of CORE) grow(state, key, base);
+  const appearanceChange = attractivenessAgeChange(state);
+  for (const key of CORE) if (key !== 'attractiveness' || !appearanceChange) grow(state, key, base);
   grow(state, 'intelligence', f.self * .027 + (studying ? f.work * .055 : f.work * .008));
   grow(state, 'social', f.social * .055 + f.family * .012);
   grow(state, 'creativity', f.self * .045 + f.social * .009);
   grow(state, 'strength', f.self * .034 - (state.age >= 60 ? .1 : 0));
-  grow(state, 'attractiveness', f.self * .012 - (state.age >= 60 ? .025 : 0));
+  if (appearanceChange) addStat(state, 'attractiveness', appearanceChange);
+  else grow(state, 'attractiveness', f.self * .012);
   if (state.jobId) {
     const job = JOBS.find(candidate => candidate.id === state.jobId);
-    for (const [key, weight] of Object.entries(job.weights)) grow(state, key, weight * f.work * .028);
+    for (const [key, weight] of Object.entries(job.weights)) if (key !== 'attractiveness' || !appearanceChange) grow(state, key, weight * f.work * .028);
   }
   const spare = 12 - Object.values(f).reduce((sum, value) => sum + value, 0);
   addStat(state, 'stability', -.1 * (f.work - 2) + f.self * .07 + f.family * .025 + f.social * .018 + spare * .04);
@@ -245,7 +354,8 @@ export function householdLifestyle(state) {
 }
 function syncFamilyLifestyles(state) {
   const modifier = state.effects.reduce((sum, effect) => sum + (effect.years > 0 ? effect.lifestyle || 0 : 0), 0);
-  state.lifestyle = state.age < 18 ? householdLifestyle(state) : clamp(lifestyleFromResources(state.income, state.money) + modifier, 1, 10);
+  const familyCost = (livingPartner(state) ? 1 : 0) + dependents(state).length;
+  state.lifestyle = state.age < 18 ? householdLifestyle(state) : clamp(lifestyleFromResources(state.income, state.money) + modifier - familyCost, 1, 10);
   for (const child of state.children) if (child.alive !== false) child.lifestyle = child.age < 18 ? state.lifestyle : lifestyleFromResources(0, child.money);
   for (const sibling of state.siblings) if (sibling.alive !== false) sibling.lifestyle = sibling.age < 18 ? householdLifestyle(state) : lifestyleFromResources(0, sibling.money);
 }
@@ -275,27 +385,57 @@ function annualFinances(state) {
 function ageFamily(state) {
   for (const parent of state.parents) {
     if (parent.alive === false) continue;
+    addStat(parent, 'attractiveness', attractivenessAgeChange(parent));
     parent.age += 1;
     if (parent.age >= 85) { parent.alive = false; log(state, 'Remembering a parent', `${parent.name} dies at age 85. Their influence stays with you.`, 'family'); }
   }
   for (const child of state.children) {
     if (child.alive === false) continue;
+    const appearanceChange = attractivenessAgeChange(child);
     child.age += 1;
     child.height = heightAt(child.age, child.adultHeight);
     const learning = child.age < 18 ? .06 : .012;
-    for (const key of CORE) grow(child, key, learning + state.focus.family * (child.age < 18 ? .045 : .018));
+    for (const key of CORE) if (key !== 'attractiveness' || !appearanceChange) grow(child, key, learning + state.focus.family * (child.age < 18 ? .045 : .018));
+    if (appearanceChange) addStat(child, 'attractiveness', appearanceChange);
     addStat(child, 'stability', -.08 + state.focus.family * .045);
     addStat(child, 'health', (state.focus.family - 2) * .02);
+    child.relationship = round(clamp(child.relationship + (state.focus.family - 2) * .13, 1, 10));
     if (child.age >= 18) child.money += Math.round(1500 + child.stats.intelligence * 250);
     if (child.age >= 85) child.alive = false;
   }
-  for (const sibling of state.siblings) if (sibling.alive !== false) { sibling.age += 1; if (sibling.age >= 85) sibling.alive = false; }
+  for (const sibling of state.siblings) if (sibling.alive !== false) { addStat(sibling, 'attractiveness', attractivenessAgeChange(sibling)); sibling.age += 1; if (sibling.age >= 85) sibling.alive = false; }
+  const partner = livingPartner(state);
+  if (partner) {
+    const appearanceChange = attractivenessAgeChange(partner);
+    for (const key of CORE) if (key !== 'attractiveness' || !appearanceChange) grow(partner, key, .015);
+    if (appearanceChange) addStat(partner, 'attractiveness', appearanceChange);
+    grow(partner, 'social', state.focus.family * .008);
+    addStat(partner, 'stability', (state.focus.family - 2) * .035);
+    if (partner.age >= 65) addStat(partner, 'health', -.07);
+    partner.relationship = round(clamp(partner.relationship + (state.focus.family - 2) * .11, 1, 10));
+    partner.yearsTogether += 1; partner.age += 1;
+    if (partner.age >= 85) { partner.alive = false; log(state, 'Remembering your partner', `${partner.name} dies at age 85. Your shared years remain part of your story.`, 'family'); }
+  }
 }
-function applyOutcome(state, event, outcome = event) {
+const eventKey = pending => pending.subjectId ? `${pending.eventId}:${pending.subjectId}` : pending.eventId;
+export function pendingEventSubject(state, pending) {
+  if (!pending?.subjectType || pending.subjectType === 'player') return state;
+  if (pending.subjectType === 'partner') return state.partner?.id === pending.subjectId ? state.partner : null;
+  return state.children.find(person => person.id === pending.subjectId) || null;
+}
+function applyOutcome(state, event, outcome = event, context = {}) {
+  const subject = pendingEventSubject(state, context);
+  const key = eventKey({ eventId: event.id, ...context });
+  const description = (outcome.description || event.description).replaceAll('{name}', subject?.name || 'Your family member');
   for (const [key, amount] of Object.entries(outcome.statChanges || {})) addStat(state, key, amount);
+  for (const [key, amount] of Object.entries(outcome.playerChanges || {})) addStat(state, key, amount);
+  if (subject && subject !== state) {
+    for (const [key, amount] of Object.entries(outcome.subjectChanges || {})) addStat(subject, key, amount);
+    if (outcome.relationship) subject.relationship = round(clamp(subject.relationship + outcome.relationship, 1, 10));
+  }
   if (outcome.years > 0 && (Object.keys(outcome.modifiers || {}).length || outcome.lifestyle)) {
-    const old = state.effects.find(effect => effect.id === event.id);
-    const effect = { id: event.id, name: event.name, description: outcome.description, years: Math.max(old?.years || 0, outcome.years), modifiers: { ...outcome.modifiers }, kind: event.kind };
+    const old = state.effects.find(effect => effect.id === key);
+    const effect = { id: key, name: `${context.subjectId ? `${subject.name}: ` : ''}${event.name}`, description, years: Math.max(old?.years || 0, outcome.years), modifiers: { ...outcome.modifiers }, kind: event.kind };
     if (outcome.lifestyle) effect.lifestyle = outcome.lifestyle;
     if (old) Object.assign(old, { lifestyle: 0 }, effect);
     else state.effects.push(effect);
@@ -304,21 +444,26 @@ function applyOutcome(state, event, outcome = event) {
   const label = key => SKILLS.find(skill => skill.key === key)?.label || ({ health: 'Health', stability: 'Stability' }[key]);
   const delta = amount => `${amount > 0 ? '+' : ''}${amount}`;
   const changes = Object.entries(outcome.statChanges || {}).map(([key, amount]) => `${label(key)} ${delta(amount)}`);
+  for (const [key, amount] of Object.entries(outcome.playerChanges || {})) changes.push(`Your ${label(key).toLowerCase()} ${delta(amount)}`);
+  for (const [key, amount] of Object.entries(outcome.subjectChanges || {})) changes.push(`${subject.name}: ${label(key)} ${delta(amount)}`);
+  if (outcome.relationship) changes.push(`Relationship ${delta(outcome.relationship)}`);
   const temporary = Object.entries(outcome.modifiers || {}).map(([key, amount]) => `${label(key)} ${delta(amount)}`);
   if (outcome.lifestyle) temporary.push(`Lifestyle ${delta(outcome.lifestyle)}`);
   if (temporary.length) changes.push(`${temporary.join(', ')} for ${outcome.years} year${outcome.years === 1 ? '' : 's'}`);
-  const story = outcome === event ? event.description : `${outcome.label}: ${outcome.description}`;
-  log(state, event.name, `${story}${changes.length ? ` ${changes.join('; ')}.` : ''}`, event.kind);
+  const story = outcome === event ? description : `${outcome.label}: ${description}`;
+  log(state, `${context.subjectId ? `${subject.name}: ` : ''}${event.name}`, `${story}${changes.length ? ` ${changes.join('; ')}.` : ''}`, event.kind);
 }
 
-export function resolveEventChoice(state, choiceId, expectedEventId) {
+export function resolveEventChoice(state, choiceId, expectedEventId, expectedSubjectId) {
   const pending = state.pendingEvents[0];
   if (!pending) return fail('There is no event choice to resolve.');
   if (expectedEventId !== undefined && pending.eventId !== expectedEventId) return fail('That event has already been resolved.');
+  if (expectedSubjectId !== undefined && (pending.subjectId || '') !== expectedSubjectId) return fail('That family event has already been resolved.');
   const event = EVENTS.find(candidate => candidate.id === pending.eventId);
   const choice = event?.choices?.find(candidate => candidate.id === choiceId);
   if (!choice) return fail('Choose one of the options for this event.');
-  applyOutcome(state, event, choice);
+  if (!pendingEventSubject(state, pending)) return fail('That family member is unavailable.');
+  applyOutcome(state, event, choice, pending);
   state.pendingEvents.shift();
   return { ok: true, eventId: event.id, choiceId: choice.id, remaining: state.pendingEvents.length };
 }
@@ -326,6 +471,7 @@ export function resolveEventChoice(state, choiceId, expectedEventId) {
 export function advanceYear(state) {
   const status = active(state); if (!status.ok) return status;
   if (needsEducationChoice(state)) return fail('Choose college or a career before advancing the year.');
+  if (state.partner?.alive === false) state.partner = null;
   const previousStage = stage(state);
   // Each eligible event has its own independent roll. Shuffle before limiting
   // to five so the catalogue's ordering never gives an event priority.
@@ -334,7 +480,7 @@ export function advanceYear(state) {
     const other = integer(state, 0, index);
     [odds[index], odds[other]] = [odds[other], odds[index]];
   }
-  const selected = odds.filter(event => random(state) < event.chance).slice(0, 5).map(roll => EVENTS.find(event => event.id === roll.id));
+  const selected = odds.filter(event => random(state) < event.chance).slice(0, 5);
   growYear(state);
   annualFinances(state);
   ageFamily(state);
@@ -342,12 +488,15 @@ export function advanceYear(state) {
   state.effects = state.effects.filter(effect => effect.years > 0);
   state.age += 1;
   state.height = heightAt(state.age, state.adultHeight);
-  state.lastYearEvents = selected.map(event => event.id);
-  for (const event of selected) {
+  state.lastYearEvents = selected.map(roll => roll.id);
+  for (const roll of selected) {
+    const event = EVENTS.find(event => event.id === (roll.eventId || roll.id));
+    const context = roll.subjectId ? { subjectType: roll.subjectType, subjectId: roll.subjectId } : {};
     if (event.choices?.length) {
-      state.pendingEvents.push({ eventId: event.id, age: state.age });
-      log(state, event.name, `${event.description} A choice is waiting for you.`, 'choice');
-    } else applyOutcome(state, event);
+      state.pendingEvents.push({ eventId: event.id, age: state.age, ...context });
+      const subject = pendingEventSubject(state, context);
+      log(state, roll.name, `${event.description.replaceAll('{name}', subject.name)} A choice is waiting for you.`, 'choice');
+    } else applyOutcome(state, event, event, context);
   }
   if (!selected.length) log(state, 'A quiet year', previousStage === 'baby' ? `A year of small discoveries. ${state.babyChoice === 'cry' ? 'Your cries bring attention and growth, while your parents feel the strain.' : 'Quiet moments give your parents a little breathing room.'}` : 'No major surprises this year. Your everyday choices still shape who you become.', 'quiet');
   syncFamilyLifestyles(state);
@@ -365,28 +514,42 @@ export function advanceYear(state) {
     }
   }
   if (state.age === 65) log(state, 'The next chapter', 'You may continue your own life or pass the story to one of your children.', 'milestone');
+  if (state.pregnancy && state.pregnancy.dueAge <= state.age) {
+    const otherParent = state.pregnancy.otherParent;
+    state.pregnancy = null;
+    welcomeChild(state, false, otherParent);
+  } else if (!state.pregnancy && random(state) < pregnancyChance(state)) startPregnancy(state, state.partner);
+  syncFamilyLifestyles(state);
+  state.encounters = createProspects(state, datingHelpers(state), effectiveStats(state));
+  state.encounterYear = state.age;
+  if (state.encounters.length) log(state, 'Someone new', `You meet ${state.encounters.length} new ${state.encounters.length === 1 ? 'person' : 'people'} you could get to know. Visit Family to choose a connection.`, 'relationship');
   if (state.age >= 85) {
+    state.encounters = [];
     const heirs = state.children.filter(child => child.alive !== false && child.age < 85);
     state.needsSuccession = heirs.length > 0;
     state.ended = !state.needsSuccession;
     log(state, 'A life remembered', heirs.length ? 'At age 85, your chapter closes. Choose a child to carry the family story forward.' : 'At age 85, your chapter closes. With no surviving children, this family story is complete.', 'milestone');
   }
-  return { ok: true, eventId: selected[0]?.id || null, eventIds: [...state.lastYearEvents] };
+  return { ok: true, eventId: selected[0]?.eventId || selected[0]?.id || null, eventIds: [...state.lastYearEvents] };
+}
+
+function welcomeChild(state, adopted, otherParent = null) {
+  const otherAptitudes = otherParent?.aptitudes || randomAptitudes(state);
+  const aptitudes = adopted ? otherAptitudes : Object.fromEntries(CORE.map(key => [key, clamp(Math.round((state.aptitudes[key] + otherAptitudes[key]) / 2) + integer(state, -1, 1), -3, 3)]));
+  const adultHeight = adopted ? integer(state, 150, 200) : clamp(Math.round((state.adultHeight + (otherParent?.adultHeight || otherParent?.height || integer(state, 155, 190))) / 2) + integer(state, -7, 7), 145, 205);
+  const child = demographics({ id: uid(state, 'child'), name: personName(state, surname(state.name)), age: 0, stats: randomStats(state, true), aptitudes, height: 50, adultHeight, money: 0, lifestyle: state.lifestyle, alive: true, adopted, relationship: 5 });
+  state.children.push(child); state.lastChildAge = state.age;
+  syncFamilyLifestyles(state);
+  log(state, adopted ? 'A new beginning' : 'A new branch', `${adopted ? `You adopt ${child.name}, welcoming a new child into your family.` : `${child.name} joins your family.`} Family focus will help their abilities grow, and your family legacy will be divided equally among your surviving children.`, 'family');
+  return { ok: true, childId: child.id };
 }
 
 export function haveChild(state) {
   const status = active(state); if (!status.ok) return status;
-  if (state.age < 18) return fail('You can welcome a child from age 18.');
-  if (state.children.length >= 6) return fail('This framework supports up to six children per generation.');
+  if (state.age < 18) return fail('You can adopt a child from age 18.');
+  if (state.children.length + (state.pregnancy ? 1 : 0) >= 6) return fail('This family already has six children or a baby on the way filling its last place.');
   if (state.lastChildAge === state.age) return fail('You can welcome one child per year.');
-  const adopted = state.age > 60;
-  const otherAptitudes = randomAptitudes(state);
-  const aptitudes = adopted ? otherAptitudes : Object.fromEntries(CORE.map(key => [key, clamp(Math.round((state.aptitudes[key] + otherAptitudes[key]) / 2) + integer(state, -1, 1), -3, 3)]));
-  const adultHeight = adopted ? integer(state, 150, 200) : clamp(Math.round((state.adultHeight + integer(state, 155, 190)) / 2) + integer(state, -7, 7), 145, 205);
-  const child = { id: uid(state, 'child'), name: personName(state, surname(state.name)), age: 0, stats: randomStats(state, true), aptitudes, height: 50, adultHeight, money: 0, lifestyle: state.lifestyle, alive: true, adopted };
-  state.children.push(child); state.lastChildAge = state.age;
-  log(state, adopted ? 'A new beginning' : 'A new branch', `${adopted ? `You adopt ${child.name}, welcoming a new child into your family.` : `${child.name} joins your family.`} Family focus will help their abilities grow, and your family legacy will be divided equally among your surviving children.`, 'family');
-  return { ok: true, childId: child.id };
+  return welcomeChild(state, true);
 }
 
 export function successionInfo(state) {
@@ -394,8 +557,8 @@ export function successionInfo(state) {
   const rate = round(clamp(.95 - .05 * state.lifestyle, .45, .9));
   const estate = Math.floor(state.money * rate);
   const share = children.length ? Math.floor(estate / children.length) : 0;
-  const eligible = state.age >= 65 && !state.ended && children.length > 0 && !state.pendingEvents.length;
-  const reason = state.pendingEvents.length ? 'Resolve your event choices before continuing.' : state.ended ? 'This family story is complete.' : state.age < 65 ? 'Continue as a child from age 65.' : !children.length ? 'You need a surviving child to continue the family.' : '';
+  const eligible = state.age >= 65 && !state.ended && children.length > 0 && !state.pendingEvents.length && !state.pregnancy;
+  const reason = state.pendingEvents.length ? 'Resolve your event choices before continuing.' : state.pregnancy ? 'Welcome the expected child before passing the story on.' : state.ended ? 'This family story is complete.' : state.age < 65 ? 'Continue as a child from age 65.' : !children.length ? 'You need a surviving child to continue the family.' : '';
   return { eligible, reason, estate, share, rate, children };
 }
 export function succeed(state, childId) {
@@ -403,15 +566,18 @@ export function succeed(state, childId) {
   if (!info.eligible) return fail(info.reason);
   const child = info.children.find(candidate => candidate.id === childId);
   if (!child) return fail('Choose a surviving child from this family.');
-  const previous = { id: state.id, name: state.name, age: state.age, generation: state.generation, stats: clone(state.stats), aptitudes: clone(state.aptitudes), height: state.height, money: state.money, estate: info.estate, share: info.share, lifestyle: state.lifestyle, children: info.children.map(person => ({ id: person.id, name: person.name, inheritance: info.share })), alive: state.age < 85 };
+  const identity = { gender: state.gender, canGestate: state.canGestate, attractedTo: [...state.attractedTo], appearancePeakAge: state.appearancePeakAge };
+  const previous = { id: state.id, name: state.name, age: state.age, generation: state.generation, stats: clone(state.stats), aptitudes: clone(state.aptitudes), height: state.height, money: state.money, estate: info.estate, share: info.share, lifestyle: state.lifestyle, children: info.children.map(person => ({ id: person.id, name: person.name, inheritance: info.share })), alive: state.age < 85, ...identity };
   state.lineage.push(previous);
   state.siblings = info.children.filter(person => person.id !== child.id).map(person => ({ ...clone(person), money: person.money + info.share, inheritance: info.share }));
   const heir = clone(child);
   state.id = heir.id; state.name = heir.name; state.age = heir.age; state.generation += 1;
   state.stats = heir.stats; state.aptitudes = heir.aptitudes; state.height = heir.height; state.adultHeight = heir.adultHeight;
+  state.gender = heir.gender; state.canGestate = heir.canGestate; state.attractedTo = [...heir.attractedTo]; state.appearancePeakAge = heir.appearancePeakAge;
   state.money = heir.money + info.share;
-  state.parents = [{ id: previous.id, name: previous.name, age: previous.age, stats: previous.stats, aptitudes: previous.aptitudes, height: previous.height, lifestyle: previous.lifestyle, alive: previous.alive }];
+  state.parents = [{ id: previous.id, name: previous.name, age: previous.age, stats: previous.stats, aptitudes: previous.aptitudes, height: previous.height, lifestyle: previous.lifestyle, alive: previous.alive, ...identity }];
   state.children = []; state.effects = []; state.pendingEvents = []; state.lastYearEvents = []; state.focus = { work: 3, social: 3, family: 3, self: 3 };
+  state.partner = null; state.pregnancy = null; state.encounters = []; state.encounterYear = state.age;
   state.jobId = null; state.jobYears = 0; state.performance = 0; state.income = 0; state.expenses = 0; state.lifestyle = lifestyleFromResources(0, state.money);
   state.babyChoice = 'quiet'; state.schoolProgress = 0; state.lastChildAge = -1; state.ended = false; state.needsSuccession = false;
   state.education = { status: state.age < 18 ? 'school' : 'undecided', years: 0 };
@@ -433,7 +599,9 @@ function validSchema(raw, version) {
     const validLifestyle = value => Number.isInteger(value) && finite(value, 1, 10);
     const validAptitudes = aptitude => aptitude && Object.keys(aptitude).length === coreKeys.length && coreKeys.every(key => Number.isInteger(aptitude[key]) && finite(aptitude[key], -3, 3));
     const validGeneration = value => Number.isInteger(value) && finite(value, 1, 100000);
-    const validPerson = person => person && text(person.id, 100) && text(person.name, 50) && Number.isInteger(person.age) && finite(person.age, 0, 120) && finite(person.height, 40, 210) && validStats(person.stats) && validAptitudes(person.aptitudes) && (version === 1 || validLifestyle(person.lifestyle)) && (person.adopted === undefined || typeof person.adopted === 'boolean');
+    const genders = ['male', 'female', 'nonbinary'];
+    const validIdentity = person => genders.includes(person.gender) && typeof person.canGestate === 'boolean' && Array.isArray(person.attractedTo) && person.attractedTo.length > 0 && person.attractedTo.length <= 3 && new Set(person.attractedTo).size === person.attractedTo.length && person.attractedTo.every(gender => genders.includes(gender)) && Number.isInteger(person.appearancePeakAge) && finite(person.appearancePeakAge, 27, 33);
+    const validPerson = person => person && text(person.id, 100) && text(person.name, 50) && Number.isInteger(person.age) && finite(person.age, 0, 120) && finite(person.height, 40, 210) && validStats(person.stats) && validAptitudes(person.aptitudes) && (version === 1 || validLifestyle(person.lifestyle)) && (person.adopted === undefined || typeof person.adopted === 'boolean') && (version < 5 || validIdentity(person));
     if (!validPerson(raw) || raw.age > 85 || !Number.isInteger(raw.generation) || !finite(raw.generation, 1, 100000)) return false;
     if (![raw.seed, raw.rng, raw.nextId].every(value => Number.isInteger(value) && finite(value, 0, Number.MAX_SAFE_INTEGER))) return false;
     if (!finite(raw.height, 40, 210) || !finite(raw.adultHeight, 145, 205)) return false;
@@ -445,6 +613,21 @@ function validSchema(raw, version) {
     if (!Array.isArray(raw.siblings) || !raw.siblings.every(person => validPerson(person) && validLivingAge(person) && finite(person.adultHeight, 145, 205) && finite(person.money, 0, 1e15))) return false;
     const familyIds = [raw.id, ...raw.parents.map(person => person.id), ...raw.children.map(person => person.id), ...raw.siblings.map(person => person.id)];
     if (new Set(familyIds).size !== familyIds.length) return false;
+    if (version >= 5) {
+      if (![...raw.children, ...raw.siblings].every(person => finite(person.relationship, 1, 10))) return false;
+      const validAdult = person => validPerson(person) && person.age >= 18 && validLivingAge(person) && finite(person.adultHeight, 145, 205);
+      const partner = raw.partner;
+      if (partner !== null && (!validAdult(partner) || raw.age < 18 || !finite(partner.relationship, 1, 10) || !Number.isInteger(partner.yearsTogether) || !finite(partner.yearsTogether, 0, 100) || typeof partner.married !== 'boolean' || !Number.isInteger(partner.lastProposalAge) || !finite(partner.lastProposalAge, -1, raw.age) || familyIds.includes(partner.id))) return false;
+      if (!Number.isInteger(raw.encounterYear) || !finite(raw.encounterYear, 0, raw.age) || !Array.isArray(raw.encounters) || raw.encounters.length > 5) return false;
+      if (raw.encounters.length && (raw.age < 18 || raw.encounterYear !== raw.age || partner?.alive !== false && partner !== null)) return false;
+      if (!raw.encounters.every(person => validAdult(person) && person.alive && !familyIds.includes(person.id) && person.id !== partner?.id) || new Set(raw.encounters.map(person => person.id)).size !== raw.encounters.length) return false;
+      const pregnancy = raw.pregnancy;
+      if (pregnancy !== null) {
+        if (!pregnancy || raw.age < 18 || raw.age >= 85 || raw.children.length >= 6 || !validAdult(pregnancy.otherParent) || !text(pregnancy.carrierName, 50) || !Number.isInteger(pregnancy.startedAge) || pregnancy.startedAge !== raw.age || pregnancy.dueAge !== raw.age + 1 || typeof pregnancy.casual !== 'boolean') return false;
+        const carrier = gestatingActor(raw, pregnancy.otherParent);
+        if (!carrier || carrier.id !== pregnancy.carrierId || carrier.age < 18 || carrier.age > 45) return false;
+      }
+    }
     if (![raw.money, raw.income, raw.expenses].every(value => finite(value, 0, 1e15)) || !Number.isInteger(raw.lifestyle) || !finite(raw.lifestyle, 1, 10)) return false;
     if (raw.jobId !== null && !JOBS.some(job => job.id === raw.jobId)) return false;
     if (version >= 3) {
@@ -465,9 +648,20 @@ function validSchema(raw, version) {
     if (!Number.isInteger(raw.jobYears) || !finite(raw.jobYears, 0, 100) || !finite(raw.performance, 0, 1) || !finite(raw.schoolProgress, 0, 100) || !finite(raw.lastChildAge, -1, 85)) return false;
     if (!Array.isArray(raw.effects) || raw.effects.length > (legacy ? 10 : 25) || !raw.effects.every(effect => text(effect.id, 100) && text(effect.name, 100) && typeof effect.description === 'string' && Number.isInteger(effect.years) && finite(effect.years, 1, legacy ? 3 : 5) && effect.modifiers && Object.entries(effect.modifiers).every(([key, value]) => statKeys.includes(key) && finite(value, -10, 10)) && (effect.lifestyle === undefined || !legacy && Number.isInteger(effect.lifestyle) && finite(effect.lifestyle, -10, 10)))) return false;
     if (!legacy) {
-      if (!Array.isArray(raw.lastYearEvents) || raw.lastYearEvents.length > 5 || new Set(raw.lastYearEvents).size !== raw.lastYearEvents.length || !raw.lastYearEvents.every(id => EVENTS.some(event => event.id === id))) return false;
-      if (!Array.isArray(raw.pendingEvents) || raw.pendingEvents.length > 5 || new Set(raw.pendingEvents.map(pending => pending?.eventId)).size !== raw.pendingEvents.length) return false;
-      if (!raw.pendingEvents.every(pending => pending && pending.age === raw.age && raw.lastYearEvents.includes(pending.eventId) && EVENTS.some(event => event.id === pending.eventId && event.choices?.length && raw.age - 1 >= event.minAge && raw.age - 1 <= (event.maxAge ?? 85)))) return false;
+      const knownKey = key => typeof key === 'string' && (PERSONAL_EVENTS.some(event => event.id === key) || version >= 5 && FAMILY_EVENTS.some(event => key.startsWith(`${event.id}:`) && key.length <= 200));
+      if (!Array.isArray(raw.lastYearEvents) || raw.lastYearEvents.length > 5 || new Set(raw.lastYearEvents).size !== raw.lastYearEvents.length || !raw.lastYearEvents.every(knownKey)) return false;
+      if (!Array.isArray(raw.pendingEvents) || raw.pendingEvents.length > 5 || new Set(raw.pendingEvents.map(pending => pending && eventKey(pending))).size !== raw.pendingEvents.length) return false;
+      if (!raw.pendingEvents.every(pending => {
+        if (!pending || pending.age !== raw.age || !raw.lastYearEvents.includes(eventKey(pending))) return false;
+        const event = EVENTS.find(event => event.id === pending.eventId);
+        if (!event?.choices?.length) return false;
+        if (event.subjectType) {
+          if (version < 5 || pending.subjectType !== event.subjectType || !text(pending.subjectId, 100)) return false;
+          const subject = pendingEventSubject(raw, pending);
+          return subject && subject.age - 1 >= event.minAge && subject.age - 1 <= (event.maxAge ?? 85);
+        }
+        return !pending.subjectType && !pending.subjectId && raw.age - 1 >= event.minAge && raw.age - 1 <= (event.maxAge ?? 85);
+      })) return false;
     }
     if (!Array.isArray(raw.history) || raw.history.length > 500 || !raw.history.every(memory => text(memory.id, 100) && finite(memory.age, 0, 85) && finite(memory.generation, 1, 100000) && text(memory.title, 200) && text(memory.text, 2000) && text(memory.kind, 50))) return false;
     if (!Array.isArray(raw.lineage) || !raw.lineage.every(person => validPerson(person) && validGeneration(person.generation) && typeof person.alive === 'boolean' && Number.isInteger(person.lifestyle) && finite(person.lifestyle, 1, 10) && finite(person.money, 0, 1e15) && finite(person.estate, 0, 1e15) && finite(person.share, 0, 1e15) && Array.isArray(person.children) && person.children.length <= 6 && person.children.every(child => child && text(child.id, 100) && text(child.name, 50) && finite(child.inheritance, 0, 1e15)))) return false;
@@ -478,12 +672,12 @@ function validSchema(raw, version) {
   } catch { return false; }
 }
 
-export function validateSave(raw) { return validSchema(raw, 4); }
+export function validateSave(raw) { return validSchema(raw, 5); }
 
 export function migrateSave(raw) {
   try {
     if (validateSave(raw)) return clone(raw);
-    if (![1, 2, 3].some(version => validSchema(raw, version))) return null;
+    if (![1, 2, 3, 4].some(version => validSchema(raw, version))) return null;
     const state = clone(raw);
     if (state.version === 1) {
       const convertStats = person => {
@@ -512,15 +706,18 @@ export function migrateSave(raw) {
       delete person.aptitudes.discipline;
     }
     for (const effect of state.effects) { delete effect.modifiers.discipline; delete effect.modifiers.relaxation; }
-    state.effects = state.effects.filter(effect => Object.keys(effect.modifiers).length);
+    state.effects = state.effects.filter(effect => Object.keys(effect.modifiers).length || effect.lifestyle);
     if (state.version < 3) {
       const currentJob = JOBS.find(job => job.id === state.jobId);
       const status = state.age < 18 ? 'school' : currentJob?.requiresCollege ? 'graduate' : state.age === 18 && !currentJob ? 'undecided' : 'workforce';
       state.education = { status, years: status === 'graduate' ? 4 : 0 };
       state.jobOffers = state.age < 18 ? [] : makeJobOffers(state, status === 'graduate');
     }
-    state.pendingEvents = []; state.lastYearEvents = [];
-    state.version = 4;
+    if (state.version < 4) { state.pendingEvents = []; state.lastYearEvents = []; }
+    [state, ...state.parents, ...state.children, ...state.siblings, ...state.lineage].forEach(person => demographics(person, person === state ? person.gender || 'male' : person.gender));
+    [...state.children, ...state.siblings].forEach(person => { person.relationship = 5; });
+    state.partner = null; state.encounters = []; state.encounterYear = state.age; state.pregnancy = null;
+    state.version = 5;
     return validateSave(state) ? state : null;
   } catch { return null; }
 }

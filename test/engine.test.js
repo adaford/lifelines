@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SKILLS, JOBS, EVENTS, createGame, stage, advanceYear as advanceYearAction, setBabyChoice, setFocus, effectiveStats, currentEffects, eventOdds, jobFit, canTakeJob, takeJob, quitJob, haveChild, successionInfo, succeed, lifestyleFromResources, householdLifestyle, validateSave, migrateSave, chooseEducation, needsEducationChoice, offeredJobs, resolveEventChoice } from '../engine.js';
+import { SKILLS, JOBS, EVENTS, createGame, stage, advanceYear as advanceYearAction, setBabyChoice, setFocus, effectiveStats, currentEffects, eventOdds, jobFit, canTakeJob, takeJob, quitJob, haveChild, successionInfo, succeed, lifestyleFromResources, householdLifestyle, validateSave, migrateSave, chooseEducation, needsEducationChoice, offeredJobs, resolveEventChoice, respondToEncounter, proposeMarriage, endRelationship, relationshipOdds, oneNightChance, meetingChances, proposalChance, pregnancyChance, pendingEventSubject } from '../engine.js';
 
 const copy = value => JSON.parse(JSON.stringify(value));
 const finishChoices = state => {
@@ -70,7 +70,7 @@ test('all five adult skills exist at birth, start very low, and use their indivi
   for (let seed = 1; seed <= 40; seed++) {
     const baby = createGame({ seed });
     for (const { key } of SKILLS) assert.ok(baby.stats[key] >= 1 && baby.stats[key] <= 1.5, `${key} at birth`);
-    assert.equal(baby.version, 4);
+    assert.equal(baby.version, 5);
     assert.ok(baby.stats.health >= 7);
     assert.ok(baby.stats.stability >= 8);
     assert.deepEqual(Object.keys(baby.stats).sort(), Object.keys(adult(seed).stats).sort());
@@ -395,11 +395,12 @@ test('v2 upgrades preserve school, current careers, and adults without consuming
   takeJob(professional, 'doctor'); advanceYear(professional);
   const examples = [[young, 'school', 0], [eighteen, 'undecided', 10], [unemployed, 'workforce', 10], [worker, 'workforce', 10], [professional, 'graduate', 15]];
   for (const [state, status, count] of examples) {
+    state.effects = []; // These legacy career fixtures predate lifestyle event modifiers.
     for (const old of [v2Save(state), legacySave(state)]) {
       const snapshot = copy(old);
       const upgraded = migrateSave(old);
       assert.equal(validateSave(upgraded), true);
-      assert.equal(upgraded.version, 4);
+      assert.equal(upgraded.version, 5);
       assert.equal(upgraded.education.status, status);
       assert.equal(upgraded.education.years, status === 'graduate' ? 4 : 0);
       assert.equal(upgraded.jobOffers.length, count);
@@ -473,7 +474,7 @@ test('succession resets education for young and adult heirs and an ended life st
   assert.match(advanceYearRaw(ended).reason, /life has ended/);
 });
 
-test('family focus improves children, and births are limited to one per year', () => {
+test('family focus improves children, and arrivals are limited to one per year', () => {
   const caring = adult(9);
   assert.equal(haveChild(caring).ok, true); assert.equal(haveChild(caring).ok, false);
   const distant = copy(caring);
@@ -484,7 +485,7 @@ test('family focus improves children, and births are limited to one per year', (
   for (const skill of SKILLS) assert.ok(caring.children[0].stats[skill.key] > distant.children[0].stats[skill.key]);
   assert.ok(caring.children[0].stats.stability >= distant.children[0].stats.stability);
   assert.equal(haveChild(caring).ok, true);
-  assert.equal(caring.children[0].adopted, false);
+  assert.equal(caring.children[0].adopted, true);
 });
 
 test('older heirs can adopt and continue a family beyond mandatory succession', () => {
@@ -505,14 +506,14 @@ test('older heirs can adopt and continue a family beyond mandatory succession', 
   assert.equal(state.age, 18);
   assert.equal(state.generation, 3);
   assert.equal(haveChild(state).ok, true);
-  assert.equal(state.children[0].adopted, false);
+  assert.equal(state.children[0].adopted, true);
   assert.equal(validateSave(state), true);
 });
 
-test('parenthood begins at 18, changes to adoption after 60, and remains capped at six', () => {
+test('manual adoption begins at 18 and remains capped at six', () => {
   const state = createGame({ seed: 95 });
   assert.equal(haveChild(state).ok, false);
-  state.age = 60; assert.equal(haveChild(state).ok, true); assert.equal(state.children[0].adopted, false);
+  state.age = 60; assert.equal(haveChild(state).ok, true); assert.equal(state.children[0].adopted, true);
   for (let index = 1; index < 6; index++) {
     advanceYear(state);
     assert.equal(haveChild(state).ok, true);
@@ -745,7 +746,7 @@ test('event catalogue has unique authored outcomes and only supported traits', (
       assert.equal(new Set(event.choices.map(choice => choice.id)).size, event.choices.length);
     }
     for (const outcome of outcomes) {
-      assert.ok(Object.keys(outcome.statChanges || {}).length || Object.keys(outcome.modifiers || {}).length || outcome.lifestyle, `${event.id} has a consequence`);
+      assert.ok(Object.keys(outcome.statChanges || {}).length || Object.keys(outcome.subjectChanges || {}).length || Object.keys(outcome.playerChanges || {}).length || outcome.relationship || Object.keys(outcome.modifiers || {}).length || outcome.lifestyle, `${event.id} has a consequence`);
       for (const changes of [outcome.statChanges, outcome.modifiers]) for (const [key, amount] of Object.entries(changes || {})) {
         assert.ok(traits.has(key), `${event.id}: ${key}`);
         assert.ok(Number.isFinite(amount) && amount !== 0 && Math.abs(amount) <= 3);
@@ -760,7 +761,7 @@ test('age gates apply to the year being played and every retained stat affects s
   for (const age of [0, 2, 5, 12, 15, 17, 18, 30, 65, 84]) {
     state.age = age;
     const odds = eventOdds(state);
-    for (const event of EVENTS) if (age < event.minAge || age > (event.maxAge ?? 85)) assert.equal(odds.find(roll => roll.id === event.id).chance, 0, `${event.id} at ${age}`);
+    for (const event of EVENTS.filter(event=>!event.subjectType)) if (age < event.minAge || age > (event.maxAge ?? 85)) assert.equal(odds.find(roll => roll.id === event.id).chance, 0, `${event.id} at ${age}`);
   }
   state.age = 30;
   haveChild(state);
@@ -945,7 +946,7 @@ test('lifestyle consequences are temporary, bounded, and shared by dependent chi
   advanceYear(state);
   state.effects = [];
   state.money = 775000; state.lifestyle = lifestyleFromResources(0, state.money);
-  const baseline = state.lifestyle;
+  const baseline = state.lifestyle - 1; // One dependent child also lowers lifestyle.
   state.pendingEvents = [{ eventId: 'investment_pitch', age: state.age }];
   state.lastYearEvents = ['investment_pitch'];
   assert.equal(resolveEventChoice(state, 'accept', 'investment_pitch').ok, true);
@@ -971,4 +972,255 @@ test('successive generations remain playable and valid without inheriting the ol
     assert.equal(state.generation, generation + 1);
     assert.equal(validateSave(state), true);
   }
+});
+
+function datingLife(seed = 2100, options = {}) {
+  const state = createGame({seed,...options});
+  while(state.age<18) advanceYear(state);
+  chooseEducation(state,'work');
+  state.money=8_000_000;
+  for(const {key} of SKILLS) state.stats[key]=8;
+  state.stats.health=9; state.stats.stability=7;
+  advanceYear(state);
+  return state;
+}
+
+function coupledLife(seed = 2100, options = {}) {
+  const state=datingLife(seed,options);
+  for(let year=0;!state.partner&&year<10;year++) {
+    for(const person of [...state.encounters]) {
+      const result=respondToEncounter(state,person.id,'relationship');
+      assert.equal(result.ok,true);
+      if(result.accepted) break;
+    }
+    if(!state.partner) advanceYear(state);
+  }
+  assert.ok(state.partner,'fixture reaches a relationship through a real accepted offer');
+  assert.equal(validateSave(state),true);
+  return state;
+}
+
+test('adult encounters are yearly, bounded, adult-only, and survive saved reloads', () => {
+  const child=createGame({seed:2101});
+  while(child.age<17) { advanceYear(child); assert.deepEqual(child.encounters,[]); }
+  advanceYear(child);
+  assert.equal(child.age,18);
+  const state=datingLife(2102);
+  assert.ok(state.encounters.length>0&&state.encounters.length<=5);
+  assert.equal(state.encounterYear,state.age);
+  for(const person of state.encounters) {
+    assert.ok(person.age>=18&&person.age<85);
+    assert.equal(Object.keys(person.stats).length,7);
+    assert.equal(Object.keys(person.aptitudes).length,5);
+    assert.equal(person.gender,'female');
+  }
+  const restored=migrateSave(copy(state));
+  assert.deepEqual(restored,state);
+  const oldIds=state.encounters.map(person=>person.id);
+  const before=state.rng;
+  const person=state.encounters[0];
+  assert.equal(respondToEncounter(state,person.id,'ignore').ok,true);
+  assert.equal(state.rng,before,'ignoring does not reroll an invitation');
+  assert.equal(respondToEncounter(state,person.id,'relationship').ok,false);
+  advanceYear(state);
+  assert.ok(state.encounters.every(person=>!oldIds.includes(person.id)));
+  assert.equal(validateSave(state),true);
+});
+
+test('pursuit can succeed or be declined once, with partner bonuses and lifestyle costs', () => {
+  const base=datingLife(2103);
+  assert.ok(base.encounters.length);
+  const target=base.encounters[0];
+  const outcomes=new Set();
+  for(let seed=1;seed<=100&&outcomes.size<2;seed++) {
+    const state=copy(base); state.rng=seed;
+    const stats=effectiveStats(state), lifestyle=state.lifestyle;
+    const result=respondToEncounter(state,target.id,'relationship');
+    assert.equal(result.ok,true); outcomes.add(result.accepted);
+    assert.equal(respondToEncounter(state,target.id,'relationship').ok,false);
+    if(result.accepted) {
+      assert.ok(state.partner.relationship>=3&&state.partner.relationship<=7);
+      assert.equal(state.partner.yearsTogether,0);
+      assert.deepEqual(state.encounters,[]);
+      assert.equal(effectiveStats(state).social,Math.min(10,Math.round((stats.social+.7)*100)/100));
+      assert.equal(effectiveStats(state).stability,Math.min(10,Math.round((stats.stability+.6)*100)/100));
+      assert.equal(state.lifestyle,Math.max(1,lifestyle-1));
+      const after=copy(state); const repeated=proposeMarriage(state);
+      assert.equal(repeated.ok,true);
+      assert.equal(proposeMarriage(state).ok,false);
+      assert.equal(endRelationship(after).ok,true);
+      assert.equal(after.partner,null);
+      assert.equal(after.lifestyle,lifestyle);
+    } else assert.equal(state.partner,null);
+    assert.equal(validateSave(state),true);
+  }
+  assert.deepEqual(outcomes,new Set([true,false]));
+});
+
+test('marriage proposals depend strongly on years together and are limited to one each year', () => {
+  const base=coupledLife(2104);
+  base.partner.relationship=5;
+  const early=proposalChance(base);
+  base.partner.yearsTogether=6;
+  assert.ok(proposalChance(base)>=early+.41);
+  base.partner.relationship=9;
+  assert.ok(proposalChance(base)>early+.5);
+  const outcomes=new Set();
+  for(let seed=1;seed<=100&&outcomes.size<2;seed++) {
+    const state=copy(base); state.rng=seed;
+    const result=proposeMarriage(state);
+    outcomes.add(result.accepted);
+    assert.equal(result.ok,true);
+    assert.equal(state.partner.lastProposalAge,state.age);
+    const snapshot=copy(state);
+    assert.equal(proposeMarriage(state).ok,false);
+    assert.deepEqual(state,snapshot);
+    assert.equal(state.partner.married,result.accepted);
+    if(!result.accepted) {
+      advanceYear(state);
+      assert.equal(proposeMarriage(state).ok,true);
+    }
+    assert.equal(validateSave(state),true);
+  }
+  assert.equal(outcomes.size,2);
+});
+
+test('casual encounters are consensual rolls, consumed once, and never create a partner', () => {
+  const base=datingLife(2105), target=base.encounters[0];
+  const outcomes=new Set();
+  for(let seed=1;seed<=100&&outcomes.size<2;seed++) {
+    const state=copy(base); state.rng=seed;
+    const before=state.stats.social;
+    const result=respondToEncounter(state,target.id,'casual');
+    assert.equal(result.ok,true); outcomes.add(result.accepted);
+    assert.equal(state.partner,null);
+    assert.equal(respondToEncounter(state,target.id,'casual').ok,false);
+    assert.equal(state.stats.social,result.accepted?Math.min(10,Math.round((before+.25)*100)/100):before);
+    assert.equal(validateSave(state),true);
+  }
+  assert.equal(outcomes.size,2);
+});
+
+test('marriage raises pregnancy chances and a saved pregnancy produces an inherited newborn next year', () => {
+  const base=coupledLife(2106);
+  base.partner.age=25; base.partner.stats.health=10;
+  for(const {key} of SKILLS) { base.aptitudes[key]=-3; base.partner.aptitudes[key]=3; }
+  const dating=pregnancyChance(base);
+  base.partner.married=true;
+  assert.ok(pregnancyChance(base)>dating*10);
+  let pregnant;
+  for(let seed=1;seed<=100;seed++) {
+    const state=copy(base); state.rng=seed;
+    advanceYear(state);
+    if(state.pregnancy) { pregnant=state; break; }
+  }
+  assert.ok(pregnant,'married simulation can conceive');
+  assert.equal(pregnant.pregnancy.dueAge,pregnant.age+1);
+  assert.equal(pregnant.pregnancy.carrierId,pregnant.partner.id);
+  const restored=migrateSave(copy(pregnant));
+  assert.deepEqual(restored,pregnant);
+  endRelationship(pregnant);
+  assert.ok(pregnant.pregnancy,'breaking up does not erase an expected child');
+  advanceYear(pregnant);
+  const child=pregnant.children[0];
+  assert.equal(pregnant.pregnancy,null);
+  assert.equal(child.age,0); assert.equal(child.adopted,false); assert.equal(child.relationship,5);
+  assert.equal(child.lifestyle,pregnant.lifestyle);
+  for(const {key} of SKILLS) {
+    assert.ok(child.stats[key]>=1&&child.stats[key]<=1.5);
+    assert.ok(child.aptitudes[key]>=-1&&child.aptitudes[key]<=1,'both parents affect inherited affinity');
+  }
+  assert.equal(validateSave(pregnant),true);
+});
+
+test('generic pregnancy roles also support a gestating player with a male partner', () => {
+  const base=coupledLife(2107,{gender:'female'});
+  assert.equal(base.canGestate,true); assert.equal(base.partner.gender,'male');
+  assert.equal(base.partner.canGestate,false);
+  base.partner.married=true;
+  let state;
+  for(let seed=1;seed<=100;seed++) {
+    const candidate=copy(base); candidate.rng=seed; advanceYear(candidate);
+    if(candidate.pregnancy) { state=candidate; break; }
+  }
+  assert.ok(state,'a gestating player can conceive');
+  assert.equal(state.pregnancy.carrierId,state.id);
+  advanceYear(state);
+  assert.equal(state.children.length,1);
+  assert.equal(validateSave(state),true);
+});
+
+test('family focus grows partner and child relationships; dependent children have visible household tradeoffs', () => {
+  const base=coupledLife(2108);
+  base.partner.canGestate=false; // Keep this comparison focused on care, not births.
+  base.partner.relationship=5;
+  const beforeSocial=effectiveStats(base).social, beforeLifestyle=base.lifestyle;
+  haveChild(base);
+  assert.equal(base.children[0].adopted,true);
+  assert.equal(base.lifestyle,Math.max(1,beforeLifestyle-1));
+  assert.equal(effectiveStats(base).social,Math.min(10,Math.round((beforeSocial+.2)*100)/100));
+  const caring=copy(base),distant=copy(base);
+  caring.focus={work:2,social:2,family:5,self:3};
+  distant.focus={work:3,social:3,family:0,self:3};
+  advanceYear(caring); advanceYear(distant);
+  assert.ok(caring.partner.relationship>distant.partner.relationship);
+  assert.ok(caring.children[0].relationship>distant.children[0].relationship);
+  assert.ok(caring.children[0].stats.intelligence>distant.children[0].stats.intelligence);
+  assert.equal(caring.partner.yearsTogether,base.partner.yearsTogether+1);
+});
+
+test('family choice queues target the correct child and reject stale choices for a sibling', () => {
+  const state=adult(2109);
+  haveChild(state); advanceYear(state); haveChild(state);
+  const event=EVENTS.find(event=>event.id==='household_child_school');
+  state.children.forEach(child=>{ child.age=7; child.stats.intelligence=4; });
+  const records=state.children.map(child=>({eventId:event.id,age:state.age,subjectType:'child',subjectId:child.id}));
+  state.pendingEvents=records;
+  state.lastYearEvents=records.map(record=>`${record.eventId}:${record.subjectId}`);
+  assert.equal(validateSave(state),true);
+  const saved=migrateSave(copy(state));
+  assert.deepEqual(saved,state);
+  const first=state.children[0],second=state.children[1];
+  const before=copy(second.stats);
+  assert.equal(pendingEventSubject(state,records[0]).id,first.id);
+  assert.equal(resolveEventChoice(state,event.choices[0].id,event.id,first.id).ok,true);
+  assert.deepEqual(second.stats,before,'the sibling does not receive the first child outcome');
+  const afterFirst=copy(state);
+  assert.equal(resolveEventChoice(state,event.choices[0].id,event.id,first.id).ok,false);
+  assert.deepEqual(state,afterFirst);
+  assert.equal(resolveEventChoice(state,event.choices[1].id,event.id,second.id).ok,true);
+  assert.equal(state.pendingEvents.length,0);
+  assert.equal(validateSave(state),true);
+});
+
+test('attractiveness peaks near thirty and slowly declines despite self focus or an appearance-based job', () => {
+  for(let seed=1;seed<=30;seed++) {
+    const state=adult(2200+seed);
+    assert.ok(state.appearancePeakAge>=27&&state.appearancePeakAge<=33);
+    state.age=state.appearancePeakAge; state.encounters=[];
+    state.stats.attractiveness=8;
+    state.focus={work:5,social:0,family:0,self:5};
+    state.aptitudes.attractiveness=3;
+    const job=JOBS.find(job=>job.id==='performer'); offerJob(state,job);
+    state.jobId=job.id; state.effects=[];
+    advanceYear(state);
+    assert.ok(state.stats.attractiveness<8&&state.stats.attractiveness>7.8);
+  }
+});
+
+test('v4 migration keeps unresolved choices and lifestyle-only effects without consuming randomness', () => {
+  const previous=adult(2110); advanceYear(previous); previous.effects=[{id:'windfall',name:'A little good fortune',description:'Comfort.',years:2,modifiers:{},lifestyle:1,kind:'positive'}];
+  previous.pendingEvents=[{eventId:'investment_pitch',age:previous.age}]; previous.lastYearEvents=['investment_pitch'];
+  previous.version=4;
+  for(const person of [previous,...previous.parents,...previous.children,...previous.siblings,...previous.lineage]) {
+    delete person.gender; delete person.canGestate; delete person.attractedTo; delete person.appearancePeakAge;
+  }
+  delete previous.partner; delete previous.encounters; delete previous.encounterYear; delete previous.pregnancy;
+  const snapshot=copy(previous),converted=migrateSave(previous);
+  assert.ok(converted); assert.equal(validateSave(converted),true);
+  for(const key of ['rng','nextId','age','name','history','education','jobOffers','effects','pendingEvents','lastYearEvents','stats','aptitudes']) assert.deepEqual(converted[key],previous[key]);
+  assert.deepEqual(previous,snapshot);
+  assert.equal(converted.partner,null); assert.deepEqual(converted.encounters,[]);
+  const event=EVENTS.find(event=>event.id==='investment_pitch');
+  assert.equal(resolveEventChoice(converted,event.choices[0].id,event.id).ok,true);
 });
