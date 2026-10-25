@@ -4,6 +4,12 @@ A small, generational life simulator about how you spend your years and what you
 
 **Play:** https://adaford.github.io/lifelines/
 
+## Designed for phones
+
+The game uses a single-column layout with four bottom tabs: **Year**, **Career**, **Family**, and **You**. The **Next year** control stays within reach at the bottom of the Year screen. Full character stats live in You; health, instability, and lifestyle remain visible at a glance.
+
+Tap **More** (the three dots) for help, event odds, save export/import, or a new life. These menus open as bottom sheets. Focus controls have 44-pixel touch targets, inputs use 16-pixel text to avoid automatic zoom, and the layout reserves room for phone safe areas. Larger screens display the same centered phone layout. Existing browser saves are preserved.
+
 ## The first playable framework
 
 - Begin at age 0 with randomized parents, inherited growth aptitudes, and a growing height.
@@ -49,7 +55,7 @@ npm ci
 npm test
 ```
 
-The engine tests cover deterministic progression, probabilities, temporary effects, aptitude, career earnings, parenting, inheritance, save validation, and repeated succession. DOM integration tests use LinkeDOM to exercise UI rendering and action handlers without a browser. Actual browser visual testing was blocked by the available browser-control tooling during the initial build.
+The engine tests cover deterministic progression, probabilities, temporary effects, aptitude, career earnings, parenting, inheritance, save validation, and repeated succession. DOM integration tests use LinkeDOM to exercise UI rendering, bottom navigation, menu confirmations, save preservation, and action handlers without a browser. Phone dimensions and safe-area spacing have been reviewed in the stylesheet; actual browser/device visual testing remains unverified because the available browser-control tooling cannot provide a preview.
 
 ## Source and deployment
 

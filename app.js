@@ -32,7 +32,8 @@ const icons = {
   check: '<path d="m5 12 4 4L19 6"/>',
   heart: '<path d="M20 5c-3-3-7-1-8 1-1-2-5-4-8-1-5 5 3 11 8 15 5-4 13-10 8-15Z"/>',
   spark: '<path d="m12 2 3 7 7 3-7 3-3 7-3-7-7-3 7-3 3-7Z"/>',
-  download: '<path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/>'
+  download: '<path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/>',
+  menu: '<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>'
 };
 const icon = name => `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[name] || icons.spark}</svg>`;
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -82,21 +83,26 @@ function avatar(person, small = false) {
 
 function render() {
   const lifeStage = stage(state);
-  app.innerHTML = `<div class="app-shell">
+  const stats = effectiveStats(state);
+  const isYear = activeTab === 'year';
+  app.innerHTML = `<div class="app-shell ${isYear?'with-advance':''}">
     <header class="topbar">
-      <a class="brand" href="#" data-action="tab" data-tab="year" aria-label="Lifelines home"><span class="brand-mark">${icon('sprout')}</span><span><span class="brand-title">lifelines<span style="color:var(--accent,#b46b50)">.</span></span><span class="brand-subtitle">MAKE A LIFE OF IT</span></span></a>
-      <div class="top-actions"><span class="save-status">${icon(saveAvailable ? 'check' : 'download')}${saveAvailable ? 'Saved on this device' : 'Session only'}</span><button class="icon-button" data-action="help" aria-label="How to play">${icon('help')}</button><button class="button secondary small" data-action="new">${icon('plus')} New life</button></div>
+      <a class="brand" href="#" data-action="tab" data-tab="year" aria-label="Lifelines home"><span class="brand-mark">${icon('sprout')}</span><span class="brand-title">lifelines<span style="color:var(--orange)">.</span></span></a>
+      <div class="top-actions"><span class="save-status">${icon(saveAvailable ? 'check' : 'download')}${saveAvailable ? 'Saved' : 'Session only'}</span><button class="icon-button" data-action="menu" aria-label="More options" aria-haspopup="dialog">${icon('menu')}</button></div>
     </header>
-    <div class="game-layout">
-      <aside class="sidebar"><section class="identity-card"><div class="portrait">${avatar(state)}<span class="age-badge">${state.age}</span></div><p class="eyebrow">GENERATION ${state.generation}</p><h1 class="person-name">${esc(state.name)}</h1><p class="muted">${state.age === 0 ? 'Just arrived. Everything ahead.' : `${state.age} years old · ${state.age < 3 ? 'Infant' : state.age < 18 ? 'Student' : career()?.name || 'Finding a path'}`}</p><div class="life-progress"><div class="progress-track"><span class="progress-fill" style="width:${Math.min(state.age/85*100,100)}%"></span></div><div class="progress-labels"><span>First breath</span><span>Legacy</span></div></div></section>
-      <nav class="nav-list" aria-label="Game sections">${[['year','Your year'],['career','Career'],['family','Family'],['character','Character']].map(([id,label]) => `<button class="nav-button ${activeTab===id?'active':''}" data-action="tab" data-tab="${id}" ${activeTab===id?'aria-current="page"':''}><span class="nav-icon">${icon(id)}</span>${label}${id==='family' && state.children.length ? `<span class="nav-count">${state.children.length}</span>` : ''}${id==='career' && state.age<18 ? '<span class="nav-count">18+</span>' : ''}</button>`).join('')}</nav>
-      <div class="sidebar-note">${icon('sprout')}<p>You can’t choose everything.<br>You can choose what matters.</p><span>FRAMEWORK · v0.1</span></div></aside>
-      <main class="main-column" id="main-content"><div class="chapter-heading"><p class="eyebrow">${activeTab==='year' ? `CHAPTER ${String(state.generation).padStart(2,'0')} / AGE ${state.age}` : 'THE SHAPE OF YOUR LIFE'}</p><h2>${activeTab==='year' ? stageNames[lifeStage] : ({career:'Find your calling',family:'A life, connected',character:'Beautifully human'}[activeTab])}<span style="color:var(--accent,#b46b50)">.</span></h2><p>${activeTab==='year' ? (state.age<3 ? 'For now, the smallest choices are your whole world.' : 'A year is a little life. Decide where to put your energy.') : ({career:'Different strengths open different doors.',family:'What you give your family grows with them.',character:'Your starting point is only part of the story.'}[activeTab])}</p></div>
+    <section class="profile-bar" aria-label="Your life"><div class="portrait">${avatar(state)}</div><div class="profile-copy"><p class="eyebrow">GENERATION ${state.generation}</p><h1 class="person-name">${esc(state.name)}</h1><p class="muted">${state.age<3?'A whole life ahead':state.age<18?'Student':career()?.name || 'Finding a path'}</p></div><div class="profile-age"><strong>${state.age}</strong><span>YEARS OLD</span></div></section>
+    <div class="status-strip" aria-label="At a glance">${[['Health',number(stats.health)],['Instability',number(stats.instability)],['Lifestyle',state.lifestyle]].map(([label,value])=>`<button class="status-pill" data-action="tab" data-tab="character" aria-label="${label} ${value} out of 10. View your character."><span class="status-label">${label}</span><strong>${value}<small>/10</small></strong></button>`).join('')}</div>
+      <main class="main-column" id="main-content"><div class="chapter-heading"><h2>${isYear ? stageNames[lifeStage] : ({career:'Find your calling',family:'A life, connected',character:'This is you'}[activeTab])}<span style="color:var(--orange)">.</span></h2><p>${isYear ? (state.age<3 ? 'Small choices. A whole world ahead.' : 'Choose what matters this year.') : ({career:'Find a role that fits your strengths.',family:'Grow together. Leave a legacy.',character:'Your starting point is only part of the story.'}[activeTab])}</p></div>
       ${state.ended ? endPanel() : ''}${state.needsSuccession ? successionPanel() : ''}
       ${activeTab==='year' ? yearView() : activeTab==='career' ? careerView() : activeTab==='family' ? familyView() : characterView()}</main>
-      <aside class="right-column">${statsView()}${effectsView()}<div class="footer-note">A little luck. A little intention.<br>A life that’s entirely yours.</div></aside>
-    </div>
+    <footer class="bottom-dock" aria-label="Game controls">${isYear?advanceControls():''}<nav class="nav-list" aria-label="Game sections">${[['year','Year'],['career','Career'],['family','Family'],['character','You']].map(([id,label])=>`<button class="nav-button ${activeTab===id?'active':''}" data-action="tab" data-tab="${id}" ${activeTab===id?'aria-current="page"':''}><span class="nav-icon">${icon(id)}</span><span class="nav-label">${label}</span>${id==='family'&&state.children.length?`<span class="nav-count">${state.children.length}</span>`:''}</button>`).join('')}</nav></footer>
   </div>`;
+}
+
+function advanceControls() {
+  if (state.ended) return `<div class="advance-row"><button class="button primary advance-button" data-action="new">Begin another life ${icon('arrow')}</button></div>`;
+  if (state.needsSuccession) return `<div class="advance-row"><button class="button primary advance-button" data-action="tab" data-tab="family">Choose your heir ${icon('arrow')}</button></div>`;
+  return `<div class="advance-row"><div class="advance-copy"><strong>Age ${state.age} → ${state.age+1}</strong><span>${state.age<3?(state.babyChoice==='cry'?'Cry for attention':'Stay quiet'):`${focusUsed()}/12 focus used`}</span></div><button class="button primary advance-button" data-action="advance">Next year ${icon('arrow')}</button></div>`;
 }
 
 function statsView() {
@@ -114,10 +120,10 @@ function effectsView() {
 function yearView() {
   const baby = state.age < 3;
   const disabled = state.ended || state.needsSuccession;
-  return `<section class="panel focus-panel"><div class="panel-heading"><h3>${baby ? 'Big feelings, tiny human' : 'Where will your energy go?'}</h3><span class="tag">${baby ? 'AGES 0–2' : `${focusUsed()} / 12 POINTS`}</span></div><p class="section-description">${baby ? 'Your parents are figuring this out, too. Choose how to ask for their attention.' : 'Set each focus from 0 to 5. You have 12 points to share across your year.'}</p>
+  return `<section class="panel focus-panel"><div class="panel-heading"><h3>${baby ? 'Ask for attention' : 'Your focus'}</h3><span class="tag">${baby ? 'AGES 0–2' : `${focusUsed()} / 12 POINTS`}</span></div><p class="section-description">${baby ? 'More attention helps you grow, but strains your parents.' : 'Share 12 points. Each focus takes 0–5.'}</p>
     ${baby ? `<div class="baby-choices"><button class="choice-card ${state.babyChoice==='cry'?'selected':''}" data-action="baby" data-choice="cry" aria-pressed="${state.babyChoice==='cry'}" ${disabled?'disabled':''}><span class="choice-symbol">${icon('social')}</span><h4>Make some noise</h4><p>Cry for more attention. Your skills grow faster, but your parents feel the strain.</p><span class="choice-footer">More growth · more parent stress ${state.babyChoice==='cry'?icon('check'):''}</span></button><button class="choice-card ${state.babyChoice==='quiet'?'selected':''}" data-action="baby" data-choice="quiet" aria-pressed="${state.babyChoice==='quiet'}" ${disabled?'disabled':''}><span class="choice-symbol">${icon('self')}</span><h4>Quiet little observer</h4><p>Don’t cry. Grow at your own pace and give your parents a little breathing room.</p><span class="choice-footer">Gentler growth · calmer parents ${state.babyChoice==='quiet'?icon('check'):''}</span></button></div>` : focusView(disabled)}
-    <div class="advance-row"><div class="advance-copy"><strong>${state.ended?'A chapter complete':state.needsSuccession?'The next generation is waiting':`Next stop: age ${state.age+1}`}</strong><span>${baby?'Small beginnings. A whole year of growing.':'Your choices shape the odds. Life does the rest.'}</span></div><button class="button primary advance-button" data-action="advance" ${disabled?'disabled':''}>Next year ${icon('arrow')}</button></div></section>
-    ${lifestyleView()}
+    </section>
+    ${state.effects.length?`<button class="effect-summary button secondary" data-action="tab" data-tab="character">${icon('spark')} ${state.effects.length} active life effect${state.effects.length===1?'':'s'} · View ${icon('arrow')}</button>`:''}
     ${journalView()}`;
 }
 
@@ -127,7 +133,7 @@ function lifestyleView() {
 }
 
 function focusView(disabled) {
-  const rows = [['work',state.age<18?'School':'Career',state.age<18?'Build intelligence, discipline, and your future.':'Build success and improve your lifestyle.',state.age<18?'school':'career'],['social','Friends & social','Build confidence, connections, and social ability.','social'],['family','Family','Care for your parents and help your children grow.','family'],['self','Yourself','Learn, get stronger, and make room to relax.','self']];
+  const rows = [['work',state.age<18?'School':'Career',state.age<18?'Learn & build discipline':'Success & lifestyle',state.age<18?'school':'career'],['social','Friends','Connection & confidence','social'],['family','Family','Care & help your kids grow','family'],['self','Yourself','Learn, grow & relax','self']];
   return `<div class="focus-list">${rows.map(([key,label,description,ico]) => `<div class="focus-row"><span class="focus-icon">${icon(ico)}</span><div class="focus-copy"><h4>${label}</h4><p>${description}</p><div class="focus-scale" aria-hidden="true">${Array.from({length:5},(_,i)=>`<span class="${i<state.focus[key]?'filled':''}"></span>`).join('')}</div></div><div class="stepper" role="group" aria-label="${label} focus"><button data-action="focus" data-key="${key}" data-delta="-1" aria-label="Decrease ${label.toLowerCase()} focus" ${state.focus[key]<=0||disabled?'disabled':''}>${icon('minus')}</button><output aria-label="${label} focus level">${state.focus[key]}</output><button data-action="focus" data-key="${key}" data-delta="1" aria-label="Increase ${label.toLowerCase()} focus" ${state.focus[key]>=5||focusUsed()>=12||disabled?'disabled':''}>${icon('plus')}</button></div></div>`).join('')}</div><div class="budget-bar"><div class="budget-summary"><span>${focusUsed()===12?'All your energy has a place.':`${12-focusUsed()} focus point${12-focusUsed()===1?'':'s'} still available`}</span><strong>${focusUsed()} / 12</strong></div><div class="budget-track"><span style="width:${focusUsed()/12*100}%"></span></div></div>`;
 }
 
@@ -152,7 +158,7 @@ function miniStats(person) {
 function personCard(person, role, child = false) {
   const info = successionInfo(state);
   const canSelect = child && info.eligible && info.children.some(c=>c.id===person.id);
-  return `<article class="family-card"><div class="family-header"><div class="family-avatar">${avatar(person,true)}</div><div class="family-meta"><span class="eyebrow">${role}</span><h3>${esc(person.name)}</h3><p>${person.age} years old${person.age>=85?' · Remembered':''}</p></div></div>${miniStats(person)}${child?`<div class="family-card-footer"><span>${person.alive!==false?'An equal share of your legacy':'Remembered with love'}</span>${canSelect?`<button class="button primary small" data-action="heir" data-id="${esc(person.id)}">Continue as ${esc(person.name.split(' ')[0])} ${icon('arrow')}</button>`:''}</div>`:''}</article>`;
+  return `<article class="family-card"><div class="family-header"><div class="family-avatar">${avatar(person,true)}</div><div class="family-meta"><span class="eyebrow">${role}</span><h3>${esc(person.name)}</h3><p>${person.age} years old${person.age>=85?' · Remembered':` · Instability ${number(person.stats.instability)}/10`}</p></div></div><details class="family-details"><summary>Skills & wellbeing</summary>${miniStats(person)}</details>${child?`<div class="family-card-footer"><span>${person.alive!==false?'An equal share of your legacy':'Remembered with love'}</span>${canSelect?`<button class="button primary small" data-action="heir" data-id="${esc(person.id)}">Continue as ${esc(person.name.split(' ')[0])} ${icon('arrow')}</button>`:''}</div>`:''}</article>`;
 }
 
 function familyView() {
@@ -166,7 +172,7 @@ function familyView() {
 
 function characterView() {
   const stats = effectiveStats(state);
-  return `<section class="panel"><div class="panel-heading"><h3>Part nature. Part nurture.</h3><span class="tag">GROWTH POTENTIAL</span></div><p class="section-description">Skills run from 1 to 10. Each has a lifelong aptitude from −3 to +3 that changes how quickly it develops. Even a difficult skill can improve with time.</p><div class="character-grid">${SKILLS.map(skill=>`<article class="attribute-card"><div class="stat-heading"><h4>${esc(skill.label)}</h4><strong>${number(stats[skill.key])}<small> / 10</small></strong></div><div class="stat-track"><span class="stat-fill" style="--stat-color:var(--${skill.key});width:${stats[skill.key]*10}%"></span></div><p><span class="aptitude ${state.aptitudes[skill.key]>0?'positive':state.aptitudes[skill.key]<0?'negative':''}">${aptitude(state.aptitudes[skill.key])}</span> ${aptitudeLabel(state.aptitudes[skill.key])}</p></article>`).join('')}</div></section><section class="panel"><div class="panel-heading"><h3>Mind, body, everyday life</h3></div><div class="help-grid"><div class="help-item"><h4>Health · ${number(stats.health)}/10</h4><p>Self-care supports health. Injuries and illness can temporarily reduce it; it gradually declines in later life.</p></div><div class="help-item"><h4>Mental instability · ${number(stats.instability)}/10</h4><p>Higher means more strain. It raises the odds of burnout, anxiety, and a mental health crisis. Rest, friends, and family help.</p></div><div class="help-item"><h4>Relaxation · ${number(stats.relaxation)}/10</h4><p>Making time for yourself helps you recover. Overworking and neglecting rest can wear you down.</p></div><div class="help-item"><h4>Height · ${Math.round(state.height)} cm</h4><p>${state.age<18?'You are still growing. Your adult height will be reached at 18.':'You have reached your adult height.'}</p></div><div class="help-item"><h4>Lifestyle · ${state.lifestyle}/10</h4><p>Your career success and family legacy support your lifestyle. Higher levels mean more everyday comfort. Your legacy is shared equally among your children.</p></div><div class="help-item"><h4>Save your story</h4><p>Your game saves in this browser after every action. Export a backup to keep it elsewhere.</p><button class="button secondary small" data-action="export">${icon('download')} Export save</button><button class="button ghost small" data-action="import">Import save</button><input type="file" id="import-file" accept=".json,application/json" hidden></div></div></section>`;
+  return `${statsView()}${effectsView()}<details class="panel character-guide"><summary>How your character grows</summary><div class="help-grid"><div class="help-item"><h4>Nature & nurture</h4><p>Skills run from 1–10. The −3 to +3 rating is your lifelong growth aptitude: positive means faster growth, negative means more practice. Every skill can improve.</p></div><div class="help-item"><h4>Health · ${number(stats.health)}/10</h4><p>Self-care supports health. Injuries and illness can temporarily reduce it; it gradually declines in later life.</p></div><div class="help-item"><h4>Mental instability · ${number(stats.instability)}/10</h4><p>Higher means more strain and greater odds of burnout or a mental health crisis. Rest, friends, and family help.</p></div><div class="help-item"><h4>Relaxation · ${number(stats.relaxation)}/10</h4><p>Time for yourself helps you recover. Overworking and neglecting rest can wear you down.</p></div><div class="help-item"><h4>Height · ${Math.round(state.height)} cm</h4><p>${state.age<18?'You are still growing. Your adult height will be reached at 18.':'You have reached your adult height.'}</p></div><div class="help-item"><h4>Lifestyle · ${state.lifestyle}/10</h4><p>Your career success and family legacy support your comfort. Your legacy is shared equally among your children.</p></div></div></details>`;
 }
 
 function endPanel() {
@@ -184,16 +190,31 @@ function toast(message, error = false) {
 }
 
 function openModal(title, body, actions = '') {
-  modalReturnFocus = document.activeElement;
+  if (!modalRoot.firstElementChild) modalReturnFocus = document.activeElement;
   modalRoot.innerHTML = `<div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div class="modal-header"><h2 id="modal-title">${title}</h2><button class="icon-button" data-action="close" aria-label="Close dialog">${icon('close')}</button></div><div class="modal-body">${body}</div>${actions?`<div class="modal-actions">${actions}</div>`:''}</section></div>`;
   document.body.style.overflow='hidden';
+  app.setAttribute('inert', '');
   (modalRoot.querySelector('input') || modalRoot.querySelector('button'))?.focus();
 }
 
 function closeModal() {
   modalRoot.innerHTML='';
   document.body.style.overflow='';
-  modalReturnFocus?.focus();
+  app.removeAttribute('inert');
+  modalReturnFocus?.focus({preventScroll:true});
+}
+
+function menuModal() {
+  openModal('Your story', `<div class="menu-list"><button data-action="help">${icon('help')} How to play ${icon('arrow')}</button><button data-action="odds">${icon('spark')} This year’s odds ${icon('arrow')}</button><button data-action="export">${icon('download')} Export save ${icon('arrow')}</button><button data-action="import">${icon('year')} Import save ${icon('arrow')}</button><button data-action="new">${icon('plus')} Start a new life ${icon('arrow')}</button></div><p class="menu-note">${saveAvailable?'Your life saves automatically on this device. Export a backup to move it to another phone.':'Browser saving is unavailable. Export your story before leaving.'}</p>`);
+}
+
+function navigate(tab) {
+  if (!['year','career','family','character'].includes(tab)) return;
+  if (modalRoot.firstElementChild) closeModal();
+  activeTab = tab;
+  render();
+  window.scrollTo?.({top:0,behavior:'instant'});
+  app.querySelector(`.nav-button[data-tab="${tab}"]`)?.focus({preventScroll:true});
 }
 
 function helpModal() {
@@ -218,16 +239,17 @@ document.addEventListener('click', event => {
   if (!button || button.disabled) return;
   event.preventDefault();
   const {action} = button.dataset;
-  if (action==='tab') { activeTab=button.dataset.tab; render(); }
+  if (action==='tab') navigate(button.dataset.tab);
+  if (action==='menu') menuModal();
   if (action==='baby') update(()=>setBabyChoice(state,button.dataset.choice));
   if (action==='focus') {
     const {key,delta} = button.dataset;
     update(()=>setFocus(state,key,state.focus[key]+Number(delta)));
-    app.querySelector(`[data-action="focus"][data-key="${key}"][data-delta="${delta}"]`)?.focus();
+    app.querySelector(`[data-action="focus"][data-key="${key}"][data-delta="${delta}"]`)?.focus({preventScroll:true});
   }
   if (action==='advance') {
     update(()=>advanceYear(state));
-    if (!state.ended&&!state.needsSuccession) app.querySelector('[data-action="advance"]')?.focus();
+    if (!state.ended&&!state.needsSuccession) app.querySelector('[data-action="advance"]')?.focus({preventScroll:true});
     toast(state.ended?'A life complete. Your journal is saved.':state.needsSuccession?'It’s time to choose the next generation.':`Hello, ${state.age}. A new year begins.`);
   }
   if (action==='job') update(()=>takeJob(state,button.dataset.id),'A new chapter in your career.');
@@ -249,11 +271,16 @@ document.addEventListener('click', event => {
     state = createGame(name?{name}:{}); activeTab='year'; showAllHistory=false; closeModal(); save(); render(); toast('Welcome to the world.');
   }
   if (action==='export') {
+    closeModal();
     const blob = new Blob([JSON.stringify(state,null,2)], {type:'application/json'});
     const url = URL.createObjectURL(blob); const link = document.createElement('a');
     link.href=url; link.download=`lifelines-generation-${state.generation}-age-${state.age}.json`; link.click(); setTimeout(()=>URL.revokeObjectURL(url),5000); toast('Your story has been exported.');
   }
-  if (action==='import') document.querySelector('#import-file')?.click();
+  if (action==='import') {
+    closeModal();
+    const input = document.querySelector('#import-file');
+    if (input) { input.value = ''; input.click(); }
+  }
 });
 
 document.addEventListener('change', async event => {

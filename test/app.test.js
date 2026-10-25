@@ -83,13 +83,74 @@ afterEach(() => {
 });
 
 describe('Lifelines DOM integration', { concurrency: false }, () => {
+  test('the phone navigation keeps one year action and preserves the current life', async () => {
+    const fixture = ageTo(createGame({ name: 'Riley Santos', seed: 20 }), 12);
+    fixture.focus = { work: 5, social: 2, family: 2, self: 3 };
+    const ui = await mount(fixture);
+    const originalSave = ui.saved();
+    const expectedTabs = ['year', 'career', 'family', 'character'];
+    const expectedLabels = ['Year', 'Career', 'Family', 'You'];
+    assert.equal(ui.all('.sidebar, .right-column').length, 0);
+    assert.equal(ui.all('.bottom-dock .nav-list .nav-button').length, 4);
+    assert.deepEqual(ui.all('.bottom-dock .nav-button').map(button => button.dataset.tab), expectedTabs);
+    assert.deepEqual(ui.all('.bottom-dock .nav-label').map(label => label.textContent.trim()), expectedLabels);
+    assert.equal(ui.all('[data-action="advance"]').length, 1);
+    assert.ok(ui.query('.bottom-dock [data-action="advance"]'));
+    assert.match(ui.query('.profile-bar').textContent, /Riley Santos/);
+    assert.match(ui.query('.status-strip').textContent, /Health/);
+    assert.match(ui.query('.status-strip').textContent, /Instability/);
+
+    for (const tab of ['career', 'family', 'character']) {
+      ui.click(`.bottom-dock [data-tab="${tab}"]`);
+      assert.equal(ui.all('[data-action="advance"]').length, 0, 'other screens must not advance time accidentally');
+      assert.equal(ui.query(`.nav-list [data-tab="${tab}"]`).getAttribute('aria-current'), 'page');
+      assert.equal(ui.all('.bottom-dock .nav-button').length, 4);
+      assert.deepEqual(ui.saved(), originalSave, 'navigation must preserve the full saved life');
+    }
+    ui.click('.bottom-dock [data-tab="year"]');
+    assert.equal(ui.all('[data-action="advance"]').length, 1);
+    assert.deepEqual(ui.saved().focus, fixture.focus);
+    ui.click('.bottom-dock [data-action="advance"]');
+    assert.equal(ui.saved().age, 13);
+    assert.equal(ui.all('[data-action="advance"]').length, 1);
+    assert.equal(validateSave(ui.saved()), true);
+  });
+
+  test('the More menu exposes utilities and a new life still requires confirmation', async () => {
+    const ui = await mount(ageTo(createGame({ name: 'Casey Walker', seed: 21 }), 24));
+    const originalSave = ui.saved();
+    assert.equal(ui.all('[data-action="new"]').length, 0, 'restart belongs in the utility menu');
+    ui.click('[data-action="menu"]');
+    assert.equal(ui.all('[role="dialog"]').length, 1);
+    assert.equal(ui.query('#app').hasAttribute('inert'), true, 'the game underneath a sheet must not receive taps');
+    for (const action of ['help', 'export', 'import', 'new']) {
+      assert.ok(ui.query(`.menu-list [data-action="${action}"]`));
+    }
+    assert.deepEqual(ui.saved(), originalSave);
+    ui.click('.menu-list [data-action="new"]');
+    assert.equal(ui.all('[role="dialog"]').length, 1, 'a new-life prompt must replace the utility sheet');
+    assert.ok(ui.query('#new-name'));
+    assert.ok(ui.query('[data-action="confirm-new"]'));
+    assert.deepEqual(ui.saved(), originalSave, 'opening the restart prompt must not discard progress');
+    ui.click('.modal [data-action="close"]');
+    assert.deepEqual(ui.saved(), originalSave);
+    assert.equal(ui.all('[role="dialog"]').length, 0);
+    assert.equal(ui.document.body.style.overflow, '');
+    assert.equal(ui.query('#app').hasAttribute('inert'), false);
+    ui.click('[data-action="menu"]');
+    ui.click('.menu-list [data-action="help"]');
+    assert.equal(ui.all('[role="dialog"]').length, 1);
+    assert.match(ui.query('.modal-body').textContent, /focus/i);
+    assert.deepEqual(ui.saved(), originalSave);
+  });
+
   test('a new baby renders, crying saves, and three annual advances unlock focus', async () => {
     const ui = await mount();
     const initial = ui.saved();
     assert.equal(initial.age, 0);
     assert.equal(ui.query('.person-name').textContent, 'Jamie Reed');
     assert.equal(ui.all('.choice-card').length, 2);
-    assert.equal(ui.all('.stat-list .stat-row').length, 6);
+    assert.equal(ui.all('.stat-list .stat-row').length, 0, 'detailed skills belong on the You screen');
     assert.equal(ui.all('[data-action="focus"]').length, 0);
 
     ui.click('[data-action="baby"][data-choice="cry"]');
@@ -107,6 +168,10 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     assert.match(ui.query('.journal-list').textContent, /bigger little world/i);
     assert.equal(validateSave(ui.saved()), true);
     assert.doesNotMatch(ui.query('#app').textContent, /undefined|NaN/);
+    ui.click('.nav-list [data-tab="character"]');
+    assert.equal(ui.all('.stat-list .stat-row').length, 6);
+    assert.equal(ui.all('.stat-list .aptitude').length, 6);
+    assert.equal(ui.saved().age, 3, 'viewing detailed skills must not advance the year');
   });
 
   test('the focus controls enforce the shared budget and persist reallocations', async () => {
@@ -135,9 +200,10 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     assert.equal(ui.all('.family-card').length, 2);
     assert.equal(ui.query('[data-action="child"]').disabled, true);
     ui.click('[data-action="tab"][data-tab="character"]');
-    assert.equal(ui.all('.attribute-card').length, 6);
-    assert.ok(ui.query('[data-action="export"]'));
-    ui.click('[data-action="help"]');
+    assert.equal(ui.all('.stat-list .stat-row').length, 6);
+    ui.click('[data-action="menu"]');
+    assert.ok(ui.query('.menu-list [data-action="export"]'));
+    ui.click('.menu-list [data-action="help"]');
     assert.equal(ui.all('[role="dialog"]').length, 1);
     assert.equal(ui.all('.help-item').filter(item => item.closest('.modal')).length, 6);
     assert.equal(ui.document.body.style.overflow, 'hidden');
@@ -151,7 +217,8 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
 
   test('starting over stores the chosen name as escaped text', async () => {
     const ui = await mount(ageTo(createGame({ seed: 98 }), 7));
-    ui.click('[data-action="new"]');
+    ui.click('[data-action="menu"]');
+    ui.click('.menu-list [data-action="new"]');
     const chosenName = '<img src=x onerror=1> & Lee';
     ui.query('#new-name').value = chosenName;
     ui.click('[data-action="confirm-new"]');
@@ -235,6 +302,28 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     assert.equal(validateSave(ui.saved()), true);
   });
 
+  test('the phone dock leads to succession when a life closes', async () => {
+    const elder = ageTo(createGame({ name: 'Jordan Patel', seed: 22 }), 60);
+    assert.equal(haveChild(elder).ok, true);
+    ageTo(elder, 85);
+    const child = structuredClone(elder.children[0]);
+    const ui = await mount(elder);
+    assert.equal(ui.saved().needsSuccession, true);
+    assert.equal(ui.all('[data-action="advance"]').length, 0);
+    assert.match(ui.query('.bottom-dock .advance-button').textContent, /Choose your heir/);
+    ui.click('.bottom-dock .advance-button');
+    assert.equal(ui.query('.nav-list [data-tab="family"]').getAttribute('aria-current'), 'page');
+    assert.equal(ui.saved().age, 85);
+    ui.click(`[data-action="heir"][data-id="${child.id}"]`);
+    ui.click('[data-action="confirm-heir"]');
+    assert.equal(ui.saved().generation, 2);
+    assert.equal(ui.saved().name, child.name);
+    assert.equal(ui.saved().age, child.age);
+    assert.equal(ui.saved().needsSuccession, false);
+    assert.equal(ui.all('.bottom-dock [data-action="advance"]').length, 1);
+    assert.equal(ui.query('#app').hasAttribute('inert'), false);
+  });
+
   test('all views and succession show lifestyle without money or annual cash-flow metrics', async () => {
     const elder = ageTo(createGame({ name: 'Robin Reed', seed: 47 }), 18);
     assert.equal(takeJob(elder, 'retail').ok, true);
@@ -249,7 +338,7 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     for (const tab of ['year', 'career', 'family', 'character']) {
       ui.click(`[data-action="tab"][data-tab="${tab}"]`);
       assertNoMoneyDisplay(ui.query('#app'), `${tab} view`);
-      assert.match(ui.query('#main-content').textContent, /Lifestyle[\s\S]{0,30}5\s*\/\s*10/i, `${tab} view should show lifestyle on its 1–10 scale`);
+      assert.match(ui.query('.status-strip').textContent, /Lifestyle[\s\S]{0,30}5\s*\/\s*10/i, `${tab} view should show lifestyle on its 1–10 scale`);
     }
 
     ui.click('[data-action="tab"][data-tab="family"]');
@@ -260,22 +349,39 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     assert.equal(ui.saved().generation, 2);
     assertNoMoneyDisplay(ui.query('#app'), 'next generation');
     assertNoMoneyDisplay(ui.query('.journal-list'), 'succession journal');
-    assert.match(ui.query('#main-content').textContent, /Lifestyle[\s\S]{0,30}\b(?:10|[1-9])\s*\/\s*10/i);
+    assert.match(ui.query('.status-strip').textContent, /Lifestyle\s*(?:10|[1-9])\s*\/\s*10/i);
     ui.click('[data-action="history"]');
     assertNoMoneyDisplay(ui.query('.journal-list'), 'complete family journal');
   });
 
-  test('a saved life reloads and a valid import waits for explicit restore', async () => {
+  test('a saved life reloads and the same import can be retried after cancelling restore', async () => {
     const fixture = ageTo(createGame({ name: 'Taylor Brooks', seed: 99 }), 29);
     fixture.focus = { work: 5, social: 2, family: 2, self: 3 };
     const ui = await mount(fixture);
     assert.equal(ui.saved().age, 29);
     assert.deepEqual(ui.saved().focus, fixture.focus);
-    ui.click('[data-action="tab"][data-tab="character"]');
+    const input = ui.query('#import-file');
+    input.value = 'C:\\fakepath\\lifelines-save.json';
+    ui.click('[data-action="menu"]');
+    assert.ok(ui.query('.menu-list [data-action="import"]'));
+    ui.click('.menu-list [data-action="import"]');
+    assert.equal(input.value, '', 'opening the picker must clear its previous file selection');
     const incoming = createGame({ name: 'Avery Rivera', seed: 42 });
     const raw = JSON.stringify(incoming);
-    await ui.change('#import-file', { size: raw.length, text: async () => raw });
-    assert.equal(ui.saved().name, fixture.name);
+    const importFile = { size: raw.length, text: async () => raw };
+    input.value = 'C:\\fakepath\\lifelines-save.json';
+    await ui.change('#import-file', importFile);
+    assert.deepEqual(ui.saved(), fixture);
+    assert.match(ui.query('.modal-body').textContent, /Avery Rivera/);
+    ui.click('.modal [data-action="close"]');
+    assert.equal(ui.all('[role="dialog"]').length, 0);
+    assert.deepEqual(ui.saved(), fixture, 'cancelling restore must preserve every part of the current life');
+    ui.click('[data-action="menu"]');
+    ui.click('.menu-list [data-action="import"]');
+    assert.equal(input.value, '', 'clearing the persistent input permits choosing the same file again');
+    input.value = 'C:\\fakepath\\lifelines-save.json';
+    await ui.change('#import-file', importFile);
+    assert.deepEqual(ui.saved(), fixture, 'retrying import still requires explicit restore');
     assert.match(ui.query('.modal-body').textContent, /Avery Rivera/);
     ui.click('#restore-save');
     assert.equal(ui.saved().name, incoming.name);
