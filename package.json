@@ -1,0 +1,14 @@
+{
+  "name": "lifelines",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A small, generational life simulator. Your time is your most valuable inheritance.",
+  "scripts": {
+    "test": "node --test",
+    "start": "node server.mjs"
+  },
+  "devDependencies": {
+    "linkedom": "^0.18.14"
+  }
+}
