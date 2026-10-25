@@ -1,6 +1,6 @@
 # Lifelines
 
-Lifelines is a phone-first, generational life simulator. Read `README.md` for the current gameplay rules, save migrations, and deployment details before changing behavior.
+Lifelines is a phone-first, generational life simulator. Read `HANDOFF.md` for the project and cloud setup status, and `README.md` for the current gameplay rules, save migrations, and deployment details before changing behavior.
 
 ## Setup and validation
 

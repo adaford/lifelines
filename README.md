@@ -4,6 +4,8 @@ A small, generational life simulator about how you spend your years and what you
 
 **Play:** https://adaford.github.io/lifelines/
 
+**Development handoff:** [HANDOFF.md](HANDOFF.md) covers the implemented game, save contract, code structure, cloud setup, and remaining work. Coding instructions live in [AGENTS.md](AGENTS.md).
+
 ## Designed for phones
 
 The game uses a single-column layout with four bottom tabs: **Year**, **Career**, **Family**, and **You**. The **Next year** control stays within reach at the bottom of the Year screen. Full character stats live in You; health, stability, and lifestyle remain visible at a glance. Babies also show all five skills and their affinities on the Year screen.
@@ -26,7 +28,7 @@ Tap **More** (the three dots) for help, event odds, save export/import, or a new
 - Single adults can meet up to five people per year. Attractiveness, social ability, and lifestyle affect frequency, profile strength, and pursuit success. Profiles show every stat and affinity; browse one at a time on a phone. Choose a relationship, a consensual one-night stand, or ignore. Unanswered encounters expire the following year.
 - A new relationship starts at a random 3–7 out of 10. Dating adds social ability +0.7 and stability +0.6; marriage raises these to +0.9 and +0.8. Either costs one lifestyle level. Family focus builds the bond. Propose once per year; relationship strength and years together determine acceptance.
 - Dating has a low annual pregnancy chance; marriage raises it substantially. Pregnancy is saved, and a baby arrives on the next yearly turn. A one-night stand also has a small pregnancy chance. Adults can adopt, with a maximum of six children and one arrival per year. An expected baby reserves a place in the family.
-- Each living child adds social ability +0.2 (up to +1.2), and each dependent child costs one lifestyle level. Children have their own 1–10 bond, stats, and affinities. Family focus improves their bond and abilities. Partners and children have personal events and decisions with clearly labeled consequences for them and for you.
+- Each living dependent child under 18 adds social ability +0.2 (up to +1.2) and costs one lifestyle level. Children have their own 1–10 bond, stats, and affinities. Family focus improves their bond and abilities. Partners and children have personal events and decisions with clearly labeled consequences for them and for you.
 - Attractiveness naturally peaks at an individual age between 27 and 33, then gradually declines. Events can still change it.
 - Retirement opens at 65. Choose any eligible child; if there are no eligible children, choose a sibling. With neither, give the legacy to a random child aged 6–12 with low stats and a different surname. At 85, this handoff is required, so a childless life can still continue. The preview stays the same across menu visits and reloads.
 - Heirs keep their age, stats, affinity, height, identity, and personal resources. Child and sibling heirs keep your family surname regardless of gender. A sibling handoff preserves the existing parents and remaining siblings; a previously played character cannot receive another handoff.
