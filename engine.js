@@ -1,19 +1,19 @@
 // Lifelines: deterministic, browser-independent simulation rules.
 // All public actions mutate their state and return { ok, reason? }.
-import { JOBS } from './jobs.js?v=natural-stats-1';
-import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=natural-stats-1';
-import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=natural-stats-1';
-import { mortalityRisk, rollMortality } from './mortality.js?v=natural-stats-1';
-import { heightReference, advanceGrowth } from './growth.js?v=natural-stats-1';
-import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=natural-stats-1';
-import { naturalSkillRating, skillChanges, childhoodWellbeing, DEVELOPMENT_BALANCE } from './development.js?v=natural-stats-1';
-import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=natural-stats-1';
-import { normalPercentile } from './percentiles.js?v=natural-stats-1';
+import { JOBS } from './jobs.js?v=year-recap-1';
+import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=year-recap-1';
+import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=year-recap-1';
+import { mortalityRisk, rollMortality } from './mortality.js?v=year-recap-1';
+import { heightReference, advanceGrowth } from './growth.js?v=year-recap-1';
+import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=year-recap-1';
+import { naturalSkillRating, skillChanges, childhoodWellbeing, DEVELOPMENT_BALANCE, BIRTH_VARIATION } from './development.js?v=year-recap-1';
+import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=year-recap-1';
+import { normalPercentile } from './percentiles.js?v=year-recap-1';
 export { DEVELOPMENT_BALANCE };
-export { heightPercentile } from './growth.js?v=natural-stats-1';
-export { mortalityRisk } from './mortality.js?v=natural-stats-1';
-import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=natural-stats-1';
-export { JOBS, JOB_CATEGORIES } from './jobs.js?v=natural-stats-1';
+export { heightPercentile } from './growth.js?v=year-recap-1';
+export { mortalityRisk } from './mortality.js?v=year-recap-1';
+import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=year-recap-1';
+export { JOBS, JOB_CATEGORIES } from './jobs.js?v=year-recap-1';
 export const EVENTS = [...PERSONAL_EVENTS, ...FAMILY_EVENTS];
 
 export const SKILLS = [
@@ -76,9 +76,9 @@ function developSkills(person, context = person, career = null) {
   for (const [key, amount] of Object.entries(skillChanges(context, career))) addStat(person, key, amount);
 }
 function randomStats(state, aptitudes) {
-  const result = Object.fromEntries(CORE.filter(key => key !== 'attractiveness').map(key => [key, round(clamp(naturalSkillRating(aptitudes[key]) + normal(state) * .65, 1, 10))]));
-  result.attractiveness = round(clamp(5 + normal(state) * 1.5, 1, 10));
-  return { ...result, health: round(clamp(5 + normal(state), 1, 10)), stability: round(clamp(5 + normal(state), 1, 10)) };
+  const result = Object.fromEntries(CORE.filter(key => key !== 'attractiveness').map(key => [key, round(clamp(naturalSkillRating(aptitudes[key]) + normal(state) * BIRTH_VARIATION.skill, 1, 10))]));
+  result.attractiveness = round(clamp(5 + normal(state) * BIRTH_VARIATION.appearance, 1, 10));
+  return { ...result, health: round(clamp(5 + normal(state) * BIRTH_VARIATION.health, 1, 10)), stability: round(clamp(5 + normal(state) * BIRTH_VARIATION.stability, 1, 10)) };
 }
 function randomAptitudes(state) { return Object.fromEntries(CORE.map(key => [key, integer(state, -3, 3)])); }
 function inheritAptitudes(state, first, second) {
@@ -131,7 +131,7 @@ function newbornGrowth(state, person, parents = []) {
   person.growthFactor = Math.round(clamp(1 + .7 * (inherited - 1) + normal(state) * (parents.length ? .047 : .054), .8, 1.2) * 10000) / 10000;
   // Only attained adult height is stored. While growing there is no endpoint.
   person.adultHeight = null;
-  if (parents.length) person.stats.attractiveness = round(clamp(parents.reduce((sum, p) => sum + p.stats.attractiveness, 0) / parents.length + normal(state) * .7, 1, 10));
+  if (parents.length) person.stats.attractiveness = round(clamp(parents.reduce((sum, p) => sum + p.stats.attractiveness, 0) / parents.length + normal(state) * BIRTH_VARIATION.inheritedAppearance, 1, 10));
   person.growthAnchor = null;
 }
 function datingHelpers(state) {
@@ -164,7 +164,7 @@ export function createGame({ name, surname: chosenSurname, firstName, seed, gend
     education: { status: 'school', years: 0 }, jobOffers: [],
     partner: null, encounters: [], encounterYear: 0, pregnancy: null,
     effects: [], pendingEvents: [], lastYearEvents: [], history: [], lineage: [], ended: false, needsSuccession: false };
-  const familyName = normalizeSurname(chosenSurname);
+  const familyName = normalizeSurname(chosenSurname) || (typeof firstName === 'string' && firstName.trim() ? pick(state, LAST_NAMES) : '');
   if (familyName) {
     const givenName = typeof firstName === 'string' && firstName.trim() ? firstName.trim().replace(/\s+/g, ' ') : pick(state, GENDER_NAMES[gender] || FIRST_NAMES);
     state.familyName = familyName;
@@ -399,7 +399,7 @@ function growYear(state) {
     for (const [key, amount] of Object.entries(childhoodWellbeing(state))) addStat(state, key, amount);
     for (const parent of state.parents.filter(p => p.alive !== false)) {
       addStat(parent, 'stability', .2 - 2 * intensity ** 1.35);
-      parent.relationship = round(clamp(parent.relationship + .08 + intensity * .32, 1, 10));
+      parent.relationship = round(clamp(parent.relationship + .2 * (state.cryLevel - 3), 1, 10));
     }
     return;
   }
@@ -604,7 +604,9 @@ function routineYear(state, growthRandom, careerRandom) {
     }
     if (Number.isFinite(previous.relationship)) {
       const change = person.relationship - previous.relationship;
-      person.relationship = round(clamp(previous.relationship + change + clamp(growthRandom(), -3, 3) * (Math.abs(change) * .2 + .01), 1, 10));
+      const neutralCrying = state.age < 3 && state.cryLevel === 3 && state.parents.includes(person);
+      const sd = neutralCrying ? 0 : Math.abs(change) * .2 + .01;
+      person.relationship = round(clamp(previous.relationship + change + clamp(growthRandom(), -3, 3) * sd, 1, 10));
     }
   }
   state.effects.forEach(effect => { effect.years -= 1; });
@@ -687,6 +689,10 @@ export function advanceYear(state, { mortalityRandom, growthRandom, parentCareer
   const status = active(state); if (!status.ok) return status;
   if (needsEducationChoice(state)) return fail('Choose college or a career before advancing the year.');
   const before = yearSnapshot(state);
+  const decisions = state.age < 3 ? { cryLevel: state.cryLevel } : {
+    focus: { ...state.focus },
+    workLabel: state.age < 18 ? 'School' : state.education.status === 'college' ? 'College' : 'Career',
+  };
   const oldMemories = new Set(state.history.map(memory => memory.id));
   const previousStage = stage(state);
   // Each eligible event has its own independent roll. Shuffle before limiting
@@ -749,7 +755,7 @@ export function advanceYear(state, { mortalityRandom, growthRandom, parentCareer
     state.ended = false;
     if (state.alive) log(state, 'Time for the next chapter', 'You retire at 85.', 'milestone');
   }
-  state.yearSummary = { ...yearChanges(before, state), events: state.history.filter(memory => !oldMemories.has(memory.id)).map(({ title, text, kind }) => ({ title, text, kind })), dismissed: false };
+  state.yearSummary = { ...yearChanges(before, state), decisions, events: state.history.filter(memory => !oldMemories.has(memory.id)).map(({ title, text, kind }) => ({ title, text, kind })), dismissed: false };
   return { ok: true, eventId: selected[0]?.eventId || selected[0]?.id || null, eventIds: [...state.lastYearEvents] };
 }
 
@@ -799,7 +805,7 @@ function legacyBeneficiary(state) {
     for (const key of CORE) if (key !== 'attractiveness') addStat(person, key, normal(draft) * .06);
     person.age++;
   }
-  person.stats.attractiveness = round(clamp(5 + normal(draft) * 1.5, 1, 10));
+  person.stats.attractiveness = round(clamp(5 + normal(draft) * BIRTH_VARIATION.appearance, 1, 10));
   return person;
 }
 
@@ -897,6 +903,16 @@ function validSchema(raw, version) {
       if (raw.alive ? raw.death !== null : !raw.death || !raw.needsSuccession || raw.pendingEvents.length || raw.pregnancy) return false;
       const validDelta = value => value && finite(value.before, 1, 10) && finite(value.after, 1, 10) && finite(value.change, -9, 9) && Math.abs(round(value.after - value.before) - value.change) < .001;
       const summary = raw.yearSummary;
+      if (summary?.decisions !== undefined) {
+        const decisions = summary.decisions;
+        if (!decisions || typeof decisions !== 'object' || Array.isArray(decisions)) return false;
+        if (summary.fromAge < 3) {
+          if (Object.keys(decisions).length !== 1 || !Number.isInteger(decisions.cryLevel) || !finite(decisions.cryLevel, 1, 5)) return false;
+        } else {
+          const focus = decisions.focus;
+          if (Object.keys(decisions).length !== 2 || !['School', 'College', 'Career'].includes(decisions.workLabel) || !focus || Object.keys(focus).length !== 4 || !FOCUS_KEYS.every(key => Number.isInteger(focus[key]) && finite(focus[key], 0, 5)) || FOCUS_KEYS.reduce((sum, key) => sum + focus[key], 0) > 12) return false;
+        }
+      }
       if (summary?.height !== undefined && (!finite(summary.height.before, 40, 240) || !finite(summary.height.after, 40, 240) || !finite(summary.height.change, 0, 200) || Math.abs(round(summary.height.after - summary.height.before) - summary.height.change) > .001)) return false;
       if (summary !== null && (!summary || typeof summary.dismissed !== 'boolean' || summary.toAge !== raw.age || summary.fromAge !== raw.age - 1 || !summary.stats || Object.keys(summary.stats).length !== STAT_KEYS.length || !STAT_KEYS.every(key => validDelta(summary.stats[key])) || !validDelta(summary.lifestyle) || !Array.isArray(summary.parents) || summary.parents.length > 2 || !summary.parents.every(parent => text(parent.id, 100) && text(parent.name, 50) && validDelta(parent.stability) && validDelta(parent.relationship) && (parent.lifestyle === undefined || validDelta(parent.lifestyle))) || !Array.isArray(summary.events) || summary.events.length > 30 || !summary.events.every(event => text(event.title, 200) && text(event.text, 2000) && text(event.kind, 50)))) return false;
     }

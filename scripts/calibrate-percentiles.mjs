@@ -2,6 +2,7 @@
 // Reproduce: node scripts/calibrate-percentiles.mjs --samples 2000 --seed 200001
 // Refit development after changing the simulation: add --fit.
 import { readFile, writeFile } from 'node:fs/promises';
+import { BIRTH_VARIATION } from '../development.js';
 import {
   createGame, advanceYear, resolveEventChoice, EVENTS, effectiveStats,
   DEVELOPMENT_BALANCE,
@@ -109,6 +110,7 @@ const reference = {
     cryLevel: 3, focus, choices: 'uniform, independent seeded draws',
     conditionedOn: 'alive at the observed age',
     observationsByAge: [...result.ageStats.map(stats => stats.health.count), result.stats.health.count],
+    birthVariation: BIRTH_VARIATION,
     development: DEVELOPMENT_BALANCE,
     reproduce: `node scripts/calibrate-percentiles.mjs --samples ${samples} --seed ${seedStart}`,
   },

@@ -5,7 +5,8 @@ import {
   offeredJobs, needsEducationChoice, pendingEventSubject,
   relationshipOdds, meetingChances, proposalChance, pregnancyChance, oneNightChance,
   respondToEncounter, proposeMarriage, endRelationship, normalizeSurname, heightPercentile, statPercentiles
-} from './engine.js?v=natural-stats-1';
+} from './engine.js?v=year-recap-1';
+import { annotateNarrative } from './narrative.js?v=year-recap-1';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const app = document.querySelector('#app');
@@ -44,7 +45,8 @@ const icons = {
 };
 const icon = name => `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[name] || icons.spark}</svg>`;
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const journalText = value => esc(String(value ?? '')
+const narrativeText = value => esc(annotateNarrative(String(value ?? ''),state));
+const journalText = value => narrativeText(String(value ?? '')
   .replace(/\$\d[\d,]*(?:\.\d+)?/g, 'a share of the family legacy')
   .replace(/\b(?:mental\s+)?instability\s+([+−-])(\d+(?:\.\d+)?|\.\d+)/gi, (_,sign,value) => `Mental stability ${Number(value)===0?'stayed steady':sign==='+'?'decreased':'increased'}`)
   .replace(/\b(?:mental\s+)?instability\b/gi, 'Mental stability')
@@ -173,10 +175,10 @@ function statsView(preview = false) {
   const forecast = preview && !state.ended && !state.needsSuccession && !state.pendingEvents.length && !needsEducationChoice(state) ? annualForecast(state) : null;
   return `<section class="panel stats-panel ${preview?'year-stats':''} ${forecast?'forecast-panel':''}" aria-label="${preview?'Your stats and expected changes':'Your character stats'}"><div class="panel-heading"><h3>${labelWithHelp(preview?'Your stats':'Your character','stats')}</h3><span class="tag">1–10</span></div><div class="stat-list">${SKILLS.map(skill => {
     const value = stats[skill.key]; const apt = state.aptitudes[skill.key];
-    return `<div class="stat-row" data-stat="${skill.key}"><div class="stat-heading"><span class="stat-name">${labelWithHelp(skill.label,skill.key)}</span><span class="aptitude ${apt>0?'positive':apt<0?'negative':''}" aria-label="Natural aptitude ${aptitude(apt)}">${aptitude(apt)}</span><strong class="stat-value">${number(value)}</strong>${percentileTag(percentiles,skill.key)}</div>${projectedMeter(skill.label,value,forecast?.stats[skill.key],skill.key)}</div>`;
-  }).join('')}</div><div class="stat-help-links">${labelWithHelp('Natural aptitude','affinity')}${percentiles?labelWithHelp('Percentiles','percentiles'):''}${forecast?labelWithHelp('Next year','forecast'):''}</div><div class="vitals-grid">${[['health','Health','heart'],['stability','Mental stability','spark'],['lifestyle','Lifestyle','self']].map(([key,label,ico]) => {
+    return `<div class="stat-row" data-stat="${skill.key}"><div class="stat-heading"><span class="stat-name">${labelWithHelp(skill.label,skill.key)}</span><span class="aptitude ${apt>0?'positive':apt<0?'negative':''}" aria-label="Natural aptitude ${aptitude(apt)}">${aptitude(apt)}</span><strong class="stat-value">${number(value)}</strong></div>${projectedMeter(skill.label,value,forecast?.stats[skill.key],skill.key)}</div>`;
+  }).join('')}</div><div class="stat-help-links">${labelWithHelp('Natural aptitude','affinity')}${forecast?labelWithHelp('Next year','forecast'):''}</div><div class="vitals-grid">${[['health','Health','heart'],['stability','Mental stability','spark'],['lifestyle','Lifestyle','self']].map(([key,label,ico]) => {
     const value = key==='lifestyle' ? state.lifestyle : stats[key];
-    return `<div class="vital" data-stat="${key}"><span class="vital-label">${labelWithHelp(label,key)}</span><span class="vital-value">${number(value)}<small>/10</small></span>${percentileTag(percentiles,key)}${projectedMeter(label,value,key==='lifestyle'?forecast?.lifestyle:forecast?.stats[key],key)}</div>`;
+    return `<div class="vital" data-stat="${key}"><span class="vital-label">${labelWithHelp(label,key)}</span><span class="vital-value">${number(value)}<small>/10</small></span>${projectedMeter(label,value,key==='lifestyle'?forecast?.lifestyle:forecast?.stats[key],key)}</div>`;
   }).join('')}<div class="vital height-vital" data-stat="height"><span class="vital-label">${labelWithHelp('Height','height',state.id)}</span><span class="vital-value">${number(state.height)}<small> cm</small></span>${percentiles?percentileTag(percentiles,'height'):state.age>=18?'<span class="height-percentile">Adult height</span>':''}</div></div></section>`;
 }
 
@@ -205,7 +207,7 @@ function eventDecisionView() {
   const event = EVENTS.find(event => event.id===pending.eventId);
   const subject = pendingEventSubject(state,pending);
   const story = text => String(text).replaceAll('{name}',subject?.name || 'your loved one');
-  return `<section class="panel event-decision" aria-labelledby="event-title" data-event-id="${esc(event.id)}" data-subject-id="${esc(pending.subjectId || '')}"><div class="panel-heading"><span class="eyebrow">${pending.subjectId?'A FAMILY MOMENT':'A TURN IN YOUR STORY'}</span><span class="tag">${state.pendingEvents.length} CHOICE${state.pendingEvents.length===1?'':'S'} LEFT</span></div><h3 id="event-title" tabindex="-1">${journalText(event.name)}</h3><p class="event-context">${pending.subjectId?`${esc(subject?.name)} · Age ${subject?.age} · Your age ${pending.age}`:`Age ${pending.age}`} · Year in review</p><p class="section-description">${journalText(story(event.description))}</p><div class="event-choices">${event.choices.map(choice=>`<button class="event-option" data-action="event-choice" data-event="${esc(event.id)}" data-subject="${esc(pending.subjectId || '')}" data-choice="${esc(choice.id)}"><strong>${journalText(choice.label)} ${icon('arrow')}</strong><span>${journalText(story(choice.description))}</span><span class="event-consequences">${esc(outcomeSummary(choice,subject,pending))}</span></button>`).join('')}</div><p class="decision-required">Choose before moving on.</p></section>`;
+  return `<section class="panel event-decision" aria-labelledby="event-title" data-event-id="${esc(event.id)}" data-subject-id="${esc(pending.subjectId || '')}"><div class="panel-heading"><span class="eyebrow">${pending.subjectId?'A FAMILY MOMENT':'A TURN IN YOUR STORY'}</span><span class="tag">${state.pendingEvents.length} CHOICE${state.pendingEvents.length===1?'':'S'} LEFT</span></div><h3 id="event-title" tabindex="-1">${journalText(event.name)}</h3><p class="event-context">${pending.subjectId?`${narrativeText(subject?.name)} · Age ${subject?.age} · Your age ${pending.age}`:`Age ${pending.age}`} · Year in review</p><p class="section-description">${journalText(story(event.description))}</p><div class="event-choices">${event.choices.map(choice=>`<button class="event-option" data-action="event-choice" data-event="${esc(event.id)}" data-subject="${esc(pending.subjectId || '')}" data-choice="${esc(choice.id)}"><strong>${journalText(choice.label)} ${icon('arrow')}</strong><span>${journalText(story(choice.description))}</span><span class="event-consequences">${narrativeText(outcomeSummary(choice,subject,pending))}</span></button>`).join('')}</div><p class="decision-required">Choose before moving on.</p></section>`;
 }
 
 function focusEventDecision() {
@@ -249,10 +251,20 @@ function changesView(changes, lifestyle, height) {
   return `<div class="year-changes">${entries.map(([key,value])=>`<div class="year-change" data-stat="${esc(key)}"><span>${esc(skillLabel(key))}</span><strong class="${value.change>0?'gain':value.change<0?'loss':'unchanged'}">${beforeAfter(value,key==='height'?' cm':'')}</strong></div>`).join('')}</div>`;
 }
 
+function yearDecisionsView(decisions) {
+  if (!decisions) return '';
+  const entries=decisions.cryLevel!==undefined
+    ? [['Cry level',`${decisions.cryLevel}/5`]]
+    : [[decisions.workLabel || 'School/career','work'],['Friends','social'],['Family','family'],['Yourself','self']].map(([label,key])=>[label,`${decisions.focus[key]}/5`]);
+  const rest=decisions.focus?12-Object.values(decisions.focus).reduce((sum,value)=>sum+value,0):0;
+  if(rest) entries.push(['Rest',`${rest} point${rest===1?'':'s'}`]);
+  return `<section class="year-decisions" aria-label="Choices used this year"><h3>Your choices</h3><dl>${entries.map(([label,value])=>`<div><dt>${label}</dt><dd>${value}</dd></div>`).join('')}</dl></section>`;
+}
+
 function yearSummaryModal() {
   const summary=state.yearSummary;
   if (!summary || summary.dismissed) return;
-  openModal(`Age ${summary.fromAge} → ${summary.toAge}`, `${changesView(summary.stats,summary.lifestyle,summary.height)}${summary.parents?.length?`<details class="forecast-parents"><summary>Parents</summary>${summary.parents.map(parent=>`<p><strong>${esc(parent.name)}</strong><span>Mental stability ${beforeAfter(parent.stability)}<br>Relationship ${beforeAfter(parent.relationship)}${parent.lifestyle?`<span class="parent-review-lifestyle">Lifestyle ${beforeAfter(parent.lifestyle)}</span>`:''}</span></p>`).join('')}</details>`:''}${summary.events?.length?`<details class="year-review-events" open><summary>Events</summary><ul>${summary.events.map(event=>`<li><strong>${journalText(event.title)}</strong><p>${journalText(event.text)}</p></li>`).join('')}</ul></details>`:''}${state.pendingEvents.length?'<p class="form-note">Decisions waiting.</p>':''}`, '<button class="button primary" data-action="close">Continue '+icon('arrow')+'</button>');
+  openModal(`Age ${summary.fromAge} → ${summary.toAge}`, `${yearDecisionsView(summary.decisions)}${changesView(summary.stats,summary.lifestyle,summary.height)}${summary.parents?.length?`<details class="forecast-parents"><summary>Parents</summary>${summary.parents.map(parent=>`<p><strong>${narrativeText(parent.name)}</strong><span>Mental stability ${beforeAfter(parent.stability)}<br>Relationship ${beforeAfter(parent.relationship)}${parent.lifestyle?`<span class="parent-review-lifestyle">Lifestyle ${beforeAfter(parent.lifestyle)}</span>`:''}</span></p>`).join('')}</details>`:''}${summary.events?.length?`<details class="year-review-events" open><summary>Events</summary><ul>${summary.events.map(event=>`<li><strong>${journalText(event.title)}</strong><p>${journalText(event.text)}</p></li>`).join('')}</ul></details>`:''}${state.pendingEvents.length?'<p class="form-note">Decisions waiting.</p>':''}`, '<button class="button primary" data-action="close">Continue '+icon('arrow')+'</button>');
   showingYearSummary=true;
   modalRoot.querySelector('.modal').classList.add('year-review-modal');
   modalRoot.querySelector('.modal-backdrop').classList.add('year-review-backdrop');
@@ -312,7 +324,7 @@ function profileStats(person, forecast) {
 
 function pregnancyView() {
   if (!state.pregnancy) return '';
-  const carrierName = state.pregnancy.carrierId===state.id ? 'You' : esc(state.pregnancy.otherParent.name);
+  const carrierName = state.pregnancy.carrierId===state.id ? 'You' : narrativeText(state.pregnancy.otherParent.name);
   return `<section class="panel pregnancy-panel"><div class="panel-heading"><h3>${labelWithHelp('Pregnancy','pregnancy')}</h3><span class="tag">EXPECTING</span></div><p class="section-description">${carrierName} · Due at your age ${state.pregnancy.dueAge}.</p></section>`;
 }
 
@@ -379,11 +391,11 @@ function characterView() {
 }
 
 function endPanel() {
-  return `<section class="panel"><div class="panel-heading"><h3>A life, fully lived.</h3><span class="tag">AGE ${state.age}</span></div><p class="section-description">${esc(state.name)}’s story has come to a close. </p><button class="button primary" data-action="new">Begin another story ${icon('arrow')}</button></section>`;
+  return `<section class="panel"><div class="panel-heading"><h3>A life, fully lived.</h3><span class="tag">AGE ${state.age}</span></div><p class="section-description">${narrativeText(state.name)}’s story has come to a close. </p><button class="button primary" data-action="new">Begin another story ${icon('arrow')}</button></section>`;
 }
 
 function successionPanel() {
-  return `<section class="panel"><div class="panel-heading"><h3>The story goes on.</h3><span class="tag">NEXT GENERATION</span></div><p class="section-description">${state.alive===false?`${esc(state.name)} died at age ${state.age}.`:'This playable chapter closes at age 85.'} Choose your next character in Family.</p><button class="button primary" data-action="tab" data-tab="family">Choose your heir ${icon('arrow')}</button></section>`;
+  return `<section class="panel"><div class="panel-heading"><h3>The story goes on.</h3><span class="tag">NEXT GENERATION</span></div><p class="section-description">${state.alive===false?`${narrativeText(state.name)} died at age ${state.age}.`:'This playable chapter closes at age 85.'} Choose your next character in Family.</p><button class="button primary" data-action="tab" data-tab="family">Choose your heir ${icon('arrow')}</button></section>`;
 }
 
 function toast(message, error = false) {
@@ -420,7 +432,7 @@ function menuModal() {
 }
 
 function newLifeModal(initial = false) {
-  openModal(initial?'A new life':'Begin a new family?', `<p class="section-description">${initial?'Your surname carries through the generations.':'This replaces your saved life.'}</p><label class="field-label" for="new-surname">Family surname</label><input class="text-input" id="new-surname" maxlength="30" required aria-required="true" placeholder="Your family name" autocomplete="family-name" autocapitalize="words"><label class="field-label" for="new-name">First name <span class="muted">(optional)</span></label><input class="text-input" id="new-name" maxlength="19" placeholder="Random if blank" autocomplete="given-name" autocapitalize="words">`, `${initial?'':'<button class="button secondary" data-action="close">Cancel</button>'}<button class="button primary" data-action="confirm-new">Begin ${icon('arrow')}</button>`, initial);
+  openModal(initial?'A new life':'Begin a new family?', `${initial?'':'<p class="section-description">This replaces your saved life.</p>'}<label class="field-label" for="new-surname">Family surname <span class="muted">(optional)</span></label><input class="text-input" id="new-surname" maxlength="30" placeholder="Random if blank" autocomplete="family-name" autocapitalize="words"><label class="field-label" for="new-name">First name <span class="muted">(optional)</span></label><input class="text-input" id="new-name" maxlength="19" placeholder="Random if blank" autocomplete="given-name" autocapitalize="words">`, `${initial?'':'<button class="button secondary" data-action="close">Cancel</button>'}<button class="button primary" data-action="confirm-new">Begin ${icon('arrow')}</button>`, initial);
 }
 
 function navigate(tab) {
@@ -442,12 +454,11 @@ function topicHelpModal(topic, id) {
     attractiveness: ['Attractiveness', ['Starts near its adult value, with tiny random changes each year rather than gains from practice. In this game, aging lowers it after 30 for men and 22 for women.']],
     affinity: ['Natural aptitude', ['This inherited −3 to +3 trait affects starting ability and responsiveness to focus; higher is stronger. Practice does not increase attractiveness.']],
     forecast: ['Next year’s stat bars', ['Colored segments preview average routine changes; events and yearly variation can alter the result.']],
-    percentiles: ['Percentiles', ['Compared with simulated lives your age. For rated stats, 5/10 is average: the 50th percentile.']],
     health: ['Health', ['Self-care supports health; illness and aging reduce it. Poor health raises disease risk and reduces childhood height gains.']],
     stability: ['Mental stability', ['Higher means calmer; rest and relationships help. Low parental mental stability can lead to difficult childhood events.']],
     lifestyle: ['Lifestyle', ['Until 18, you share your parents’ changing household lifestyle. As an adult, work, family, events and inheritance shape it.']],
     height: ['Height', ['Final height emerges from yearly growth shaped by age, inheritance, health and chance, ending at 14–18. Poor health reduces new growth, never existing height.']],
-    cry: ['Cry level', ['Crying (1–5) brings care and strengthens parent relationships; harder crying strains their mental stability more.']],
+    cry: ['Cry level', ['Parent relationships tend to fall at levels 1–2, stay steady at 3, and rise at 4–5, with yearly variation. Harder crying strains their mental stability more.']],
     focus: ['Your focus', ['Allocate 12 points, at most 5 per area; unused points allow rest. Focused skills can rise, neglected ones can fall, and results vary yearly.']],
     'focus-work': ['School & career focus', ['Study and work exercise relevant abilities; career focus also supports performance and lifestyle.']],
     'focus-social': ['Friends focus', ['Can improve social ability, support mental stability and create chances to meet people.']],
@@ -465,6 +476,7 @@ function topicHelpModal(topic, id) {
     inheritance: ['Retirement & inheritance', ['Succession opens at 65 or on death and is required at 85; choose a child, sibling or unrelated child, in that order. Eligible children share inheritance equally; otherwise the chosen heir receives it.']]
   };
   let entry = help[topic];
+  if(topic==='height' && id===state.id && state.age<18) entry=[entry[0],[...entry[1],'Percentile compares simulated heights at your age.']];
   if (topic==='job') {
     const job = JOBS.find(candidate=>candidate.id===id);
     if (job) entry = [job.name,[job.description,'+3 marks a core skill; skill fit reflects your current match.']];
@@ -550,7 +562,7 @@ document.addEventListener('click', event => {
     if (result?.ok) toast(result.accepted?'You are married.':'Not yet. Try again next year.');
   }
   if (action==='breakup' && state.partner) {
-    openModal('End this relationship?', '<p>Leave <strong>'+esc(state.partner.name)+'</strong>? Children and any pregnancy remain.</p>', '<button class="button secondary" data-action="close">Stay together</button><button class="button primary" data-action="confirm-breakup">End relationship</button>');
+    openModal('End this relationship?', '<p>Leave <strong>'+narrativeText(state.partner.name)+'</strong>? Children and any pregnancy remain.</p>', '<button class="button secondary" data-action="close">Stay together</button><button class="button primary" data-action="confirm-breakup">End relationship</button>');
   }
   if (action==='confirm-breakup') { closeModal(); update(()=>endRelationship(state),'Your relationship has ended.'); }
   if (action==='job') update(()=>takeJob(state,button.dataset.id),'A new chapter in your career.');
@@ -560,8 +572,9 @@ document.addEventListener('click', event => {
     const info = successionInfo(state);
     const child = info.candidates.find(person=>person.id===button.dataset.id);
     if (!child || !info.eligible) return;
+    const heirName=info.route==='beneficiary'?esc(`${child.name} (Heir)`):narrativeText(child.name);
     const inheritance = info.route==='children'?'Living children receive equal shares.':info.route==='siblings'?'Your sibling receives the inheritance.':'This child inherits; their surname remains '+esc(child.familyName)+'.';
-    openModal(state.alive===false?'Continue their legacy?':'Retire and continue?', `<p>Play as <strong>${esc(child.name)}</strong>, age ${child.age}, ending this chapter.</p><p>${inheritance}</p>`, `<button class="button secondary" data-action="close">Back</button><button class="button primary" data-action="confirm-heir" data-id="${esc(child.id)}">${state.alive===false?'Play next chapter':'Retire & continue'} ${icon('arrow')}</button>`);
+    openModal(state.alive===false?'Continue their legacy?':'Retire and continue?', `<p>Play as <strong>${heirName}</strong>, age ${child.age}, ending this chapter.</p><p>${inheritance}</p>`, `<button class="button secondary" data-action="close">Back</button><button class="button primary" data-action="confirm-heir" data-id="${esc(child.id)}">${state.alive===false?'Play next chapter':'Retire & continue'} ${icon('arrow')}</button>`);
   }
   if (action==='confirm-heir') { closeModal(); activeTab='year'; update(()=>succeed(state,button.dataset.id),'A new generation. The same story.'); }
   if (action==='history') { showAllHistory=!showAllHistory; render(); }
@@ -573,7 +586,6 @@ document.addEventListener('click', event => {
   if (action==='confirm-new') {
     const surname=normalizeSurname(modalRoot.querySelector('#new-surname').value);
     const firstName=modalRoot.querySelector('#new-name').value.trim();
-    if (!surname) { modalRoot.querySelector('#new-surname').setAttribute('aria-invalid','true'); modalRoot.querySelector('#new-surname').focus(); toast('Enter a family surname to begin.',true); return; }
     state=createGame({surname,firstName}); mustNameFamily=false; modalLocked=false;
     activeTab='year'; showAllHistory=false; encounterIndex=0; closeModal(); save(); render(); toast('Welcome to the '+state.familyName+' family.');
   }

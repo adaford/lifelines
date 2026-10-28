@@ -1,17 +1,25 @@
 // Ratings use the same scale throughout life. Balanced focus is 3 per area;
 // childhood event drift is fitted by scripts/calibrate-percentiles.mjs.
+export const BIRTH_VARIATION = {
+  skill: 2,
+  health: 2,
+  stability: 2,
+  appearance: 2,
+  inheritedAppearance: 1.5,
+};
+
 export const DEVELOPMENT_BALANCE = {
   "innateScale": 0.8,
   "skillReversion": 0.012,
   "childhoodBias": {
-    "intelligence": -0.03031,
-    "strength": -0.004584,
-    "social": -0.030553,
-    "creativity": -0.030086
+    "intelligence": -0.034144,
+    "strength": -0.005709,
+    "social": -0.033055,
+    "creativity": -0.033106
   },
   "wellbeingTarget": {
-    "health": 5.036037,
-    "stability": 4.704038
+    "health": 5.029503,
+    "stability": 4.708605
   },
   "wellbeingReversion": {
     "health": 0.06,

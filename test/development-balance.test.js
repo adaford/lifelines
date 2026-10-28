@@ -3,10 +3,11 @@ import assert from 'node:assert/strict';
 import { naturalSkillRating, skillChanges, childhoodWellbeing } from '../development.js';
 import { createGame, advanceYear, resolveEventChoice, EVENTS, effectiveStats } from '../engine.js';
 
-test('newborn ratings share the adult scale and high innate ability starts high', () => {
-  const keys = ['intelligence', 'strength', 'social', 'creativity'];
+test('newborn ratings span the scale around five with broad variation and aptitude correlation', () => {
+  const learned = ['intelligence', 'strength', 'social', 'creativity'];
+  const keys = [...learned, 'attractiveness', 'health', 'stability'];
   const samples = Object.fromEntries(keys.map(key => [key, { all: [], high: [], low: [] }]));
-  for (let seed = 820001; seed < 820601; seed++) {
+  for (let seed = 820001; seed < 822001; seed++) {
     const state = createGame({ seed });
     for (const key of keys) {
       const value = state.stats[key];
@@ -17,10 +18,17 @@ test('newborn ratings share the adult scale and high innate ability starts high'
   }
   const mean = values => values.reduce((sum, value) => sum + value, 0) / values.length;
   for (const [key, values] of Object.entries(samples)) {
-    assert.ok(Math.abs(mean(values.all) - 5) < .25, `${key} starts around five`);
-    assert.ok(mean(values.high) > 6.3, `${key} high innate ability starts high`);
-    assert.ok(mean(values.low) < 3.7, `${key} low innate ability starts low`);
-    assert.ok(new Set(values.high).size > 25, `${key} varies even with high ability`);
+    const average = mean(values.all);
+    const sd = Math.sqrt(mean(values.all.map(value => (value - average) ** 2)));
+    assert.ok(Math.abs(average - 5) < .2, `${key} starts around five: ${average}`);
+    assert.ok(sd > 1.75 && sd < 2.7, `${key} has broad variation: ${sd}`);
+    assert.equal(Math.min(...values.all), 1, `${key} can start at the bottom of the scale`);
+    assert.equal(Math.max(...values.all), 10, `${key} can start at the top of the scale`);
+    if (learned.includes(key)) {
+      assert.ok(mean(values.high) > mean(values.low) + 2, `${key} aptitude shifts the distribution`);
+      assert.ok(values.high.some(value => value < 5), `${key} high aptitude does not fix the starting score`);
+      assert.ok(values.low.some(value => value > 5), `${key} low aptitude does not fix the starting score`);
+    }
   }
 });
 
@@ -116,7 +124,7 @@ test('independent game lives reach age 18 with average ratings near five and ret
     const average = values.reduce((sum, value) => sum + value, 0) / values.length;
     const sd = Math.sqrt(values.reduce((sum, value) => sum + (value - average) ** 2, 0) / values.length);
     assert.ok(Math.abs(average - 5) < .2, `${key} mean ${average}`);
-    assert.ok(sd > .25 && sd < 2, `${key} SD ${sd}`);
+    assert.ok(sd > .25 && sd < 3, `${key} SD ${sd}`);
     assert.ok(new Set(values).size > 50, `${key} varies between lives`);
   }
 });

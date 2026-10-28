@@ -62,7 +62,7 @@ function expectPregnancy(state, otherParent, carrierId) {
   assert.equal(validateSave(state), true, 'pregnancy fixture must be a valid saved life');
 }
 
-test('five cry levels increase development and parent bonds while increasing parental strain', () => {
+test('crying below three lowers parent relationships, three is neutral, and higher levels raise them', () => {
   const baby = createGame({ seed: 18 });
   baby.parents.forEach(parent => { parent.stats.stability = 7; parent.relationship = 5; });
   let previous;
@@ -70,7 +70,7 @@ test('five cry levels increase development and parent bonds while increasing par
     const state = clone(baby);
     assert.equal(setCryLevel(state, level).ok, true);
     const preview = annualForecast(state);
-    assert.ok(preview.parents.every(parent => parent.relationship.change > 0));
+    assert.ok(preview.parents.every(parent => Math.sign(parent.relationship.change) === Math.sign(level - 3)));
     if (previous) {
       assert.ok(preview.stats.intelligence.change > previous.stats.intelligence.change);
       assert.ok(preview.parents[0].relationship.change > previous.parents[0].relationship.change);
@@ -86,6 +86,20 @@ test('five cry levels increase development and parent bonds while increasing par
   }
   const child = survivorAt(3);
   assert.equal(setCryLevel(child, 3).ok, false);
+});
+
+test('cry level three has no routine relationship change even with yearly variation', () => {
+  let checked = 0;
+  for (let seed = 1; seed <= 60; seed++) {
+    const state = createGame({ seed });
+    setCryLevel(state, 3);
+    state.parents.forEach(parent => { parent.relationship = 7; });
+    advanceYear(state, { ...survives, growthRandom: () => 3, parentCareerRandom: () => 1 });
+    if (state.lastYearEvents.length) continue;
+    assert.ok(state.parents.every(parent => parent.relationship === 7));
+    checked++;
+  }
+  assert.ok(checked > 20);
 });
 
 test('crying respects stat and relationship limits and never changes deceased parents', () => {
@@ -135,11 +149,13 @@ test('annual forecasts are pure, include expiring effects, and match mean growth
 
 test('year summaries survive reload, can be dismissed, and reopen only after the next year', () => {
   let state = createGame({ seed: 23 });
+  setCryLevel(state, 2);
   advanceYear(state, survives);
   assert.equal(state.yearSummary.fromAge, 0);
   assert.equal(state.yearSummary.toAge, 1);
   assert.equal(state.yearSummary.dismissed, false);
   assert.ok(state.yearSummary.events.length > 0);
+  assert.deepEqual(state.yearSummary.decisions, { cryLevel: 2 });
   assert.equal(validateSave(state), true);
   state = migrateSave(JSON.parse(JSON.stringify(state)));
   assert.equal(state.yearSummary.dismissed, false);
@@ -149,6 +165,56 @@ test('year summaries survive reload, can be dismissed, and reopen only after the
   advanceYear(state, survives);
   assert.equal(state.yearSummary.dismissed, false);
   assert.equal(state.yearSummary.toAge, 2);
+});
+
+test('year reviews retain the completed year decisions across age and education boundaries', () => {
+  const baby = survivorAt(2, 405);
+  setCryLevel(baby, 4);
+  advanceYear(baby, survives);
+  assert.equal(baby.age, 3);
+  assert.deepEqual(baby.yearSummary.decisions, { cryLevel: 4 });
+  finishChoices(baby);
+  const focus = { work: 2, social: 4, family: 5, self: 1 };
+  baby.focus = clone(focus);
+  advanceYear(baby, survives);
+  baby.focus.self = 0;
+  assert.deepEqual(baby.yearSummary.decisions, { focus, workLabel: 'School' });
+  assert.deepEqual(migrateSave(clone(baby)).yearSummary.decisions, baby.yearSummary.decisions);
+  const older = clone(baby);
+  delete older.yearSummary.decisions;
+  assert.ok(migrateSave(older), 'older reviews still load without inventing choices');
+
+  const student = survivorAt(17, 406);
+  const schoolFocus = clone(student.focus);
+  advanceYear(student, survives);
+  assert.deepEqual(student.yearSummary.decisions, { focus: schoolFocus, workLabel: 'School' });
+  finishChoices(student);
+  assert.equal(chooseEducation(student, 'college').ok, true);
+  while (student.age < 22) { advanceYear(student, survives); finishChoices(student); }
+  assert.equal(student.education.status, 'graduate');
+  assert.equal(student.yearSummary.decisions.workLabel, 'College');
+});
+
+test('malformed saved year decisions are rejected without changing the original save', () => {
+  const baby = survivorAt(1, 408);
+  for (const decisions of [null, [], { cryLevel: 0 }, { cryLevel: 6 }, { cryLevel: 2.5 }, { focus: {} }]) {
+    const bad = clone(baby);
+    bad.yearSummary.decisions = decisions;
+    assert.equal(migrateSave(bad), null);
+  }
+  const child = survivorAt(4, 409);
+  for (const decisions of [
+    { cryLevel: 3 },
+    { focus: { work: 5, social: 5, family: 5, self: 5 }, workLabel: 'School' },
+    { focus: { work: 3, social: 3, family: 3, self: 3 }, workLabel: '<script>' },
+    { focus: { work: 3, social: 3, family: 3 }, workLabel: 'School' },
+  ]) {
+    const bad = clone(child);
+    bad.yearSummary.decisions = decisions;
+    assert.equal(migrateSave(bad), null);
+  }
+  assert.equal(validateSave(baby), true);
+  assert.equal(validateSave(child), true);
 });
 
 test('v6 saves gain cry level and parent bonds without rerolling progress or queued decisions', () => {

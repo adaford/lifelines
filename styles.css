@@ -133,7 +133,12 @@ button svg { pointer-events: none; }
 .year-review-modal .modal-header { border-radius: 18px 18px 0 0; }
 .year-review-modal .modal-header h2 { font-size: 24px; }
 .year-review-modal .modal-body { padding: 14px 18px; }
-.year-review-modal .year-review-intro { margin-bottom: 8px; font-size: 12px; }
+.year-decisions { margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+.year-decisions h3 { font-size: 13px; margin-bottom: 8px; }
+.year-decisions dl { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 6px 14px; margin: 0; font-size: 12px; }
+.year-decisions dl > div { display: flex; justify-content: space-between; gap: 8px; }
+.year-decisions dt { color: var(--muted); }
+.year-decisions dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
 .mortality-odds { margin-top: 16px; }
 .mortality-odds summary { min-height: 44px; padding: 10px 0; cursor: pointer; font-weight: 600; }
 .mortality-row { display: flex; justify-content: space-between; gap: 14px; padding: 12px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
@@ -224,7 +229,6 @@ button svg { pointer-events: none; }
 .employment-status { padding: 4px 8px; background: var(--surface-soft); border-radius: 5px; }
 .stat-name { min-width: 0; color: #52644c; }
 .stat-percentile { display: block; color: var(--muted); font-size: 11px; line-height: 1.4; font-variant-numeric: tabular-nums; }
-.stat-heading > .stat-percentile { grid-column: 1/-1; justify-self: end; margin-top: -5px; }
 .vital > .stat-percentile { margin-top: 3px; }
 .stat-value { font-size: 14px; font-weight: 650; font-variant-numeric: tabular-nums; }
 .stat-track { position: relative; height: 9px; border-radius: 4px; background: #e9ebe0; overflow: hidden; }

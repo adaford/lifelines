@@ -63,7 +63,8 @@ test('new families have a mom and dad with varied bonds centered near eight', ()
   assert.ok(new Set(bonds).size > 100, 'bonds vary across families');
   assert.ok(appearances.every(value => value >= 1 && value <= 10));
   assert.ok(median(appearances) >= 4 && median(appearances) <= 8);
-  assert.ok(appearances.filter(value => value >= 4 && value <= 8).length > 750);
+  assert.ok(standardDeviation(appearances) > 1.7 && standardDeviation(appearances) < 2.4, 'appearance starts with a broad spread');
+  assert.ok(appearances.some(value => value <= 2) && appearances.some(value => value >= 9));
   assert.ok(heights.size > 50, 'newborn length varies instead of always being 50cm');
 });
 
@@ -92,14 +93,14 @@ test('mean attractiveness stays at its initial level and declines only after the
   }
 });
 
-test('hard crying has a substantially larger mean mental-stability cost while all levels build bonds', () => {
+test('hard crying has a larger mental-stability cost and relationships change around neutral level three', () => {
   const state = createGame({ seed: 57 });
   state.parents.forEach(parent => { parent.stats.stability = 7; parent.relationship = 7; });
   const changes = [];
   for (let level = 1; level <= 5; level++) {
     setCryLevel(state, level);
     const forecast = annualForecast(state);
-    assert.ok(forecast.parents.every(parent => parent.relationship.change > 0));
+    assert.ok(forecast.parents.every(parent => Math.sign(parent.relationship.change) === Math.sign(level - 3)));
     changes.push(forecast.parents[0].stability.change);
   }
   assert.equal(changes[0], .2);
