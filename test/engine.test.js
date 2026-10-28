@@ -11,7 +11,7 @@ const finishChoices = state => {
 };
 const advanceYearRaw = state => {
   finishChoices(state);
-  const result = advanceYearAction(state);
+  const result = advanceYearAction(state, { mortalityRandom: () => 1 });
   finishChoices(state);
   return result;
 };
@@ -70,7 +70,7 @@ test('all five adult skills exist at birth, start very low, and use their indivi
   for (let seed = 1; seed <= 40; seed++) {
     const baby = createGame({ seed });
     for (const { key } of SKILLS) assert.ok(baby.stats[key] >= 1 && baby.stats[key] <= 1.5, `${key} at birth`);
-    assert.equal(baby.version, 6);
+    assert.equal(baby.version, 7);
     assert.ok(baby.stats.health >= 7);
     assert.ok(baby.stats.stability >= 8);
     assert.deepEqual(Object.keys(baby.stats).sort(), Object.keys(adult(seed).stats).sort());
@@ -400,7 +400,7 @@ test('v2 upgrades preserve school, current careers, and adults without consuming
       const snapshot = copy(old);
       const upgraded = migrateSave(old);
       assert.equal(validateSave(upgraded), true);
-      assert.equal(upgraded.version, 6);
+      assert.equal(upgraded.version, 7);
       assert.equal(upgraded.education.status, status);
       assert.equal(upgraded.education.years, status === 'graduate' ? 4 : 0);
       assert.equal(upgraded.jobOffers.length, count);
@@ -583,6 +583,7 @@ test('a young heir keeps a deceased parents household support through guardiansh
   haveChild(parent);
   while (parent.age < 85) advanceYear(parent);
   const household = parent.lifestyle = 7;
+  parent.alive = false; parent.death = { cause: 'disease', age: parent.age };
   succeed(parent, parent.children[0].id);
   assert.equal(parent.age, 5);
   assert.equal(parent.parents[0].alive, false);
@@ -720,7 +721,7 @@ test('long simulations retain bounds and mix quiet years with at most five uniqu
       if (result.eventIds.length > 1) multiple += 1;
       assert.ok(result.eventIds.length <= 5);
       assert.equal(new Set(result.eventIds).size, result.eventIds.length);
-      assert.ok(result.eventIds.every(id => EVENTS.some(event => event.id === id)));
+      assert.ok(result.eventIds.every(id => EVENTS.some(event => event.id === id || id.startsWith(`${event.id}:`))));
       assert.equal(validateSave(state), true, `invalid seed ${seed}, age ${state.age}`);
       for (const value of Object.values(effectiveStats(state))) assert.ok(value >= 1 && value <= 10);
     }
@@ -1351,9 +1352,10 @@ test('old childless endings become valid retirement choices without resetting th
   const state=createGame({seed:3105});
   while(state.age<85) advanceYear(state);
   const previous=copy(state); previous.version=5; previous.ended=true; previous.needsSuccession=false;
+  for (const parent of previous.parents) { parent.age = Math.min(85, parent.age); if (parent.age === 85) parent.alive = false; }
   for(const person of [previous,...previous.parents,...previous.children,...previous.siblings,...previous.lineage,...previous.encounters,previous.partner,previous.pregnancy?.otherParent].filter(Boolean)) delete person.familyName;
   const migrated=migrateSave(previous);
-  assert.equal(validateSave(migrated),true); assert.equal(migrated.version,6);
+  assert.equal(validateSave(migrated),true); assert.equal(migrated.version,7);
   assert.equal(migrated.ended,false); assert.equal(migrated.needsSuccession,true);
   for(const key of ['id','name','age','rng','nextId','stats','aptitudes','history','money','education','jobOffers','effects','pendingEvents']) assert.deepEqual(migrated[key],previous[key]);
   const info=successionInfo(migrated);

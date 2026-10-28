@@ -13,7 +13,7 @@ export function desirability(state, stats = state.stats) {
 
 export function meetingChances(state, stats = state.stats) {
   const score = desirability(state, stats);
-  if (state.age < 18 || state.age >= 85 || state.partner || state.ended || state.needsSuccession) {
+  if (state.age < 18 || state.age >= 85 || (state.partner && state.partner.alive !== false) || state.ended || state.needsSuccession) {
     return { desirability: score, slots: 0, chance: 0, expected: 0 };
   }
   const strength = (score - 1) / 9;
@@ -30,7 +30,7 @@ export function prospectQuality(person) {
 }
 
 export function relationshipOdds(state, person, stats = state.stats) {
-  if (state.age < 18 || person?.age < 18 || !person?.stats || person.alive === false || state.partner || state.ended || state.needsSuccession) return 0;
+  if (state.age < 18 || person?.age < 18 || !person?.stats || person.alive === false || (state.partner && state.partner.alive !== false) || state.ended || state.needsSuccession) return 0;
   const appeal = desirability(state, stats);
   return clamp(.58 + (appeal - prospectQuality(person)) * .065 + (appeal - 5.5) * .012, .04, .94);
 }

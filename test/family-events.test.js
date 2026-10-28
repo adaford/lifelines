@@ -13,7 +13,7 @@ function household(childAge = 10) {
 const chanceFor = (state, eventId, subjectId) => familyEventChances(state).find(event => event.eventId === eventId && (!subjectId || event.subjectId === subjectId))?.chance || 0;
 
 test('household catalog provides distinct, consequential choices for partners and children', () => {
-  assert.equal(FAMILY_EVENTS.length, 32);
+  assert.ok(FAMILY_EVENTS.length >= 32);
   assert.equal(new Set(FAMILY_EVENTS.map(event => event.id)).size, FAMILY_EVENTS.length);
   for (const subjectType of ['partner', 'child']) {
     assert.ok(FAMILY_EVENTS.filter(event => event.subjectType === subjectType && event.choices?.length).length >= 4);
@@ -112,5 +112,68 @@ test('all retained subject traits influence events, with small ordinary househol
     assert.ok(rolls.every(roll => Number.isFinite(roll.chance) && roll.chance >= 0 && roll.chance <= .12));
     const expected = rolls.reduce((sum, roll) => sum + roll.chance, 0);
     assert.ok(expected >= .14 && expected <= .3, `ordinary household expectation ${expected}`);
+  }
+});
+
+function childhood(age = 0) {
+  return { age, parents: [actor('parent-one', age + 30), actor('parent-two', age + 32)],
+    partner: null, children: [], focus: { work: 3, social: 3, family: 3, self: 3 },
+    ended: false, needsSuccession: false };
+}
+
+test('parent experiences respect the child age and never require a baby to manage a parent', () => {
+  const events = FAMILY_EVENTS.filter(event => event.subjectType === 'parent');
+  assert.ok(events.length >= 6);
+  for (const event of events) {
+    assert.ok(event.minPlayerAge >= 0 && event.maxPlayerAge <= 17);
+    assert.equal(event.choices, undefined, 'childhood parent experiences are automatic');
+  }
+  for (const age of [0, 1, 2, 3, 10, 17, 18, 40]) {
+    const state = childhood(age);
+    for (const roll of familyEventChances(state).filter(roll => roll.chance > 0)) {
+      const event = events.find(event => event.id === roll.eventId);
+      assert.ok(event && age >= event.minPlayerAge && age <= event.maxPlayerAge);
+    }
+    assert.equal(chanceFor(state, 'household_parent_sleepless') > 0, age <= 2);
+    assert.equal(chanceFor(state, 'household_parent_listening') > 0, age >= 3 && age <= 17);
+    assert.equal(chanceFor(state, 'household_parent_illness') > 0, age <= 17);
+  }
+  const state = childhood();
+  state.parents[0].age = 90;
+  assert.ok(chanceFor(state, 'household_parent_soothing', 'parent-one') > 0, 'an older living caregiver can still care for a child');
+  state.parents[0].alive = false;
+  assert.ok(familyEventChances(state).filter(roll => roll.subjectId === 'parent-one').every(roll => roll.chance === 0));
+  state.needsSuccession = true;
+  assert.deepEqual(familyEventChances(state), []);
+});
+
+test('parent stress, health and bonds influence their own childhood events', () => {
+  const state = childhood(6);
+  state.parents[0].stats.stability = 2;
+  state.parents[1].stats.stability = 9;
+  assert.ok(chanceFor(state, 'household_parent_overloaded', 'parent-one') > chanceFor(state, 'household_parent_overloaded', 'parent-two') * 10);
+  assert.ok(chanceFor(state, 'household_parent_routine', 'parent-two') > chanceFor(state, 'household_parent_routine', 'parent-one') * 10);
+  assert.ok(chanceFor(state, 'household_parent_support', 'parent-one') > chanceFor(state, 'household_parent_support', 'parent-two'), 'stress also makes recovery through help more likely');
+  state.parents[0].stats.health = 2;
+  state.parents[1].stats.health = 9;
+  assert.ok(chanceFor(state, 'household_parent_illness', 'parent-one') > chanceFor(state, 'household_parent_illness', 'parent-two') * 10);
+  state.parents[0].relationship = 2;
+  state.parents[1].relationship = 9;
+  assert.ok(chanceFor(state, 'household_parent_listening', 'parent-two') > chanceFor(state, 'household_parent_listening', 'parent-one') * 10);
+  const before = JSON.stringify(state);
+  const rolls = familyEventChances(state);
+  assert.equal(JSON.stringify(state), before);
+  assert.equal(new Set(rolls.map(roll => roll.id)).size, rolls.length);
+  assert.ok(rolls.every(roll => roll.chance >= 0 && roll.chance <= .12));
+});
+
+test('ordinary childhood leaves room for quiet years and supportive parent experiences', () => {
+  for (const age of [0, 2, 3, 10, 17]) {
+    const state = childhood(age);
+    const rolls = familyEventChances(state);
+    const expected = rolls.reduce((sum, roll) => sum + roll.chance, 0);
+    assert.ok(expected > .05 && expected < .2, `ordinary parent experience expectation ${expected}`);
+    const positive = rolls.filter(roll => FAMILY_EVENTS.find(event => event.id === roll.eventId).kind === 'positive').reduce((sum, roll) => sum + roll.chance, 0);
+    assert.ok(positive > expected / 2, 'care includes positive and recovering moments, not just stress');
   }
 });

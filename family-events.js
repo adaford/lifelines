@@ -5,11 +5,24 @@ const low = key => [key, 'low'];
 const high = key => [key, 'high'];
 const option = (id, label, description, outcome) => ({ id, label, description, ...outcome });
 const group = (subjectType, defaults, entries) => entries.map(event => ({
-  subjectType, category: subjectType === 'partner' ? 'Your relationship' : 'Your children',
+  subjectType, category: subjectType === 'parent' ? 'Growing up at home' : subjectType === 'partner' ? 'Your relationship' : 'Your children',
   years: 0, modifiers: {}, kind: 'positive', ...defaults, ...event,
 }));
 
 export const FAMILY_EVENTS = [
+  // These are experiences of the child, not responsibilities placed on them.
+  // Stability represents the caregiver's current stress and capacity; support
+  // can help an overwhelmed parent recover, and no outcome is inevitable.
+  ...group('parent', { minAge: 0, maxAge: 120, minPlayerAge: 0, maxPlayerAge: 17, baseChance: .012 }, [
+    { id: 'household_parent_sleepless', name: 'Tired days after broken nights', description: '{name} has trouble resting between caring for you and other demands. Your days feel less settled for a while.', maxPlayerAge: 2, kind: 'negative', statFactors: [low('stability')], subjectChanges: { stability: -.3, health: -.1 }, playerChanges: { stability: -.2 } },
+    { id: 'household_parent_soothing', name: 'A familiar, comforting voice', description: '{name} holds you close and responds to your sounds. You begin to recognize the comfort of being heard.', maxPlayerAge: 2, statFactors: [high('stability')], playerChanges: { stability: .25, social: .15 }, relationship: .3 },
+    { id: 'household_parent_overloaded', name: 'Stress spills into the day', description: '{name} is carrying a lot of stress and has less patience than usual. The tension leaves you unsettled; it is not your fault.', minPlayerAge: 3, kind: 'negative', statFactors: [low('stability')], relationshipFactor: 'low', subjectChanges: { stability: -.15 }, playerChanges: { stability: -.3 }, relationship: -.2 },
+    { id: 'household_parent_routine', name: 'Small routines feel reassuring', description: '{name} makes time for familiar meals, play and rest. Knowing what comes next helps you feel secure.', statFactors: [high('stability')], playerChanges: { stability: .25, health: .1 }, relationship: .2 },
+    { id: 'household_parent_illness', name: 'A parent needs time to recover', description: '{name} is unwell and needs extra rest. Care routines change for a while, and you miss some of your usual time together.', kind: 'negative', statFactors: [low('health')], subjectChanges: { health: -.35 }, playerChanges: { stability: -.2 } },
+    { id: 'household_parent_support', name: 'Someone helps with the load', description: '{name} accepts help with everyday responsibilities. A little rest makes home feel calmer for both of you.', statFactors: [low('stability')], subjectChanges: { stability: .5, health: .1 }, playerChanges: { stability: .2 }, relationship: .15 },
+    { id: 'household_parent_stories', name: 'Time to wonder together', description: '{name} shares stories and follows your questions. Their attention gives your curiosity room to grow.', minPlayerAge: 3, statFactors: [high('creativity')], relationshipFactor: 'high', playerChanges: { intelligence: .2, creativity: .2 }, relationship: .25 },
+    { id: 'household_parent_listening', name: 'A parent makes room to listen', description: '{name} notices something on your mind and listens without rushing. You feel understood and more confident about speaking up.', minPlayerAge: 3, statFactors: [high('social')], relationshipFactor: 'high', subjectChanges: { stability: .1 }, playerChanges: { social: .2, stability: .2 }, relationship: .3 },
+  ]),
   ...group('partner', { minAge: 18, maxAge: 84, baseChance: .008 }, [
     { id: 'household_partner_learning', name: 'A difficult idea becomes clear', description: '{name} works through a subject that once felt out of reach.', statFactors: [high('intelligence')], subjectChanges: { intelligence: .35, stability: .15 } },
     { id: 'household_partner_illness', name: 'A rough patch of health', description: '{name} has an illness that interrupts familiar routines and worries you.', kind: 'negative', statFactors: [low('health')], subjectChanges: { health: -.5 }, playerChanges: { stability: -.2 } },
@@ -94,6 +107,7 @@ function traitFactor(value, direction) {
 }
 function eligible(event, state, subject) {
   if (subject.alive === false || subject.age < event.minAge || subject.age > event.maxAge) return false;
+  if (state.age < (event.minPlayerAge ?? 0) || state.age > (event.maxPlayerAge ?? Infinity)) return false;
   if (event.subjectType === 'partner' && state.age < 18) return false;
   return (event.conditions || []).every(condition => {
     if (condition === 'married') return subject.married === true;
@@ -106,6 +120,7 @@ function eligible(event, state, subject) {
 export function familyEventChances(state) {
   if (state.ended || state.needsSuccession) return [];
   const actors = [
+    ...(state.parents || []).map(person => ({ subjectType: 'parent', person })),
     ...(state.partner ? [{ subjectType: 'partner', person: state.partner }] : []),
     ...(state.children || []).map(person => ({ subjectType: 'child', person })),
   ];

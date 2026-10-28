@@ -40,6 +40,85 @@ test('first launch requires a surname, capitalizes its first letter, and preserv
   assert.equal(ui.all('#new-surname').length,0,'an existing family must not be asked to start over');
 });
 
+test('all parent stats, affinities, and relationships are visible from childhood', async () => {
+  const fixture=createGame({name:'Jamie Reed',seed:121});
+  fixture.parents[0].relationship=7.25;
+  fixture.parents[1].alive=false;
+  const ui=await mount(fixture);
+  ui.click('.nav-list [data-tab="family"]');
+  for(const parent of fixture.parents) {
+    const card=ui.query(`.roots-panel [data-person-id="${parent.id}"]`);
+    assert.equal(card.querySelectorAll('.profile-stat[data-skill]').length,7);
+    assert.equal(card.querySelectorAll('.aptitude').length,5);
+    assert.ok(card.querySelector('.family-details').hasAttribute('open'));
+    assert.equal(card.querySelector('.relationship-meter').getAttribute('aria-valuenow'),String(parent.relationship));
+    if(parent.alive===false) assert.match(card.textContent,/Remembered/);
+    else assert.doesNotMatch(card.textContent,/Remembered/);
+    assertNoMoneyDisplay(card,'parent profile');
+  }
+  assert.deepEqual(ui.saved(),fixture,'reading family profiles must preserve all state');
+});
+
+test('cry levels update a visible forecast without advancing time or consuming randomness', async () => {
+  const ui=await mount(createGame({name:'Jamie Reed',seed:121}));
+  const initial=ui.saved();
+  ui.click('[data-action="baby"][data-level="1"]');
+  const low=Number(ui.query('.forecast-panel [data-stat="intelligence"] strong').textContent);
+  ui.click('[data-action="baby"][data-level="5"]');
+  const high=Number(ui.query('.forecast-panel [data-stat="intelligence"] strong').textContent);
+  assert.ok(high>low);
+  assert.equal(ui.all('.forecast-panel .year-change').length,8);
+  assert.match(ui.query('.forecast-parents').textContent,/Stability.*Bond/);
+  assert.match(ui.query('.forecast-panel').textContent,/Random events/);
+  assert.equal(ui.saved().rng,initial.rng);
+  assert.equal(ui.saved().age,initial.age);
+  assert.equal(ui.saved().cryLevel,5);
+  assertNoMoneyDisplay(ui.query('.forecast-panel'),'annual forecast');
+});
+
+test('new-year review shows actual changes, survives reload, and dismisses persistently', async () => {
+  let ui=await mount(createGame({name:'Jamie Reed',seed:121}));
+  ui.click('[data-action="advance"]');
+  const advanced=ui.saved();
+  assert.equal(advanced.yearSummary.dismissed,false);
+  assert.equal(ui.all('.year-review-modal').length,1);
+  assert.match(ui.query('.year-review-intro').textContent,/age 0 to 1/);
+  for(const [key,delta] of Object.entries(advanced.yearSummary.stats)) {
+    assert.equal(Number(ui.query(`.year-review-modal [data-stat="${key}"] strong`).textContent),delta.change);
+  }
+  assertNoMoneyDisplay(ui.query('.year-review-modal'),'year in review');
+  assert.ok(ui.query('#app').hasAttribute('inert'));
+  ui=await mount(advanced);
+  assert.equal(ui.all('.year-review-modal').length,1,'unread reviews reopen after reload');
+  assert.deepEqual(ui.saved(),advanced);
+  ui.key('.year-review-modal [data-action="close"]','Escape');
+  assert.equal(ui.saved().yearSummary.dismissed,true);
+  assert.equal(ui.all('[role="dialog"]').length,0);
+  assert.equal(ui.query('#app').hasAttribute('inert'),false);
+  const dismissed=ui.saved();
+  ui=await mount(dismissed);
+  assert.equal(ui.all('.year-review-modal').length,0);
+  assert.deepEqual(ui.saved(),dismissed);
+});
+
+test('a death before retirement opens a playable next chapter', async () => {
+  const fixture=createGame({name:'Jamie Reed',seed:121});
+  assert.equal(advanceYear(fixture,{mortalityRandom:()=>0}).ok,true);
+  assert.equal(fixture.alive,false);
+  const ui=await mount(fixture);
+  ui.click('.year-review-modal [data-action="close"]');
+  assert.match(ui.query('#main-content').textContent,/died at age 1/);
+  ui.click('.bottom-dock .advance-button');
+  assert.ok(ui.query('.beneficiary-preview'));
+  ui.click('[data-action="heir"]');
+  assert.match(ui.query('#modal-title').textContent,/legacy/i);
+  ui.click('[data-action="confirm-heir"]');
+  assert.equal(ui.saved().generation,2);
+  assert.equal(ui.saved().alive,true);
+  assert.equal(ui.saved().needsSuccession,false);
+  assert.equal(validateSave(ui.saved()),true);
+});
+
 test('a blank surname cannot replace an existing life', async () => {
   const fixture=ageTo(createGame({name:'Riley Reed',seed:2091}),20);
   const ui=await mount(fixture);
@@ -142,6 +221,10 @@ test('a childless retirement previews one stable low-stat beneficiary with a dif
 test('a previously finished v5 childless life can continue through a beneficiary at age85', async () => {
   const old=ageTo(createGame({name:'Morgan Brooks',seed:2094}),85);
   old.version=5; old.ended=true; old.needsSuccession=false;
+  // The pre-mortality schema capped every relative at 85.
+  for(const person of [...old.parents,...old.children,...old.siblings]) {
+    if(person.age>=85) { person.age=85; person.alive=false; }
+  }
   for(const person of [old,...old.parents,...old.children,...old.siblings,...old.lineage]) delete person.familyName;
   const ui=await mount(old);
   assert.equal(ui.saved().age,85);
@@ -233,6 +316,7 @@ function resolvePending(state) {
   }
 }
 function resolveUIEvents(ui) {
+  if (ui.all('.year-review-modal').length) ui.click('.year-review-modal [data-action="close"]');
   while (ui.saved().pendingEvents.length) ui.click('[data-action="event-choice"]');
 }
 
@@ -255,7 +339,8 @@ function encounterFixture() {
   state.focus={work:2,social:5,family:2,self:3};
   state.effects=[];
   for(let attempt=0;attempt<5;attempt++) {
-    assert.equal(advanceYear(state).ok,true); resolvePending(state);
+    assert.equal(advanceYear(state,{mortalityRandom:()=>1}).ok,true); resolvePending(state);
+    if(state.yearSummary) state.yearSummary.dismissed=true;
     if(state.encounters.length>=2) break;
   }
   assert.ok(state.encounters.length>=2 && state.encounters.length<=5);
@@ -291,9 +376,10 @@ function ageTo(state, age) {
   resolvePending(state);
   while (state.age < age) {
     if (needsEducationChoice(state)) assert.equal(chooseEducation(state, 'work').ok, true);
-    assert.equal(advanceYear(state).ok, true);
+    assert.equal(advanceYear(state,{mortalityRandom:()=>1}).ok, true);
     resolvePending(state);
   }
+  if(state.yearSummary) state.yearSummary.dismissed=true;
   assert.equal(validateSave(state), true, 'fixture must be a valid loadable save');
   return state;
 }
@@ -424,6 +510,23 @@ afterEach(() => {
 });
 
 describe('Dating and family DOM integration', {concurrency:false},()=>{
+  test('a remembered partner does not hide new encounters',async()=>{
+    const fixture=partnerFixture();
+    fixture.partner.alive=false;
+    fixture.partner.death={cause:'disease',age:fixture.partner.age};
+    fixture.encounters=encounterFixture().encounters.map((person,index)=>({...person,id:`widowed-prospect-${index}`}));
+    fixture.encounterYear=fixture.age;
+    assert.equal(validateSave(fixture),true);
+    const ui=await mount(fixture);
+    ui.click('.nav-list [data-tab="family"]');
+    assert.match(ui.query('.remembered-partner').textContent,new RegExp(fixture.partner.name));
+    assert.equal(ui.all('.encounter-card').length,1);
+    assert.equal(ui.all('[data-action="encounter"]').length,3);
+    assert.equal(ui.all('[data-action="propose"]').length,0);
+    ui.click('[data-action="encounter"][data-choice="ignore"]');
+    assert.equal(ui.saved().encounters.length,fixture.encounters.length-1);
+  });
+
   test('adult encounters show one complete profile at a time and ignoring persists',async()=>{
     let ui=await mount(ageTo(createGame({seed:1201}),17));
     ui.click('.nav-list [data-tab="family"]');
@@ -685,7 +788,7 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     const initial = ui.saved();
     assert.equal(initial.age, 0);
     assert.equal(ui.query('.person-name').textContent, 'Jamie Reed');
-    assert.equal(ui.all('.choice-card').length, 2);
+    assert.equal(ui.all('.cry-level').length, 5);
     assert.equal(ui.all('.stat-list .stat-row').length, 0, 'detailed skills belong on the You screen');
     assert.equal(ui.all('.birth-skills .birth-skill').length, 5, 'all adult skills must be visible from birth');
     assert.equal(ui.all('.birth-skills .aptitude').length, 5, 'every newborn skill needs its growth affinity');
@@ -699,15 +802,15 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     assert.match(ui.query('.birth-skills').textContent, /affinity/i);
     assert.equal(ui.all('[data-action="focus"]').length, 0);
 
-    ui.click('[data-action="baby"][data-choice="cry"]');
-    assert.equal(ui.saved().babyChoice, 'cry');
-    assert.equal(ui.query('[data-choice="cry"]').getAttribute('aria-pressed'), 'true');
+    ui.click('[data-action="baby"][data-level="5"]');
+    assert.equal(ui.saved().cryLevel, 5);
+    assert.equal(ui.query('[data-action="baby"][data-level="5"]').getAttribute('aria-pressed'), 'true');
     for (let year = 1; year <= 3; year += 1) {
       ui.click('[data-action="advance"]');
     resolveUIEvents(ui);
       assert.equal(ui.saved().age, year, 'one click advances exactly one year');
     }
-    assert.equal(ui.all('.choice-card').length, 0);
+    assert.equal(ui.all('.cry-level').length, 0);
     assert.equal(ui.all('.focus-row').length, 4);
     assert.equal(ui.all('[data-action="focus"]').length, 8);
     assert.ok(ui.saved().stats.intelligence > initial.stats.intelligence);
