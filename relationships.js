@@ -109,7 +109,7 @@ export function createProspects(state, helpers, stats = state.stats) {
     }
     actorStats.attractiveness = round(actorStats.attractiveness);
     prospects.push({
-      id: uid('prospect'), name: personName(), age, stats: actorStats, aptitudes,
+      id: uid('prospect'), name: personName(gender), age, stats: actorStats, aptitudes,
       height, adultHeight: height, lifestyle: Math.round(clamp(center + (random() - .5) * 4, 1, 10)), alive: true,
       gender, canGestate: gender === 'female', attractedTo: [state.gender || 'male'], appearancePeakAge,
     });

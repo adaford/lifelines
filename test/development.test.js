@@ -35,7 +35,8 @@ function legacyV7(state) {
   const legacy = copy(state);
   legacy.version = 7;
   for (const person of [legacy, ...legacy.parents, ...legacy.children, ...legacy.siblings, ...legacy.lineage, legacy.partner, ...legacy.encounters, legacy.pregnancy?.otherParent].filter(Boolean)) {
-    for (const key of ['growthSex', 'maturityAge', 'birthHeight', 'growthAnchor', 'parentRole']) delete person[key];
+    if (person.adultHeight === null) person.adultHeight = 170;
+    for (const key of ['growthSex', 'growthFactor', 'maturityAge', 'birthHeight', 'growthAnchor', 'parentRole', 'career']) delete person[key];
     person.appearancePeakAge = 30;
   }
   return legacy;
@@ -66,7 +67,7 @@ test('new families have a mom and dad with varied bonds centered near eight', ()
   assert.ok(heights.size > 50, 'newborn length varies instead of always being 50cm');
 });
 
-test('routine attractiveness stays at its initial level and declines only after the chosen threshold', () => {
+test('mean attractiveness stays at its initial level and declines only after the chosen threshold', () => {
   for (const gender of ['male', 'female', 'nonbinary']) {
     const state = createGame({ seed: 344, gender });
     const start = state.stats.attractiveness;
@@ -143,7 +144,7 @@ test('v7 migration preserves existing height, bonds, random state and non-infant
   const before = copy(legacy);
   const migrated = migrateSave(legacy);
   assert.ok(migrated);
-  assert.equal(migrated.version, 8);
+  assert.equal(migrated.version, 9);
   for (const key of ['rng', 'seed', 'nextId', 'age', 'height', 'stats', 'pendingEvents', 'history', 'yearSummary']) assert.deepEqual(migrated[key], before[key], key);
   assert.deepEqual(migrated.parents.map(parent => parent.relationship), [6.3, 9.1]);
   assert.deepEqual(legacy, before, 'migration leaves the original object unchanged');
@@ -169,13 +170,15 @@ test('young heirs preserve their growth profile and reach adult height within th
   finishChoices(state);
   const heir = copy(state.children[0]);
   assert.equal(succeed(state, heir.id).ok, true);
-  for (const key of ['height', 'adultHeight', 'growthSex', 'maturityAge', 'birthHeight', 'growthAnchor']) assert.deepEqual(state[key], heir[key], key);
+  for (const key of ['height', 'adultHeight', 'growthSex', 'growthFactor', 'maturityAge', 'birthHeight', 'growthAnchor']) assert.deepEqual(state[key], heir[key], key);
   assert.ok(state.maturityAge >= 14 && state.maturityAge <= 18);
+  assert.equal(state.adultHeight, null, 'a growing heir has no predetermined endpoint');
   let previousHeight = state.height;
   while (state.age < state.maturityAge) {
     finishChoices(state);
     advanceYear(state, meanYear);
-    assert.ok(state.height >= previousHeight && state.height <= state.adultHeight);
+    assert.ok(state.height >= previousHeight);
+    if (state.age < state.maturityAge) assert.equal(state.adultHeight, null);
     previousHeight = state.height;
     assert.equal(validateSave(state), true);
   }
@@ -194,6 +197,9 @@ test('saved growth profiles reject malformed ages, references, and partial famil
     s => { s.maturityAge = 19; },
     s => { s.birthHeight = NaN; },
     s => { s.growthSex = 'unknown'; },
+    s => { s.growthFactor = -.1; },
+    s => { s.growthFactor = 1.21; },
+    s => { s.adultHeight = NaN; },
     s => { s.growthAnchor = { age: 3, height: 80 }; },
     s => { delete s.parents[0].growthSex; },
     s => { s.parents[0].parentRole = 'unknown'; },

@@ -148,6 +148,7 @@ test('year summaries survive reload, can be dismissed, and reopen only after the
 test('v6 saves gain cry level and parent bonds without rerolling progress or queued decisions', () => {
   const legacy = survivorAt(8, 70);
   legacy.version = 6;
+  legacy.adultHeight ??= 170;
   for (const person of [legacy, ...legacy.parents, ...legacy.children, ...legacy.siblings, legacy.partner, ...legacy.encounters, legacy.pregnancy?.otherParent].filter(Boolean)) person.appearancePeakAge = 30;
   legacy.babyChoice = 'cry';
   delete legacy.cryLevel; delete legacy.alive; delete legacy.death; delete legacy.yearSummary;
@@ -157,7 +158,7 @@ test('v6 saves gain cry level and parent bonds without rerolling progress or que
   const before = clone(legacy);
   const migrated = migrateSave(legacy);
   assert.ok(migrated);
-  assert.equal(migrated.version, 8);
+  assert.equal(migrated.version, 9);
   assert.equal(migrated.cryLevel, 5);
   assert.equal(migrated.alive, true);
   assert.equal(migrated.yearSummary, null);

@@ -203,6 +203,17 @@ button svg { pointer-events: none; }
 .empty-state h4 { font-family: Georgia, serif; font-size: 19px; font-weight: 400; color: #64765a; margin-bottom: 5px; }
 .stat-list { display: grid; gap: 19px; }
 .stat-heading { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 14px; }
+.label-with-help { display: inline-flex; align-items: center; gap: 2px; max-width: 100%; min-width: 0; }
+.help-button { display: inline-flex; flex: 0 0 44px; align-items: center; justify-content: center; width: 44px; min-width: 44px; height: 44px; min-height: 44px; border: 0; border-radius: 10px; background: transparent; color: var(--muted); cursor: pointer; vertical-align: middle; }
+.help-button > span { display: flex; align-items: center; justify-content: center; width: 18px; height: 18px; border: 1px solid currentColor; border-radius: 50%; font-size: 12px; font-weight: 650; line-height: 1; }
+.help-button:hover { background: var(--surface-soft); color: var(--green); }
+.help-button:focus-visible { outline: 2px solid var(--green); outline-offset: 1px; background: var(--surface-soft); }
+.stat-help-links { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 12px; color: var(--muted); font-size: 12px; margin-top: 8px; }
+.game-status, .decision-required { color: var(--muted); font-size: 13px; line-height: 1.6; margin-top: 10px; }
+.parent-career { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 8px; margin-bottom: 8px; color: var(--muted); font-size: 12px; }
+.parent-career > span:first-child { display: inline-flex; align-items: center; gap: 5px; }
+.parent-career strong { color: var(--green); }
+.employment-status { padding: 4px 8px; background: var(--surface-soft); border-radius: 5px; }
 .stat-name { flex: 1; color: #52644c; }
 .stat-value { font-size: 14px; font-weight: 650; font-variant-numeric: tabular-nums; }
 .stat-track { position: relative; height: 9px; border-radius: 4px; background: #e9ebe0; overflow: hidden; }
@@ -387,6 +398,12 @@ details p { font-size: 13px; color: var(--muted); line-height: 1.65; padding-bot
 .modal-body .mini-stats > span { padding-bottom: 9px; border-bottom: 1px solid #eceee4; }
 .modal-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 9px; position: sticky; bottom: 0; padding: 14px 20px; background: #f6f7ee; border-top: 1px solid var(--line); flex-shrink: 0; }
 .modal-actions .button { width: 100%; }
+.help-popup-backdrop { align-items: center; padding: max(16px,var(--safe-top)) 16px max(16px,var(--safe-bottom)); }
+.help-popup { max-width: 420px; max-height: min(620px,80dvh); border-radius: 18px; padding-bottom: 0; }
+.help-popup .modal-header { border-radius: 18px 18px 0 0; }
+.help-popup .modal-header h2 { font-size: 22px; }
+.help-popup .modal-body { padding: 16px 20px 20px; }
+.help-popup .modal-body > p { font-size: 13px; line-height: 1.65; }
 .field-label { display: block; font-size: 14px; font-weight: 600; color: #58704b; margin-bottom: 8px; }
 .text-input { width: 100%; min-height: 48px; border: 1px solid #cdd9c4; border-radius: 9px; padding: 11px 13px; background: #fffefb; color: var(--ink); font-size: 16px; }
 .text-input::placeholder { color: #929c87; }

@@ -1,14 +1,15 @@
 // Lifelines: deterministic, browser-independent simulation rules.
 // All public actions mutate their state and return { ok, reason? }.
-import { JOBS } from './jobs.js?v=growth-years-1';
-import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=growth-years-1';
-import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=growth-years-1';
-import { mortalityRisk, rollMortality } from './mortality.js?v=growth-years-1';
-import { growthHeightAt, heightReference, advanceHeight } from './growth.js?v=growth-years-1';
-export { heightPercentile } from './growth.js?v=growth-years-1';
-export { mortalityRisk } from './mortality.js?v=growth-years-1';
-import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=growth-years-1';
-export { JOBS, JOB_CATEGORIES } from './jobs.js?v=growth-years-1';
+import { JOBS } from './jobs.js?v=life-details-1';
+import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=life-details-1';
+import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=life-details-1';
+import { mortalityRisk, rollMortality } from './mortality.js?v=life-details-1';
+import { heightReference, advanceGrowth } from './growth.js?v=life-details-1';
+import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=life-details-1';
+export { heightPercentile } from './growth.js?v=life-details-1';
+export { mortalityRisk } from './mortality.js?v=life-details-1';
+import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=life-details-1';
+export { JOBS, JOB_CATEGORIES } from './jobs.js?v=life-details-1';
 export const EVENTS = [...PERSONAL_EVENTS, ...FAMILY_EVENTS];
 
 export const SKILLS = [
@@ -22,6 +23,10 @@ const CORE = SKILLS.map(s => s.key);
 const STAT_KEYS = [...CORE, 'health', 'stability'];
 const FOCUS_KEYS = ['work', 'social', 'family', 'self'];
 const FIRST_NAMES = ['Alex', 'Jamie', 'Rowan', 'Sage', 'Riley', 'Morgan', 'Avery', 'Jordan', 'Taylor', 'Quinn', 'Casey', 'Robin', 'Sam', 'Ellis', 'Charlie', 'Reese'];
+const GENDER_NAMES = {
+  male: ['Adam', 'Benjamin', 'Daniel', 'David', 'Ethan', 'Gabriel', 'Henry', 'Isaac', 'James', 'Leo', 'Lucas', 'Nathan', 'Noah', 'Oliver', 'Samuel', 'Thomas'],
+  female: ['Amelia', 'Anna', 'Charlotte', 'Chloe', 'Clara', 'Ella', 'Emily', 'Grace', 'Hannah', 'Isabella', 'Lily', 'Lucy', 'Mia', 'Olivia', 'Sophia', 'Zoe'],
+};
 const LAST_NAMES = ['Bennett', 'Park', 'Rivera', 'Morgan', 'Reed', 'Patel', 'Santos', 'Chen', 'Walker', 'Brooks'];
 const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
 const round = n => Math.round(n * 100) / 100;
@@ -50,7 +55,7 @@ export function normalizeSurname(value) {
   const cleaned = typeof value === 'string' ? value.trim().replace(/\s+/g, ' ').slice(0, 30) : '';
   return cleaned ? (cleaned[0].toLocaleUpperCase() + cleaned.slice(1)).slice(0, 30).trimEnd() : '';
 }
-function personName(state, lastName) { return `${pick(state, FIRST_NAMES)} ${lastName || pick(state, LAST_NAMES)}`; }
+function personName(state, lastName, gender) { return `${pick(state, GENDER_NAMES[gender] || FIRST_NAMES)} ${lastName || pick(state, LAST_NAMES)}`; }
 function useFamilyName(person, familyName) {
   const old = person.familyName || surname(person.name);
   const firstName = person.name.toLocaleLowerCase().endsWith(` ${old.toLocaleLowerCase()}`) ? person.name.slice(0, -old.length).trim() : person.name.split(/\s+/)[0];
@@ -90,8 +95,17 @@ function ensureGrowth(person) {
   person.growthSex ??= person.gender === 'female' ? 'female' : person.gender === 'male' ? 'male' : hash % 2 ? 'female' : 'male';
   person.maturityAge ??= (person.growthSex === 'female' ? 14 : 16) + hash % 3;
   person.birthHeight ??= round(heightReference(0, person.growthSex).median);
-  person.adultHeight ??= person.height;
+  if (person.adultHeight === undefined) person.adultHeight = person.age >= person.maturityAge ? person.height : null;
   person.growthAnchor ??= null;
+  // A persistent inherited tendency changes annual growth velocity, never an
+  // adult-height destination. Legacy profiles get a stable, RNG-free default.
+  if (person.growthFactor === undefined) {
+    const adult = heightReference(20, person.growthSex).median;
+    const birth = heightReference(0, person.growthSex).median;
+    const stableNormal = clamp(Math.sqrt(-2 * Math.log(((hash & 65535) + .5) / 65536)) * Math.cos(2 * Math.PI * ((hash >>> 16) + .5) / 65536), -3, 3);
+    const tendency = person.age >= person.maturityAge ? (person.height - adult) / (adult - birth) : stableNormal * .054;
+    person.growthFactor = Math.round(clamp(1 + tendency, .8, 1.2) * 10000) / 10000;
+  }
   return person;
 }
 function newbornGrowth(state, person, parents = []) {
@@ -100,19 +114,15 @@ function newbornGrowth(state, person, parents = []) {
   const reference = heightReference(0, person.growthSex);
   person.birthHeight = round(clamp(reference.median + normal(state) * reference.sd, 40, 60));
   person.height = person.birthHeight;
-  const adult = heightReference(20, person.growthSex);
-  const parentZ = parents.length ? parents.reduce((sum, parent) => {
-    const ref = heightReference(20, parent.growthSex || (parent.gender === 'female' ? 'female' : 'male'));
-    return sum + ((parent.adultHeight || parent.height) - ref.median) / ref.sd;
-  }, 0) / parents.length : 0;
-  // Independent parental z-scores averaged together have variance .5.
-  // .7 inheritance + .87 residual retains approximately unit population SD.
-  person.adultHeight = round(clamp(adult.median + adult.sd * (parentZ * .7 + normal(state) * (parents.length ? .87 : 1)), 145, 205));
+  const inherited = parents.length ? parents.reduce((sum, parent) => sum + ensureGrowth(parent).growthFactor, 0) / parents.length : 1;
+  person.growthFactor = Math.round(clamp(1 + .7 * (inherited - 1) + normal(state) * (parents.length ? .047 : .054), .8, 1.2) * 10000) / 10000;
+  // Only attained adult height is stored. While growing there is no endpoint.
+  person.adultHeight = null;
   if (parents.length) person.stats.attractiveness = round(clamp(parents.reduce((sum, p) => sum + p.stats.attractiveness, 0) / parents.length + normal(state) * .7, 1, 10));
   person.growthAnchor = null;
 }
 function datingHelpers(state) {
-  return { random: () => random(state), integer: (low, high) => integer(state, low, high), uid: prefix => uid(state, prefix), personName: () => personName(state), randomAptitudes: () => randomAptitudes(state) };
+  return { random: () => random(state), integer: (low, high) => integer(state, low, high), uid: prefix => uid(state, prefix), personName: gender => personName(state, undefined, gender), randomAptitudes: () => randomAptitudes(state) };
 }
 const livingPartner = state => state.partner?.alive !== false ? state.partner : null;
 const dependents = state => state.children.filter(child => child.alive !== false && child.age < 18);
@@ -120,7 +130,8 @@ function makeParent(state, lastName, gender) {
   const age = integer(state, 25, 40);
   const reference = heightReference(20, gender);
   const height = round(clamp(reference.median + normal(state) * reference.sd, 145, 205));
-  return demographics({ id: uid(state, 'parent'), name: personName(state, lastName), familyName: lastName, parentRole: gender === 'female' ? 'mom' : 'dad', age, stats: randomStats(state), aptitudes: randomAptitudes(state), height, adultHeight: height, alive: true, relationship: initialBond(state) }, gender);
+  const growthFactor = Math.round(clamp(1 + (height - reference.median) / (reference.median - heightReference(0, gender).median), .8, 1.2) * 10000) / 10000;
+  return demographics({ id: uid(state, 'parent'), name: personName(state, lastName, gender), familyName: lastName, parentRole: gender === 'female' ? 'mom' : 'dad', age, stats: randomStats(state), aptitudes: randomAptitudes(state), height, adultHeight: height, growthFactor, alive: true, relationship: initialBond(state) }, gender);
 }
 function active(state) {
   if (state.pendingEvents.length) return fail('Resolve your event choices before continuing.');
@@ -131,8 +142,8 @@ function active(state) {
 
 export function createGame({ name, surname: chosenSurname, firstName, seed, gender = 'male', canGestate, attractedTo } = {}) {
   const initialSeed = Number.isFinite(seed) ? seed >>> 0 : (Date.now() ^ Math.floor(Math.random() * 0xFFFFFFFF)) >>> 0;
-  const state = { version: 8, seed: initialSeed, rng: initialSeed, nextId: 0, id: `life-${initialSeed}`, age: 0, generation: 1,
-    name: '', stats: {}, aptitudes: {}, height: 50, adultHeight: 170,
+  const state = { version: 9, seed: initialSeed, rng: initialSeed, nextId: 0, id: `life-${initialSeed}`, age: 0, generation: 1,
+    name: '', stats: {}, aptitudes: {}, height: 50, adultHeight: null,
     focus: { work: 3, social: 3, family: 3, self: 3 }, babyChoice: 'quiet', cryLevel: 1, alive: true, death: null, yearSummary: null,
     parents: [], children: [], siblings: [], money: 0, income: 0, expenses: 0, lifestyle: 1,
     jobId: null, jobYears: 0, performance: 0, schoolProgress: 0, lastChildAge: -1,
@@ -141,16 +152,16 @@ export function createGame({ name, surname: chosenSurname, firstName, seed, gend
     effects: [], pendingEvents: [], lastYearEvents: [], history: [], lineage: [], ended: false, needsSuccession: false };
   const familyName = normalizeSurname(chosenSurname);
   if (familyName) {
-    const givenName = typeof firstName === 'string' && firstName.trim() ? firstName.trim().replace(/\s+/g, ' ') : pick(state, FIRST_NAMES);
+    const givenName = typeof firstName === 'string' && firstName.trim() ? firstName.trim().replace(/\s+/g, ' ') : pick(state, GENDER_NAMES[gender] || FIRST_NAMES);
     state.familyName = familyName;
     state.name = `${givenName.slice(0, 49 - familyName.length)} ${familyName}`;
-  } else state.name = typeof name === 'string' && name.trim() ? name.trim().slice(0, 50) : personName(state);
+  } else state.name = typeof name === 'string' && name.trim() ? name.trim().slice(0, 50) : personName(state, undefined, gender);
   demographics(state, ['male', 'female', 'nonbinary'].includes(gender) ? gender : 'male');
   if (typeof canGestate === 'boolean') state.canGestate = canGestate;
   if (Array.isArray(attractedTo) && attractedTo.length && attractedTo.every(value => ['male', 'female', 'nonbinary'].includes(value))) state.attractedTo = [...new Set(attractedTo)];
   state.parents = [makeParent(state, state.familyName, 'female'), makeParent(state, state.familyName, 'male')];
   const homeLifestyle = integer(state, 2, 8);
-  state.parents.forEach(parent => { parent.lifestyle = homeLifestyle; });
+  state.parents.forEach(parent => { parent.lifestyle = homeLifestyle; parent.career = initialParentCareer(parent, integer(state, 1, 5)); });
   state.lifestyle = homeLifestyle;
   state.stats = randomStats(state, true);
   state.aptitudes = Object.fromEntries(CORE.map(key => [key, clamp(Math.round((state.parents[0].aptitudes[key] + state.parents[1].aptitudes[key]) / 2) + integer(state, -1, 1), -3, 3)]));
@@ -320,8 +331,10 @@ export function respondToEncounter(state, personId, decision) {
     syncFamilyLifestyles(state);
     log(state, 'A connection becomes a relationship', `You and ${person.name} begin dating. Time together will shape your relationship.`, 'relationship');
   } else {
+    const before = effectiveStats(state);
     addStat(state, 'social', .25); addStat(state, 'stability', -.1);
-    log(state, 'A brief connection', `You and ${person.name} choose to spend a night together, without starting a relationship. Social ability +0.25; stability -0.1.`, 'relationship');
+    const after = effectiveStats(state);
+    log(state, 'A brief connection', `You and ${person.name} choose to spend a night together, without starting a relationship. Social ability ${before.social} → ${after.social}; mental stability ${before.stability} → ${after.stability}.`, 'relationship');
     if (random(state) < pregnancyChance(state, person, { casual: true })) startPregnancy(state, person, true);
   }
   return { ok: true, accepted: true, chance };
@@ -422,6 +435,25 @@ function syncFamilyLifestyles(state) {
   for (const child of state.children) if (child.alive !== false) child.lifestyle = child.age < 18 ? state.lifestyle : lifestyleFromResources(0, child.money);
   for (const sibling of state.siblings) if (sibling.alive !== false) sibling.lifestyle = sibling.age < 18 ? householdLifestyle(state) : lifestyleFromResources(0, sibling.money);
 }
+function parentCareersForYear(state, careerRandom, growthRandom) {
+  const events = [];
+  const before = householdLifestyle(state);
+  for (const parent of state.parents) {
+    parent.career ??= initialParentCareer(parent, 1 + personHash(parent) % 5);
+    if (parent.alive === false) continue;
+    if (careerRandom) {
+      const result = advanceParentCareer(parent, { random: careerRandom, normal: growthRandom });
+      parent.career = result.career;
+      if (result.event) events.push(result.event);
+    } else parent.career = careerForecast(parent);
+  }
+  const living = state.parents.filter(parent => parent.alive !== false);
+  if (living.length) {
+    const lifestyle = clamp(Math.round(living.reduce((sum, parent) => sum + parent.career.progress, 0) / living.length), 1, 10);
+    for (const parent of living) parent.lifestyle = lifestyle;
+  }
+  return events.map(event => ({ ...event, text: `${event.text} Household lifestyle ${before} → ${householdLifestyle(state)}.` }));
+}
 function annualFinances(state) {
   if (state.age < 18) {
     state.income = 0;
@@ -487,6 +519,7 @@ export function pendingEventSubject(state, pending) {
 }
 function applyOutcome(state, event, outcome = event, context = {}) {
   const subject = pendingEventSubject(state, context);
+  const before = { stats: effectiveStats(state), lifestyle: state.lifestyle, subjectStats: subject ? { ...subject.stats } : {}, relationship: subject?.relationship };
   const key = eventKey({ eventId: event.id, ...context });
   const description = (outcome.description || event.description).replaceAll('{name}', subject?.name || 'Your family member');
   for (const [key, amount] of Object.entries(outcome.statChanges || {})) addStat(state, key, amount);
@@ -503,15 +536,15 @@ function applyOutcome(state, event, outcome = event, context = {}) {
     else state.effects.push(effect);
   }
   syncFamilyLifestyles(state);
-  const label = key => SKILLS.find(skill => skill.key === key)?.label || ({ health: 'Health', stability: 'Stability' }[key]);
-  const delta = amount => `${amount > 0 ? '+' : ''}${amount}`;
-  const changes = Object.entries(outcome.statChanges || {}).map(([key, amount]) => `${label(key)} ${delta(amount)}`);
-  for (const [key, amount] of Object.entries(outcome.playerChanges || {})) changes.push(`Your ${label(key).toLowerCase()} ${delta(amount)}`);
-  for (const [key, amount] of Object.entries(outcome.subjectChanges || {})) changes.push(`${subject.name}: ${label(key)} ${delta(amount)}`);
-  if (outcome.relationship) changes.push(`Relationship ${delta(outcome.relationship)}`);
-  const temporary = Object.entries(outcome.modifiers || {}).map(([key, amount]) => `${label(key)} ${delta(amount)}`);
-  if (outcome.lifestyle) temporary.push(`Lifestyle ${delta(outcome.lifestyle)}`);
-  if (temporary.length) changes.push(`${temporary.join(', ')} for ${outcome.years} year${outcome.years === 1 ? '' : 's'}`);
+  const label = key => SKILLS.find(skill => skill.key === key)?.label || ({ health: 'Health', stability: 'Mental stability' }[key]);
+  const after = effectiveStats(state);
+  const keys = new Set([...Object.keys(outcome.statChanges || {}), ...Object.keys(outcome.playerChanges || {}), ...Object.keys(outcome.modifiers || {})]);
+  const changes = [...keys].map(key => `Your ${label(key).toLowerCase()} ${before.stats[key]} → ${after[key]}`);
+  if (subject && subject !== state) {
+    for (const key of Object.keys(outcome.subjectChanges || {})) changes.push(`${subject.name}: ${label(key)} ${before.subjectStats[key]} → ${subject.stats[key]}`);
+    if (outcome.relationship) changes.push(`${subject.name}: Relationship ${before.relationship} → ${subject.relationship}`);
+  }
+  if (outcome.lifestyle) changes.push(`Lifestyle ${before.lifestyle} → ${state.lifestyle}`);
   const story = outcome === event ? description : `${outcome.label}: ${description}`;
   log(state, `${context.subjectId ? `${subject.name}: ` : ''}${event.name}`, `${story}${changes.length ? ` ${changes.join('; ')}.` : ''}`, event.kind);
 }
@@ -530,19 +563,22 @@ export function resolveEventChoice(state, choiceId, expectedEventId, expectedSub
   return { ok: true, eventId: event.id, choiceId: choice.id, remaining: state.pendingEvents.length };
 }
 
-function routineYear(state, growthRandom) {
+function routineYear(state, growthRandom, careerRandom) {
   const people = [state, ...state.parents, ...state.children, ...state.siblings, livingPartner(state)].filter(person => person && person.alive !== false);
   const before = people.map(person => {
     ensureGrowth(person);
     return { person, stats: { ...person.stats }, relationship: person.relationship,
-      height: advanceHeight(person, growthRandom ? growthRandom() : 0) };
+      growth: advanceGrowth(person === state ? { ...person, stats: effectiveStats(state) } : person, growthRandom ? growthRandom() : 0) };
   });
   growYear(state);
+  const careerEvents = parentCareersForYear(state, careerRandom, growthRandom);
   annualFinances(state);
   ageFamily(state);
   for (const previous of before) {
     const person = previous.person;
-    person.height = previous.height;
+    person.height = previous.growth.height;
+    // State's age increments below; family members have already aged.
+    if ((person === state ? state.age + 1 : person.age) >= person.maturityAge) person.adultHeight = person.height;
     if (!growthRandom) continue;
     for (const key of STAT_KEYS) {
       const change = person.stats[key] - previous.stats[key];
@@ -550,9 +586,8 @@ function routineYear(state, growthRandom) {
       // intelligence/appearance SD. Affinity supplies persistent differences;
       // this residual provides modest, reproducible year-to-year variation.
       const draw = growthRandom();
-      if (key === 'attractiveness' && !change) continue;
       const wellbeing = key === 'health' || key === 'stability';
-      const sd = Math.abs(change) * (wellbeing ? .25 : key === 'attractiveness' ? .3 : .18) + (wellbeing ? .02 : 0);
+      const sd = Math.abs(change) * (wellbeing ? .25 : key === 'attractiveness' ? .3 : .18) + (wellbeing ? .02 : key === 'attractiveness' ? .04 : 0);
       person.stats[key] = round(clamp(previous.stats[key] + change + clamp(draw, -3, 3) * sd, 1, 10));
     }
     if (Number.isFinite(previous.relationship)) {
@@ -564,20 +599,22 @@ function routineYear(state, growthRandom) {
   state.effects = state.effects.filter(effect => effect.years > 0);
   state.age += 1;
   syncFamilyLifestyles(state);
+  for (const event of careerEvents) log(state, event.title, event.text, event.kind);
 }
 function yearSnapshot(state) {
-  return { age: state.age, stats: effectiveStats(state), lifestyle: state.lifestyle,
-    parents: state.parents.map(p => ({ id: p.id, name: p.name, stability: p.stats.stability, relationship: p.relationship })) };
+  return { age: state.age, height: state.height, stats: effectiveStats(state), lifestyle: state.lifestyle,
+    parents: state.parents.map(p => ({ id: p.id, name: p.name, lifestyle: p.lifestyle, stability: p.stats.stability, relationship: p.relationship })) };
 }
 function yearChanges(before, state) {
   const after = yearSnapshot(state);
   const delta = (a, b) => ({ before: a, after: b, change: round(b - a) });
   return { fromAge: before.age, toAge: state.age,
+    height: delta(before.height, after.height),
     stats: Object.fromEntries(STAT_KEYS.map(key => [key, delta(before.stats[key], after.stats[key])])),
     lifestyle: delta(before.lifestyle, after.lifestyle),
     parents: before.parents.map(parent => {
       const next = after.parents.find(p => p.id === parent.id) || parent;
-      return { id: parent.id, name: parent.name, stability: delta(parent.stability, next.stability), relationship: delta(parent.relationship, next.relationship) };
+      return { id: parent.id, name: parent.name, lifestyle: delta(parent.lifestyle, next.lifestyle), stability: delta(parent.stability, next.stability), relationship: delta(parent.relationship, next.relationship) };
     }) };
 }
 // A pure preview of routine growth, finances, aging and expiring effects.
@@ -615,7 +652,7 @@ function applyDeath(state, person, death) {
   }
 }
 
-export function advanceYear(state, { mortalityRandom, growthRandom } = {}) {
+export function advanceYear(state, { mortalityRandom, growthRandom, parentCareerRandom } = {}) {
   const status = active(state); if (!status.ok) return status;
   if (needsEducationChoice(state)) return fail('Choose college or a career before advancing the year.');
   const before = yearSnapshot(state);
@@ -636,7 +673,7 @@ export function advanceYear(state, { mortalityRandom, growthRandom } = {}) {
   const otherParent = state.pregnancy?.otherParent;
   if (otherParent?.alive && !people.some(person => person.id === otherParent.id)) people.push(otherParent);
   const deaths = people.map(person => ({ person, result: rollMortality(person === state ? { ...state, stats: effectiveStats(state) } : person, mortalityRandom || (() => random(state))) })).filter(item => item.result);
-  routineYear(state, growthRandom || (() => normal(state)));
+  routineYear(state, growthRandom || (() => normal(state)), parentCareerRandom || (() => random(state)));
   if (otherParent?.alive && ![...state.parents, ...state.children, ...state.siblings, state.partner].some(person => person?.id === otherParent.id)) otherParent.age += 1;
   for (const { person, result } of deaths) applyDeath(state, person, result);
   selected = selected.filter(roll => state.alive && (!roll.subjectId || pendingEventSubject(state, roll)?.alive !== false));
@@ -650,7 +687,7 @@ export function advanceYear(state, { mortalityRandom, growthRandom } = {}) {
       log(state, roll.name, `${event.description.replaceAll('{name}', subject.name)} A choice is waiting for you.`, 'choice');
     } else applyOutcome(state, event, event, context);
   }
-  if (!selected.length && !deaths.length) log(state, 'A quiet year', previousStage === 'baby' ? `A year of small discoveries. At cry level ${state.cryLevel}, responding to your needs builds your bond with your parents.` : 'No major surprises this year. Your everyday choices still shape who you become.', 'quiet');
+  if (!selected.length && !deaths.length && !state.history.some(memory => !oldMemories.has(memory.id))) log(state, 'A quiet year', previousStage === 'baby' ? 'A year of small discoveries and time together with your parents.' : 'A year of everyday moments passes.', 'quiet');
   syncFamilyLifestyles(state);
   if (state.age === 3) log(state, 'A bigger little world', 'You can now choose how to spend your year. Divide up to 12 focus points between school, friends, family, and yourself.', 'milestone');
   if (state.age === 18) {
@@ -688,13 +725,14 @@ export function advanceYear(state, { mortalityRandom, growthRandom } = {}) {
 function welcomeChild(state, adopted, otherParent = null) {
   const otherAptitudes = otherParent?.aptitudes || randomAptitudes(state);
   const aptitudes = adopted ? otherAptitudes : Object.fromEntries(CORE.map(key => [key, clamp(Math.round((state.aptitudes[key] + otherAptitudes[key]) / 2) + integer(state, -1, 1), -3, 3)]));
-  const child = demographics({ id: uid(state, 'child'), name: personName(state, state.familyName), familyName: state.familyName, age: 0, stats: randomStats(state, true), aptitudes, height: 50, adultHeight: 170, money: 0, lifestyle: state.lifestyle, alive: true, adopted, relationship: initialBond(state) });
+  const gender = random(state) < .5 ? 'female' : 'male';
+  const child = demographics({ id: uid(state, 'child'), name: personName(state, state.familyName, gender), familyName: state.familyName, age: 0, stats: randomStats(state, true), aptitudes, height: 50, adultHeight: null, money: 0, lifestyle: state.lifestyle, alive: true, adopted, relationship: initialBond(state) }, gender);
   newbornGrowth(state, child, adopted ? [] : [state, otherParent].filter(Boolean));
   const coParent = adopted ? livingPartner(state) : otherParent;
   child.parentIds = [state.id, ...(coParent ? [coParent.id] : [])];
   state.children.push(child); state.lastChildAge = state.age;
   syncFamilyLifestyles(state);
-  log(state, adopted ? 'A new beginning' : 'A new branch', `${adopted ? `You adopt ${child.name}, welcoming a new child into your family.` : `${child.name} joins your family.`} Family focus will help their abilities grow, and your family legacy will be divided equally among your surviving children.`, 'family');
+  log(state, adopted ? 'A new beginning' : 'A new branch', adopted ? `You adopt ${child.name}, welcoming a new child into your family.` : `${child.name} joins your family.`, 'family');
   return { ok: true, childId: child.id };
 }
 
@@ -712,18 +750,18 @@ function legacyBeneficiary(state) {
   const seed = personHash({ id: state.id, name: state.seed + ':' + state.generation });
   const draft = { rng: seed, nextId: 0 };
   const familyName = pick(draft, LAST_NAMES.filter(name => name.toLocaleLowerCase() !== state.familyName.toLocaleLowerCase()));
-  const age = integer(draft, 6, 12), adultHeight = integer(draft, 150, 200);
+  const age = integer(draft, 6, 12), gender = random(draft) < .5 ? 'female' : 'male';
   const person = {
     id: 'beneficiary-' + state.seed + '-' + state.generation + '-' + seed,
-    name: personName(draft, familyName), familyName, age, adultHeight,
+    name: personName(draft, familyName, gender), familyName, age: 0, adultHeight: null,
     height: 50,
     stats: Object.fromEntries(STAT_KEYS.map(key => [key, round((CORE.includes(key) ? 1 : 2) + random(draft) * 2)])),
     aptitudes: randomAptitudes(draft), money: 0, lifestyle: 1, alive: true,
     relationship: 3, adopted: false,
   };
-  demographics(person);
+  demographics(person, gender);
   newbornGrowth(draft, person);
-  person.height = growthHeightAt(age, person.adultHeight, person.maturityAge, person.growthSex, person.birthHeight);
+  while (person.age < age) { Object.assign(person, advanceGrowth(person, normal(draft))); person.age++; }
   person.stats.attractiveness = round(clamp(5.5 + normal(draft) * 1.5, 1, 10));
   return person;
 }
@@ -751,7 +789,7 @@ export function succeed(state, heirId) {
   const heir = ensureGrowth(clone(candidate));
   const familyName = info.route === 'beneficiary' ? heir.familyName : state.familyName;
   useFamilyName(heir, familyName);
-  const identity = { gender: state.gender, canGestate: state.canGestate, attractedTo: [...state.attractedTo], appearancePeakAge: state.appearancePeakAge, familyName: state.familyName, growthSex: state.growthSex, maturityAge: state.maturityAge, birthHeight: state.birthHeight, adultHeight: state.adultHeight, growthAnchor: clone(state.growthAnchor) };
+  const identity = { gender: state.gender, canGestate: state.canGestate, attractedTo: [...state.attractedTo], appearancePeakAge: state.appearancePeakAge, familyName: state.familyName, growthSex: state.growthSex, growthFactor: state.growthFactor, maturityAge: state.maturityAge, birthHeight: state.birthHeight, adultHeight: state.adultHeight, growthAnchor: clone(state.growthAnchor) };
   const previous = { id: state.id, name: state.name, age: state.age, generation: state.generation, stats: clone(state.stats), aptitudes: clone(state.aptitudes), height: state.height, money: state.money, estate: info.estate, share: info.share, lifestyle: state.lifestyle, children: info.children.map(person => ({ id: person.id, name: person.name, inheritance: info.share })), alive: state.alive, death: state.death, retired: true, successor: { id: heir.id, name: heir.name, route: info.route }, ...identity };
   const formerParents = clone(state.parents);
   const formerSiblings = clone(state.siblings);
@@ -761,6 +799,12 @@ export function succeed(state, heirId) {
     state.parents = [{ id: previous.id, name: previous.name, age: previous.age, stats: clone(previous.stats), aptitudes: previous.aptitudes, height: previous.height, lifestyle: previous.lifestyle, alive: previous.alive, death: previous.death, relationship: heir.relationship, parentRole: previous.gender === 'female' ? 'mom' : previous.gender === 'male' ? 'dad' : 'parent', ...identity }];
     // Preserve a known co-parent; a later partner is not automatically a parent.
     if (state.partner && heir.parentIds?.includes(state.partner.id)) state.parents.push({ ...clone(state.partner), relationship: heir.relationship });
+    // A child keeps the household they already lived in. A co-parent's old
+    // standalone profile must not create an artificial support jump next year.
+    for (const parent of state.parents) {
+      parent.lifestyle = previous.lifestyle;
+      parent.career = { ...(parent.career || initialParentCareer(parent, parent.id === previous.id ? state.focus.work : 1 + personHash(parent) % 5)), progress: previous.lifestyle };
+    }
   } else if (info.route === 'siblings') {
     state.siblings = formerSiblings.filter(person => person.id !== heir.id);
     state.parents = formerParents;
@@ -770,7 +814,8 @@ export function succeed(state, heirId) {
   }
   state.id = heir.id; state.name = heir.name; state.familyName = familyName; state.age = heir.age; state.generation += 1;
   state.stats = heir.stats; state.aptitudes = heir.aptitudes; state.height = heir.height; state.adultHeight = heir.adultHeight;
-  for (const key of ['growthSex', 'maturityAge', 'birthHeight', 'growthAnchor']) state[key] = clone(heir[key]);
+  for (const key of ['growthSex', 'growthFactor', 'maturityAge', 'birthHeight', 'growthAnchor']) state[key] = clone(heir[key]);
+  for (const parent of state.parents) parent.career ??= initialParentCareer(parent, parent.id === previous.id ? state.focus.work : 1 + personHash(parent) % 5);
   state.gender = heir.gender; state.canGestate = heir.canGestate; state.attractedTo = [...heir.attractedTo]; state.appearancePeakAge = heir.appearancePeakAge;
   state.money = heir.money + info.share;
   state.children = []; state.effects = []; state.pendingEvents = []; state.lastYearEvents = []; state.focus = { work: 3, social: 3, family: 3, self: 3 };
@@ -799,13 +844,14 @@ function validSchema(raw, version) {
     const validGeneration = value => Number.isInteger(value) && finite(value, 1, 100000);
     const genders = ['male', 'female', 'nonbinary'];
     const validIdentity = person => genders.includes(person.gender) && typeof person.canGestate === 'boolean' && Array.isArray(person.attractedTo) && person.attractedTo.length > 0 && person.attractedTo.length <= 3 && new Set(person.attractedTo).size === person.attractedTo.length && person.attractedTo.every(gender => genders.includes(gender)) && Number.isInteger(person.appearancePeakAge) && finite(person.appearancePeakAge, version >= 8 ? 22 : 27, 33);
-    const validGrowth = person => ['male','female'].includes(person.growthSex) && Number.isInteger(person.maturityAge) && finite(person.maturityAge, 14, 18) && finite(person.birthHeight, 40, 60) && finite(person.adultHeight, 145, 205) && (person.growthAnchor === null || person.growthAnchor && Number.isInteger(person.growthAnchor.age) && finite(person.growthAnchor.age, 0, person.age) && finite(person.growthAnchor.height, 40, 210));
+    const validAdultHeight = person => version >= 9 ? (person.adultHeight === null && person.age < (person.maturityAge ?? 18) || finite(person.adultHeight, 40, 240)) : finite(person.adultHeight, 145, 205);
+    const validGrowth = person => ['male','female'].includes(person.growthSex) && Number.isInteger(person.maturityAge) && finite(person.maturityAge, 14, 18) && finite(person.birthHeight, 40, 60) && validAdultHeight(person) && (version < 9 || finite(person.growthFactor, .8, 1.2)) && (person.growthAnchor === null || person.growthAnchor && Number.isInteger(person.growthAnchor.age) && finite(person.growthAnchor.age, 0, person.age) && finite(person.growthAnchor.height, 40, 210));
     const validDeath = person => person.death === undefined || person.death === null || person.alive === false && ['disease', 'accident'].includes(person.death.cause) && person.death.age === person.age;
-    const validPerson = person => person && text(person.id, 100) && text(person.name, 50) && Number.isInteger(person.age) && finite(person.age, 0, version >= 7 ? 200 : 120) && finite(person.height, 40, 210) && validStats(person.stats) && validAptitudes(person.aptitudes) && (version === 1 || validLifestyle(person.lifestyle)) && (person.adopted === undefined || typeof person.adopted === 'boolean') && (version < 5 || validIdentity(person)) && (version < 6 || text(person.familyName, 30) && normalizeSurname(person.familyName) === person.familyName) && (version < 7 || validDeath(person));
+    const validPerson = person => person && text(person.id, 100) && text(person.name, 50) && Number.isInteger(person.age) && finite(person.age, 0, version >= 7 ? 200 : 120) && finite(person.height, 40, version >= 9 ? 240 : 210) && validStats(person.stats) && validAptitudes(person.aptitudes) && (version === 1 || validLifestyle(person.lifestyle)) && (person.adopted === undefined || typeof person.adopted === 'boolean') && (version < 5 || validIdentity(person)) && (version < 6 || text(person.familyName, 30) && normalizeSurname(person.familyName) === person.familyName) && (version < 7 || validDeath(person));
     if (!validPerson(raw) || raw.age > 85 || !Number.isInteger(raw.generation) || !finite(raw.generation, 1, 100000)) return false;
     if (version >= 8 && (!validGrowth(raw) || ![...raw.parents, ...raw.children, ...raw.siblings, ...raw.lineage, raw.partner, ...raw.encounters, raw.pregnancy?.otherParent].filter(Boolean).every(person => (['growthSex','maturityAge','birthHeight','growthAnchor'].every(key => person[key] === undefined) || validGrowth(person)) && (person.parentRole === undefined || ['mom','dad','parent'].includes(person.parentRole))))) return false;
     if (![raw.seed, raw.rng, raw.nextId].every(value => Number.isInteger(value) && finite(value, 0, Number.MAX_SAFE_INTEGER))) return false;
-    if (!finite(raw.height, 40, 210) || !finite(raw.adultHeight, 145, 205)) return false;
+    if (!finite(raw.height, 40, version >= 9 ? 240 : 210) || !validAdultHeight(raw)) return false;
     if (!raw.focus || Object.keys(raw.focus).length !== 4 || !FOCUS_KEYS.every(key => Number.isInteger(raw.focus[key]) && finite(raw.focus[key], 0, 5)) || FOCUS_KEYS.reduce((sum, key) => sum + raw.focus[key], 0) > 12) return false;
     if (!['cry', 'quiet'].includes(raw.babyChoice) || ![raw.ended, raw.needsSuccession].every(value => typeof value === 'boolean')) return false;
     const validLivingAge = person => typeof person.alive === 'boolean' && (version >= 7 || person.age <= 85 && (!person.alive || person.age < 85));
@@ -814,18 +860,20 @@ function validSchema(raw, version) {
       if (raw.alive ? raw.death !== null : !raw.death || !raw.needsSuccession || raw.pendingEvents.length || raw.pregnancy) return false;
       const validDelta = value => value && finite(value.before, 1, 10) && finite(value.after, 1, 10) && finite(value.change, -9, 9) && Math.abs(round(value.after - value.before) - value.change) < .001;
       const summary = raw.yearSummary;
-      if (summary !== null && (!summary || typeof summary.dismissed !== 'boolean' || summary.toAge !== raw.age || summary.fromAge !== raw.age - 1 || !summary.stats || Object.keys(summary.stats).length !== STAT_KEYS.length || !STAT_KEYS.every(key => validDelta(summary.stats[key])) || !validDelta(summary.lifestyle) || !Array.isArray(summary.parents) || summary.parents.length > 2 || !summary.parents.every(parent => text(parent.id, 100) && text(parent.name, 50) && validDelta(parent.stability) && validDelta(parent.relationship)) || !Array.isArray(summary.events) || summary.events.length > 30 || !summary.events.every(event => text(event.title, 200) && text(event.text, 2000) && text(event.kind, 50)))) return false;
+      if (summary?.height !== undefined && (!finite(summary.height.before, 40, 240) || !finite(summary.height.after, 40, 240) || !finite(summary.height.change, 0, 200) || Math.abs(round(summary.height.after - summary.height.before) - summary.height.change) > .001)) return false;
+      if (summary !== null && (!summary || typeof summary.dismissed !== 'boolean' || summary.toAge !== raw.age || summary.fromAge !== raw.age - 1 || !summary.stats || Object.keys(summary.stats).length !== STAT_KEYS.length || !STAT_KEYS.every(key => validDelta(summary.stats[key])) || !validDelta(summary.lifestyle) || !Array.isArray(summary.parents) || summary.parents.length > 2 || !summary.parents.every(parent => text(parent.id, 100) && text(parent.name, 50) && validDelta(parent.stability) && validDelta(parent.relationship) && (parent.lifestyle === undefined || validDelta(parent.lifestyle))) || !Array.isArray(summary.events) || summary.events.length > 30 || !summary.events.every(event => text(event.title, 200) && text(event.text, 2000) && text(event.kind, 50)))) return false;
     }
     if (!Array.isArray(raw.parents) || raw.parents.length > 2 || !raw.parents.every(person => validPerson(person) && validLivingAge(person) && (!person.alive || person.age > raw.age))) return false;
     if (version >= 7 && !raw.parents.every(person => finite(person.relationship, 1, 10))) return false;
-    if (!Array.isArray(raw.children) || raw.children.length > 6 || !raw.children.every(child => validPerson(child) && validLivingAge(child) && child.age < raw.age && finite(child.height, 40, 210) && finite(child.adultHeight, 145, 205) && finite(child.money, 0, 1e15))) return false;
+    if (version >= 9 && !raw.parents.every(person => person.career && Number.isInteger(person.career.focus) && finite(person.career.focus, 0, 5) && ['employed','unemployed','retired'].includes(person.career.status) && finite(person.career.progress, 1, 10) && Number.isInteger(person.career.years) && finite(person.career.years, 0, 200))) return false;
+    if (!Array.isArray(raw.children) || raw.children.length > 6 || !raw.children.every(child => validPerson(child) && validLivingAge(child) && child.age < raw.age && finite(child.height, 40, version >= 9 ? 240 : 210) && validAdultHeight(child) && finite(child.money, 0, 1e15))) return false;
     if (version >= 7 && ![...raw.children, ...(raw.siblings || [])].every(person => person.parentIds === undefined || Array.isArray(person.parentIds) && person.parentIds.length >= 1 && person.parentIds.length <= 2 && new Set(person.parentIds).size === person.parentIds.length && person.parentIds.every(id => text(id, 100) && id !== person.id))) return false;
-    if (!Array.isArray(raw.siblings) || !raw.siblings.every(person => validPerson(person) && validLivingAge(person) && finite(person.adultHeight, 145, 205) && finite(person.money, 0, 1e15))) return false;
+    if (!Array.isArray(raw.siblings) || !raw.siblings.every(person => validPerson(person) && validLivingAge(person) && validAdultHeight(person) && finite(person.money, 0, 1e15))) return false;
     const familyIds = [raw.id, ...raw.parents.map(person => person.id), ...raw.children.map(person => person.id), ...raw.siblings.map(person => person.id)];
     if (new Set(familyIds).size !== familyIds.length) return false;
     if (version >= 5) {
       if (![...raw.children, ...raw.siblings].every(person => finite(person.relationship, 1, 10))) return false;
-      const validAdult = person => validPerson(person) && person.age >= 18 && validLivingAge(person) && finite(person.adultHeight, 145, 205);
+      const validAdult = person => validPerson(person) && person.age >= 18 && validLivingAge(person) && validAdultHeight(person);
       const partner = raw.partner;
       if (partner !== null && (!validAdult(partner) || raw.age < 18 || !finite(partner.relationship, 1, 10) || !Number.isInteger(partner.yearsTogether) || !finite(partner.yearsTogether, 0, 100) || typeof partner.married !== 'boolean' || !Number.isInteger(partner.lastProposalAge) || !finite(partner.lastProposalAge, -1, raw.age) || familyIds.includes(partner.id))) return false;
       if (!Number.isInteger(raw.encounterYear) || !finite(raw.encounterYear, 0, raw.age) || !Array.isArray(raw.encounters) || raw.encounters.length > 5) return false;
@@ -883,12 +931,12 @@ function validSchema(raw, version) {
   } catch { return false; }
 }
 
-export function validateSave(raw) { return validSchema(raw, 8); }
+export function validateSave(raw) { return validSchema(raw, 9); }
 
 export function migrateSave(raw) {
   try {
     if (validateSave(raw)) return clone(raw);
-    if (![1, 2, 3, 4, 5, 6, 7].some(version => validSchema(raw, version))) return null;
+    if (![1, 2, 3, 4, 5, 6, 7, 8].some(version => validSchema(raw, version))) return null;
     const state = clone(raw);
     if (state.version === 1) {
       const convertStats = person => {
@@ -940,22 +988,36 @@ export function migrateSave(raw) {
     const people = [state, ...state.parents, ...state.children, ...state.siblings, ...state.lineage, state.partner, ...state.encounters, state.pregnancy?.otherParent].filter(Boolean);
     for (const person of people) {
       ensureGrowth(person);
-      person.appearancePeakAge = appearanceDeclineAge(person);
-      if (person.age >= 18) person.adultHeight = clamp(person.height, 145, 205);
-      else {
-        // Older saves used an age-18 endpoint. Preserve that remaining growth
-        // for adolescents rather than forcing a large one-year catch-up.
-        if (person.age >= 12 && person.height < person.adultHeight) person.maturityAge = 18;
-        person.growthAnchor = { age: person.age, height: person.height };
+      if (state.version < 8) {
+        person.appearancePeakAge = appearanceDeclineAge(person);
+        if (person.age >= 12 && person.age < 18) person.maturityAge = 18;
+        if (person.age < 3 && person.stats.attractiveness < 3) {
+          const relatives = person === state ? state.parents : [state];
+          const center = relatives.length ? relatives.reduce((sum, p) => sum + p.stats.attractiveness, 0) / relatives.length : 5.5;
+          person.stats.attractiveness = round(clamp(center + ((personHash(person) % 1001) / 1000 - .5), 3, 9));
+        }
       }
-      if (person.age < 3 && person.stats.attractiveness < 3) {
-        const relatives = person === state ? state.parents : [state];
-        const center = relatives.length ? relatives.reduce((sum, p) => sum + p.stats.attractiveness, 0) / relatives.length : 5.5;
-        person.stats.attractiveness = round(clamp(center + ((personHash(person) % 1001) / 1000 - .5), 3, 9));
-      }
+      // Discard obsolete endpoints without changing a recorded measurement.
+      // Future height emerges solely from new yearly gains.
+      person.adultHeight = person.age >= person.maturityAge ? person.height : null;
+      person.growthAnchor = null;
+      delete person.heightGrowthLoss;
     }
-    state.parents.forEach(parent => { parent.parentRole ??= parent.gender === 'female' ? 'mom' : parent.gender === 'male' ? 'dad' : 'parent'; });
-    state.version = 8;
+    const names = new Set();
+    const recordedHousehold = householdLifestyle(state);
+    state.parents.forEach(parent => {
+      parent.parentRole ??= parent.gender === 'female' ? 'mom' : parent.gender === 'male' ? 'dad' : 'parent';
+      if (parent.alive !== false) parent.lifestyle = recordedHousehold;
+      parent.career ??= initialParentCareer(parent, 1 + personHash(parent) % 5);
+      if (names.has(parent.name.toLocaleLowerCase())) {
+        const pool = GENDER_NAMES[parent.gender] || FIRST_NAMES;
+        let index = personHash(parent) % pool.length;
+        while (names.has(`${pool[index]} ${parent.familyName}`.toLocaleLowerCase())) index = (index + 1) % pool.length;
+        parent.name = `${pool[index]} ${parent.familyName}`;
+      }
+      names.add(parent.name.toLocaleLowerCase());
+    });
+    state.version = 9;
     return validateSave(state) ? state : null;
   } catch { return null; }
 }

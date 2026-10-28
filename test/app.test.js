@@ -14,6 +14,140 @@ const originalGlobals = new Map(['document', 'window', 'localStorage', 'setTimeo
 const timers = new Set();
 let importId = 0;
 
+test('context help is a compact accessible dialog that returns focus without saving or advancing', async () => {
+  const ui = await mount(createGame({name:'Jamie Reed',seed:121}));
+  const original = ui.saved(), writes = ui.writes();
+  const trigger = ui.query('[data-topic="stats"]');
+  assert.equal(trigger.tagName,'BUTTON');
+  assert.equal(trigger.getAttribute('aria-label'),'About Your stats');
+  assert.equal(trigger.getAttribute('aria-haspopup'),'dialog');
+  trigger.focus();
+  ui.click('[data-topic="stats"]');
+  const dialog = ui.query('.help-popup[role="dialog"]');
+  assert.equal(dialog.getAttribute('aria-modal'),'true');
+  assert.equal(dialog.getAttribute('aria-describedby'),'topic-help-content');
+  assert.match(dialog.textContent,/start low at birth.*increase through childhood and practice/);
+  assert.match(dialog.textContent,/Attractiveness starts near its inherited adult value.*does not grow like a learned skill.*Tiny random changes/);
+  assert.equal(ui.document.activeElement,ui.query('.help-popup [data-action="close"]'));
+  assert.ok(ui.query('#app').hasAttribute('inert'));
+  ui.key('.help-popup [data-action="close"]','Escape');
+  assert.equal(ui.all('[role="dialog"]').length,0);
+  assert.equal(ui.document.activeElement,trigger);
+  assert.equal(ui.query('#app').hasAttribute('inert'),false);
+  ui.click('[data-topic="stats"]');
+  ui.click('.help-popup .modal-body');
+  assert.equal(ui.all('[role="dialog"]').length,1,'clicking the content keeps help open');
+  ui.click('.help-popup-backdrop');
+  assert.equal(ui.all('[role="dialog"]').length,0);
+  assert.equal(ui.document.activeElement,trigger);
+  ui.click('[data-topic="stats"]');
+  ui.click('.help-popup [data-action="close"]');
+  assert.equal(ui.document.activeElement,trigger);
+  assert.deepEqual(ui.saved(),original);
+  assert.equal(ui.writes(),writes,'reading or dismissing help must not write the save');
+});
+
+test('health, appearance, growth, crying, and household help contain the requested rules', async () => {
+  const ui = await mount(createGame({seed:121}));
+  const topics = [
+    ['health',/Poor health while growing reduces that year’s height gain.*Final height emerges.*never shrinks/],
+    ['height',/Final height is not predetermined.*yearly gains.*between ages 14 and 18.*percentile.*Poor health reduces that year’s height gain.*never shrinks/],
+    ['attractiveness',/Tiny random changes.*up or down each year.*after 30 for men and after 22 for women/],
+    ['cry',/1 to 5.*strengthens your relationship.*Harder crying has a larger effect/],
+    ['lifestyle',/Until 18.*parents.*focus can change each year.*losing a job/],
+  ];
+  for(const [topic,content] of topics) {
+    ui.click(`[data-topic="${topic}"]`);
+    assert.match(ui.query('.help-popup').textContent,content);
+    assertNoMoneyDisplay(ui.query('.help-popup'),`${topic} popup`);
+    ui.click('.help-popup [data-action="close"]');
+  }
+});
+
+test('mechanics explanations live in help across childhood, college, and adult routes', async () => {
+  const child=createGame({seed:123});
+  const college=ageTo(createGame({seed:124}),18);chooseEducation(college,'college');
+  const adult=partnerFixture();
+  for(const fixture of [child,college,adult]) {
+    const ui=await mount(fixture);
+    for(const tab of ['year','career','family','character']) {
+      ui.click(`.nav-list [data-tab="${tab}"]`);
+      assert.ok(ui.all('#main-content [data-action="topic-help"]').length,`${tab} needs contextual help`);
+      assert.equal(ui.all('#app .form-note, #app .trait-legend, #app .forecast-legend, #app .character-guide, #app .profile-affinity-note, #app .focus-copy p, #app .job-description').length,0);
+      assert.doesNotMatch(ui.query('#app').textContent,/Higher is calmer|College focus builds|Family focus strengthens|Attractiveness, social ability, and lifestyle shape|Small −3 to \+3 ratings|\bbonds?\b/i);
+      for(const button of ui.all('#main-content [data-action="topic-help"]')) {
+        assert.equal(button.tagName,'BUTTON');
+        assert.match(button.getAttribute('aria-label'),/^About .+/);
+        assert.equal(button.getAttribute('aria-haspopup'),'dialog');
+      }
+    }
+  }
+});
+
+test('parent profiles show career focus and employment without internal career progress', async () => {
+  const fixture=createGame({seed:121});
+  fixture.parents[0].career={...fixture.parents[0].career,focus:5,status:'unemployed',progress:3.1415926};
+  fixture.parents[1].career={...fixture.parents[1].career,focus:2,status:'retired',progress:6.2831853};
+  const ui=await mount(fixture);
+  ui.click('.nav-list [data-tab="family"]');
+  const [mom,dad]=ui.all('.roots-panel .parent-career');
+  assert.match(mom.textContent,/Career focus\? 5\/5.*Unemployed/);
+  assert.match(dad.textContent,/Career focus\? 2\/5.*Retired/);
+  assert.doesNotMatch(ui.query('.roots-panel').textContent,/3\.1415926|6\.2831853/);
+  ui.click('.roots-panel [data-topic="parent-career"]');
+  assert.match(ui.query('.help-popup').textContent,/change a little each year.*Job loss, unemployment, recovery, and retirement/);
+  assertNoMoneyDisplay(ui.query('.help-popup'),'parent career help');
+});
+
+test('opening help while a decision is pending preserves the choice and accurate previews', async () => {
+  const fixture=pendingFixture(1);
+  const ui=await mount(fixture);
+  const saved=ui.saved(), writes=ui.writes();
+  const before=ui.query('.event-choices').textContent;
+  assert.match(before,/\d\.\d → \d\.\d/);
+  assert.doesNotMatch(before,/[+−-]\d/);
+  ui.click('[data-topic="stats"]');
+  ui.key('.help-popup [data-action="close"]','Escape');
+  assert.equal(ui.query('.event-choices').textContent,before);
+  assert.deepEqual(ui.saved(),saved);
+  assert.equal(ui.writes(),writes);
+  assert.equal(ui.all('[data-action="advance"]').length,0);
+});
+
+test('parent lifestyle recaps show before and after while older summaries remain readable', async () => {
+  const fixture=ageTo(createGame({seed:121}),1);
+  fixture.yearSummary.dismissed=false;
+  fixture.yearSummary.parents[0].lifestyle={before:6,after:5,change:-1};
+  delete fixture.yearSummary.parents[1].lifestyle;
+  const ui=await mount(fixture);
+  assert.equal(ui.all('.parent-review-lifestyle').length,1);
+  assert.equal(ui.query('.parent-review-lifestyle').textContent,'Lifestyle 6.0 → 5.0');
+  assert.match(ui.query('.forecast-parents').textContent,/Mental stability.*Relationship.*Lifestyle/);
+  assert.doesNotMatch(ui.query('.forecast-parents').textContent,/undefined|NaN|[+−-]\d/);
+  assert.deepEqual(ui.saved().yearSummary,fixture.yearSummary);
+});
+
+test('legacy journal and review text hides signed changes and tutorial suffixes without rewriting history', async () => {
+  const fixture=ageTo(createGame({seed:121}),1);
+  fixture.history[0].title='A closer bond';
+  fixture.history[0].text='A visit goes well. Bond +0.4; Social ability +.25; stability -0.1; Health −0.2; Instability +0.3. Lifestyle 6.0 → 5.0. Family focus will help their abilities grow, and your family legacy will be divided equally among your surviving children.';
+  fixture.yearSummary.dismissed=false;
+  fixture.yearSummary.events=[{title:fixture.history[0].title,text:fixture.history[0].text,kind:'family'}];
+  fixture.effects=[{id:'legacy-effect',name:'A stronger bond',description:'Bond +0.3; Stability -0.2.',years:2,modifiers:{stability:-.2},kind:'negative'}];
+  const ui=await mount(fixture);
+  const review=ui.query('.year-review-events').textContent;
+  assert.match(review,/A closer relationship.*relationship increased.*Social ability increased.*Mental stability decreased.*Health decreased.*Mental stability decreased.*Lifestyle 6\.0 → 5\.0/);
+  assert.doesNotMatch(review,/\bbonds?\b|instability|[+−-](?:\d|\.)|Family focus will help/i);
+  ui.click('.year-review-modal [data-action="close"]');
+  const journal=ui.query('.journal-list').textContent;
+  assert.match(journal,/A visit goes well/);
+  assert.doesNotMatch(journal,/\bbonds?\b|instability|[+−-](?:\d|\.)|Family focus will help/i);
+  ui.click('.nav-list [data-tab="character"]');
+  assert.match(ui.query('.effect-card').textContent,/A stronger relationship.*relationship increased.*Mental stability decreased/);
+  assert.deepEqual(ui.saved().history,fixture.history,'display normalization must preserve original saved history');
+  assert.deepEqual(ui.saved().effects,fixture.effects);
+});
+
 test('first launch requires a surname, capitalizes its first letter, and preserves multiword names', async () => {
   let ui=await mount(null);
   assert.equal(ui.storage.has(SAVE_KEY),false,'an unnamed provisional life must not overwrite storage');
@@ -74,8 +208,11 @@ test('cry levels update colored stat forecasts without numeric deltas or consumi
   assert.equal(ui.all('.forecast-panel .year-change').length,0);
   assert.equal(Number(ui.query('.forecast-panel [data-stat="intelligence"] strong').textContent),Number(initial.stats.intelligence.toFixed(1)));
   assert.match(ui.query('.forecast-panel [data-stat="intelligence"] [role="meter"]').getAttribute('aria-valuetext'),/expected to increase/);
-  assert.match(ui.query('.forecast-panel').textContent,/Expected increase.*Expected decrease/);
-  assert.match(ui.query('.forecast-panel').textContent,/Growth varies each year/);
+  assert.doesNotMatch(ui.query('.forecast-panel').textContent,/expected increase|expected decrease|Growth varies each year/i);
+  ui.click('.forecast-panel [data-topic="forecast"]');
+  assert.match(ui.query('.help-popup').textContent,/Green: expected increase.*Red: expected decrease/);
+  assert.match(ui.query('.help-popup').textContent,/Actual changes vary/);
+  ui.click('.help-popup [data-action="close"]');
   assert.equal(ui.saved().rng,initial.rng);
   assert.equal(ui.saved().age,initial.age);
   assert.equal(ui.saved().cryLevel,5);
@@ -96,7 +233,8 @@ test('gender is visible next to the name and height percentiles end at individua
     ui=await mount(grown);
     ui.click('.nav-list [data-tab="character"]');
     assert.equal(ui.query('.height-vital .height-percentile').textContent,'Adult height');
-    assert.match(ui.query('.character-guide').textContent,/reached your adult height/);
+    ui.click('.height-vital [data-topic="height"]');
+    assert.match(ui.query('.help-popup').textContent,/reached adult height/);
   }
 });
 
@@ -123,8 +261,15 @@ test('new-year review shows actual changes, survives reload, and dismisses persi
   assert.equal(ui.all('.year-review-modal').length,1);
   assert.match(ui.query('.year-review-intro').textContent,/age 0 to 1/);
   for(const [key,delta] of Object.entries(advanced.yearSummary.stats)) {
-    assert.equal(Number(ui.query(`.year-review-modal [data-stat="${key}"] strong`).textContent),delta.change);
+    const digits=delta.before!==delta.after && delta.before.toFixed(1)===delta.after.toFixed(1)?2:1;
+    assert.equal(ui.query(`.year-review-modal [data-stat="${key}"] strong`).textContent,`${delta.before.toFixed(digits)} → ${delta.after.toFixed(digits)}`);
   }
+  const height=advanced.yearSummary.height;
+  assert.equal(ui.query('.year-review-modal [data-stat="height"] > span').textContent,'Height');
+  assert.equal(ui.query('.year-review-modal [data-stat="height"] strong').textContent,`${height.before.toFixed(1)} → ${height.after.toFixed(1)} cm`);
+  assert.doesNotMatch(ui.query('.year-changes').textContent,/[+−-]\d/);
+  assert.doesNotMatch(ui.query('.forecast-parents').textContent,/\bbond\b|[+−-]\d/i);
+  assert.match(ui.query('.forecast-parents').textContent,/Mental stability [\d.]+ → [\d.]+.*Relationship [\d.]+ → [\d.]+/);
   assertNoMoneyDisplay(ui.query('.year-review-modal'),'year in review');
   assert.ok(ui.query('#app').hasAttribute('inert'));
   ui=await mount(advanced);
@@ -138,6 +283,17 @@ test('new-year review shows actual changes, survives reload, and dismisses persi
   ui=await mount(dismissed);
   assert.equal(ui.all('.year-review-modal').length,0);
   assert.deepEqual(ui.saved(),dismissed);
+  for(const [after,expected] of [[4.33,'4.32 → 4.33'],[4.36,'4.3 → 4.4']]) {
+    const older=structuredClone(advanced);
+    delete older.yearSummary.height;
+    older.yearSummary.stats.intelligence={before:4.32,after,change:Math.round((after-4.32)*100)/100};
+    older.yearSummary.parents[0].stability={before:8.12,after:8.13,change:.01};
+    ui=await mount(older);
+    assert.equal(ui.all('.year-review-modal [data-stat="height"]').length,0,'old reviews have no invented height history');
+    assert.equal(ui.query('.year-review-modal [data-stat="intelligence"] strong').textContent,expected);
+    assert.match(ui.query('.forecast-parents').textContent,/Mental stability 8\.12 → 8\.13/);
+    assert.deepEqual(ui.saved(),older);
+  }
 });
 
 test('a death before retirement opens a playable next chapter', async () => {
@@ -438,7 +594,7 @@ function assertCareerOffers(ui, count) {
   for (const card of cards) {
     const job = JOBS.find(candidate => candidate.id === card.dataset.jobId);
     assert.ok(job, 'every offered career belongs to the catalog');
-    assert.equal(card.querySelector('h3').textContent.trim(), job.name);
+    assert.equal(card.querySelector('h3 .label-with-help').firstChild.textContent, job.name);
     const lifestyle = card.querySelector('.job-lifestyle');
     assert.ok(lifestyle, 'every role must show its lifestyle, including the selected role');
     assert.match(lifestyle.textContent, new RegExp(`${job.baseLifestyle}\\s*\\/\\s*10`));
@@ -470,6 +626,8 @@ function legacySave(state) {
   delete legacy.pendingEvents;
   delete legacy.lastYearEvents;
   for (const person of [legacy, ...legacy.parents, ...legacy.children, ...legacy.siblings, ...legacy.lineage]) {
+    // Historical saves kept a numeric adult endpoint, including for children.
+    person.adultHeight=Math.max(145,Math.min(205,person.adultHeight ?? 175));
     person.stats.discipline = 5;
     person.stats.relaxation = 7;
     person.aptitudes.discipline = 0;
@@ -491,13 +649,19 @@ async function mount(initial = createGame({ name: 'Jamie Reed', seed: 121 })) {
   for (const timer of timers) nativeClearTimeout(timer);
   timers.clear();
   const { document, window } = parseHTML(html);
+  // LinkeDOM does not track focus; model that DOM behavior so modal focus
+  // placement and return can be tested without driving a desktop browser.
+  let focused = document.body;
+  Object.defineProperty(document, 'activeElement', { configurable: true, get: () => focused });
+  window.HTMLElement.prototype.focus = function () { focused = this; };
   const storage = new Map(initial === null ? [] : [[SAVE_KEY, typeof initial === 'string' ? initial : JSON.stringify(initial)]]);
+  let saveWrites = 0;
   Object.assign(globalThis, {
     document,
     window,
     localStorage: {
       getItem: key => storage.get(key) ?? null,
-      setItem: (key, value) => storage.set(key, String(value)),
+      setItem: (key, value) => { saveWrites++; storage.set(key, String(value)); },
       removeItem: key => storage.delete(key),
     },
     setTimeout: (...args) => {
@@ -516,6 +680,7 @@ async function mount(initial = createGame({ name: 'Jamie Reed', seed: 121 })) {
   return {
     document,
     storage,
+    writes: () => saveWrites,
     query,
     all: selector => [...document.querySelectorAll(selector)],
     saved: () => JSON.parse(storage.get(SAVE_KEY)),
@@ -734,7 +899,8 @@ describe('Dating and family DOM integration', {concurrency:false},()=>{
     const ui=await mount(fixture);
     assert.equal(ui.query('.event-decision').dataset.subjectId,fixture.partner.id);
     assert.match(ui.query('.event-decision').textContent,new RegExp(fixture.partner.name));
-    assert.match(ui.query('[data-choice="listen"] .event-consequences').textContent,/Bond.*\+0\.6/);
+    assert.match(ui.query('[data-choice="listen"] .event-consequences').textContent,/Relationship.*5\.0 → 5\.6/);
+    assert.doesNotMatch(ui.query('[data-choice="listen"] .event-consequences').textContent,/\bbond\b|[+−-]\d/i);
     ui.click('[data-action="event-choice"][data-choice="listen"]');
     assert.equal(ui.saved().stats.social,5.2);
     assert.equal(ui.saved().partner.stats.social,5.2);
@@ -883,18 +1049,21 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
 
   test('a child shares the displayed parental lifestyle until adulthood', async () => {
     const fixture = createGame({ name: 'Robin Park', seed: 211 });
-    const parentLifestyle = fixture.parents[0].lifestyle;
-    assert.ok(Number.isInteger(parentLifestyle) && parentLifestyle >= 1 && parentLifestyle <= 10);
-    assert.ok(fixture.parents.every(parent => parent.lifestyle === parentLifestyle));
+    const initialLifestyle = fixture.parents[0].lifestyle;
+    assert.ok(Number.isInteger(initialLifestyle) && initialLifestyle >= 1 && initialLifestyle <= 10);
+    assert.ok(fixture.parents.every(parent => parent.lifestyle === initialLifestyle));
     const ui = await mount(fixture);
     for (let age = 0; age < 18; age += 1) {
-      assert.equal(ui.saved().age, age);
-      assert.equal(ui.saved().lifestyle, parentLifestyle);
+      const saved=ui.saved();
+      const parentLifestyle=(saved.parents.find(parent=>parent.alive!==false) || saved.parents[0]).lifestyle;
+      assert.equal(saved.age, age);
+      assert.equal(saved.lifestyle, parentLifestyle);
       assert.match(ui.query('.status-strip').textContent, new RegExp(`Lifestyle\\s*${parentLifestyle}\\s*\\/\\s*10`));
       if (age === 0 || age === 17) {
         ui.click('.nav-list [data-tab="family"]');
-        for (const card of ui.all('.family-card')) {
-          assert.match(card.textContent, new RegExp(`Lifestyle[\\s\\S]{0,20}${parentLifestyle}\\s*\\/\\s*10`, 'i'));
+        for (const card of ui.all('.roots-panel .family-card')) {
+          const parent=saved.parents.find(parent=>parent.id===card.dataset.personId);
+          assert.match(card.textContent, new RegExp(`Lifestyle[\\s\\S]{0,20}${parent.lifestyle}\\s*\\/\\s*10`, 'i'));
         }
         ui.click('.nav-list [data-tab="year"]');
       }
@@ -915,9 +1084,12 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
       assert.doesNotMatch(ui.query('#app').textContent, /instability/i, `${tab} must use the positive stability scale`);
       assert.match(ui.query('.status-strip').textContent, /Mental stability\s*[\d.]+\s*\/\s*10/);
     }
-    assert.match(ui.query('.effect-card.negative').textContent, /[Ss]tability\s*-1\.2/);
-    assert.match(ui.query('.vitals-grid').textContent, /Higher is calmer/);
-    assert.match(ui.query('.character-guide').textContent, /affinity/i);
+    assert.match(ui.query('.effect-card.negative').textContent, /Mental stability\s*[\d.]+/);
+    assert.doesNotMatch(ui.query('.effect-card.negative').textContent, /[+−-]\d/);
+    assert.doesNotMatch(ui.query('.vitals-grid').textContent, /Higher is calmer/);
+    ui.click('.vitals-grid [data-topic="stability"]');
+    assert.match(ui.query('.help-popup').textContent, /Higher means calmer/);
+    ui.click('.help-popup [data-action="close"]');
     ui.click('[data-action="menu"]');
     ui.click('.menu-list [data-action="help"]');
     assert.doesNotMatch(ui.query('.modal-body').textContent, /instability/i);
@@ -1134,6 +1306,8 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     const legacy = structuredClone(fixture);
     legacy.version = 2;
     for (const person of [legacy, ...legacy.parents, ...legacy.children, ...legacy.siblings, ...legacy.lineage]) {
+    // Historical saves kept a numeric adult endpoint, including for children.
+    person.adultHeight=Math.max(145,Math.min(205,person.adultHeight ?? 175));
       person.stats.discipline=5; person.stats.relaxation=7; person.aptitudes.discipline=0;
     }
     delete legacy.pendingEvents; delete legacy.lastYearEvents;

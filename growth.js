@@ -50,85 +50,57 @@ export function heightReference(age, growthSex = 'male') {
   return { L, M, S, median: M, sd: M * S };
 }
 
-function curveProgress(age, maturityAge, growthSex) {
+// Population medians supply age-specific increments, never personal targets.
+// Shift pubertal timing after age 8 while preserving infant/childhood growth.
+// The source population grows slightly past our playable maturity ages, so its
+// small adult median remainder is spread across the last three reference years.
+export function populationMedianAt(age, maturityAge = 17, growthSex = 'male') {
   const maturity = clamp(maturityAge, 14, 18);
-  if (age >= maturity) return 1;
-  if (age <= 0) return 0;
-  // Shift pubertal timing after age 8, leaving rapid infant growth intact.
-  // The completion ages and time warp are gameplay variation; CDC describes
-  // population cross-sections, not an individual's predicted growth path.
+  const birthMedian = heightReference(0, growthSex).median;
+  const adultMedian = heightReference(20, growthSex).median;
+  if (age <= 0) return birthMedian;
+  if (age >= maturity) return adultMedian;
   const referenceMaturity = sexOf(growthSex) === 'female' ? 15 : 17;
-  const referenceAge = age <= 8 ? age : 8 + (age - 8) * (referenceMaturity - 8) / (maturity - 8);
-  const birth = heightReference(0, growthSex).median;
-  const final = heightReference(referenceMaturity, growthSex).median;
-  return clamp((heightReference(referenceAge, growthSex).median - birth) / (final - birth), 0, 1);
-}
-
-export function growthHeightAt(age, adultHeight, maturityAge = 17, growthSex = 'male', birthHeight = 50, growthAnchor = null) {
-  const progress = curveProgress(age, maturityAge, growthSex);
-  if (growthAnchor && Number.isFinite(growthAnchor.age) && Number.isFinite(growthAnchor.height)) {
-    // A migration anchor preserves the saved measurement. Only the remaining
-    // growth is fitted to the curve, so loading never changes height or RNG.
-    if (age <= growthAnchor.age) return growthAnchor.height;
-    const start = curveProgress(growthAnchor.age, maturityAge, growthSex);
-    const remaining = start >= 1 ? 1 : clamp((progress - start) / (1 - start), 0, 1);
-    return round(growthAnchor.height + Math.max(0, adultHeight - growthAnchor.height) * remaining);
-  }
-  if (age >= maturityAge) return adultHeight;
-  if (age <= 0) return birthHeight;
-  // Match childhood dispersion to the reference LMS scale rather than scaling
-  // every centimetre of growth by adult size (which makes children too similar).
-  // Birth and adult size can differ: blend their z-scores through age 3, with
-  // variance normalization so the transition does not collapse the population.
-  const birth = heightReference(0, growthSex);
-  const adult = heightReference(20, growthSex);
-  const birthZ = (birthHeight - birth.median) / birth.sd;
-  const adultZ = (adultHeight - adult.median) / adult.sd;
-  const referenceMaturity = sexOf(growthSex) === 'female' ? 15 : 17;
-  const lastReference = heightReference(referenceMaturity, growthSex);
-  const smooth = x => { const t = clamp(x, 0, 1); return t * t * (3 - 2 * t); };
+  const remainder = adultMedian - heightReference(referenceMaturity, growthSex).median;
   const atBirthday = year => {
-    const referenceAge = year <= 8 ? year : 8 + (year - 8) * (referenceMaturity - 8) / (maturityAge - 8);
-    const ref = heightReference(referenceAge, growthSex);
-    const finish = smooth((referenceAge - referenceMaturity + 3) / 3);
-    // The source population still grows a little beyond our playable maturity
-    // ages. Fold that small median/SD remainder into the last three years.
-    const median = ref.median + (adult.median - lastReference.median) * finish;
-    const sd = ref.sd + (adult.sd - lastReference.sd) * finish;
-    const t = smooth(year / 3);
-    const z = ((1 - t) * birthZ + t * adultZ) / Math.sqrt((1 - t) ** 2 + t ** 2);
-    return median + sd * z;
+    const referenceAge = year <= 8 ? year : 8 + (year - 8) * (referenceMaturity - 8) / (maturity - 8);
+    const t = clamp((referenceAge - referenceMaturity + 3) / 3, 0, 1);
+    const finish = t * t * (3 - 2 * t);
+    return heightReference(referenceAge, growthSex).median + remainder * finish;
   };
-  // Catch-down growth for very different birth/adult z-scores can otherwise
-  // imply a shorter next measurement. Keep annual knots monotone and bounded.
-  let previous = birthHeight;
-  for (let year = 1; year <= Math.ceil(age); year++) {
-    const next = year >= maturityAge ? adultHeight : clamp(atBirthday(year), previous, Math.max(previous, adultHeight - .01));
-    if (year >= age) return round(previous + (next - previous) * (age - year + 1));
-    previous = next;
-  }
-  return round(previous);
+  const low = Math.floor(age), high = Math.ceil(age);
+  return round(atBirthday(low) + (atBirthday(high) - atBirthday(low)) * (age - low));
 }
 
 // The engine supplies a seeded standard-normal residual; previews supply zero.
-// Individual birth height, adult target and maturity account for most variation.
-// Small annual residuals are a game approximation, not measured growth-velocity
-// SDs. A bridge gently fades previous deviations toward the fixed adult target.
-export function advanceHeight(person, normalDraw = 0) {
+// Each year contributes an independent increment around the population age
+// curve. Persistent growthFactor represents genetics, not an adult-height goal.
+// Neither current height nor a legacy adultHeight target changes future gains.
+// Annual residual SDs are gameplay variation, not measured velocity estimates.
+// Poor nutrition and repeated/chronic illness can impair linear growth:
+// https://www.who.int/news/item/19-11-2015-stunting-in-a-nutshell
+// Health 7+ leaves the reference curve unchanged. Below that, up to 15% of a
+// year's potential gain is lost at health 1. That mapping is game calibration,
+// not a medical estimate. Recovery changes future gains, never repays missed
+// growth. Actual adult height emerges from all the yearly gains and freezes at
+// individual maturity; there is no personal endpoint or maturity catch-up.
+export function advanceGrowth(person, normalDraw = 0) {
   const maturity = person.maturityAge ?? (person.growthSex === 'female' ? 15 : 17);
-  const target = Math.max(person.height, person.adultHeight ?? person.height);
-  if (person.age >= maturity) return person.height;
-  if (person.age + 1 >= maturity) return round(target);
-  const args = [target, maturity, person.growthSex, person.birthHeight ?? 50, person.growthAnchor];
-  const currentBase = growthHeightAt(person.age, ...args);
-  const nextBase = growthHeightAt(person.age + 1, ...args);
-  const remaining = Math.max(.001, target - currentBase);
-  const retainedDeviation = (person.height - currentBase) * (target - nextBase) / remaining;
-  const expected = nextBase + retainedDeviation;
-  const progress = curveProgress(person.age + 1, maturity, person.growthSex);
-  const annualSD = Math.min(.45, Math.max(.1, (nextBase - currentBase) * .08)) * Math.sqrt(1 - progress);
+  if (person.alive === false || person.age >= maturity) return { height: person.height };
+  const referenceGain = Math.max(0, populationMedianAt(person.age + 1, maturity, person.growthSex) - populationMedianAt(person.age, maturity, person.growthSex));
+  const genetics = Number.isFinite(person.growthFactor) ? clamp(person.growthFactor, .8, 1.2) : 1;
+  const expectedGain = referenceGain * genetics;
+  const annualSD = Math.min(1.6, Math.max(.2, expectedGain * .08));
   const residual = clamp(Number.isFinite(normalDraw) ? normalDraw : 0, -3, 3) * annualSD;
-  return round(clamp(expected + residual, person.height, Math.max(person.height, target - .01)));
+  const health = Number.isFinite(person.stats?.health) ? person.stats.health : 7;
+  const healthMultiplier = 1 - .15 * clamp((7 - health) / 6, 0, 1);
+  const gain = Math.max(0, expectedGain + residual) * healthMultiplier;
+  return { height: round(person.height + gain) };
+}
+
+// Compatibility for callers that need only a projected measurement.
+export function advanceHeight(person, normalDraw = 0) {
+  return advanceGrowth(person, normalDraw).height;
 }
 
 function normalCDF(z) {
