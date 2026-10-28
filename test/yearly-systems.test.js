@@ -111,12 +111,16 @@ test('annual forecasts are pure, include expiring effects, and match mean growth
   for (let seed = 1; seed <= 50 && !checked; seed++) {
     const state = createGame({ seed });
     state.effects = [{ id: 'baby_cold', name: 'A cold', description: 'Recovering', years: 1, modifiers: { health: -.6 }, kind: 'negative' }];
+    const withoutCold = clone(state);
+    withoutCold.effects = [];
+    const routine = annualForecast(withoutCold);
     const before = clone(state);
     const preview = annualForecast(state);
     assert.deepEqual(annualForecast(state), preview);
     assert.deepEqual(state, before, 'preview must not consume RNG or mutate any saved state');
-    assert.ok(preview.stats.health.change >= .6, 'recovery from expiring modifiers is included');
-    advanceYear(state, { ...survives, growthRandom: () => 0 });
+    assert.equal(preview.stats.health.after, routine.stats.health.after, 'the expired cold no longer changes final health');
+    assert.ok(Math.abs(preview.stats.health.change - routine.stats.health.change - .6) < .001, 'recovery is added to routine wellbeing drift');
+    advanceYear(state, { ...survives, growthRandom: () => 0, parentCareerRandom: () => 1 });
     if (state.lastYearEvents.length) continue;
     assert.deepEqual(state.yearSummary.stats, preview.stats);
     assert.deepEqual(state.yearSummary.parents, preview.parents);

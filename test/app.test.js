@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { afterEach, describe, test } from 'node:test';
 import { parseHTML } from 'linkedom';
-import { SKILLS, JOBS, EVENTS, resolveEventChoice, eventOdds, canTakeJob, chooseEducation, offeredJobs, needsEducationChoice, createGame, advanceYear, haveChild, takeJob, successionInfo, succeed, validateSave, respondToEncounter, proposeMarriage, effectiveStats, relationshipOdds, proposalChance } from '../engine.js';
+import { SKILLS, JOBS, EVENTS, resolveEventChoice, eventOdds, canTakeJob, chooseEducation, offeredJobs, needsEducationChoice, createGame, advanceYear, haveChild, takeJob, successionInfo, succeed, validateSave, respondToEncounter, proposeMarriage, effectiveStats, relationshipOdds, proposalChance, statPercentiles } from '../engine.js';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
@@ -52,7 +52,7 @@ test('health, appearance, growth, crying, and household help contain the request
   const ui = await mount(createGame({seed:121}));
   const topics = [
     ['health',/Poor health raises disease risk and reduces childhood height gains/],
-    ['height',/Final height emerges from yearly growth.*14–18.*Poor health reduces new growth, never existing height.*Percentile.*until growth ends/],
+    ['height',/Final height emerges from yearly growth.*14–18.*Poor health reduces new growth, never existing height/],
     ['attractiveness',/tiny random changes each year.*rather than gains from practice.*after 30 for men and 22 for women/],
     ['cry',/1–5.*builds skills and parent relationships.*harder crying strains their mental stability more/],
     ['lifestyle',/Until 18.*parents.*changing household lifestyle.*adult.*work, family, events and inheritance/],
@@ -224,9 +224,10 @@ test('cry levels update colored stat forecasts without numeric deltas or consumi
   assert.ok(ui.query('.roots-panel .relationship-meter .stat-projection.increase'));
 });
 
-test('gender is visible next to the name and height percentiles end at individual maturity', async () => {
+test('gender is visible next to the name and player height percentiles continue until eighteen', async () => {
   for(const gender of ['male','female','nonbinary']) {
     const baby=createGame({name:'Jamie Reed',seed:121,gender});
+    baby.maturityAge=16;
     let ui=await mount(baby);
     assert.equal(ui.query('.profile-name-row .person-name').textContent,baby.name);
     assert.equal(ui.query('.profile-name-row .gender-label').textContent,gender==='nonbinary'?'Nonbinary':gender[0].toUpperCase()+gender.slice(1));
@@ -234,10 +235,56 @@ test('gender is visible next to the name and height percentiles end at individua
     const grown=ageTo(baby,baby.maturityAge);
     ui=await mount(grown);
     ui.click('.nav-list [data-tab="character"]');
-    assert.equal(ui.query('.height-vital .height-percentile').textContent,'Adult height');
+    assert.match(ui.query('.height-vital .height-percentile').textContent,/percentile/);
+    assert.equal(ui.query('.height-vital .height-percentile').dataset.percentileKey,'height');
     ui.click('.height-vital [data-topic="height"]');
     assert.match(ui.query('.help-popup').textContent,/ending at 14–18/);
     assert.doesNotMatch(ui.query('.help-popup').textContent,/Current position|This person has reached/);
+    const adult=ageTo(grown,18);
+    chooseEducation(adult,'work');
+    ui=await mount(adult);
+    ui.click('.nav-list [data-tab="character"]');
+    assert.equal(ui.query('.height-vital .height-percentile').textContent,'Adult height');
+    assert.equal(ui.all('.stats-panel .stat-percentile').length,0);
+  }
+});
+
+test('all own stats show simulation percentiles before eighteen without changing current values or saves', async () => {
+  const keys=[...SKILLS.map(skill=>skill.key),'health','stability','lifestyle','height'];
+  const ordinal=value=>{
+    const rank=Math.round(value);
+    if(rank<1) return 'Below 1st percentile';
+    if(rank>99) return 'Above 99th percentile';
+    const suffix=rank%100>=11&&rank%100<=13?'th':({1:'st',2:'nd',3:'rd'}[rank%10]||'th');
+    return `${rank}${suffix} percentile`;
+  };
+  for(const age of [0,17,18]) {
+    const fixture=ageTo(createGame({seed:121}),age);
+    if(age===18) chooseEducation(fixture,'work');
+    const current=effectiveStats(fixture), percentiles=statPercentiles(fixture);
+    const ui=await mount(fixture), saved=ui.saved(), writes=ui.writes();
+    for(const tab of ['year','character','year']) {
+      ui.click(`.nav-list [data-tab="${tab}"]`);
+      assert.equal(ui.all('.stats-panel .stat-percentile').length,age<18?9:0);
+      for(const key of keys) {
+        const row=ui.query(`.stats-panel [data-stat="${key}"]`);
+        const value=row.querySelector('.stat-value, .vital-value');
+        assert.equal(parseFloat(value.textContent),Number((key==='height'?fixture.height:key==='lifestyle'?fixture.lifestyle:current[key]).toFixed(1)),`${key} keeps its current number`);
+        if(age<18) {
+          const label=row.querySelector(`[data-percentile-key="${key}"]`);
+          assert.ok(label,`${key} needs its own percentile`);
+          assert.equal(label.textContent,ordinal(percentiles[key].percentile));
+          assert.match(label.getAttribute('aria-label'),/percentile/);
+        }
+      }
+      if(age<18) {
+        ui.click('.stats-panel [data-topic="percentiles"]');
+        assert.match(ui.query('.help-popup').textContent,/Projected to 18 with your current focus.*simulated lives.*50th percentile is average: 5\/10 for rated stats.*Lifestyle compares households your age/);
+        ui.click('.help-popup [data-action="close"]');
+      } else assert.equal(ui.all('.stats-panel [data-topic="percentiles"]').length,0);
+    }
+    assert.deepEqual(ui.saved(),saved);
+    assert.equal(ui.writes(),writes,'refreshing percentile displays must not save or reroll');
   }
 });
 
@@ -307,6 +354,8 @@ test('a death before retirement opens a playable next chapter', async () => {
   const ui=await mount(fixture);
   ui.click('.year-review-modal [data-action="close"]');
   assert.match(ui.query('#main-content').textContent,/died at age 1/);
+  assert.equal(ui.all('.stats-panel .stat-percentile').length,0,'a closed life has no projected adulthood');
+  assert.doesNotMatch(ui.query('.height-vital').textContent,/Adult height/,'a baby’s final height is not adult height');
   ui.click('.bottom-dock .advance-button');
   assert.ok(ui.query('.beneficiary-preview'));
   ui.click('[data-action="heir"]');

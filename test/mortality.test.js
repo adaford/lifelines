@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { baselineAnnualMortality, mortalityRisk, rollMortality } from '../mortality.js';
 
-const person = (age, health = 7, stability = 7) => ({ age, alive: true, stats: { health, stability } });
+const person = (age, health = 5, stability = 5) => ({ age, alive: true, stats: { health, stability } });
 const close = (actual, expected, tolerance = 1e-12) => assert.ok(Math.abs(actual - expected) < tolerance, `${actual} should equal ${expected}`);
 function seededRandom(seed) {
   let state = seed >>> 0;
@@ -19,6 +19,7 @@ test('reference health reproduces observed annual rates across the lifespan', ()
   for (const [age, rate] of expected) {
     close(baselineAnnualMortality(age), rate);
     close(mortalityRisk(person(age)).total, rate);
+    close(mortalityRisk({ age, alive: true }).total, rate, 1e-12);
   }
   assert.ok(mortalityRisk(person(0)).total > mortalityRisk(person(1)).total);
   assert.ok(mortalityRisk(person(1)).total > mortalityRisk(person(10)).total);
@@ -33,17 +34,17 @@ test('health changes disease risk and stability has only a modest adult accident
     assert.ok(unwell.total > healthy.total);
     assert.ok(healthy.total > 0);
   }
-  const calm = mortalityRisk(person(30, 7, 10));
-  const stressed = mortalityRisk(person(30, 7, 1));
+  const calm = mortalityRisk(person(30, 5, 10));
+  const stressed = mortalityRisk(person(30, 5, 1));
   assert.ok(stressed.accident > calm.accident);
   assert.ok(stressed.accident / calm.accident < 1.4);
-  assert.deepEqual(mortalityRisk(person(0, 7, 1)), mortalityRisk(person(0, 7, 10)));
-  assert.deepEqual(mortalityRisk(person(12, 7, 1)), mortalityRisk(person(12, 7, 10)));
+  assert.deepEqual(mortalityRisk(person(0, 5, 1)), mortalityRisk(person(0, 5, 10)));
+  assert.deepEqual(mortalityRisk(person(12, 5, 1)), mortalityRisk(person(12, 5, 10)));
 });
 
 test('all risks are bounded and causes partition rather than duplicate annual mortality', () => {
   for (let age = 0; age <= 130; age++) {
-    for (const health of [1, 7, 10]) {
+    for (const health of [1, 5, 10]) {
       const risk = mortalityRisk(person(age, health, 1));
       assert.ok(risk.total > 0 && risk.total < 1);
       assert.ok(risk.disease > 0 && risk.accident > 0);

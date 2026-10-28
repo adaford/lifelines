@@ -132,8 +132,10 @@ test('annual development varies around the pure mean forecast and is reproducibl
   }
   assert.ok(gains.length > 60);
   assert.ok(new Set(gains).size > 6, 'ordinary gains vary even without a random event');
-  assert.ok(Math.abs(median(gains) - forecast.stats.intelligence.change) < .04);
-  assert.ok(standardDeviation(gains) > .025 && standardDeviation(gains) < .11);
+  const expectedGain = forecast.stats.intelligence.change;
+  assert.ok(Math.abs(median(gains) - expectedGain) < Math.max(.02, expectedGain * .15));
+  const relativeSpread = standardDeviation(gains) / expectedGain;
+  assert.ok(relativeSpread > .1 && relativeSpread < .3, 'annual variation stays modest relative to calibrated growth');
   assert.ok(standardDeviation(stressChanges) > .1);
 });
 

@@ -51,8 +51,8 @@ export function advanceParentCareer(person, { random = () => .5, normal = () => 
   if (career.status === 'retired') return { career, event: null };
   const draw = () => clamp(finite(random(), .5), 0, 1);
   const noise = () => clamp(finite(normal(), 0), -3, 3);
-  const health = clamp(finite(person.stats?.health, 7), 1, 10);
-  const stability = clamp(finite(person.stats?.stability, 7), 1, 10);
+  const health = clamp(finite(person.stats?.health, 5), 1, 10);
+  const stability = clamp(finite(person.stats?.stability, 5), 1, 10);
   const name = person.name || 'Your parent';
 
   if (career.status === 'unemployed') {
@@ -66,7 +66,7 @@ export function advanceParentCareer(person, { random = () => .5, normal = () => 
     return { career, event: null };
   }
 
-  const lossChance = clamp(.023 - .0015 * career.focus + .001 * (7 - health) + .001 * (7 - stability), .01, .03);
+  const lossChance = clamp(.023 - .0015 * career.focus + .001 * (5 - health) + .001 * (5 - stability), .01, .03);
   if (draw() < lossChance) {
     career.status = 'unemployed';
     career.progress = round(career.progress - 1 - draw());

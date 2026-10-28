@@ -48,7 +48,7 @@ test('actual yearly growth keeps childhood medians and approximate population sp
     for (let i = 0; i < 3000; i++) {
       const person = { age: 0, height: Math.round((birth.median + normal() * birth.sd) * 100) / 100, growthSex,
         growthFactor: Math.max(.8, Math.min(1.2, 1 + normal() * .054)),
-        maturityAge: Math.max(14, Math.min(18, Math.round((growthSex === 'female' ? 15 : 17) + normal() * .7))), stats: { health: 7 } };
+        maturityAge: Math.max(14, Math.min(18, Math.round((growthSex === 'female' ? 15 : 17) + normal() * .7))), stats: { health: 5 } };
       samples[0].push(person.height);
       while (person.age < 10) {
         Object.assign(person, advanceGrowth(person, normal())); person.age++;
@@ -73,7 +73,7 @@ test('actual yearly growth keeps childhood medians and approximate population sp
 
 test('annual gains never shrink height and stop at each maturity timing even at extreme draws', () => {
   for (const growthSex of ['male', 'female']) for (let maturityAge = 14; maturityAge <= 18; maturityAge++) {
-    for (const growthFactor of [.8, 1.2]) for (const health of [1, 7]) for (const draw of [-3, 3]) {
+    for (const growthFactor of [.8, 1.2]) for (const health of [1, 5]) for (const draw of [-3, 3]) {
       const person = { age: 0, height: 50, growthSex, maturityAge, growthFactor, stats: { health } };
       while (person.age <= 20) {
         const next = advanceGrowth(person, draw);
@@ -86,7 +86,7 @@ test('annual gains never shrink height and stop at each maturity timing even at 
 });
 
 test('annual growth is an independent gain with no personal endpoint or catch-up', () => {
-  const original = { age: 0, height: 50, adultHeight: 180, maturityAge: 17, birthHeight: 50, growthSex: 'male', growthFactor: 1, stats: { health: 7 } };
+  const original = { age: 0, height: 50, adultHeight: 180, maturityAge: 17, birthHeight: 50, growthSex: 'male', growthFactor: 1, stats: { health: 5 } };
   const before = structuredClone(original);
   assert.ok(advanceHeight(original, -1) < advanceHeight(original, 0));
   assert.ok(advanceHeight(original, 1) > advanceHeight(original, 0));
@@ -111,11 +111,12 @@ test('annual growth is an independent gain with no personal endpoint or catch-up
 });
 
 test('health and inherited growth factor influence each year without removing random variation', () => {
-  const person = { age: 0, height: 50, maturityAge: 17, growthSex: 'male', growthFactor: 1, stats: { health: 7 } };
+  const person = { age: 0, height: 50, maturityAge: 17, growthSex: 'male', growthFactor: 1, stats: { health: 5 } };
   const before = structuredClone(person);
   for (const draw of [-3, -1, 0, 1, 3]) {
     const reference = advanceGrowth({ ...person, stats: undefined }, draw);
-    assert.deepEqual(advanceGrowth(person, draw), reference);
+    assert.deepEqual(advanceGrowth(person, draw), reference, 'average health 5 has no growth penalty');
+    assert.deepEqual(advanceGrowth({ ...person, stats: { health: 7 } }, draw), reference);
     assert.deepEqual(advanceGrowth({ ...person, stats: { health: 10 } }, draw), reference);
     const moderate = advanceGrowth({ ...person, stats: { health: 4 } }, draw);
     const poor = advanceGrowth({ ...person, stats: { health: 1 } }, draw);
@@ -132,7 +133,7 @@ test('health and inherited growth factor influence each year without removing ra
 test('health affects the final growing year and attained height freezes at every maturity timing', () => {
   for (const growthSex of ['male', 'female']) for (let maturityAge = 14; maturityAge <= 18; maturityAge++) {
     const birthHeight = Math.round(heightReference(0, growthSex).median * 100) / 100;
-    const original = { age: 0, height: birthHeight, maturityAge, growthSex, growthFactor: 1, stats: { health: 7 } };
+    const original = { age: 0, height: birthHeight, maturityAge, growthSex, growthFactor: 1, stats: { health: 5 } };
     const healthy = structuredClone(original), moderate = structuredClone(original), poor = structuredClone(original);
     moderate.stats.health = 4; poor.stats.health = 1;
     while (healthy.age < maturityAge) {
@@ -157,18 +158,18 @@ test('health affects the final growing year and attained height freezes at every
 });
 
 test('recovered health and old targets never repay missed growth or alter saved height', () => {
-  const healthy = { age: 0, height: 50, maturityAge: 17, growthSex: 'male', growthFactor: 1, stats: { health: 7 } };
+  const healthy = { age: 0, height: 50, maturityAge: 17, growthSex: 'male', growthFactor: 1, stats: { health: 5 } };
   const recovered = structuredClone(healthy);
   recovered.stats.health = 1;
   let missedGrowth;
   while (healthy.age < 17) {
-    if (healthy.age === 3) { recovered.stats.health = 7; missedGrowth = healthy.height - recovered.height; }
+    if (healthy.age === 3) { recovered.stats.health = 5; missedGrowth = healthy.height - recovered.height; }
     const draw = [.7, -.4, .2][healthy.age % 3];
     Object.assign(healthy, advanceGrowth(healthy, draw)); healthy.age++;
     Object.assign(recovered, advanceGrowth(recovered, draw)); recovered.age++;
     if (missedGrowth !== undefined) assert.ok(Math.abs(healthy.height - recovered.height - missedGrowth) < .02);
   }
-  const migrated = { age: 10, height: 145, adultHeight: 205, growthAnchor: { age: 10, height: 145 }, maturityAge: 17, growthSex: 'male', growthFactor: 1, stats: { health: 7 } };
+  const migrated = { age: 10, height: 145, adultHeight: 205, growthAnchor: { age: 10, height: 145 }, maturityAge: 17, growthSex: 'male', growthFactor: 1, stats: { health: 5 } };
   const short = { ...migrated, height: 120, adultHeight: 150 };
   assert.ok(Math.abs((advanceHeight(migrated) - migrated.height) - (advanceHeight(short) - short.height)) < .001);
   assert.equal(migrated.height, 145);
@@ -184,7 +185,7 @@ test('yearly stochastic growth produces approximately reference adult medians an
     for (let i = 0; i < 3000; i++) {
       const person = { age: 0, height: Math.round((birth.median + normal() * birth.sd) * 100) / 100, growthSex,
         growthFactor: Math.max(.8, Math.min(1.2, 1 + normal() * .054)),
-        maturityAge: Math.max(14, Math.min(18, Math.round((growthSex === 'female' ? 15 : 17) + normal() * .7))), stats: { health: 7 } };
+        maturityAge: Math.max(14, Math.min(18, Math.round((growthSex === 'female' ? 15 : 17) + normal() * .7))), stats: { health: 5 } };
       while (person.age < person.maturityAge) { Object.assign(person, advanceGrowth(person, normal())); person.age++; }
       heights.push(person.height);
     }

@@ -4,8 +4,8 @@ import {
   effectiveStats, eventOdds, mortalityOdds, stage, migrateSave, chooseEducation,
   offeredJobs, needsEducationChoice, pendingEventSubject,
   relationshipOdds, meetingChances, proposalChance, pregnancyChance, oneNightChance,
-  respondToEncounter, proposeMarriage, endRelationship, normalizeSurname, heightPercentile
-} from './engine.js?v=parent-bars-1';
+  respondToEncounter, proposeMarriage, endRelationship, normalizeSurname, heightPercentile, statPercentiles
+} from './engine.js?v=stat-percentiles-1';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const app = document.querySelector('#app');
@@ -81,16 +81,19 @@ const focusUsed = () => Object.values(state.focus).reduce((a,b) => a+b, 0);
 const genderLabel = person => ({ male: 'Male', female: 'Female', nonbinary: 'Nonbinary' }[person.gender] || 'Unspecified');
 const genderBadge = person => `<span class="gender-label" aria-label="Gender: ${genderLabel(person)}">${genderLabel(person)}</span>`;
 const parentLabel = person => ({ mom: 'Mom', mother: 'Mom', dad: 'Dad', father: 'Dad', parent: 'Parent' }[String(person.parentRole || '').toLowerCase()] || (person.gender==='female'?'Mom':person.gender==='male'?'Dad':'Parent'));
-function heightLabel(person) {
-  const percentile = heightPercentile(person);
-  if (percentile === null) return 'Adult height';
+function percentileLabel(percentile) {
   const rank = Math.round(percentile);
   if (rank < 1) return 'Below 1st percentile';
   if (rank > 99) return 'Above 99th percentile';
   const last = rank % 10, teens = rank % 100;
   const suffix = teens >= 11 && teens <= 13 ? 'th' : last === 1 ? 'st' : last === 2 ? 'nd' : last === 3 ? 'rd' : 'th';
-  return `${rank}${suffix} percentile for age`;
+  return `${rank}${suffix} percentile`;
 }
+function heightLabel(person) {
+  const percentile = heightPercentile(person);
+  return percentile===null?'Adult height':`${percentileLabel(percentile)} for age`;
+}
+const percentileTag = (percentiles, key) => percentiles ? `<span class="stat-percentile${key==='height'?' height-percentile':''}" data-percentile-key="${key}" aria-label="${esc(skillLabel(key))}: ${percentileLabel(percentiles[key].percentile)}">${percentileLabel(percentiles[key].percentile)}</span>` : '';
 function projectedMeter(label, value, projected, key = '', extraClass = '') {
   const change = projected?.change || 0;
   const direction = change > 0 ? 'increase' : change < 0 ? 'decrease' : 'steady';
@@ -166,14 +169,15 @@ function advanceControls() {
 
 function statsView(preview = false) {
   const stats = effectiveStats(state);
+  const percentiles = statPercentiles(state);
   const forecast = preview && !state.ended && !state.needsSuccession && !state.pendingEvents.length && !needsEducationChoice(state) ? annualForecast(state) : null;
   return `<section class="panel stats-panel ${preview?'year-stats':''} ${forecast?'forecast-panel':''}" aria-label="${preview?'Your stats and expected changes':'Your character stats'}"><div class="panel-heading"><h3>${labelWithHelp(preview?'Your stats':'Your character','stats')}</h3><span class="tag">1–10</span></div><div class="stat-list">${SKILLS.map(skill => {
     const value = stats[skill.key]; const apt = state.aptitudes[skill.key];
-    return `<div class="stat-row" data-stat="${skill.key}"><div class="stat-heading"><span class="stat-name">${labelWithHelp(skill.label,skill.key)}</span><span class="aptitude ${apt>0?'positive':apt<0?'negative':''}" aria-label="Growth affinity ${aptitude(apt)}">${aptitude(apt)}</span><strong class="stat-value">${number(value)}</strong></div>${projectedMeter(skill.label,value,forecast?.stats[skill.key],skill.key)}</div>`;
-  }).join('')}</div><div class="stat-help-links">${labelWithHelp('Growth affinity','affinity')}${forecast?labelWithHelp('Next year','forecast'):''}</div><div class="vitals-grid">${[['health','Health','heart'],['stability','Mental stability','spark'],['lifestyle','Lifestyle','self']].map(([key,label,ico]) => {
+    return `<div class="stat-row" data-stat="${skill.key}"><div class="stat-heading"><span class="stat-name">${labelWithHelp(skill.label,skill.key)}</span><span class="aptitude ${apt>0?'positive':apt<0?'negative':''}" aria-label="Growth affinity ${aptitude(apt)}">${aptitude(apt)}</span><strong class="stat-value">${number(value)}</strong>${percentileTag(percentiles,skill.key)}</div>${projectedMeter(skill.label,value,forecast?.stats[skill.key],skill.key)}</div>`;
+  }).join('')}</div><div class="stat-help-links">${labelWithHelp('Growth affinity','affinity')}${percentiles?labelWithHelp('Percentiles','percentiles'):''}${forecast?labelWithHelp('Next year','forecast'):''}</div><div class="vitals-grid">${[['health','Health','heart'],['stability','Mental stability','spark'],['lifestyle','Lifestyle','self']].map(([key,label,ico]) => {
     const value = key==='lifestyle' ? state.lifestyle : stats[key];
-    return `<div class="vital" data-stat="${key}"><span class="vital-label">${labelWithHelp(label,key)}</span><span class="vital-value">${number(value)}<small>/10</small></span>${projectedMeter(label,value,key==='lifestyle'?forecast?.lifestyle:forecast?.stats[key],key)}</div>`;
-  }).join('')}<div class="vital height-vital"><span class="vital-label">${labelWithHelp('Height','height',state.id)}</span><span class="vital-value">${number(state.height)}<small> cm</small></span><span class="height-percentile">${heightLabel(state)}</span></div></div></section>`;
+    return `<div class="vital" data-stat="${key}"><span class="vital-label">${labelWithHelp(label,key)}</span><span class="vital-value">${number(value)}<small>/10</small></span>${percentileTag(percentiles,key)}${projectedMeter(label,value,key==='lifestyle'?forecast?.lifestyle:forecast?.stats[key],key)}</div>`;
+  }).join('')}<div class="vital height-vital" data-stat="height"><span class="vital-label">${labelWithHelp('Height','height',state.id)}</span><span class="vital-value">${number(state.height)}<small> cm</small></span>${percentiles?percentileTag(percentiles,'height'):state.age>=18?'<span class="height-percentile">Adult height</span>':''}</div></div></section>`;
 }
 
 function outcomeSummary(outcome, subject, pending) {
@@ -438,10 +442,11 @@ function topicHelpModal(topic, id) {
     attractiveness: ['Attractiveness', ['Starts near its adult value, with tiny random changes each year rather than gains from practice. In this game, aging lowers it after 30 for men and 22 for women.']],
     affinity: ['Growth affinity', ['This inherited −3 to +3 rating controls learning speed; positive is faster. It does not increase attractiveness.']],
     forecast: ['Next year’s stat bars', ['Colored segments preview average routine changes; events and yearly variation can alter the result.']],
+    percentiles: ['Percentiles', ['Projected to 18 with your current focus against simulated lives. The 50th percentile is average: 5/10 for rated stats. Lifestyle compares households your age.']],
     health: ['Health', ['Self-care supports health; illness and aging reduce it. Poor health raises disease risk and reduces childhood height gains.']],
     stability: ['Mental stability', ['Higher means calmer; rest and relationships help. Low parental mental stability can lead to difficult childhood events.']],
     lifestyle: ['Lifestyle', ['Until 18, you share your parents’ changing household lifestyle. As an adult, work, family, events and inheritance shape it.']],
-    height: ['Height & percentile', ['Final height emerges from yearly growth shaped by age, inheritance, health and chance, ending at 14–18. Poor health reduces new growth, never existing height. Percentile compares you with the reference for your age until growth ends.']],
+    height: ['Height', ['Final height emerges from yearly growth shaped by age, inheritance, health and chance, ending at 14–18. Poor health reduces new growth, never existing height.']],
     cry: ['Cry level', ['More crying (1–5) builds skills and parent relationships, while harder crying strains their mental stability more.']],
     focus: ['Your focus', ['Allocate 12 points, at most 5 per area; unused points allow rest. Focus shapes growth and event chances.']],
     'focus-work': ['School & career focus', ['Studying builds skills; career focus supports job performance and lifestyle.']],

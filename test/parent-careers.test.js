@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { initialParentCareer, careerForecast, advanceParentCareer } from '../parent-careers.js';
 
-const parent = (overrides = {}) => ({ name: 'Alex Morgan', age: 30, alive: true, lifestyle: 4, stats: { health: 8, stability: 8 }, ...overrides });
+const parent = (overrides = {}) => ({ name: 'Alex Morgan', age: 30, alive: true, lifestyle: 4, stats: { health: 5, stability: 5 }, ...overrides });
 function seeded(seed) {
   const random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return (seed + .5) / 4294967296; };
   return { random, normal: () => Math.sqrt(-2 * Math.log(random())) * Math.cos(2 * Math.PI * random()) };
@@ -76,12 +76,23 @@ test('job loss reduces support and recovery rebuilds it without erasing the setb
 
 test('focus and wellbeing improve employment prospects without guaranteeing recovery', () => {
   const unemployed = focus => parent({ career: { ...initialParentCareer(parent(), focus), status: 'unemployed' } });
-  assert.equal(advanceParentCareer(unemployed(0), { random: () => .4 }).career.status, 'unemployed');
-  assert.equal(advanceParentCareer(unemployed(5), { random: () => .4 }).career.status, 'employed');
+  assert.equal(advanceParentCareer(unemployed(0), { random: () => .35 }).career.status, 'unemployed');
+  assert.equal(advanceParentCareer(unemployed(5), { random: () => .35 }).career.status, 'employed');
   assert.equal(advanceParentCareer(unemployed(5), { random: () => .9 }).career.status, 'unemployed');
   const struggling = unemployed(5);
   struggling.stats = { health: 1, stability: 1 };
-  assert.equal(advanceParentCareer(struggling, { random: () => .4 }).career.status, 'unemployed');
+  assert.equal(advanceParentCareer(struggling, { random: () => .35 }).career.status, 'unemployed');
+});
+
+test('average wellbeing and absent stats use neutral job-loss risk', () => {
+  const average = parent({ career: initialParentCareer(parent()) });
+  const options = () => ({ random: sequence(.02, 1), normal: () => 0 });
+  const result = advanceParentCareer(average, options());
+  assert.equal(result.career.status, 'employed');
+  assert.equal(result.event, null);
+  assert.deepEqual(advanceParentCareer({ ...average, stats: undefined }, options()), result);
+  const unwell = { ...average, stats: { health: 1, stability: 1 } };
+  assert.equal(advanceParentCareer(unwell, options()).career.status, 'unemployed');
 });
 
 test('career progress is bounded and promotions are separate from ordinary growth', () => {

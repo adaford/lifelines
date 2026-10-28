@@ -79,7 +79,7 @@ export function populationMedianAt(age, maturityAge = 17, growthSex = 'male') {
 // Annual residual SDs are gameplay variation, not measured velocity estimates.
 // Poor nutrition and repeated/chronic illness can impair linear growth:
 // https://www.who.int/news/item/19-11-2015-stunting-in-a-nutshell
-// Health 7+ leaves the reference curve unchanged. Below that, up to 15% of a
+// Health 5+ leaves the reference curve unchanged. Below that, up to 15% of a
 // year's potential gain is lost at health 1. That mapping is game calibration,
 // not a medical estimate. Recovery changes future gains, never repays missed
 // growth. Actual adult height emerges from all the yearly gains and freezes at
@@ -92,8 +92,8 @@ export function advanceGrowth(person, normalDraw = 0) {
   const expectedGain = referenceGain * genetics;
   const annualSD = Math.min(1.6, Math.max(.2, expectedGain * .08));
   const residual = clamp(Number.isFinite(normalDraw) ? normalDraw : 0, -3, 3) * annualSD;
-  const health = Number.isFinite(person.stats?.health) ? person.stats.health : 7;
-  const healthMultiplier = 1 - .15 * clamp((7 - health) / 6, 0, 1);
+  const health = Number.isFinite(person.stats?.health) ? person.stats.health : 5;
+  const healthMultiplier = 1 - .15 * clamp((5 - health) / 4, 0, 1);
   const gain = Math.max(0, expectedGain + residual) * healthMultiplier;
   return { height: round(person.height + gain) };
 }

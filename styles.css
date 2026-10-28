@@ -210,7 +210,7 @@ button svg { pointer-events: none; }
 .empty-state .icon { display: block; width: 29px; height: 29px; margin: 0 auto 10px; color: #94a386; }
 .empty-state h4 { font-family: Georgia, serif; font-size: 19px; font-weight: 400; color: #64765a; margin-bottom: 5px; }
 .stat-list { display: grid; gap: 19px; }
-.stat-heading { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 14px; }
+.stat-heading { display: grid; grid-template-columns: minmax(0,1fr) auto auto; align-items: center; gap: 0 8px; margin-bottom: 8px; font-size: 14px; }
 .label-with-help { display: inline-flex; align-items: center; gap: 2px; max-width: 100%; min-width: 0; }
 .help-button { display: inline-flex; flex: 0 0 44px; align-items: center; justify-content: center; width: 44px; min-width: 44px; height: 44px; min-height: 44px; border: 0; border-radius: 10px; background: transparent; color: var(--muted); cursor: pointer; vertical-align: middle; }
 .help-button > span { display: flex; align-items: center; justify-content: center; width: 18px; height: 18px; border: 1px solid currentColor; border-radius: 50%; font-size: 12px; font-weight: 650; line-height: 1; }
@@ -222,7 +222,10 @@ button svg { pointer-events: none; }
 .parent-career > span:first-child { display: inline-flex; align-items: center; gap: 5px; }
 .parent-career strong { color: var(--green); }
 .employment-status { padding: 4px 8px; background: var(--surface-soft); border-radius: 5px; }
-.stat-name { flex: 1; color: #52644c; }
+.stat-name { min-width: 0; color: #52644c; }
+.stat-percentile { display: block; color: var(--muted); font-size: 11px; line-height: 1.4; font-variant-numeric: tabular-nums; }
+.stat-heading > .stat-percentile { grid-column: 1/-1; justify-self: end; margin-top: -5px; }
+.vital > .stat-percentile { margin-top: 3px; }
 .stat-value { font-size: 14px; font-weight: 650; font-variant-numeric: tabular-nums; }
 .stat-track { position: relative; height: 9px; border-radius: 4px; background: #e9ebe0; overflow: hidden; }
 .stat-fill { display: block; height: 100%; border-radius: inherit; background: var(--stat-color, #809b73); }

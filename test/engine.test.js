@@ -68,14 +68,22 @@ test('a new life starts at zero with complete, bounded inherited traits and pare
 });
 
 test('all five stats exist at birth with low learned skills and established appearance', () => {
+  const wellbeing = { health: [], stability: [] };
   for (let seed = 1; seed <= 40; seed++) {
     const baby = createGame({ seed });
     for (const { key } of SKILLS.filter(skill => skill.key !== 'attractiveness')) assert.ok(baby.stats[key] >= 1 && baby.stats[key] <= 1.5, `${key} at birth`);
     assert.ok(baby.stats.attractiveness >= 1 && baby.stats.attractiveness <= 10);
     assert.equal(baby.version, 9);
-    assert.ok(baby.stats.health >= 7);
-    assert.ok(baby.stats.stability >= 8);
+    for (const key of ['health', 'stability']) {
+      assert.ok(baby.stats[key] >= 1 && baby.stats[key] <= 10);
+      wellbeing[key].push(baby.stats[key]);
+    }
     assert.deepEqual(Object.keys(baby.stats).sort(), Object.keys(adult(seed).stats).sort());
+  }
+  for (const [key, values] of Object.entries(wellbeing)) {
+    const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
+    assert.ok(Math.abs(mean - 5) < .5, `${key} starts around 5 rather than near the ceiling`);
+    assert.ok(values.some(value => value < 5) && values.some(value => value > 5), `${key} varies on both sides of average`);
   }
   const fast = createGame({ seed: 93 }), slow = copy(fast);
   for (const { key } of SKILLS) { fast.aptitudes[key] = 3; slow.aptitudes[key] = -3; }

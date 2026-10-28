@@ -33,7 +33,7 @@ const LIFE_TABLE = [
 ];
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
-const stat = (person, key) => clamp(Number.isFinite(person.stats?.[key]) ? person.stats[key] : 7, 1, 10);
+const stat = (person, key) => clamp(Number.isFinite(person.stats?.[key]) ? person.stats[key] : 5, 1, 10);
 
 export function baselineAnnualMortality(age) {
   // Keep the final observed rate beyond the source's horizon rather than
@@ -62,13 +62,13 @@ export function mortalityRisk(person) {
   const baseline = baselineAnnualMortality(age);
   const hazard = -Math.log1p(-baseline);
   const injuryShare = accidentShare(age);
-  // Game calibration: health/stability 7 reproduce the population baseline.
-  // A low health score raises disease hazard (2.32x at 1, 0.66x at 10).
+  // Game calibration: health/stability 5 reproduce the population baseline.
+  // A low health score raises disease hazard (1.75x at 1, 0.50x at 10).
   // These stat mappings are fictional, not estimates from the life table.
-  const diseaseHazard = hazard * (1 - injuryShare) * Math.exp((7 - stat(person, 'health')) * .14);
-  // Adult stability has a modest effect on accident hazard (0.90x..1.23x).
+  const diseaseHazard = hazard * (1 - injuryShare) * Math.exp((5 - stat(person, 'health')) * .14);
+  // Adult stability has a modest effect on accident hazard (0.84x..1.15x).
   // A child's own mood/crying never changes their accident risk.
-  const accidentHazard = hazard * injuryShare * (age >= 18 ? Math.exp((7 - stat(person, 'stability')) * .035) : 1);
+  const accidentHazard = hazard * injuryShare * (age >= 18 ? Math.exp((5 - stat(person, 'stability')) * .035) : 1);
   const combined = diseaseHazard + accidentHazard;
   const total = -Math.expm1(-combined);
   // Competing causes share ONE annual death probability, so they cannot kill
