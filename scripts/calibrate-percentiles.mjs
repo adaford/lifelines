@@ -4,7 +4,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import {
   createGame, advanceYear, resolveEventChoice, EVENTS, effectiveStats,
-  projectAt18, DEVELOPMENT_BALANCE,
+  DEVELOPMENT_BALANCE,
 } from '../engine.js';
 
 const args = process.argv.slice(2);
@@ -31,11 +31,11 @@ function choiceRng(seed) {
   return () => { value = (Math.imul(value, 1664525) + 1013904223) >>> 0; return value / 4294967296; };
 }
 
-function cohort(measureProjections) {
+function cohort(measureAges) {
   const stats = Object.fromEntries(statKeys.map(key => [key, moment()]));
-  const projections = Array.from({ length: 18 }, () => Object.fromEntries(statKeys.map(key => [key, moment()])));
+  const ageStats = Array.from({ length: 18 }, () => Object.fromEntries(statKeys.map(key => [key, moment()])));
   const height = { male: moment(), female: moment() };
-  const projectedHeight = Object.fromEntries(['male', 'female'].map(sex => [sex, Array.from({ length: 18 }, moment)]));
+  const ageHeight = Object.fromEntries(['male', 'female'].map(sex => [sex, Array.from({ length: 18 }, moment)]));
   const lifestyle = Array.from({ length: 18 }, moment);
   const survivors = { male: 0, female: 0 };
   for (const [sexIndex, gender] of ['male', 'female'].entries()) {
@@ -45,9 +45,15 @@ function cohort(measureProjections) {
       state.cryLevel = 3;
       state.focus = { ...focus };
       const choose = choiceRng(seed);
-      const path = [];
       while (state.age < 18 && state.alive) {
-        if (measureProjections) path.push({ ...projectAt18(state), lifestyle: state.lifestyle });
+        // Same-age peers include everyone currently alive, irrespective of
+        // whether they survive later years. No future projection is involved.
+        if (measureAges) {
+          const current = effectiveStats(state);
+          for (const key of statKeys) add(ageStats[state.age][key], current[key]);
+          add(ageHeight[gender][state.age], state.height);
+          add(lifestyle[state.age], state.lifestyle);
+        }
         const result = advanceYear(state);
         if (!result.ok) throw new Error(`Seed ${seed}: ${result.reason}`);
         while (state.pendingEvents.length) {
@@ -63,14 +69,9 @@ function cohort(measureProjections) {
       const final = effectiveStats(state);
       for (const key of statKeys) add(stats[key], final[key]);
       add(height[gender], state.height);
-      for (const [age, projected] of path.entries()) {
-        for (const key of statKeys) add(projections[age][key], projected.stats[key]);
-        add(projectedHeight[gender][age], projected.height);
-        add(lifestyle[age], projected.lifestyle);
-      }
     }
   }
-  return { stats, projections, height, projectedHeight, lifestyle, survivors };
+  return { stats, ageStats, height, ageHeight, lifestyle, survivors };
 }
 
 if (args.includes('--fit')) {
@@ -83,11 +84,12 @@ if (args.includes('--fit')) {
     if (error < best.error) best = { error, balance: structuredClone(DEVELOPMENT_BALANCE) };
     if ([...learned, 'health', 'stability'].every(key => Math.abs(averages[key] - 5) <= .025)) break;
     for (const key of learned) {
-      // Damping avoids oscillation across the engine's hundredth-point rounding
-      // steps. Preserve the best measured coefficients rather than an untested
-      // final update when a quantization step prevents an exact fit.
-      const next = DEVELOPMENT_BALANCE.skillScale[key] * (3.75 / Math.max(.1, averages[key] - 1.25)) ** .4;
-      DEVELOPMENT_BALANCE.skillScale[key] = round(Math.max(.15, Math.min(2, next)));
+      // Fit an annual event-drift intercept, preserving normal starting ratings
+      // and focus effects. A small annual offset accumulates with weak reversion.
+      const reversion = DEVELOPMENT_BALANCE.skillReversion * 1.15;
+      const response = reversion ? (1 - (1 - reversion) ** 18) / reversion : 18;
+      const next = DEVELOPMENT_BALANCE.childhoodBias[key] + .8 * (5 - averages[key]) / response;
+      DEVELOPMENT_BALANCE.childhoodBias[key] = round(Math.max(-.2, Math.min(.2, next)));
     }
     for (const key of ['health', 'stability']) {
       const response = 1 - (1 - DEVELOPMENT_BALANCE.wellbeingReversion[key]) ** 18;
@@ -105,23 +107,24 @@ const reference = {
   calibration: {
     samplesPerSex: samples, seedStart, survivors: result.survivors,
     cryLevel: 3, focus, choices: 'uniform, independent seeded draws',
-    conditionedOn: 'surviving to age 18',
+    conditionedOn: 'alive at the observed age',
+    observationsByAge: [...result.ageStats.map(stats => stats.health.count), result.stats.health.count],
     development: DEVELOPMENT_BALANCE,
     reproduce: `node scripts/calibrate-percentiles.mjs --samples ${samples} --seed ${seedStart}`,
   },
   stats: Object.fromEntries(statKeys.map(key => [key, {
     mean: 5, observedMean: round(mean(result.stats[key])), sd: summarize(result.stats[key]).sd,
-    corrections: result.projections.map(projected => round(mean(result.stats[key]) - mean(projected[key]))),
+    ages: result.ageStats.map(stats => ({ mean: 5, observedMean: round(mean(stats[key])), sd: summarize(stats[key]).sd })),
   }])),
   height: Object.fromEntries(['male', 'female'].map(sex => [sex, {
     ...summarize(result.height[sex]),
-    corrections: result.projectedHeight[sex].map(projected => round(mean(result.height[sex]) - mean(projected))),
+    ages: result.ageHeight[sex].map(summarize),
   }])),
   lifestyle: result.lifestyle.map(summarize),
 };
 const generated = '// Generated from seeded game lives; no real-world percentile tables.\n' +
-  '// See calibration.reproduce below. Mean corrections cover expected future events\n' +
-  '// and stochastic/clamping effects absent from the routine-only projection.\n' +
+  '// See calibration.reproduce below. Ages contain current same-age peer ratings;\n' +
+  '// top-level stat and height moments describe age 18.\n' +
   `export const PERCENTILE_REFERENCE = ${JSON.stringify(reference, null, 2)};\n`;
 await writeFile(new URL('../percentile-reference.js', import.meta.url), generated);
 console.log(JSON.stringify({ survivors: result.survivors, stats: Object.fromEntries(statKeys.map(key => [key, summarize(result.stats[key])])), height: Object.fromEntries(['male', 'female'].map(sex => [sex, summarize(result.height[sex])])) }, null, 2));

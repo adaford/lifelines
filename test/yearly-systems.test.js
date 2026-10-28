@@ -88,21 +88,23 @@ test('five cry levels increase development and parent bonds while increasing par
   assert.equal(setCryLevel(child, 3).ok, false);
 });
 
-test('crying respects stat and bond limits and never changes deceased parents', () => {
+test('crying respects stat and relationship limits and never changes deceased parents', () => {
   const state = createGame({ seed: 31 });
   state.stats.intelligence = 9.99;
+  state.aptitudes.intelligence = 3;
   state.parents[0].relationship = 9.99;
   state.parents[0].stats.stability = 1;
   state.parents[1].alive = false;
   const deceased = clone(state.parents[1]);
   setCryLevel(state, 5);
   const preview = annualForecast(state);
-  assert.equal(preview.stats.intelligence.after, 10);
+  assert.ok(preview.stats.intelligence.after >= 1 && preview.stats.intelligence.after <= 10);
   assert.equal(preview.parents[0].relationship.after, 10);
   assert.equal(preview.parents[0].stability.after, 1);
   assert.equal(preview.parents[1].relationship.change, 0);
   assert.equal(preview.parents[1].stability.change, 0);
-  advanceYear(state, survives);
+  advanceYear(state, { ...survives, growthRandom: () => 3 });
+  assert.equal(state.stats.intelligence, 10, 'a positive yearly fluctuation stops at the rating ceiling');
   assert.deepEqual(state.parents[1], deceased);
 });
 

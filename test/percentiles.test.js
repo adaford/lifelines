@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { normalPercentile } from '../percentiles.js';
-import { createGame, projectAt18, statPercentiles, annualForecast, setCryLevel, effectiveStats, migrateSave } from '../engine.js';
+import { createGame, statPercentiles, annualForecast, setCryLevel, effectiveStats, migrateSave } from '../engine.js';
 import { PERCENTILE_REFERENCE } from '../percentile-reference.js';
 
 test('normal percentiles center exactly on five and follow standard deviations', () => {
@@ -25,11 +25,11 @@ test('under-18 ranks cover all own stats and never change a saved life', () => {
     assert.ok(result.sd > 0, key);
     if (Object.hasOwn(state.stats, key)) {
       assert.equal(result.mean, 5);
-      assert.equal(result.percentile, normalPercentile(result.expected, 5, result.sd));
+      assert.equal(result.value, effectiveStats(state)[key]);
+      assert.equal(result.percentile, normalPercentile(result.value, 5, result.sd));
     }
   }
   assert.deepEqual(statPercentiles(state), first);
-  projectAt18(state);
   assert.deepEqual(state, before);
   assert.deepEqual(statPercentiles(migrateSave(JSON.parse(JSON.stringify(state)))), first);
   state.age = 18;
@@ -39,24 +39,31 @@ test('under-18 ranks cover all own stats and never change a saved life', () => {
   assert.equal(statPercentiles(state), null);
 });
 
-test('childhood ranks reflect future learning, affinity and current choices', () => {
+test('a strong baby ranks above same-age peers and changing focus only changes the forecast', () => {
   const state = createGame({ seed: 14 });
-  const fast = structuredClone(state), slow = structuredClone(state);
-  fast.aptitudes.intelligence = 3;
-  slow.aptitudes.intelligence = -3;
-  assert.ok(statPercentiles(fast).intelligence.percentile > statPercentiles(slow).intelligence.percentile);
-  setCryLevel(fast, 5);
-  setCryLevel(slow, 1);
-  assert.ok(statPercentiles(fast).intelligence.expected > statPercentiles(slow).intelligence.expected);
+  state.stats.strength = 7;
+  const babyRank = statPercentiles(state).strength;
+  assert.ok(babyRank.percentile > 80);
+  assert.equal(babyRank.sd, PERCENTILE_REFERENCE.stats.strength.ages[0].sd);
+  const quieter = structuredClone(state);
+  setCryLevel(quieter, 5);
+  assert.deepEqual(statPercentiles(quieter), statPercentiles(state));
+  assert.notEqual(annualForecast(quieter).stats.strength.change, annualForecast(state).stats.strength.change);
   state.age = 8;
-  state.stats.intelligence = 2.5;
-  const studious = structuredClone(state), unfocused = structuredClone(state);
-  studious.focus = { work: 5, self: 5, social: 1, family: 1 };
-  unfocused.focus = { work: 0, self: 0, social: 5, family: 5 };
-  assert.ok(statPercentiles(studious).intelligence.percentile > statPercentiles(unfocused).intelligence.percentile);
+  const active = structuredClone(state), inactive = structuredClone(state);
+  active.focus = { work: 3, self: 5, social: 2, family: 2 };
+  inactive.focus = { work: 4, self: 1, social: 3, family: 4 };
+  assert.deepEqual(statPercentiles(active), statPercentiles(inactive));
+  assert.ok(annualForecast(active).stats.strength.change > 0);
+  assert.ok(annualForecast(inactive).stats.strength.change < 0);
+  for (const key of Object.keys(state.stats)) state.stats[key] = 5;
+  for (let age = 0; age < 18; age++) {
+    state.age = age;
+    for (const key of Object.keys(state.stats)) assert.equal(statPercentiles(state)[key].percentile, 50, `${key} at age ${age}`);
+  }
 });
 
-test('projection expires temporary effects and leaves pending decisions unresolved', () => {
+test('current ranks include temporary effects without expiring them or resolving decisions', () => {
   const state = createGame({ seed: 15 });
   state.age = 17;
   state.height = 170;
@@ -64,14 +71,12 @@ test('projection expires temporary effects and leaves pending decisions unresolv
   state.pendingEvents = [{ eventId: 'peer_drinking', age: 17 }];
   state.lastYearEvents = ['peer_drinking'];
   const before = structuredClone(state);
-  const projected = projectAt18(state);
-  const routine = structuredClone(state);
-  routine.pendingEvents = [];
-  const forecast = annualForecast(routine);
-  for (const [key, value] of Object.entries(projected.stats)) assert.equal(value, forecast.stats[key].after, key);
-  assert.equal(projected.height, forecast.height.after);
+  const ranked = statPercentiles(state);
+  assert.equal(ranked.health.value, effectiveStats(state).health);
+  const recovered = structuredClone(state);
+  recovered.effects = [];
+  assert.ok(statPercentiles(recovered).health.percentile > ranked.health.percentile);
   assert.deepEqual(state, before);
-  assert.notEqual(projected.stats.health, effectiveStats(state).health);
 });
 
 test('height is ranked through age seventeen without choosing an actual adult endpoint', () => {
@@ -81,9 +86,9 @@ test('height is ranked through age seventeen without choosing an actual adult en
   state.height = 164;
   state.adultHeight = 164;
   const before = structuredClone(state);
-  assert.equal(projectAt18(state).height, 164);
   assert.ok(Number.isFinite(statPercentiles(state).height.percentile));
-  assert.equal(statPercentiles(state).height.expected, 164);
+  assert.equal(statPercentiles(state).height.value, 164);
+  assert.equal(statPercentiles(state).height.mean, PERCENTILE_REFERENCE.height.male.ages[16].mean);
   assert.deepEqual(state, before);
   state.age = 17;
   assert.ok(statPercentiles(state).height);
@@ -99,7 +104,7 @@ test('household lifestyle compares same-age game households before personal fina
   state.age = 12;
   state.lifestyle = 4;
   const rank = statPercentiles(state).lifestyle;
-  assert.equal(rank.expected, 4);
+  assert.equal(rank.value, 4);
   assert.equal(rank.mean, PERCENTILE_REFERENCE.lifestyle[12].mean);
   assert.equal(rank.sd, PERCENTILE_REFERENCE.lifestyle[12].sd);
   assert.ok(rank.sd > 0);

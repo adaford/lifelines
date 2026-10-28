@@ -5,7 +5,7 @@ import {
   offeredJobs, needsEducationChoice, pendingEventSubject,
   relationshipOdds, meetingChances, proposalChance, pregnancyChance, oneNightChance,
   respondToEncounter, proposeMarriage, endRelationship, normalizeSurname, heightPercentile, statPercentiles
-} from './engine.js?v=stat-percentiles-1';
+} from './engine.js?v=natural-stats-1';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const app = document.querySelector('#app');
@@ -173,8 +173,8 @@ function statsView(preview = false) {
   const forecast = preview && !state.ended && !state.needsSuccession && !state.pendingEvents.length && !needsEducationChoice(state) ? annualForecast(state) : null;
   return `<section class="panel stats-panel ${preview?'year-stats':''} ${forecast?'forecast-panel':''}" aria-label="${preview?'Your stats and expected changes':'Your character stats'}"><div class="panel-heading"><h3>${labelWithHelp(preview?'Your stats':'Your character','stats')}</h3><span class="tag">1–10</span></div><div class="stat-list">${SKILLS.map(skill => {
     const value = stats[skill.key]; const apt = state.aptitudes[skill.key];
-    return `<div class="stat-row" data-stat="${skill.key}"><div class="stat-heading"><span class="stat-name">${labelWithHelp(skill.label,skill.key)}</span><span class="aptitude ${apt>0?'positive':apt<0?'negative':''}" aria-label="Growth affinity ${aptitude(apt)}">${aptitude(apt)}</span><strong class="stat-value">${number(value)}</strong>${percentileTag(percentiles,skill.key)}</div>${projectedMeter(skill.label,value,forecast?.stats[skill.key],skill.key)}</div>`;
-  }).join('')}</div><div class="stat-help-links">${labelWithHelp('Growth affinity','affinity')}${percentiles?labelWithHelp('Percentiles','percentiles'):''}${forecast?labelWithHelp('Next year','forecast'):''}</div><div class="vitals-grid">${[['health','Health','heart'],['stability','Mental stability','spark'],['lifestyle','Lifestyle','self']].map(([key,label,ico]) => {
+    return `<div class="stat-row" data-stat="${skill.key}"><div class="stat-heading"><span class="stat-name">${labelWithHelp(skill.label,skill.key)}</span><span class="aptitude ${apt>0?'positive':apt<0?'negative':''}" aria-label="Natural aptitude ${aptitude(apt)}">${aptitude(apt)}</span><strong class="stat-value">${number(value)}</strong>${percentileTag(percentiles,skill.key)}</div>${projectedMeter(skill.label,value,forecast?.stats[skill.key],skill.key)}</div>`;
+  }).join('')}</div><div class="stat-help-links">${labelWithHelp('Natural aptitude','affinity')}${percentiles?labelWithHelp('Percentiles','percentiles'):''}${forecast?labelWithHelp('Next year','forecast'):''}</div><div class="vitals-grid">${[['health','Health','heart'],['stability','Mental stability','spark'],['lifestyle','Lifestyle','self']].map(([key,label,ico]) => {
     const value = key==='lifestyle' ? state.lifestyle : stats[key];
     return `<div class="vital" data-stat="${key}"><span class="vital-label">${labelWithHelp(label,key)}</span><span class="vital-value">${number(value)}<small>/10</small></span>${percentileTag(percentiles,key)}${projectedMeter(label,value,key==='lifestyle'?forecast?.lifestyle:forecast?.stats[key],key)}</div>`;
   }).join('')}<div class="vital height-vital" data-stat="height"><span class="vital-label">${labelWithHelp('Height','height',state.id)}</span><span class="vital-value">${number(state.height)}<small> cm</small></span>${percentiles?percentileTag(percentiles,'height'):state.age>=18?'<span class="height-percentile">Adult height</span>':''}</div></div></section>`;
@@ -307,7 +307,7 @@ function relationshipMeter(person, forecast) {
 }
 
 function profileStats(person, forecast) {
-  return `<div class="profile-stats">${SKILLS.map(skill=>`<div class="profile-stat" data-skill="${skill.key}"><span>${labelWithHelp(skill.label,skill.key)}</span><strong>${number(person.stats[skill.key])}<small>/10</small></strong><span class="aptitude ${person.aptitudes[skill.key]>0?'positive':person.aptitudes[skill.key]<0?'negative':''}" aria-label="${esc(skill.label)} growth affinity ${aptitude(person.aptitudes[skill.key])}">${aptitude(person.aptitudes[skill.key])}</span></div>`).join('')}${[['health','Health'],['stability','Mental stability']].map(([key,label])=>`<div class="profile-stat" data-skill="${key}"><span>${labelWithHelp(label,key)}</span><strong>${number(person.stats[key])}<small>/10</small></strong>${key==='stability'?projectedMeter(label,person.stats[key],forecast?.stability,'green'):''}</div>`).join('')}<div class="profile-stat"><span>${labelWithHelp('Lifestyle','lifestyle')}</span><strong>${person.lifestyle}<small>/10</small></strong></div><div class="profile-stat"><span>${labelWithHelp('Height','height',person.id)}</span><strong>${number(person.height)}<small> cm</small></strong><span class="height-percentile">${heightLabel(person)}</span></div></div><div class="stat-help-links">${labelWithHelp('Growth affinity','affinity')}</div>`;
+  return `<div class="profile-stats">${SKILLS.map(skill=>`<div class="profile-stat" data-skill="${skill.key}"><span>${labelWithHelp(skill.label,skill.key)}</span><strong>${number(person.stats[skill.key])}<small>/10</small></strong><span class="aptitude ${person.aptitudes[skill.key]>0?'positive':person.aptitudes[skill.key]<0?'negative':''}" aria-label="${esc(skill.label)} natural aptitude ${aptitude(person.aptitudes[skill.key])}">${aptitude(person.aptitudes[skill.key])}</span></div>`).join('')}${[['health','Health'],['stability','Mental stability']].map(([key,label])=>`<div class="profile-stat" data-skill="${key}"><span>${labelWithHelp(label,key)}</span><strong>${number(person.stats[key])}<small>/10</small></strong>${key==='stability'?projectedMeter(label,person.stats[key],forecast?.stability,'green'):''}</div>`).join('')}<div class="profile-stat"><span>${labelWithHelp('Lifestyle','lifestyle')}</span><strong>${person.lifestyle}<small>/10</small></strong></div><div class="profile-stat"><span>${labelWithHelp('Height','height',person.id)}</span><strong>${number(person.height)}<small> cm</small></strong><span class="height-percentile">${heightLabel(person)}</span></div></div><div class="stat-help-links">${labelWithHelp('Natural aptitude','affinity')}</div>`;
 }
 
 function pregnancyView() {
@@ -434,30 +434,30 @@ function navigate(tab) {
 
 function topicHelpModal(topic, id) {
   const help = {
-    stats: ['Your stats', ['Intelligence, strength, social ability and creativity start low at birth and grow with practice; attractiveness starts near its adult value.']],
-    intelligence: ['Intelligence', ['School, college and mentally demanding work build this skill.']],
-    strength: ['Strength', ['Physical growth, self-care and active work build strength.']],
-    social: ['Social ability', ['Friends, family and people-focused work build social skills.']],
-    creativity: ['Creativity', ['Learning, personal interests and creative work develop this skill.']],
+    stats: ['Your stats', ['Before 18, ability ratings compare you with others your age: high infant intelligence means strong natural potential. Focus can raise skills; neglect can lower them.']],
+    intelligence: ['Intelligence', ['Reasoning ability for your age; school and mental practice can strengthen it.']],
+    strength: ['Strength', ['A 7/10 baby is strong for a baby. Exercise can maintain or raise this rating; inactivity can lower it.']],
+    social: ['Social ability', ['Ease with people for your age; social practice can improve it.']],
+    creativity: ['Creativity', ['Creative potential for your age, shaped by exploration and practice.']],
     attractiveness: ['Attractiveness', ['Starts near its adult value, with tiny random changes each year rather than gains from practice. In this game, aging lowers it after 30 for men and 22 for women.']],
-    affinity: ['Growth affinity', ['This inherited −3 to +3 rating controls learning speed; positive is faster. It does not increase attractiveness.']],
+    affinity: ['Natural aptitude', ['This inherited −3 to +3 trait affects starting ability and responsiveness to focus; higher is stronger. Practice does not increase attractiveness.']],
     forecast: ['Next year’s stat bars', ['Colored segments preview average routine changes; events and yearly variation can alter the result.']],
-    percentiles: ['Percentiles', ['Projected to 18 with your current focus against simulated lives. The 50th percentile is average: 5/10 for rated stats. Lifestyle compares households your age.']],
+    percentiles: ['Percentiles', ['Compared with simulated lives your age. For rated stats, 5/10 is average: the 50th percentile.']],
     health: ['Health', ['Self-care supports health; illness and aging reduce it. Poor health raises disease risk and reduces childhood height gains.']],
     stability: ['Mental stability', ['Higher means calmer; rest and relationships help. Low parental mental stability can lead to difficult childhood events.']],
     lifestyle: ['Lifestyle', ['Until 18, you share your parents’ changing household lifestyle. As an adult, work, family, events and inheritance shape it.']],
     height: ['Height', ['Final height emerges from yearly growth shaped by age, inheritance, health and chance, ending at 14–18. Poor health reduces new growth, never existing height.']],
-    cry: ['Cry level', ['More crying (1–5) builds skills and parent relationships, while harder crying strains their mental stability more.']],
-    focus: ['Your focus', ['Allocate 12 points, at most 5 per area; unused points allow rest. Focus shapes growth and event chances.']],
-    'focus-work': ['School & career focus', ['Studying builds skills; career focus supports job performance and lifestyle.']],
-    'focus-social': ['Friends focus', ['Develops social ability, supports mental stability and creates chances to meet people.']],
+    cry: ['Cry level', ['Crying (1–5) brings care and strengthens parent relationships; harder crying strains their mental stability more.']],
+    focus: ['Your focus', ['Allocate 12 points, at most 5 per area; unused points allow rest. Focused skills can rise, neglected ones can fall, and results vary yearly.']],
+    'focus-work': ['School & career focus', ['Study and work exercise relevant abilities; career focus also supports performance and lifestyle.']],
+    'focus-social': ['Friends focus', ['Can improve social ability, support mental stability and create chances to meet people.']],
     'focus-family': ['Family focus', ['Strengthens relationships, helps children develop and supports parents’ mental stability.']],
-    'focus-self': ['Yourself focus', ['Supports health, learning and mental stability.']],
+    'focus-self': ['Yourself focus', ['Exercise, learning and self-care support strength, creativity, health and mental stability.']],
     parents: ['Your parents', ['Their wellbeing and careers affect your childhood. Starting relationships vary around 8/10; age and health influence their chance of death.']],
     'parent-career': ['Parents’ careers', ['Higher career focus and experience tend to improve lifestyle; job loss can set it back.']],
     relationship: ['Relationship', ['Higher means closer; family time and shared events change this rating. Partners support social ability and mental stability, but lower lifestyle.']],
     career: ['Careers', ['Your skills determine job fit; career focus and experience improve performance and lifestyle. Start working at 18 or after college.']],
-    college: ['College or career', ['College takes four years, builds skills and opens 15 job offers. Starting work at 18 gives 10 offers.']],
+    college: ['College or career', ['Four years of college open 15 offers and time to develop skills; starting work at 18 gives 10.']],
     children: ['Children', ['Adults can have up to six children, with one adoption per year. Family time helps them develop; dependent children lower lifestyle.']],
     dating: ['People you meet', ['Attractiveness, social ability and lifestyle affect encounters. Invitations expire next year or when a relationship starts, and either approach can be declined.']],
     marriage: ['Marriage', ['Propose once per year; a closer relationship and more years together improve acceptance.']],
@@ -478,7 +478,7 @@ function topicHelpModal(topic, id) {
 }
 
 function helpModal() {
-  openModal('How to play', `<div class="help-grid"><div class="help-item"><h4>Babies</h4><p>Choose a cry level from 1–5.</p></div><div class="help-item"><h4>Each year</h4><p>From age 3, allocate 12 focus points, up to 5 per area, then press Next year.</p></div><div class="help-item"><h4>Stats</h4><p>Growth affinity sets learning speed; tap ? for details.</p></div><div class="help-item"><h4>Events</h4><p>Age, focus and stats affect random events; some require a choice.</p></div><div class="help-item"><h4>Work</h4><p>At 18, choose work or four years of college.</p></div><div class="help-item"><h4>Family</h4><p>Build relationships, raise children and choose an heir when your chapter ends.</p></div></div>`, '<button class="button primary" data-action="close">Got it</button>');
+  openModal('How to play', `<div class="help-grid"><div class="help-item"><h4>Babies</h4><p>Choose a cry level from 1–5.</p></div><div class="help-item"><h4>Each year</h4><p>From age 3, allocate 12 focus points, up to 5 per area, then press Next year.</p></div><div class="help-item"><h4>Stats</h4><p>Natural aptitude and focus shape abilities; tap ? for details.</p></div><div class="help-item"><h4>Events</h4><p>Age, focus and stats affect random events; some require a choice.</p></div><div class="help-item"><h4>Work</h4><p>At 18, choose work or four years of college.</p></div><div class="help-item"><h4>Family</h4><p>Build relationships, raise children and choose an heir when your chapter ends.</p></div></div>`, '<button class="button primary" data-action="close">Got it</button>');
 }
 
 function oddsModal() {

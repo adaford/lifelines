@@ -1,15 +1,17 @@
-// Game-balanced development. Reference cohorts use cry level 3 and balanced
-// focus (3 per area). These constants are fitted by scripts/calibrate-percentiles.mjs.
+// Ratings use the same scale throughout life. Balanced focus is 3 per area;
+// childhood event drift is fitted by scripts/calibrate-percentiles.mjs.
 export const DEVELOPMENT_BALANCE = {
-  "skillScale": {
-    "intelligence": 0.550879,
-    "strength": 0.964072,
-    "social": 0.608378,
-    "creativity": 0.701911
+  "innateScale": 0.8,
+  "skillReversion": 0.012,
+  "childhoodBias": {
+    "intelligence": -0.03031,
+    "strength": -0.004584,
+    "social": -0.030553,
+    "creativity": -0.030086
   },
   "wellbeingTarget": {
-    "health": 5.033235,
-    "stability": 4.758119
+    "health": 5.036037,
+    "stability": 4.704038
   },
   "wellbeingReversion": {
     "health": 0.06,
@@ -19,11 +21,39 @@ export const DEVELOPMENT_BALANCE = {
 
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
 const number = (value, fallback) => Number.isFinite(value) ? value : fallback;
+const skills = ['intelligence', 'strength', 'social', 'creativity'];
 
-export function skillGrowth(person, key, amount) {
-  const affinity = clamp(number(person.aptitudes?.[key], 0), -3, 3);
-  const scale = person.age < 18 ? DEVELOPMENT_BALANCE.skillScale[key] ?? 1 : 1;
-  return amount * (1 + affinity * .18) * scale;
+// This is a weak innate tendency, not a destination or a preselected final score.
+export function naturalSkillRating(aptitude = 0) {
+  return clamp(5 + DEVELOPMENT_BALANCE.innateScale * clamp(number(aptitude, 0), -3, 3), 1, 10);
+}
+
+// Pure annual means; the engine adds seeded individual variation afterwards.
+export function skillChanges(person, career = null) {
+  if (person.alive === false) return Object.fromEntries(skills.map(key => [key, 0]));
+  const age = number(person.age, 18);
+  const flexibility = age < 18 ? 1.15 : age < 40 ? 1 : age < 60 ? .85 : .65;
+  const focus = Object.fromEntries(['work', 'social', 'family', 'self'].map(key => [key, clamp(number(person.focus?.[key], 3), 0, 5) - 3]));
+  const babyCare = .02 * (clamp(number(person.careFocus, 3), 0, 5) - 3);
+  const practice = age < 3
+    ? Object.fromEntries(skills.map(key => [key, .02 * (clamp(number(person.cryLevel, 3), 1, 5) - 3) + babyCare]))
+    : {
+      intelligence: .075 * focus.work + .035 * focus.self,
+      strength: .1 * focus.self,
+      social: .08 * focus.social + .025 * focus.family,
+      creativity: .08 * focus.self + .025 * focus.social,
+    };
+  return Object.fromEntries(skills.map(key => {
+    const aptitude = clamp(number(person.aptitudes?.[key], 0), -3, 3);
+    const careerPractice = age >= 18 ? .035 * clamp(number(career?.weights?.[key], 0), 0, 1) * focus.work : 0;
+    const effort = practice[key] + careerPractice;
+    // Aptitude helps improvement and buffers loss without eliminating either.
+    const response = effort * (effort >= 0 ? 1 + aptitude * .12 : 1 - aptitude * .1);
+    const current = number(person.stats?.[key], naturalSkillRating(aptitude));
+    const tendency = DEVELOPMENT_BALANCE.skillReversion * (naturalSkillRating(aptitude) - current);
+    const eventBias = age < 18 ? number(DEVELOPMENT_BALANCE.childhoodBias[key], 0) : 0;
+    return [key, (response + tendency) * flexibility + eventBias];
+  }));
 }
 
 // Wellbeing is not a learned skill. It varies around a middle rating while

@@ -1,15 +1,74 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { skillGrowth, childhoodWellbeing } from '../development.js';
+import { naturalSkillRating, skillChanges, childhoodWellbeing } from '../development.js';
 import { createGame, advanceYear, resolveEventChoice, EVENTS, effectiveStats } from '../engine.js';
 
-test('childhood development retains individual affinity and adult development is unscaled', () => {
-  const child = { age: 10, aptitudes: { intelligence: 0 } };
-  assert.ok(skillGrowth(child, 'intelligence', .3) > 0);
-  assert.ok(skillGrowth({ ...child, aptitudes: { intelligence: 3 } }, 'intelligence', .3) > skillGrowth(child, 'intelligence', .3));
-  assert.ok(skillGrowth({ ...child, aptitudes: { intelligence: -3 } }, 'intelligence', .3) < skillGrowth(child, 'intelligence', .3));
-  assert.equal(skillGrowth({ ...child, age: 18 }, 'intelligence', .3), .3);
-  assert.equal(skillGrowth({ ...child, age: 18, aptitudes: { intelligence: 3 } }, 'intelligence', .3), .3 * 1.54);
+test('newborn ratings share the adult scale and high innate ability starts high', () => {
+  const keys = ['intelligence', 'strength', 'social', 'creativity'];
+  const samples = Object.fromEntries(keys.map(key => [key, { all: [], high: [], low: [] }]));
+  for (let seed = 820001; seed < 820601; seed++) {
+    const state = createGame({ seed });
+    for (const key of keys) {
+      const value = state.stats[key];
+      samples[key].all.push(value);
+      if (state.aptitudes[key] >= 2) samples[key].high.push(value);
+      if (state.aptitudes[key] <= -2) samples[key].low.push(value);
+    }
+  }
+  const mean = values => values.reduce((sum, value) => sum + value, 0) / values.length;
+  for (const [key, values] of Object.entries(samples)) {
+    assert.ok(Math.abs(mean(values.all) - 5) < .25, `${key} starts around five`);
+    assert.ok(mean(values.high) > 6.3, `${key} high innate ability starts high`);
+    assert.ok(mean(values.low) < 3.7, `${key} low innate ability starts low`);
+    assert.ok(new Set(values.high).size > 25, `${key} varies even with high ability`);
+  }
+});
+
+test('lifetime focus produces substantial gains, losses, and reversals without fixing a final score', () => {
+  const person = {
+    age: 20, alive: true,
+    stats: { intelligence: 5, strength: 5, social: 5, creativity: 5 },
+    aptitudes: { intelligence: 0, strength: 0, social: 0, creativity: 0 },
+    focus: { work: 3, social: 3, family: 3, self: 3 },
+  };
+  assert.deepEqual(skillChanges(person), { intelligence: 0, strength: 0, social: 0, creativity: 0 });
+  const practice = { work: 5, social: 1, family: 1, self: 5 };
+  const neglect = { work: 1, social: 5, family: 5, self: 1 };
+  const advance = (state, focus, years) => {
+    state.focus = focus;
+    for (let year = 0; year < years; year++) {
+      for (const [key, change] of Object.entries(skillChanges(state))) state.stats[key] = Math.max(1, Math.min(10, state.stats[key] + change));
+      state.age++;
+    }
+    return state;
+  };
+  const trained = advance(structuredClone(person), practice, 10);
+  const neglected = advance(structuredClone(person), neglect, 10);
+  assert.ok(trained.stats.intelligence > 6.8);
+  assert.ok(neglected.stats.intelligence < 3.2);
+  const previous = trained.stats.intelligence;
+  advance(trained, neglect, 10);
+  assert.ok(trained.stats.intelligence < previous - 1.8);
+  assert.ok(trained.stats.intelligence < 5);
+  assert.deepEqual(person.stats, { intelligence: 5, strength: 5, social: 5, creativity: 5 });
+});
+
+test('aptitude helps learning and retention while care and older-age focus still matter', () => {
+  const person = aptitude => ({
+    age: 25, alive: true,
+    stats: { intelligence: naturalSkillRating(aptitude) }, aptitudes: { intelligence: aptitude },
+    focus: { work: 5, social: 1, family: 1, self: 5 },
+  });
+  assert.ok(skillChanges(person(3)).intelligence > skillChanges(person(0)).intelligence);
+  const neglected = aptitude => ({ ...person(aptitude), focus: { work: 1, social: 5, family: 5, self: 1 } });
+  assert.ok(skillChanges(neglected(3)).intelligence > skillChanges(neglected(0)).intelligence);
+  assert.ok(skillChanges(neglected(3)).intelligence < 0);
+  const older = skillChanges({ ...person(0), age: 75 });
+  assert.ok(older.intelligence > .1 && older.intelligence < skillChanges(person(0)).intelligence);
+  const baby = { ...person(0), age: 0, cryLevel: 3 };
+  assert.ok(skillChanges({ ...baby, careFocus: 5 }).intelligence > skillChanges({ ...baby, careFocus: 1 }).intelligence);
+  assert.ok(skillChanges({ ...baby, cryLevel: 5 }).social > skillChanges({ ...baby, cryLevel: 1 }).social);
+  assert.deepEqual(skillChanges({ ...person(0), alive: false }), { intelligence: 0, strength: 0, social: 0, creativity: 0 });
 });
 
 test('childhood wellbeing recovers toward its usual range while choices still matter', () => {

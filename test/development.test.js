@@ -110,6 +110,7 @@ test('hard crying has a substantially larger mean mental-stability cost while al
 test('annual development varies around the pure mean forecast and is reproducible from a saved seed', () => {
   const template = createGame({ seed: 76 });
   template.aptitudes.intelligence = 0;
+  template.stats.intelligence = 5;
   template.parents.forEach(parent => { parent.stats.stability = 7; parent.relationship = 7; });
   setCryLevel(template, 5);
   const beforePreview = copy(template);
@@ -133,9 +134,10 @@ test('annual development varies around the pure mean forecast and is reproducibl
   assert.ok(gains.length > 60);
   assert.ok(new Set(gains).size > 6, 'ordinary gains vary even without a random event');
   const expectedGain = forecast.stats.intelligence.change;
-  assert.ok(Math.abs(median(gains) - expectedGain) < Math.max(.02, expectedGain * .15));
-  const relativeSpread = standardDeviation(gains) / expectedGain;
-  assert.ok(relativeSpread > .1 && relativeSpread < .3, 'annual variation stays modest relative to calibrated growth');
+  assert.ok(Math.abs(median(gains) - expectedGain) < .025);
+  const spread = standardDeviation(gains);
+  assert.ok(spread > .035 && spread < .12, 'small annual variation remains even when the mean change is near zero');
+  assert.ok(gains.some(gain => gain < 0) && gains.some(gain => gain > 0), 'ordinary yearly variation can move ratings in either direction');
   assert.ok(standardDeviation(stressChanges) > .1);
 });
 
