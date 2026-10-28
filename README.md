@@ -8,9 +8,11 @@ A small, generational life simulator about how you spend your years and what you
 
 ## Designed for phones
 
-The four tabs are **Year**, **Career**, **Family**, and **You**. Year shows focus controls, stats, and compact **Dad:**/**Mom:** rows with mental stability and relationship bars. Green/red segments preview routine changes; year reviews show the choices used and actual **before → after** values. Only height displays a percentile, comparing same-age simulated lives while the player is alive and under 18. Full parent profiles remain in Family. Known names in stories show their relationship, such as **Name (Mom)**. Short explanations live in **?** popups. Health, mental stability, lifestyle, and gender remain visible beside the character profile.
+The four tabs are **Year**, **Career**, **Family**, and **You**. Year keeps health, mental stability, lifestyle, and height in the top status strip, with five skill bars below; tap any top vital for full details in You. Compact **Dad:**/**Mom:** rows show mental stability and relationships. Green/red segments preview routine changes; year reviews show the choices used and actual **before → after** values. Only height displays a percentile, comparing same-age simulated lives while the player is alive and under 18. Full parent profiles remain in Family. Known names in stories show their relationship, such as **Name (Mom)**. Short explanations live in **?** popups; gender appears beside the name.
 
 Tap **More** (the three dots) for help, event odds, save export/import, or a new life. These menus open as bottom sheets. Focus controls have 44-pixel touch targets, inputs use 16-pixel text to avoid automatic zoom, and the layout reserves room for phone safe areas. Larger screens display the same centered phone layout. Existing browser saves are preserved.
+
+Before 18, Career shows a disabled **Unlocks at age 18** bar; adult college and job choices remain available as usual.
 
 ## The first playable framework
 
@@ -81,7 +83,7 @@ Actor identity, growth-reference profile, attraction preferences, and pregnancy 
 
 Job skill affinities run from +1 (useful) to +3 (central), and their relative weights determine skill fit and job-related development. These describe what a role uses; a character’s own −3 to +3 natural aptitude affects starting ability and response to practice. Job lifestyle ratings and education requirements are fictional balancing values for this framework.
 
-Existing saves and JSON backups upgrade automatically to schema v9. This release preserves existing stats, RNG, height, relationships, careers, pending decisions, pregnancy, and year review; ratings are never reset or rescaled. New people use the broader starting distributions. New summaries optionally store the completed year's `decisions` as cry level or focus and work label; older summaries show no invented choices. Relationship annotations affect rendered prose only, preserving stored names and history. Earlier migrations, including growth, career, identity, surname, and stat conversions, remain compatible. The browser key stays `lifelines.save.v1`; the release cache token is `year-recap-1`.
+Existing saves and JSON backups upgrade automatically to schema v9. This release preserves existing stats, RNG, height, relationships, careers, pending decisions, pregnancy, and year review; ratings are never reset or rescaled. New people use the broader starting distributions. New summaries optionally store the completed year's `decisions` as cry level or focus and work label; older summaries show no invented choices. Relationship annotations affect rendered prose only, preserving stored names and history. Earlier migrations, including growth, career, identity, surname, and stat conversions, remain compatible. The browser key stays `lifelines.save.v1`; the release cache token is `top-vitals-1`.
 
 ## Run locally
 

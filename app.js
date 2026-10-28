@@ -5,8 +5,8 @@ import {
   offeredJobs, needsEducationChoice, pendingEventSubject,
   relationshipOdds, meetingChances, proposalChance, pregnancyChance, oneNightChance,
   respondToEncounter, proposeMarriage, endRelationship, normalizeSurname, heightPercentile, statPercentiles
-} from './engine.js?v=year-recap-1';
-import { annotateNarrative } from './narrative.js?v=year-recap-1';
+} from './engine.js?v=top-vitals-1';
+import { annotateNarrative } from './narrative.js?v=top-vitals-1';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const app = document.querySelector('#app');
@@ -96,12 +96,12 @@ function heightLabel(person) {
   return percentile===null?'Adult height':`${percentileLabel(percentile)} for age`;
 }
 const percentileTag = (percentiles, key) => percentiles ? `<span class="stat-percentile${key==='height'?' height-percentile':''}" data-percentile-key="${key}" aria-label="${esc(skillLabel(key))}: ${percentileLabel(percentiles[key].percentile)}">${percentileLabel(percentiles[key].percentile)}</span>` : '';
-function projectedMeter(label, value, projected, key = '', extraClass = '') {
+function projectedMeter(label, value, projected, key = '', extraClass = '', element = 'div') {
   const change = projected?.change || 0;
   const direction = change > 0 ? 'increase' : change < 0 ? 'decrease' : 'steady';
   const left = Math.min(value, projected?.after ?? value) * 10;
   const width = Math.abs(change) * 10;
-  return `<div class="stat-track ${extraClass}" role="meter" aria-label="${esc(label)}" aria-valuemin="1" aria-valuemax="10" aria-valuenow="${value}" ${projected?`aria-valuetext="${number(value)} out of 10; expected to ${direction==='steady'?'stay steady':direction} next year"`:''}><span class="stat-fill" style="--stat-color:var(--${key || 'green'}, #809b73);width:${value*10}%"></span>${change?`<span class="stat-projection ${direction}" data-direction="${direction}" style="left:${left}%;width:${width}%" aria-hidden="true"></span>`:''}</div>`;
+  return `<${element} class="stat-track ${extraClass}" role="meter" aria-label="${esc(label)}" aria-valuemin="1" aria-valuemax="10" aria-valuenow="${value}" ${projected?`aria-valuetext="${number(value)} out of 10; expected to ${direction==='steady'?'stay steady':direction} next year"`:''}><span class="stat-fill" style="--stat-color:var(--${key || 'green'}, #809b73);width:${value*10}%"></span>${change?`<span class="stat-projection ${direction}" data-direction="${direction}" style="left:${left}%;width:${width}%" aria-hidden="true"></span>`:''}</${element}>`;
 }
 const helpButton = (topic, label, id = '') => `<button type="button" class="help-button" data-action="topic-help" data-topic="${esc(topic)}" ${id?`data-id="${esc(id)}"`:''} aria-label="About ${esc(label)}" aria-haspopup="dialog"><span aria-hidden="true">?</span></button>`;
 const labelWithHelp = (label, topic, id = '') => `<span class="label-with-help">${esc(label)}${helpButton(topic,label,id)}</span>`;
@@ -147,14 +147,16 @@ function render() {
   const lifeStage = stage(state);
   const stats = effectiveStats(state);
   const isYear = activeTab === 'year';
+  const forecast = isYear && !state.ended && !state.needsSuccession && !state.pendingEvents.length && !needsEducationChoice(state) ? annualForecast(state) : null;
+  const percentiles = statPercentiles(state);
   app.innerHTML = `<div class="app-shell ${isYear?'with-advance':''}">
     <header class="topbar">
       <a class="brand" href="#" data-action="tab" data-tab="year" aria-label="Lifelines home"><span class="brand-mark">${icon('sprout')}</span><span class="brand-title">lifelines<span style="color:var(--orange)">.</span></span></a>
       <div class="top-actions"><span class="save-status">${icon(saveAvailable ? 'check' : 'download')}${saveAvailable ? 'Saved' : 'Session only'}</span><button class="icon-button" data-action="menu" aria-label="More options" aria-haspopup="dialog">${icon('menu')}</button></div>
     </header>
     <section class="profile-bar" aria-label="Your life"><div class="portrait">${avatar(state)}</div><div class="profile-copy"><p class="eyebrow">GENERATION ${state.generation}</p><div class="profile-name-row"><h1 class="person-name">${esc(state.name)}</h1>${genderBadge(state)}</div><p class="muted">${state.age<3?'A whole life ahead':state.age<18?'Student':state.education.status==='college'?'College student':career()?.name || 'Finding a path'}</p></div><div class="profile-age"><strong>${state.age}</strong><span>YEARS OLD</span></div></section>
-    <div class="status-strip" aria-label="At a glance">${[['Health',number(stats.health)],['Mental stability',number(stats.stability)],['Lifestyle',state.lifestyle]].map(([label,value])=>`<button class="status-pill" data-action="tab" data-tab="character" aria-label="${label} ${value} out of 10. View your character."><span class="status-label">${label}</span><strong>${value}<small>/10</small></strong></button>`).join('')}</div>
-      <main class="main-column" id="main-content"><div class="chapter-heading"><h2>${isYear ? stageNames[lifeStage] : ({career:'Find your calling',family:'A life, connected',character:'This is you'}[activeTab])}<span style="color:var(--orange)">.</span></h2></div>
+    <div class="status-strip" aria-label="At a glance">${[['health','Health',stats.health],['stability','Mental stability',stats.stability],['lifestyle','Lifestyle',state.lifestyle],['height','Height',state.height]].map(([key,label,value])=>`<button class="status-pill" data-stat="${key}" data-action="tab" data-tab="character" aria-label="${label} ${number(value)} ${key==='height'?'centimetres':'out of 10'}. View your character."><span class="status-label">${label}</span><strong class="status-value">${number(value)}<small>${key==='height'?' cm':'/10'}</small></strong>${key==='height'?(percentiles?percentileTag(percentiles,'height'):state.age>=18?'<span class="height-percentile">Adult height</span>':''):isYear?projectedMeter(label,value,key==='lifestyle'?forecast?.lifestyle:forecast?.stats[key],key,'','span'):''}</button>`).join('')}</div>
+      <main class="main-column" id="main-content">${activeTab==='career'?'':`<div class="chapter-heading"><h2>${isYear ? stageNames[lifeStage] : ({family:'A life, connected',character:'This is you'}[activeTab])}<span style="color:var(--orange)">.</span></h2></div>`}
       ${eventDecisionView()}${state.ended ? endPanel() : ''}${state.needsSuccession ? successionPanel() : ''}
       ${activeTab==='year' ? yearView() : activeTab==='career' ? careerView() : activeTab==='family' ? familyView() : characterView()}</main>
     <footer class="bottom-dock" aria-label="Game controls">${isYear?advanceControls():''}<nav class="nav-list" aria-label="Game sections">${[['year','Year'],['career','Career'],['family','Family'],['character','You']].map(([id,label])=>`<button class="nav-button ${activeTab===id?'active':''}" data-action="tab" data-tab="${id}" ${activeTab===id?'aria-current="page"':''}><span class="nav-icon">${icon(id)}</span><span class="nav-label">${label}</span>${id==='family'&&state.children.length?`<span class="nav-count">${state.children.length}</span>`:''}</button>`).join('')}</nav></footer>
@@ -176,10 +178,10 @@ function statsView(preview = false) {
   return `<section class="panel stats-panel ${preview?'year-stats':''} ${forecast?'forecast-panel':''}" aria-label="${preview?'Your stats and expected changes':'Your character stats'}"><div class="panel-heading"><h3>${labelWithHelp(preview?'Your stats':'Your character','stats')}</h3><span class="tag">1–10</span></div><div class="stat-list">${SKILLS.map(skill => {
     const value = stats[skill.key]; const apt = state.aptitudes[skill.key];
     return `<div class="stat-row" data-stat="${skill.key}"><div class="stat-heading"><span class="stat-name">${labelWithHelp(skill.label,skill.key)}</span><span class="aptitude ${apt>0?'positive':apt<0?'negative':''}" aria-label="Natural aptitude ${aptitude(apt)}">${aptitude(apt)}</span><strong class="stat-value">${number(value)}</strong></div>${projectedMeter(skill.label,value,forecast?.stats[skill.key],skill.key)}</div>`;
-  }).join('')}</div><div class="stat-help-links">${labelWithHelp('Natural aptitude','affinity')}${forecast?labelWithHelp('Next year','forecast'):''}</div><div class="vitals-grid">${[['health','Health','heart'],['stability','Mental stability','spark'],['lifestyle','Lifestyle','self']].map(([key,label,ico]) => {
+  }).join('')}</div><div class="stat-help-links">${labelWithHelp('Natural aptitude','affinity')}${forecast?labelWithHelp('Next year','forecast'):''}</div>${preview?'':`<div class="vitals-grid">${[['health','Health','heart'],['stability','Mental stability','spark'],['lifestyle','Lifestyle','self']].map(([key,label,ico]) => {
     const value = key==='lifestyle' ? state.lifestyle : stats[key];
     return `<div class="vital" data-stat="${key}"><span class="vital-label">${labelWithHelp(label,key)}</span><span class="vital-value">${number(value)}<small>/10</small></span>${projectedMeter(label,value,key==='lifestyle'?forecast?.lifestyle:forecast?.stats[key],key)}</div>`;
-  }).join('')}<div class="vital height-vital" data-stat="height"><span class="vital-label">${labelWithHelp('Height','height',state.id)}</span><span class="vital-value">${number(state.height)}<small> cm</small></span>${percentiles?percentileTag(percentiles,'height'):state.age>=18?'<span class="height-percentile">Adult height</span>':''}</div></div></section>`;
+  }).join('')}<div class="vital height-vital" data-stat="height"><span class="vital-label">${labelWithHelp('Height','height',state.id)}</span><span class="vital-value">${number(state.height)}<small> cm</small></span>${percentiles?percentileTag(percentiles,'height'):state.age>=18?'<span class="height-percentile">Adult height</span>':''}</div></div>`}</section>`;
 }
 
 function outcomeSummary(outcome, subject, pending) {
@@ -292,7 +294,7 @@ function collegeProgressView() {
 }
 
 function careerView() {
-  if (state.age<18) return `<section class="panel"><div class="panel-heading"><h3>${labelWithHelp('Your future starts here','career')}</h3><span class="tag">AGE 18</span></div></section>`;
+  if (state.age<18) return '<button class="career-locked-bar" type="button" disabled>Unlocks at age 18</button>';
   if (state.education.status==='college') return `${collegeProgressView()}<section class="panel"><button class="button primary" data-action="tab" data-tab="year">Continue studying ${icon('arrow')}</button></section>`;
   const current = career();
   const offers = offeredJobs(state);

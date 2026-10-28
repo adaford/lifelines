@@ -77,12 +77,15 @@ button svg { pointer-events: none; }
 .profile-age { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 47px; padding-left: 10px; border-left: 1px solid var(--line); }
 .profile-age strong { font-family: Georgia, "Times New Roman", serif; font-size: 30px; font-weight: 400; line-height: 1.1; }
 .profile-age span { font-size: 9px; font-weight: 650; color: var(--muted); letter-spacing: .6px; margin-top: 4px; }
-.status-strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; margin-bottom: 22px; }
+.status-strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; margin-bottom: 22px; }
 .status-pill { min-width: 0; min-height: 65px; padding: 9px 8px; background: #ebece2; border: 1px solid #e0e3d5; border-radius: 10px; text-align: left; }
-.status-label { display: block; color: var(--muted); font-size: 11px; line-height: 1.4; margin-bottom: 3px; }
+.status-label { display: block; color: var(--muted); font-size: 11px; line-height: 1.4; min-height: 2.8em; margin-bottom: 3px; }
 .status-label .icon { width: 13px; height: 13px; margin-right: 3px; }
 .status-pill strong { color: var(--green); font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .status-pill small { font-size: 11px; color: var(--muted); }
+.status-pill .stat-track { display: block; height: 5px; margin-top: 7px; }
+.status-pill .height-percentile { display: block; margin-top: 4px; font-size: 10px; line-height: 1.3; }
+.career-locked-bar { display: block; width: 100%; padding: 16px; border: 1px solid #d8dad5; border-radius: 9px; background: #e8e9e5; color: #797e76; font: inherit; font-size: 14px; text-align: center; opacity: 1; cursor: default; }
 .main-column { min-width: 0; }
 .chapter-heading { margin-bottom: 17px; }
 .chapter-heading .eyebrow { margin-bottom: 5px; }
@@ -449,6 +452,8 @@ details p { font-size: 13px; color: var(--muted); line-height: 1.65; padding-bot
   .status-strip { gap: 5px; }
   .status-pill { padding: 9px 7px; }
   .status-label { font-size: 10px; }
+  .status-pill strong { font-size: 16px; }
+  .status-pill small, .status-pill .height-percentile { font-size: 9px; }
   .panel { padding: 14px; }
   .focus-row { grid-template-columns: minmax(0, 1fr) auto; column-gap: 10px; }
   .focus-icon { display: none; }
