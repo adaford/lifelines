@@ -46,6 +46,9 @@ test('all parent stats, affinities, and relationships are visible from childhood
   fixture.parents[1].alive=false;
   const ui=await mount(fixture);
   ui.click('.nav-list [data-tab="family"]');
+  assert.match(ui.query('.roots-panel').textContent,/Mom/);
+  assert.match(ui.query('.roots-panel').textContent,/Dad/);
+  assert.doesNotMatch(ui.query('.roots-panel').textContent,/PARENT ONE|PARENT TWO/);
   for(const parent of fixture.parents) {
     const card=ui.query(`.roots-panel [data-person-id="${parent.id}"]`);
     assert.equal(card.querySelectorAll('.profile-stat[data-skill]').length,7);
@@ -59,21 +62,57 @@ test('all parent stats, affinities, and relationships are visible from childhood
   assert.deepEqual(ui.saved(),fixture,'reading family profiles must preserve all state');
 });
 
-test('cry levels update a visible forecast without advancing time or consuming randomness', async () => {
+test('cry levels update colored stat forecasts without numeric deltas or consuming randomness', async () => {
   const ui=await mount(createGame({name:'Jamie Reed',seed:121}));
   const initial=ui.saved();
   ui.click('[data-action="baby"][data-level="1"]');
-  const low=Number(ui.query('.forecast-panel [data-stat="intelligence"] strong').textContent);
+  const low=parseFloat(ui.query('.forecast-panel [data-stat="intelligence"] .stat-projection').style.width);
   ui.click('[data-action="baby"][data-level="5"]');
-  const high=Number(ui.query('.forecast-panel [data-stat="intelligence"] strong').textContent);
+  const high=parseFloat(ui.query('.forecast-panel [data-stat="intelligence"] .stat-projection').style.width);
   assert.ok(high>low);
-  assert.equal(ui.all('.forecast-panel .year-change').length,8);
-  assert.match(ui.query('.forecast-parents').textContent,/Stability.*Bond/);
-  assert.match(ui.query('.forecast-panel').textContent,/Random events/);
+  assert.equal(ui.all('.forecast-panel [role="meter"]').length,8);
+  assert.equal(ui.all('.forecast-panel .year-change').length,0);
+  assert.equal(Number(ui.query('.forecast-panel [data-stat="intelligence"] strong').textContent),Number(initial.stats.intelligence.toFixed(1)));
+  assert.match(ui.query('.forecast-panel [data-stat="intelligence"] [role="meter"]').getAttribute('aria-valuetext'),/expected to increase/);
+  assert.match(ui.query('.forecast-panel').textContent,/Expected increase.*Expected decrease/);
+  assert.match(ui.query('.forecast-panel').textContent,/Growth varies each year/);
   assert.equal(ui.saved().rng,initial.rng);
   assert.equal(ui.saved().age,initial.age);
   assert.equal(ui.saved().cryLevel,5);
   assertNoMoneyDisplay(ui.query('.forecast-panel'),'annual forecast');
+  ui.click('.nav-list [data-tab="family"]');
+  assert.ok(ui.query('.roots-panel [data-skill="stability"] .stat-projection.decrease'));
+  assert.ok(ui.query('.roots-panel .relationship-meter .stat-projection.increase'));
+});
+
+test('gender is visible next to the name and height percentiles end at individual maturity', async () => {
+  for(const gender of ['male','female','nonbinary']) {
+    const baby=createGame({name:'Jamie Reed',seed:121,gender});
+    let ui=await mount(baby);
+    assert.equal(ui.query('.profile-name-row .person-name').textContent,baby.name);
+    assert.equal(ui.query('.profile-name-row .gender-label').textContent,gender==='nonbinary'?'Nonbinary':gender[0].toUpperCase()+gender.slice(1));
+    assert.match(ui.query('.height-vital').textContent,/cm.*percentile/);
+    const grown=ageTo(baby,baby.maturityAge);
+    ui=await mount(grown);
+    ui.click('.nav-list [data-tab="character"]');
+    assert.equal(ui.query('.height-vital .height-percentile').textContent,'Adult height');
+    assert.match(ui.query('.character-guide').textContent,/reached your adult height/);
+  }
+});
+
+test('aging losses show as red segments and parents keep their explicit family roles', async () => {
+  const fixture=ageTo(createGame({name:'Jamie Reed',seed:121,gender:'female'}),23);
+  fixture.stats.attractiveness=8;
+  fixture.parents[0].parentRole='mom';
+  fixture.parents[1].parentRole='dad';
+  const ui=await mount(fixture);
+  const meter=ui.query('.year-stats [data-stat="attractiveness"] [role="meter"]');
+  assert.equal(Number(meter.getAttribute('aria-valuenow')),8);
+  assert.match(meter.getAttribute('aria-valuetext'),/expected to decrease/);
+  assert.ok(meter.querySelector('.stat-projection.decrease'));
+  ui.click('.nav-list [data-tab="family"]');
+  assert.equal(ui.query(`.roots-panel [data-person-id="${fixture.parents[0].id}"] .eyebrow`).textContent,'Mom');
+  assert.equal(ui.query(`.roots-panel [data-person-id="${fixture.parents[1].id}"] .eyebrow`).textContent,'Dad');
 });
 
 test('new-year review shows actual changes, survives reload, and dismisses persistently', async () => {
@@ -196,7 +235,7 @@ test('a childless retirement previews one stable low-stat beneficiary with a dif
   const info=successionInfo(fixture), candidate=info.candidates[0];
   assert.equal(info.route,'beneficiary');
   assert.notEqual(candidate.familyName.toLowerCase(),fixture.familyName.toLowerCase());
-  for(const skill of SKILLS) assert.ok(candidate.stats[skill.key]<=3);
+  for(const skill of SKILLS) if(skill.key!=='attractiveness') assert.ok(candidate.stats[skill.key]<=3);
   let ui=await mount(fixture);
   ui.click('.retirement-notice');
   assert.match(ui.query('.beneficiary-preview').textContent,new RegExp(candidate.name));
@@ -225,7 +264,7 @@ test('a previously finished v5 childless life can continue through a beneficiary
   for(const person of [...old.parents,...old.children,...old.siblings]) {
     if(person.age>=85) { person.age=85; person.alive=false; }
   }
-  for(const person of [old,...old.parents,...old.children,...old.siblings,...old.lineage]) delete person.familyName;
+  for(const person of [old,...old.parents,...old.children,...old.siblings,...old.lineage,...old.encounters,old.partner].filter(Boolean)) { delete person.familyName; person.appearancePeakAge=30; }
   const ui=await mount(old);
   assert.equal(ui.saved().age,85);
   assert.equal(ui.saved().ended,false);
@@ -339,7 +378,7 @@ function encounterFixture() {
   state.focus={work:2,social:5,family:2,self:3};
   state.effects=[];
   for(let attempt=0;attempt<5;attempt++) {
-    assert.equal(advanceYear(state,{mortalityRandom:()=>1}).ok,true); resolvePending(state);
+    assert.equal(advanceYear(state,{mortalityRandom:()=>1,growthRandom:()=>0}).ok,true); resolvePending(state);
     if(state.yearSummary) state.yearSummary.dismissed=true;
     if(state.encounters.length>=2) break;
   }
@@ -376,7 +415,7 @@ function ageTo(state, age) {
   resolvePending(state);
   while (state.age < age) {
     if (needsEducationChoice(state)) assert.equal(chooseEducation(state, 'work').ok, true);
-    assert.equal(advanceYear(state,{mortalityRandom:()=>1}).ok, true);
+    assert.equal(advanceYear(state,{mortalityRandom:()=>1,growthRandom:()=>0}).ok, true);
     resolvePending(state);
   }
   if(state.yearSummary) state.yearSummary.dismissed=true;
@@ -735,7 +774,7 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     assert.ok(ui.query('.bottom-dock [data-action="advance"]'));
     assert.match(ui.query('.profile-bar').textContent, /Riley Santos/);
     assert.match(ui.query('.status-strip').textContent, /Health/);
-    assert.match(ui.query('.status-strip').textContent, /Stability/);
+    assert.match(ui.query('.status-strip').textContent, /Mental stability/);
 
     for (const tab of ['career', 'family', 'character']) {
       ui.click(`.bottom-dock [data-tab="${tab}"]`);
@@ -789,17 +828,18 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     assert.equal(initial.age, 0);
     assert.equal(ui.query('.person-name').textContent, 'Jamie Reed');
     assert.equal(ui.all('.cry-level').length, 5);
-    assert.equal(ui.all('.stat-list .stat-row').length, 0, 'detailed skills belong on the You screen');
-    assert.equal(ui.all('.birth-skills .birth-skill').length, 5, 'all adult skills must be visible from birth');
-    assert.equal(ui.all('.birth-skills .aptitude').length, 5, 'every newborn skill needs its growth affinity');
+    assert.equal(ui.all('.stat-list .stat-row').length, 5, 'current skills and forecasts are visible on Year');
+    assert.equal(ui.all('.year-stats .stat-row').length, 5, 'all adult skills must be visible from birth');
+    assert.equal(ui.all('.year-stats .stat-list .aptitude').length, 5, 'every newborn skill needs its growth affinity');
     for (const [index, skill] of SKILLS.entries()) {
-      assert.ok(initial.stats[skill.key] >= 1 && initial.stats[skill.key] <= 1.5, `${skill.label} should begin very low`);
-      const cell = ui.all('.birth-skills .birth-skill')[index];
+      if (skill.key==='attractiveness') assert.ok(initial.stats[skill.key]>1.5,'appearance begins near its adult value');
+      else assert.ok(initial.stats[skill.key] >= 1 && initial.stats[skill.key] <= 1.5, `${skill.label} should begin very low`);
+      const cell = ui.all('.year-stats .stat-row')[index];
       assert.match(cell.textContent, new RegExp(skill.label));
       assert.ok(Number.isInteger(initial.aptitudes[skill.key]) && initial.aptitudes[skill.key] >= -3 && initial.aptitudes[skill.key] <= 3);
       assert.equal(cell.querySelector('.aptitude').textContent.trim(), `${initial.aptitudes[skill.key] > 0 ? '+' : ''}${initial.aptitudes[skill.key]}`);
     }
-    assert.match(ui.query('.birth-skills').textContent, /affinity/i);
+    assert.match(ui.query('.year-stats').textContent, /affinity/i);
     assert.equal(ui.all('[data-action="focus"]').length, 0);
 
     ui.click('[data-action="baby"][data-level="5"]');
@@ -866,14 +906,14 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     assert.equal(validateSave(ui.saved()), true);
   });
 
-  test('Stability replaces Instability throughout character, family, effects, and help', async () => {
+  test('Mental stability replaces abbreviated or legacy labels throughout character, family, effects, and help', async () => {
     const fixture = ageTo(createGame({ name: 'Quinn Reed', seed: 212 }), 26);
     fixture.effects = [{ id: 'burnout', name: 'Running on empty', description: 'A difficult stretch.', years: 2, modifiers: { stability: -1.2, intelligence: -.6 }, kind: 'negative' }];
     const ui = await mount(fixture);
     for (const tab of ['year', 'career', 'family', 'character']) {
       ui.click(`.nav-list [data-tab="${tab}"]`);
       assert.doesNotMatch(ui.query('#app').textContent, /instability/i, `${tab} must use the positive stability scale`);
-      assert.match(ui.query('.status-strip').textContent, /Stability\s*[\d.]+\s*\/\s*10/);
+      assert.match(ui.query('.status-strip').textContent, /Mental stability\s*[\d.]+\s*\/\s*10/);
     }
     assert.match(ui.query('.effect-card.negative').textContent, /[Ss]tability\s*-1\.2/);
     assert.match(ui.query('.vitals-grid').textContent, /Higher is calmer/);

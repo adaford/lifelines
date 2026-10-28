@@ -13,6 +13,7 @@ Lifelines is a phone-first, generational life simulator. Read `HANDOFF.md` for t
 
 - `engine.js`: simulation, progression, education, career offers, saves, and succession.
 - `jobs.js`, `events.js`, `family-events.js`, `relationships.js`: careers, event catalogs, and family/relationship rules.
+- `growth.js`, `mortality.js`: sourced age/height references and stochastic growth/mortality rules.
 - `app.js`: UI actions, browser persistence, and save import/export.
 - `styles.css`, `index.html`, `favicon.svg`: phone layout, static entry point, and branding.
 - `test/`: simulation and DOM integration tests; `server.mjs`: development server.
@@ -21,8 +22,11 @@ Lifelines is a phone-first, generational life simulator. Read `HANDOFF.md` for t
 
 - Keep the phone layout, bottom navigation, accessible touch targets, and safe-area spacing.
 - Use lifestyle 1-10 as the only player-facing financial number; do not add salary, income, spending, savings, or inheritance amounts to the UI.
-- Use stability 1-10, where higher is better. Discipline and relaxation are not character traits.
-- Babies and adults share the same skills, with low birth skills and permanent growth affinities from -3 to +3. Child lifestyle follows the parent household.
+- Label the wellbeing stat **mental stability**, 1-10 with higher better; preserve its internal `stability` save key. Discipline and relaxation are not traits.
+- Babies and adults share the same stat set. Four trainable skills start low with permanent -3 to +3 affinities; attractiveness starts near its mature inherited value and has no ordinary positive growth. Its requested decline begins after 30 for men and 22 for women. Child lifestyle follows the parent household.
+- Keep Mom/Dad roles, random initial parent bonds centered near 8, gender beside the name, and stronger parent mental-stability costs for intense crying. Preserve existing identities and bonds on migration.
+- Height follows sourced infant/childhood curves, varies between people and years, and reaches adult height between 14 and 18. Display approximate age-specific percentiles until maturity; keep growth reference separate from gender identity.
+- Show expected routine changes as green/red segments inside stat bars, without numerical forecast deltas. Keep actual year-review numbers. Forecasts never consume RNG; actual annual development has seeded variation around the mean.
 - Preserve one-year turns, focus-influenced development and event odds, age-appropriate choices, college/career progression, and generational family play unless the user requests a change.
 - Keep identity, attraction, and pregnancy capability separate so future playable genders remain possible.
 - Preserve existing saves and the `lifelines.save.v1` localStorage key. Add compatible migrations when the schema changes; do not reset or reroll existing progress. Pending decisions must survive reloads.

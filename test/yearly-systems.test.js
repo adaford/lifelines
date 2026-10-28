@@ -106,7 +106,7 @@ test('crying respects stat and bond limits and never changes deceased parents', 
   assert.deepEqual(state.parents[1], deceased);
 });
 
-test('annual forecasts are pure, include expiring effects, and match quiet-year effective changes', () => {
+test('annual forecasts are pure, include expiring effects, and match mean growth in quiet years', () => {
   let checked = false;
   for (let seed = 1; seed <= 50 && !checked; seed++) {
     const state = createGame({ seed });
@@ -116,7 +116,7 @@ test('annual forecasts are pure, include expiring effects, and match quiet-year 
     assert.deepEqual(annualForecast(state), preview);
     assert.deepEqual(state, before, 'preview must not consume RNG or mutate any saved state');
     assert.ok(preview.stats.health.change >= .6, 'recovery from expiring modifiers is included');
-    advanceYear(state, survives);
+    advanceYear(state, { ...survives, growthRandom: () => 0 });
     if (state.lastYearEvents.length) continue;
     assert.deepEqual(state.yearSummary.stats, preview.stats);
     assert.deepEqual(state.yearSummary.parents, preview.parents);
@@ -148,6 +148,7 @@ test('year summaries survive reload, can be dismissed, and reopen only after the
 test('v6 saves gain cry level and parent bonds without rerolling progress or queued decisions', () => {
   const legacy = survivorAt(8, 70);
   legacy.version = 6;
+  for (const person of [legacy, ...legacy.parents, ...legacy.children, ...legacy.siblings, legacy.partner, ...legacy.encounters, legacy.pregnancy?.otherParent].filter(Boolean)) person.appearancePeakAge = 30;
   legacy.babyChoice = 'cry';
   delete legacy.cryLevel; delete legacy.alive; delete legacy.death; delete legacy.yearSummary;
   legacy.parents.forEach(parent => { delete parent.relationship; });
@@ -156,7 +157,7 @@ test('v6 saves gain cry level and parent bonds without rerolling progress or que
   const before = clone(legacy);
   const migrated = migrateSave(legacy);
   assert.ok(migrated);
-  assert.equal(migrated.version, 7);
+  assert.equal(migrated.version, 8);
   assert.equal(migrated.cryLevel, 5);
   assert.equal(migrated.alive, true);
   assert.equal(migrated.yearSummary, null);

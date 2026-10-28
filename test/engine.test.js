@@ -59,18 +59,19 @@ function oldTraits(state, version = 3) {
 
 test('a new life starts at zero with complete, bounded inherited traits and parents', () => {
   const state = createGame({ name: 'Test Family', seed: 12 });
-  assert.equal(state.age, 0); assert.equal(state.height, 50); assert.equal(state.parents.length, 2);
+  assert.equal(state.age, 0); assert.ok(state.height >= 40 && state.height <= 60); assert.equal(state.parents.length, 2);
   assert.equal(stage(state), 'baby'); assert.equal(validateSave(state), true);
   assert.equal(JOBS.length, 100); assert.ok(EVENTS.length >= 100);
   for (const skill of SKILLS) assert.ok(state.aptitudes[skill.key] >= -3 && state.aptitudes[skill.key] <= 3);
   assert.deepEqual(createGame({ seed: 12 }), createGame({ seed: 12 }));
 });
 
-test('all five adult skills exist at birth, start very low, and use their individual affinities', () => {
+test('all five stats exist at birth with low learned skills and established appearance', () => {
   for (let seed = 1; seed <= 40; seed++) {
     const baby = createGame({ seed });
-    for (const { key } of SKILLS) assert.ok(baby.stats[key] >= 1 && baby.stats[key] <= 1.5, `${key} at birth`);
-    assert.equal(baby.version, 7);
+    for (const { key } of SKILLS.filter(skill => skill.key !== 'attractiveness')) assert.ok(baby.stats[key] >= 1 && baby.stats[key] <= 1.5, `${key} at birth`);
+    assert.ok(baby.stats.attractiveness >= 1 && baby.stats.attractiveness <= 10);
+    assert.equal(baby.version, 8);
     assert.ok(baby.stats.health >= 7);
     assert.ok(baby.stats.stability >= 8);
     assert.deepEqual(Object.keys(baby.stats).sort(), Object.keys(adult(seed).stats).sort());
@@ -78,9 +79,9 @@ test('all five adult skills exist at birth, start very low, and use their indivi
   const fast = createGame({ seed: 93 }), slow = copy(fast);
   for (const { key } of SKILLS) { fast.aptitudes[key] = 3; slow.aptitudes[key] = -3; }
   advanceYear(fast); advanceYear(slow);
-  for (const { key } of SKILLS) assert.ok(fast.stats[key] > slow.stats[key], `${key} responds to affinity`);
+  for (const { key } of SKILLS.filter(skill => skill.key !== 'attractiveness')) assert.ok(fast.stats[key] > slow.stats[key], `${key} responds to affinity`);
   const parent = adult(90); haveChild(parent);
-  for (const { key } of SKILLS) assert.ok(parent.children[0].stats[key] >= 1 && parent.children[0].stats[key] <= 1.5);
+  for (const { key } of SKILLS.filter(skill => skill.key !== 'attractiveness')) assert.ok(parent.children[0].stats[key] >= 1 && parent.children[0].stats[key] <= 1.5);
 });
 
 test('childhood shares the parents household and changes to independent lifestyle exactly at18', () => {
@@ -130,7 +131,8 @@ test('crying improves development more but stresses both parents', () => {
   const cry = createGame({ seed: 3 }), quiet = copy(cry);
   setBabyChoice(cry, 'cry'); setBabyChoice(quiet, 'quiet');
   advanceYear(cry); advanceYear(quiet);
-  for (const skill of SKILLS) assert.ok(cry.stats[skill.key] > quiet.stats[skill.key]);
+  for (const skill of SKILLS.filter(skill => skill.key !== 'attractiveness')) assert.ok(cry.stats[skill.key] > quiet.stats[skill.key]);
+  assert.equal(cry.stats.attractiveness, quiet.stats.attractiveness);
   for (let i = 0; i < 2; i++) assert.ok(cry.parents[i].stats.stability < quiet.parents[i].stats.stability);
 });
 
@@ -400,7 +402,7 @@ test('v2 upgrades preserve school, current careers, and adults without consuming
       const snapshot = copy(old);
       const upgraded = migrateSave(old);
       assert.equal(validateSave(upgraded), true);
-      assert.equal(upgraded.version, 7);
+      assert.equal(upgraded.version, 8);
       assert.equal(upgraded.education.status, status);
       assert.equal(upgraded.education.years, status === 'graduate' ? 4 : 0);
       assert.equal(upgraded.jobOffers.length, count);
@@ -482,7 +484,7 @@ test('family focus improves children, and arrivals are limited to one per year',
   distant.focus = { work: 4, social: 4, family: 0, self: 4 };
   advanceYear(caring); advanceYear(distant);
   assert.equal(caring.children[0].age, 1);
-  for (const skill of SKILLS) assert.ok(caring.children[0].stats[skill.key] > distant.children[0].stats[skill.key]);
+  for (const skill of SKILLS.filter(skill => skill.key !== 'attractiveness')) assert.ok(caring.children[0].stats[skill.key] > distant.children[0].stats[skill.key]);
   assert.ok(caring.children[0].stats.stability >= distant.children[0].stats.stability);
   assert.equal(haveChild(caring).ok, true);
   assert.equal(caring.children[0].adopted, true);
@@ -1125,10 +1127,10 @@ test('marriage raises pregnancy chances and a saved pregnancy produces an inheri
   advanceYear(pregnant);
   const child=pregnant.children[0];
   assert.equal(pregnant.pregnancy,null);
-  assert.equal(child.age,0); assert.equal(child.adopted,false); assert.equal(child.relationship,5);
+  assert.equal(child.age,0); assert.equal(child.adopted,false); assert.ok(child.relationship >= 5 && child.relationship <= 10);
   assert.equal(child.lifestyle,pregnant.lifestyle);
   for(const {key} of SKILLS) {
-    assert.ok(child.stats[key]>=1&&child.stats[key]<=1.5);
+    assert.ok(child.stats[key]>=1&&child.stats[key]<=(key==='attractiveness'?10:1.5));
     assert.ok(child.aptitudes[key]>=-1&&child.aptitudes[key]<=1,'both parents affect inherited affinity');
   }
   assert.equal(validateSave(pregnant),true);
@@ -1316,7 +1318,7 @@ test('childless retirement offers a stable low-stat beneficiary with a different
   const kid=info.beneficiary;
   assert.notEqual(kid.familyName,state.familyName);
   assert.ok(kid.age>=6&&kid.age<=12);
-  for(const {key} of SKILLS) assert.ok(kid.stats[key]>=1&&kid.stats[key]<=3);
+  for(const {key} of SKILLS.filter(skill=>skill.key!=='attractiveness')) assert.ok(kid.stats[key]>=1&&kid.stats[key]<=3);
   for(const key of ['health','stability']) assert.ok(kid.stats[key]>=2&&kid.stats[key]<=4);
   const restored=migrateSave(copy(state));
   assert.deepEqual(successionInfo(restored).beneficiary,kid);
@@ -1353,9 +1355,9 @@ test('old childless endings become valid retirement choices without resetting th
   while(state.age<85) advanceYear(state);
   const previous=copy(state); previous.version=5; previous.ended=true; previous.needsSuccession=false;
   for (const parent of previous.parents) { parent.age = Math.min(85, parent.age); if (parent.age === 85) parent.alive = false; }
-  for(const person of [previous,...previous.parents,...previous.children,...previous.siblings,...previous.lineage,...previous.encounters,previous.partner,previous.pregnancy?.otherParent].filter(Boolean)) delete person.familyName;
+  for(const person of [previous,...previous.parents,...previous.children,...previous.siblings,...previous.lineage,...previous.encounters,previous.partner,previous.pregnancy?.otherParent].filter(Boolean)) { delete person.familyName; person.appearancePeakAge = 30; }
   const migrated=migrateSave(previous);
-  assert.equal(validateSave(migrated),true); assert.equal(migrated.version,7);
+  assert.equal(validateSave(migrated),true); assert.equal(migrated.version,8);
   assert.equal(migrated.ended,false); assert.equal(migrated.needsSuccession,true);
   for(const key of ['id','name','age','rng','nextId','stats','aptitudes','history','money','education','jobOffers','effects','pendingEvents']) assert.deepEqual(migrated[key],previous[key]);
   const info=successionInfo(migrated);
@@ -1370,7 +1372,7 @@ test('v5 family migration preserves partnership, pregnancy, offers, and future s
   while(!state.pregnancy&&state.age<42) advanceYear(state);
   assert.ok(state.pregnancy);
   const previous=copy(state); previous.version=5;
-  for(const person of [previous,...previous.parents,...previous.children,...previous.siblings,...previous.lineage,...previous.encounters,previous.partner,previous.pregnancy.otherParent]) delete person.familyName;
+  for(const person of [previous,...previous.parents,...previous.children,...previous.siblings,...previous.lineage,...previous.encounters,previous.partner,previous.pregnancy.otherParent]) { delete person.familyName; person.appearancePeakAge = 30; }
   const migrated=migrateSave(previous);
   assert.equal(validateSave(migrated),true);
   for(const key of ['rng','nextId','id','name','age','stats','education','jobOffers','history','pendingEvents']) assert.deepEqual(migrated[key],previous[key]);

@@ -70,10 +70,17 @@ export function pregnancyChance(state, partner = state.partner, { casual = false
   return baseChance * healthFactor * ageFactor;
 }
 
+// Requested appearance pacing for the game, not a biological attractiveness
+// standard. Identity remains independent from pregnancy and growth profiles.
+export function appearanceDeclineAge(person) {
+  return person.gender === 'female' ? 22 : 30;
+}
+
 export function attractivenessAgeChange(person) {
-  const peak = person.appearancePeakAge ?? 30;
-  if (person.age < peak) return 0;
-  return -(.06 + Math.min(40, person.age - peak) * .0018);
+  const declineAge = appearanceDeclineAge(person);
+  // Called at the start of a one-year interval: 30 -> 31 is after age 30.
+  if (person.age < declineAge) return 0;
+  return -(.06 + Math.min(40, person.age - declineAge) * .0018);
 }
 
 // Helpers are bound to the engine's seeded state: random(), integer(lo,hi),
@@ -96,9 +103,9 @@ export function createProspects(state, helpers, stats = state.stats) {
     const age = integer(Math.max(18, state.age - 5), Math.min(84, Math.max(18, state.age + 5)));
     const height = integer(150, 195);
     const aptitudes = helpers.randomAptitudes ? helpers.randomAptitudes() : Object.fromEntries(CORE.map(key => [key, integer(-3, 3)]));
-    const appearancePeakAge = integer(27, 33);
+    const appearancePeakAge = appearanceDeclineAge({ gender });
     for (let pastAge = appearancePeakAge; pastAge < age; pastAge++) {
-      actorStats.attractiveness = clamp(actorStats.attractiveness + attractivenessAgeChange({age:pastAge,appearancePeakAge}),1,10);
+      actorStats.attractiveness = clamp(actorStats.attractiveness + attractivenessAgeChange({age:pastAge,gender}),1,10);
     }
     actorStats.attractiveness = round(actorStats.attractiveness);
     prospects.push({

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { desirability, meetingChances, prospectQuality, relationshipOdds, oneNightChance, proposalChance, pregnancyChance, gestatingActor, attractivenessAgeChange, createProspects } from '../relationships.js';
+import { desirability, meetingChances, prospectQuality, relationshipOdds, oneNightChance, proposalChance, pregnancyChance, gestatingActor, appearanceDeclineAge, attractivenessAgeChange, createProspects } from '../relationships.js';
 
 const core = ['intelligence', 'strength', 'attractiveness', 'social', 'creativity'];
 const traits = [...core, 'health', 'stability'];
@@ -90,7 +90,7 @@ test('prospect generation is deterministic, bounded, adult-only, and supports fu
     assert.ok(Object.values(person.stats).every(value=>value>=1 && value<=10));
     assert.deepEqual(Object.keys(person.aptitudes),core);
     assert.ok(Object.values(person.aptitudes).every(value=>Number.isInteger(value) && value>=-3 && value<=3));
-    assert.ok(person.appearancePeakAge>=27 && person.appearancePeakAge<=33);
+    assert.equal(person.appearancePeakAge,22);
     assert.equal(person.gender,'female');assert.equal(person.canGestate,true);
   }
   const future={...state,gender:'female',canGestate:true,attractedTo:['male']};
@@ -111,9 +111,15 @@ test('higher appeal produces stronger profiles on average without removing varia
   assert.ok(mean(high)-mean(low)>3);
 });
 
-test('appearance ages turn gradually downward after each individual peak',()=>{
-  assert.equal(attractivenessAgeChange({...actor(),age:26,appearancePeakAge:27}),0);
-  assert.ok(attractivenessAgeChange({...actor(),age:27,appearancePeakAge:27})<0);
-  assert.ok(attractivenessAgeChange({...actor(),age:50})<attractivenessAgeChange({...actor(),age:30}));
-  assert.ok(attractivenessAgeChange({...actor(),age:84})>-.15);
+test('appearance decline begins in the year after the requested gender threshold',()=>{
+  for (const [gender, declineAge] of [['male',30],['female',22],['nonbinary',30]]) {
+    const person={...actor(),gender,appearancePeakAge:27};
+    assert.equal(appearanceDeclineAge(person),declineAge);
+    for (const age of [0,18,declineAge-1]) assert.equal(attractivenessAgeChange({...person,age}),0);
+    assert.equal(attractivenessAgeChange({...person,age:declineAge}),-.06);
+    assert.ok(attractivenessAgeChange({...person,age:50})<attractivenessAgeChange({...person,age:declineAge}));
+    assert.ok(attractivenessAgeChange({...person,age:84})>-.15);
+  }
+  assert.ok(attractivenessAgeChange({...actor(),gender:'female',age:25})<0);
+  assert.equal(attractivenessAgeChange({...actor(),gender:'male',age:25}),0);
 });
