@@ -86,6 +86,8 @@ test('prospect generation is deterministic, bounded, adult-only, and supports fu
   assert.ok(first.length>0 && first.length<=5);
   for(const person of first) {
     assert.ok(person.age>=18 && person.age<=23);
+    assert.ok(person.height>=59.06 && person.height<=76.77, 'adult height is stored in inches');
+    assert.equal(person.adultHeight,person.height);
     assert.deepEqual(Object.keys(person.stats),traits);
     assert.ok(Object.values(person.stats).every(value=>value>=1 && value<=10));
     assert.deepEqual(Object.keys(person.aptitudes),core);

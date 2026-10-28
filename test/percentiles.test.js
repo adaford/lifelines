@@ -66,7 +66,7 @@ test('a strong baby ranks above same-age peers and changing focus only changes t
 test('current ranks include temporary effects without expiring them or resolving decisions', () => {
   const state = createGame({ seed: 15 });
   state.age = 17;
-  state.height = 170;
+  state.height = 66.93;
   state.effects = [{ id: 'cold', name: 'Cold', description: 'Resting.', years: 1, modifiers: { health: -.6 }, kind: 'negative' }];
   state.pendingEvents = [{ eventId: 'peer_drinking', age: 17 }];
   state.lastYearEvents = ['peer_drinking'];
@@ -83,11 +83,11 @@ test('height is ranked through age seventeen without choosing an actual adult en
   const state = createGame({ seed: 16 });
   state.age = 16;
   state.maturityAge = 16;
-  state.height = 164;
+  state.height = 64.57;
   state.adultHeight = 164;
   const before = structuredClone(state);
   assert.ok(Number.isFinite(statPercentiles(state).height.percentile));
-  assert.equal(statPercentiles(state).height.value, 164);
+  assert.equal(statPercentiles(state).height.value, 64.57);
   assert.equal(statPercentiles(state).height.mean, PERCENTILE_REFERENCE.height.male.ages[16].mean);
   assert.deepEqual(state, before);
   state.age = 17;

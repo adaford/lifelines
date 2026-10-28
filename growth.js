@@ -38,9 +38,11 @@ const REFERENCES = {
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 const round = n => Math.round(n * 100) / 100;
 const sexOf = value => value === 'female' ? 'female' : 'male';
+const CM_PER_INCH = 2.54;
 
 // Keep the growth reference separate from gender identity and gestation.
 // Engine-created people persist growthSex; the default only supports old callers.
+// Source references and population medians remain in centimeters.
 export function heightReference(age, growthSex = 'male') {
   const years = clamp(Number.isFinite(age) ? age : 0, 0, 20);
   const rows = REFERENCES[sexOf(growthSex)];
@@ -84,6 +86,8 @@ export function populationMedianAt(age, maturityAge = 17, growthSex = 'male') {
 // not a medical estimate. Recovery changes future gains, never repays missed
 // growth. Actual adult height emerges from all the yearly gains and freezes at
 // individual maturity; there is no personal endpoint or maturity catch-up.
+// Saved measurements are inches. Only the annual centimeter gain crosses the
+// unit boundary; no stored measurement is converted in place.
 export function advanceGrowth(person, normalDraw = 0) {
   const maturity = person.maturityAge ?? (person.growthSex === 'female' ? 15 : 17);
   if (person.alive === false || person.age >= maturity) return { height: person.height };
@@ -95,7 +99,7 @@ export function advanceGrowth(person, normalDraw = 0) {
   const health = Number.isFinite(person.stats?.health) ? person.stats.health : 5;
   const healthMultiplier = 1 - .15 * clamp((5 - health) / 4, 0, 1);
   const gain = Math.max(0, expectedGain + residual) * healthMultiplier;
-  return { height: round(person.height + gain) };
+  return { height: round(person.height + gain / CM_PER_INCH) };
 }
 
 // Compatibility for callers that need only a projected measurement.
@@ -114,6 +118,7 @@ export function heightPercentile(person) {
   const maturity = person.maturityAge ?? (person.growthSex === 'female' ? 15 : 17);
   if (!Number.isFinite(person.age) || !Number.isFinite(person.height) || person.height <= 0 || person.age >= maturity) return null;
   const { L, M, S } = heightReference(person.age, person.growthSex);
-  const z = Math.abs(L) < 1e-8 ? Math.log(person.height / M) / S : (Math.pow(person.height / M, L) - 1) / (L * S);
+  const heightCm = person.height * CM_PER_INCH;
+  const z = Math.abs(L) < 1e-8 ? Math.log(heightCm / M) / S : (Math.pow(heightCm / M, L) - 1) / (L * S);
   return round(clamp(normalCDF(z) * 100, .01, 99.99));
 }

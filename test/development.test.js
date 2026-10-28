@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { toLegacyCentimeters } from './helpers/legacy-height.js';
 import {
   EVENTS, SKILLS, createGame, advanceYear, annualForecast, setCryLevel,
   validateSave, migrateSave, needsEducationChoice, chooseEducation,
@@ -32,7 +33,7 @@ function aged(age, seed = 43, gender = 'male') {
   return state;
 }
 function legacyV7(state) {
-  const legacy = copy(state);
+  const legacy = toLegacyCentimeters(copy(state));
   legacy.version = 7;
   for (const person of [legacy, ...legacy.parents, ...legacy.children, ...legacy.siblings, ...legacy.lineage, legacy.partner, ...legacy.encounters, legacy.pregnancy?.otherParent].filter(Boolean)) {
     if (person.adultHeight === null) person.adultHeight = 170;
@@ -149,21 +150,24 @@ test('v7 migration preserves existing height, bonds, random state and non-infant
   const before = copy(legacy);
   const migrated = migrateSave(legacy);
   assert.ok(migrated);
-  assert.equal(migrated.version, 9);
-  for (const key of ['rng', 'seed', 'nextId', 'age', 'height', 'stats', 'pendingEvents', 'history', 'yearSummary']) assert.deepEqual(migrated[key], before[key], key);
+  assert.equal(migrated.version, 10);
+  for (const key of ['rng', 'seed', 'nextId', 'age', 'stats', 'pendingEvents', 'history']) assert.deepEqual(migrated[key], before[key], key);
+  assert.equal(migrated.height, round(before.height / 2.54));
+  assert.equal(migrated.yearSummary.height.before, round(before.yearSummary.height.before / 2.54));
+  assert.deepEqual({ ...migrated.yearSummary, height: null }, { ...before.yearSummary, height: null });
   assert.deepEqual(migrated.parents.map(parent => parent.relationship), [6.3, 9.1]);
   assert.deepEqual(legacy, before, 'migration leaves the original object unchanged');
   assert.equal(validateSave(migrated), true);
   assert.deepEqual(migrateSave(legacy), migrated, 'migration never rerolls a growth profile');
   const height = migrated.height;
   advanceYear(migrated, meanYear);
-  assert.ok(migrated.height > height && migrated.height - height < 18, 'legacy height continues smoothly');
+  assert.ok(migrated.height > height && migrated.height - height < 18 / 2.54, 'legacy height continues smoothly');
 
   const infant = legacyV7(createGame({ seed: 585 }));
   infant.stats.attractiveness = 1.2;
   const upgraded = migrateSave(infant);
   assert.ok(upgraded.stats.attractiveness >= 3);
-  assert.equal(upgraded.height, infant.height);
+  assert.equal(upgraded.height, round(infant.height / 2.54));
   assert.equal(upgraded.rng, infant.rng);
   for (const skill of SKILLS.filter(skill => skill.key !== 'attractiveness')) assert.equal(upgraded.stats[skill.key], infant.stats[skill.key]);
 });

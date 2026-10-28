@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { naturalSkillRating, skillChanges, childhoodWellbeing } from '../development.js';
 import { createGame, advanceYear, resolveEventChoice, EVENTS, effectiveStats } from '../engine.js';
+import { eventChances } from '../events.js';
 
 test('newborn ratings span the scale around five with broad variation and aptitude correlation', () => {
   const learned = ['intelligence', 'strength', 'social', 'creativity'];
@@ -94,6 +95,49 @@ test('childhood wellbeing recovers toward its usual range while choices still ma
   assert.deepEqual(childhoodWellbeing({ ...child, age: 18 }), { health: 0, stability: 0 });
   assert.deepEqual(childhoodWellbeing({ ...child, alive: false }), { health: 0, stability: 0 });
   assert.deepEqual(child.stats, { health: 5, stability: 5 });
+});
+
+test('toddler play and exploration teach skills while rest supports wellbeing', () => {
+  const toddler = { age: 2, alive: true, cryLevel: 3,
+    stats: { intelligence: 5, strength: 5, social: 5, creativity: 5, health: 5, stability: 5 },
+    aptitudes: { intelligence: 0, strength: 0, social: 0, creativity: 0 },
+    focus: { work: 2, social: 2, family: 2, self: 2 } };
+  const option = key => ({ ...toddler, focus: { ...toddler.focus, [key]: 5 } });
+  for (const age of [2, 3, 4]) {
+    toddler.age = age;
+    const base = skillChanges(toddler), play = skillChanges(option('work')), explore = skillChanges(option('social'));
+    assert.ok(play.strength > base.strength && play.social > base.social && play.creativity > base.creativity);
+    assert.ok(explore.intelligence > base.intelligence && explore.creativity > base.creativity);
+    assert.deepEqual(skillChanges(option('self')), base, 'rest does not teach skills');
+    const rested = childhoodWellbeing(option('self')), usual = childhoodWellbeing(toddler);
+    assert.ok(rested.health > usual.health && rested.stability > usual.stability);
+    assert.deepEqual(childhoodWellbeing(option('work')), childhoodWellbeing(option('social')), 'play has no school-work stress penalty');
+    const family = { ...toddler, focus: { work: 3, social: 1, family: 5, self: 3 } };
+    const exploring = { ...toddler, focus: { work: 3, social: 5, family: 1, self: 3 } };
+    assert.ok(childhoodWellbeing(family).stability > childhoodWellbeing(exploring).stability);
+    assert.deepEqual(skillChanges({ ...toddler, cryLevel: 1 }), skillChanges({ ...toddler, cryLevel: 5 }));
+    assert.deepEqual(childhoodWellbeing({ ...toddler, cryLevel: 1 }), childhoodWellbeing({ ...toddler, cryLevel: 5 }));
+  }
+  const baby = { ...toddler, age: 1 };
+  assert.ok(skillChanges({ ...baby, cryLevel: 5 }).social > skillChanges({ ...baby, cryLevel: 1 }).social);
+});
+
+test('toddler events follow play and explore focus and school events begin at five', () => {
+  const stats = Object.fromEntries(['intelligence', 'strength', 'social', 'creativity', 'attractiveness', 'health', 'stability'].map(key => [key, 5]));
+  const state = { age: 2, focus: { work: 2, social: 2, family: 2, self: 2 }, lifestyle: 5, education: { status: 'school' } };
+  const odds = person => Object.fromEntries(eventChances(person, stats).map(event => [event.id, event.chance]));
+  for (const age of [2, 3, 4]) {
+    const chances = odds({ ...state, age });
+    for (const event of EVENTS.filter(event => event.category === 'School')) assert.equal(chances[event.id], 0);
+    assert.ok(chances.treehouse > 0 && chances.child_library > 0 && chances.child_art > 0);
+    for (const id of ['school_play', 'learning_bike', 'child_pet', 'child_argument']) assert.equal(chances[id], 0);
+  }
+  const play = odds({ ...state, focus: { ...state.focus, work: 5 } });
+  const explore = odds({ ...state, focus: { ...state.focus, social: 5 } });
+  const rest = odds({ ...state, focus: { ...state.focus, self: 5 } });
+  assert.ok(play.treehouse > rest.treehouse && play.stamina_gain > rest.stamina_gain);
+  assert.ok(explore.child_library > rest.child_library);
+  assert.ok(odds({ ...state, age: 5 }).good_grades > 0);
 });
 
 test('independent game lives reach age 18 with average ratings near five and retain variation', () => {

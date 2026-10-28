@@ -107,7 +107,8 @@ const result = cohort(true);
 const reference = {
   calibration: {
     samplesPerSex: samples, seedStart, survivors: result.survivors,
-    cryLevel: 3, focus, choices: 'uniform, independent seeded draws',
+    cryLevel: 3, cryThroughAge: 1, focus, choices: 'uniform, independent seeded draws',
+    heightUnit: 'inches',
     conditionedOn: 'alive at the observed age',
     observationsByAge: [...result.ageStats.map(stats => stats.health.count), result.stats.health.count],
     birthVariation: BIRTH_VARIATION,

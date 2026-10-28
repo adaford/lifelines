@@ -101,7 +101,7 @@ export function createProspects(state, helpers, stats = state.stats) {
     actorStats.health = round(clamp(4.5 + center * .45 + (random() - .5) * 2.6, 1, 10));
     actorStats.stability = round(clamp(3.7 + center * .5 + (random() - .5) * 3.6, 1, 10));
     const age = integer(Math.max(18, state.age - 5), Math.min(84, Math.max(18, state.age + 5)));
-    const height = integer(150, 195);
+    const height = round(integer(150, 195) / 2.54);
     const aptitudes = helpers.randomAptitudes ? helpers.randomAptitudes() : Object.fromEntries(CORE.map(key => [key, integer(-3, 3)]));
     const appearancePeakAge = appearanceDeclineAge({ gender });
     for (let pastAge = appearancePeakAge; pastAge < age; pastAge++) {

@@ -12,14 +12,14 @@ export const DEVELOPMENT_BALANCE = {
   "innateScale": 0.8,
   "skillReversion": 0.012,
   "childhoodBias": {
-    "intelligence": -0.034144,
-    "strength": -0.005709,
-    "social": -0.033055,
-    "creativity": -0.033106
+    "intelligence": -0.034749,
+    "strength": -0.006114,
+    "social": -0.034802,
+    "creativity": -0.033537
   },
   "wellbeingTarget": {
-    "health": 5.029503,
-    "stability": 4.708605
+    "health": 5.022861,
+    "stability": 4.723184
   },
   "wellbeingReversion": {
     "health": 0.06,
@@ -43,9 +43,15 @@ export function skillChanges(person, career = null) {
   const flexibility = age < 18 ? 1.15 : age < 40 ? 1 : age < 60 ? .85 : .65;
   const focus = Object.fromEntries(['work', 'social', 'family', 'self'].map(key => [key, clamp(number(person.focus?.[key], 3), 0, 5) - 3]));
   const babyCare = .02 * (clamp(number(person.careFocus, 3), 0, 5) - 3);
-  const practice = age < 3
+  const practice = age < 2
     ? Object.fromEntries(skills.map(key => [key, .02 * (clamp(number(person.cryLevel, 3), 1, 5) - 3) + babyCare]))
-    : {
+    : age < 5 ? {
+      // Ages 2–4: work=Play, social=Explore, family=Family time, self=Rest.
+      intelligence: .09 * focus.social + .02 * focus.family,
+      strength: .1 * focus.work,
+      social: .055 * focus.work + .055 * focus.family,
+      creativity: .055 * focus.work + .055 * focus.social,
+    } : {
       intelligence: .075 * focus.work + .035 * focus.self,
       strength: .1 * focus.self,
       social: .08 * focus.social + .025 * focus.family,
@@ -75,13 +81,18 @@ export function childhoodWellbeing(person) {
     health: DEVELOPMENT_BALANCE.wellbeingReversion.health * (DEVELOPMENT_BALANCE.wellbeingTarget.health - health),
     stability: DEVELOPMENT_BALANCE.wellbeingReversion.stability * (DEVELOPMENT_BALANCE.wellbeingTarget.stability - stability),
   };
-  if (person.age < 3) {
+  if (person.age < 2) {
     const intensity = (clamp(number(person.cryLevel, 3), 1, 5) - 1) / 4;
     result.health += .06 * (intensity - .5);
     return result;
   }
   const focus = Object.fromEntries(['work', 'social', 'family', 'self'].map(key => [key, clamp(number(person.focus?.[key], 3), 0, 5)]));
   const spare = Math.max(0, 12 - Object.values(focus).reduce((sum, value) => sum + value, 0));
+  if (person.age < 5) {
+    result.health += .05 * (focus.self - 3);
+    result.stability += .08 * (focus.self - 3) + .035 * (focus.family - 3) + spare * .04;
+    return result;
+  }
   result.health += .035 * (focus.self - 3);
   result.stability += -.1 * (focus.work - 3) + .07 * (focus.self - 3) + .025 * (focus.family - 3) + .018 * (focus.social - 3) + spare * .04;
   return result;

@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { toLegacyCentimeters } from './helpers/legacy-height.js';
 import {
   createGame, advanceYear, annualForecast, householdLifestyle,
   validateSave, migrateSave, needsEducationChoice, chooseEducation,
@@ -26,7 +27,7 @@ function quietYear(state, options = {}) {
 }
 
 function legacyV8(state) {
-  const old = copy(state);
+  const old = toLegacyCentimeters(copy(state));
   old.version = 8;
   for (const person of people(old)) {
     if (person.adultHeight === null) person.adultHeight = 170;
@@ -65,22 +66,24 @@ test('v8 migration adds career and growth state without rerolling existing lives
   const before = copy(legacy);
   const migrated = migrateSave(legacy);
   assert.ok(migrated);
-  assert.equal(migrated.version, 9);
+  assert.equal(migrated.version, 10);
   assert.equal(validateSave(migrated), true);
   assert.deepEqual(legacy, before, 'migration does not mutate the imported object');
-  for (const key of ['rng', 'seed', 'nextId', 'age', 'height', 'maturityAge', 'birthHeight', 'stats', 'pendingEvents', 'history', 'yearSummary', 'lifestyle']) {
+  for (const key of ['rng', 'seed', 'nextId', 'age', 'maturityAge', 'stats', 'pendingEvents', 'history', 'yearSummary', 'lifestyle']) {
     assert.deepEqual(migrated[key], before[key], key);
   }
+  for (const key of ['height', 'birthHeight']) assert.equal(migrated[key], Math.round(before[key] / 2.54 * 100) / 100);
   assert.equal(migrated.adultHeight, null, 'the obsolete childhood endpoint is removed');
   for (let index = 0; index < migrated.parents.length; index++) {
     const parent = migrated.parents[index], old = before.parents[index];
-    for (const key of ['id', 'name', 'gender', 'height', 'stats', 'relationship', 'lifestyle']) assert.deepEqual(parent[key], old[key], key);
+    for (const key of ['id', 'name', 'gender', 'stats', 'relationship', 'lifestyle']) assert.deepEqual(parent[key], old[key], key);
+    assert.equal(parent.height, Math.round(old.height / 2.54 * 100) / 100);
     assert.equal(parent.career.progress, old.lifestyle);
     assert.ok(Number.isInteger(parent.career.focus) && parent.career.focus >= 0 && parent.career.focus <= 5);
   }
   assert.ok(people(migrated).every(person => Number.isFinite(person.growthFactor) && person.growthFactor > 0));
   assert.deepEqual(migrateSave(legacy), migrated, 'upgrading the same save never rerolls careers');
-  assert.deepEqual(migrateSave(JSON.parse(JSON.stringify(migrated))), migrated, 'schema 9 round-trips unchanged');
+  assert.deepEqual(migrateSave(JSON.parse(JSON.stringify(migrated))), migrated, 'schema 10 round-trips unchanged');
 });
 
 test('v8 duplicate parent names are repaired deterministically while relationships survive', () => {
@@ -246,7 +249,7 @@ test('household career support ends when the player becomes financially independ
   const state = createGame({ seed: 671 });
   state.age = 17;
   state.maturityAge = 18;
-  state.height = 171.5;
+  state.height = 67.52;
   state.growthAnchor = { age: 17, height: state.height };
   state.lifestyle = 8;
   state.money = 0;

@@ -18,6 +18,7 @@ Lifelines is a phone-first, generational life simulator. Read `HANDOFF.md` for t
 - `percentiles.js`, `percentile-reference.js`: normal CDF and generated simulation references; `scripts/calibrate-percentiles.mjs` reproduces or refits them.
 - `parent-careers.js`: parent career progression, employment events, and household support.
 - `app.js`: UI actions, browser persistence, and save import/export.
+- `display.js`: one-decimal ratings and feet/inches display formatting; no simulation changes.
 - `narrative.js`: pure relationship labels for known names in rendered stories.
 - `styles.css`, `index.html`, `favicon.svg`: phone layout, static entry point, and branding.
 - `test/`: simulation and DOM integration tests; `server.mjs`: development server.
@@ -39,6 +40,8 @@ Lifelines is a phone-first, generational life simulator. Read `HANDOFF.md` for t
 - Put gameplay explanations in adjacent **?** popups. Use short, plain wording; explain each rule once and omit repeated labels or tutorial text from stories.
 - Show compact **Dad:** and **Mom:** rows on Year, with mental stability and relationship meters and colored forecast segments. Keep full profiles in Family.
 - Show expected routine changes as green/red segments inside stat bars, without numerical forecast deltas. Show actual changes as before → after values, including parent mental stability and relationship in the year review. Forecasts never consume RNG; actual annual development has seeded variation around the mean.
+- Display every stat rating with exactly one decimal, including lifestyle and before → after values; preserve internal two-decimal stats. Store height in inches under schema 10 and display feet/whole inches, such as `5'9`, rounding total inches before splitting feet/inches. Migrate all legacy centimetre height fields once without changing stats or RNG. Ages, focus, crying, aptitudes, counts, and probabilities keep their existing formats.
+- Crying applies only at ages 0–1. Ages 2–4 use Play (`work`), Explore (`social`), Family time (`family`), and Rest (`self`) activity points under the same 12-point budget and 5-per-area cap. School/Student begins at 5. Preserve historical age-two cry recaps and use saved `workLabel: 'Play'` for toddler recap labels.
 - Year reviews show the cry level or focus choices saved before that year advanced, including its School/College/Career label. Do not infer decisions from current controls or invent decisions for older summaries.
 - Preserve one-year turns, focus-influenced development and event odds, age-appropriate choices, college/career progression, and generational family play unless the user requests a change.
 - Keep identity, attraction, and pregnancy capability separate so future playable genders remain possible.

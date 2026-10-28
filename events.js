@@ -23,21 +23,21 @@ export const EVENTS = [
     { id: 'soothing_routine', name: 'A comforting rhythm', description: 'A predictable daily routine helps you feel secure.', ...temporary({ stability: .6 }, 2) },
     { id: 'copycat_game', name: 'The copying game', description: 'You discover that making a funny face can make someone smile back.', ...change({ social: .3, creativity: .2 }) },
   ]),
-  ...group('Growing up', { minAge: 3, maxAge: 12, baseChance: .011, kind: 'positive' }, [
-    { id: 'treehouse', name: 'A backyard invention', description: 'Cardboard and spare cushions become a tiny world of your own.', focusFactors: ['self'], statFactors: [high('creativity')], ...temporary({ creativity: .7 }, 2) },
-    { id: 'learning_bike', name: 'Finding your balance', description: 'Practice finally turns a shaky ride into a confident one.', focusFactors: ['self'], statFactors: [high('strength')], ...change({ strength: .4, stability: .15 }) },
-    { id: 'playground_fall', name: 'A playground fall', description: 'A misstep interrupts a lively afternoon.', kind: 'negative', statFactors: [low('strength')], focusFactors: ['social'], ...temporary({ strength: -.7, health: -.4 }) },
+  ...group('Growing up', { minAge: 2, maxAge: 12, baseChance: .011, kind: 'positive' }, [
+    { id: 'treehouse', name: 'A backyard invention', description: 'Cardboard and spare cushions become a tiny world of your own.', focusFactors: ['self'], toddlerFocusFactors: ['work'], statFactors: [high('creativity')], ...temporary({ creativity: .7 }, 2) },
+    { id: 'learning_bike', name: 'Finding your balance', description: 'Practice finally turns a shaky ride into a confident one.', minAge: 5, focusFactors: ['self'], statFactors: [high('strength')], ...change({ strength: .4, stability: .15 }) },
+    { id: 'playground_fall', name: 'A playground fall', description: 'A misstep interrupts a lively afternoon.', kind: 'negative', statFactors: [low('strength')], focusFactors: ['social'], toddlerFocusFactors: ['work'], ...temporary({ strength: -.7, health: -.4 }) },
     { id: 'lost_toy', name: 'Your favorite toy is missing', description: 'Losing something familiar makes this year feel less settled.', kind: 'negative', statFactors: [low('stability')], ...temporary({ stability: -.5 }) },
-    { id: 'child_library', name: 'A library discovery', description: 'You find a shelf of books you cannot wait to explore.', focusFactors: ['self'], statFactors: [high('intelligence')], ...change({ intelligence: .4 }) },
-    { id: 'school_play', name: 'A part in the play', description: 'You are offered a small part in a community performance.', focusFactors: ['social'], choices: [choice('perform', 'Take the part', 'The stage stretches your confidence, but rehearsals feel stressful.', { ...change({ social: .4, creativity: .3 }), ...temporary({ stability: -.3 }) }), choice('backstage', 'Help backstage', 'You find a quieter way to contribute.', change({ creativity: .3, intelligence: .2 }))] },
-    { id: 'child_pet', name: 'A neighbor needs a pet sitter', description: 'A neighbor asks whether you would like to help care for their pet.', focusFactors: ['family'], choices: [choice('help', 'Help with the pet', 'The routine teaches patience and brings a new connection.', change({ social: .25, stability: .25 })), choice('decline', 'Keep your own time', 'You put the spare time into an imaginative hobby.', change({ creativity: .25 }))] },
+    { id: 'child_library', name: 'A library discovery', description: 'You find a shelf of books you cannot wait to explore.', focusFactors: ['self'], toddlerFocusFactors: ['social'], statFactors: [high('intelligence')], ...change({ intelligence: .4 }) },
+    { id: 'school_play', name: 'A part in the play', description: 'You are offered a small part in a community performance.', minAge: 3, conditions: ['schoolAge'], focusFactors: ['social'], choices: [choice('perform', 'Take the part', 'The stage stretches your confidence, but rehearsals feel stressful.', { ...change({ social: .4, creativity: .3 }), ...temporary({ stability: -.3 }) }), choice('backstage', 'Help backstage', 'You find a quieter way to contribute.', change({ creativity: .3, intelligence: .2 }))] },
+    { id: 'child_pet', name: 'A neighbor needs a pet sitter', description: 'A neighbor asks whether you would like to help care for their pet.', minAge: 3, conditions: ['schoolAge'], focusFactors: ['family'], choices: [choice('help', 'Help with the pet', 'The routine teaches patience and brings a new connection.', change({ social: .25, stability: .25 })), choice('decline', 'Keep your own time', 'You put the spare time into an imaginative hobby.', change({ creativity: .25 }))] },
     { id: 'birthday_left_out', name: 'An invitation never comes', description: 'Being left out of a birthday gathering stings.', kind: 'negative', focusFactors: ['social'], statFactors: [low('social')], ...temporary({ social: -.5, stability: -.4 }) },
     { id: 'child_kindness', name: 'A small act of kindness', description: 'Helping someone who feels left out becomes the start of a friendship.', focusFactors: ['social'], ...temporary({ social: .5, stability: .3 }, 2) },
-    { id: 'child_argument', name: 'A game turns into an argument', description: 'Everyone has a different idea of what is fair.', kind: 'negative', focusFactors: ['social'], statFactors: [low('stability')], choices: [choice('listen', 'Hear everyone out', 'It takes effort to settle down and find common ground.', change({ social: .3, stability: .2 })), choice('leave', 'Leave the game', 'Space helps you calm down, but the others feel distant.', { ...change({ stability: .25 }), ...temporary({ social: -.25 }) })] },
+    { id: 'child_argument', name: 'A game turns into an argument', description: 'Everyone has a different idea of what is fair.', minAge: 3, conditions: ['schoolAge'], kind: 'negative', focusFactors: ['social'], statFactors: [low('stability')], choices: [choice('listen', 'Hear everyone out', 'It takes effort to settle down and find common ground.', change({ social: .3, stability: .2 })), choice('leave', 'Leave the game', 'Space helps you calm down, but the others feel distant.', { ...change({ stability: .25 }), ...temporary({ social: -.25 }) })] },
     { id: 'family_outing', name: 'A day to remember', description: 'A simple outing with family becomes a treasured memory.', focusFactors: ['family'], ...temporary({ stability: .6 }, 2) },
-    { id: 'child_art', name: 'Your picture goes on the wall', description: 'Someone proudly displays your artwork, making you want to create more.', statFactors: [high('creativity')], focusFactors: ['self'], ...change({ creativity: .35 }) },
+    { id: 'child_art', name: 'Your picture goes on the wall', description: 'Someone proudly displays your artwork, making you want to create more.', statFactors: [high('creativity')], focusFactors: ['self'], toddlerFocusFactors: ['work'], ...change({ creativity: .35 }) },
   ]),
-  ...group('School', { minAge: 6, maxAge: 17, conditions: ['school'], baseChance: .009, kind: 'positive' }, [
+  ...group('School', { minAge: 5, maxAge: 17, conditions: ['school'], baseChance: .009, kind: 'positive' }, [
     { id: 'good_grades', name: 'An excellent report card', description: 'Your understanding and study time turn into a set of strong grades.', statFactors: [high('intelligence')], focusFactors: ['work'], ...temporary({ intelligence: .8, stability: .4 }, 2) },
     { id: 'poor_grades', name: 'A difficult report card', description: 'Gaps in your understanding show up in your results.', kind: 'negative', statFactors: [low('intelligence')], neglectFactors: ['work'], ...temporary({ stability: -.6 }) },
     { id: 'science_prize', name: 'A science project stands out', description: 'A carefully explained experiment earns encouraging recognition.', statFactors: [high('intelligence'), high('creativity')], focusFactors: ['work'], ...change({ intelligence: .35, creativity: .25 }) },
@@ -132,19 +132,19 @@ export const EVENTS = [
     { id: 'social_comparison', name: 'Feeling out of place', description: 'Comparing yourself with a polished group makes it hard to join in.', kind: 'negative', statFactors: [low('attractiveness')], focusFactors: ['social'], ...temporary({ stability: -.4, social: -.3 }) },
     { id: 'friend_repair', name: 'A chance to clear the air', description: 'An old disagreement comes up again, with a chance to handle it differently.', focusFactors: ['social'], kind: 'neutral', choices: [choice('apologize', 'Own your part', 'A sincere conversation makes connection easier.', change({ social: .4, stability: .2 })), choice('space', 'Ask for more time', 'You create room to settle your thoughts, though distance remains.', change({ stability: .3, social: -.15 }))] },
   ]),
-  ...group('Health and movement', { minAge: 3, baseChance: .007, kind: 'negative' }, [
+  ...group('Health and movement', { minAge: 2, baseChance: .007, kind: 'negative' }, [
     { id: 'injury', name: 'An unexpected injury', description: 'An awkward movement slows you down. Recovery will take some time.', statFactors: [low('health')], jobFactors: { athlete: 5, dance_instructor: 3, firefighter: 2 }, ...temporary({ strength: -1, health: -.7 }, 2) },
     { id: 'illness', name: 'Under the weather', description: 'A lingering illness makes ordinary days harder.', minAge: 0, statFactors: [low('health')], ...temporary({ health: -1 }) },
     { id: 'sports_sprain', name: 'A training sprain', description: 'A sudden turn in training leaves a joint tender.', minAge: 18, conditions: ['sportsJob'], focusFactors: ['work'], statFactors: [low('strength')], jobFactors: { athlete: 3 }, ...temporary({ strength: -1.1, health: -.5 }, 2) },
     { id: 'overtraining', name: 'Too much, too soon', description: 'Pushing through fatigue makes training less productive.', minAge: 18, conditions: ['sportsJob'], focusFactors: ['work'], neglectFactors: ['self'], statFactors: [low('health')], ...temporary({ strength: -.8, health: -.7 }) },
-    { id: 'stamina_gain', name: 'Everyday strength', description: 'Regular movement starts to make ordinary tasks feel easier.', kind: 'positive', focusFactors: ['self'], statFactors: [high('strength')], ...change({ strength: .35, health: .2 }) },
+    { id: 'stamina_gain', name: 'Everyday strength', description: 'Regular movement starts to make ordinary tasks feel easier.', kind: 'positive', focusFactors: ['self'], toddlerFocusFactors: ['work'], statFactors: [high('strength')], ...change({ strength: .35, health: .2 }) },
     { id: 'healthy_stretch', name: 'A healthy stretch', description: 'You have the energy to enjoy a steady, active stretch of life.', kind: 'positive', statFactors: [high('health')], focusFactors: ['self'], ...temporary({ health: .5, stability: .3 }, 2) },
     { id: 'minor_strain', name: 'An everyday strain', description: 'A task proves more physically demanding than expected.', statFactors: [low('strength')], ...temporary({ strength: -.5, health: -.3 }) },
     { id: 'health_check', name: 'A useful check-in', description: 'A routine health conversation helps you recognize an unhelpful habit.', minAge: 18, kind: 'positive', focusFactors: ['self'], ...change({ health: .3, intelligence: .15 }) },
     { id: 'sport_triumph', name: 'A personal best', description: 'Practice comes together in a performance you can be proud of.', minAge: 18, conditions: ['sportsJob'], kind: 'positive', statFactors: [high('strength')], focusFactors: ['work'], ...temporary({ strength: .7, stability: .4 }, 2, 1) },
     { id: 'low_energy', name: 'Everything takes more effort', description: 'A low-energy spell makes it harder to keep up with your usual rhythm.', statFactors: [low('health')], ...temporary({ strength: -.5, social: -.3 }) },
   ]),
-  ...group('Inner life', { minAge: 3, baseChance: .007, kind: 'positive' }, [
+  ...group('Inner life', { minAge: 5, baseChance: .007, kind: 'positive' }, [
     { id: 'inspiration', name: 'A spark of inspiration', description: 'Time for yourself leads to an interest that lights you up.', focusFactors: ['self'], statFactors: [high('creativity')], ...temporary({ creativity: .9 }, 2) },
     { id: 'creative_block', name: 'The ideas will not come', description: 'Trying to make something leaves you frustrated and stuck.', kind: 'negative', focusFactors: ['self'], statFactors: [low('creativity')], ...temporary({ creativity: -.5, stability: -.3 }) },
     { id: 'mentor', name: 'Someone believes in you', description: 'A patient mentor notices your potential and helps you find your footing.', focusFactors: ['work'], ...temporary({ intelligence: .6, creativity: .3 }, 2) },
@@ -179,7 +179,9 @@ const PHYSICAL_JOBS = new Set(['builder', 'electrician', 'plumber', 'carpenter',
 function eligible(event, state, job) {
   if (state.age < event.minAge || state.age > (event.maxAge ?? Infinity)) return false;
   return (event.conditions || []).every(condition => {
-    if (condition === 'school') return state.age < 18;
+    if (condition === 'school') return state.age >= 5 && state.age < 18;
+    // Keep old minAge metadata valid for choices already queued in saved lives.
+    if (condition === 'schoolAge') return state.age >= 5;
     if (condition === 'college') return state.education?.status === 'college';
     if (condition === 'employed') return Boolean(job);
     if (condition === 'children') return state.children?.some(child => child.alive !== false);
@@ -193,10 +195,11 @@ function eligible(event, state, job) {
 
 export function eventChances(state, stats, job) {
   const inactive = state.ended || state.needsSuccession;
-  const focus = state.age < 3 ? { work: 0, social: 0, family: 0, self: 0 } : state.focus;
+  const focus = state.age < 2 ? { work: 0, social: 0, family: 0, self: 0 } : state.focus;
   return EVENTS.map(event => {
     let chance = inactive || !eligible(event, state, job) ? 0 : event.baseChance;
-    for (const key of event.focusFactors || []) chance *= .4 + focus[key] * .25;
+    const focusFactors = state.age < 5 && event.toddlerFocusFactors || event.focusFactors || [];
+    for (const key of focusFactors) chance *= .4 + focus[key] * .25;
     for (const key of event.neglectFactors || []) chance *= .25 + (5 - focus[key]) * .35;
     for (const [key, direction] of event.statFactors || []) {
       const value = Math.max(1, Math.min(10, key === 'lifestyle' ? state.lifestyle : stats[key]));

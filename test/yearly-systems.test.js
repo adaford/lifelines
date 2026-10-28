@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { toLegacyCentimeters } from './helpers/legacy-height.js';
 import {
   EVENTS, createGame, advanceYear, annualForecast, dismissYearSummary, setCryLevel,
   effectiveStats, mortalityOdds, haveChild, successionInfo, succeed, validateSave,
@@ -28,7 +29,7 @@ function survivorAt(age, seed = 41, gender = 'male') {
 }
 function actor(state, id, age, gender = 'female') {
   return { id, name: `${id} River`, familyName: 'River', age, stats: clone(state.stats),
-    aptitudes: clone(state.aptitudes), height: 170, adultHeight: 170, money: 0,
+    aptitudes: clone(state.aptitudes), height: 66.93, adultHeight: 66.93, money: 0,
     lifestyle: state.lifestyle, alive: true, relationship: 5, gender,
     canGestate: gender === 'female', attractedTo: [gender === 'female' ? 'male' : 'female'],
     appearancePeakAge: 30 };
@@ -168,17 +169,17 @@ test('year summaries survive reload, can be dismissed, and reopen only after the
 });
 
 test('year reviews retain the completed year decisions across age and education boundaries', () => {
-  const baby = survivorAt(2, 405);
+  const baby = survivorAt(1, 405);
   setCryLevel(baby, 4);
   advanceYear(baby, survives);
-  assert.equal(baby.age, 3);
+  assert.equal(baby.age, 2);
   assert.deepEqual(baby.yearSummary.decisions, { cryLevel: 4 });
   finishChoices(baby);
   const focus = { work: 2, social: 4, family: 5, self: 1 };
   baby.focus = clone(focus);
   advanceYear(baby, survives);
   baby.focus.self = 0;
-  assert.deepEqual(baby.yearSummary.decisions, { focus, workLabel: 'School' });
+  assert.deepEqual(baby.yearSummary.decisions, { focus, workLabel: 'Play' });
   assert.deepEqual(migrateSave(clone(baby)).yearSummary.decisions, baby.yearSummary.decisions);
   const older = clone(baby);
   delete older.yearSummary.decisions;
@@ -218,7 +219,7 @@ test('malformed saved year decisions are rejected without changing the original 
 });
 
 test('v6 saves gain cry level and parent bonds without rerolling progress or queued decisions', () => {
-  const legacy = survivorAt(8, 70);
+  const legacy = toLegacyCentimeters(survivorAt(8, 70));
   legacy.version = 6;
   legacy.adultHeight ??= 170;
   for (const person of [legacy, ...legacy.parents, ...legacy.children, ...legacy.siblings, legacy.partner, ...legacy.encounters, legacy.pregnancy?.otherParent].filter(Boolean)) person.appearancePeakAge = 30;
@@ -230,7 +231,7 @@ test('v6 saves gain cry level and parent bonds without rerolling progress or que
   const before = clone(legacy);
   const migrated = migrateSave(legacy);
   assert.ok(migrated);
-  assert.equal(migrated.version, 9);
+  assert.equal(migrated.version, 10);
   assert.equal(migrated.cryLevel, 5);
   assert.equal(migrated.alive, true);
   assert.equal(migrated.yearSummary, null);
