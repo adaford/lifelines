@@ -158,7 +158,7 @@ Preserve stable job/event IDs and queued family subject IDs. New state fields ne
 
 The four bottom tabs are **Year, Career, Family, You**. The Year screen keeps the next-year control near the bottom, with the routine-change forecast before it; the header exposes health, stability, and lifestyle. Babies show all five skills, affinities, and cry levels 1–5 on Year. Parent profiles show all stats and bonds in Family. A dismissible saved popup reviews each completed year. The More menu opens bottom sheets for help, ordinary event/mortality odds, export/import, and starting a new life. Encounter profiles are paginated for phones.
 
-The interface includes 44-pixel focus controls, 16-pixel input text, safe-area spacing, keyboard controls, focus handling, and accessible meters. LinkeDOM checks validate DOM behavior, not real browser layout or touch interactions. A real-browser visual check was not completed for this release; desktop inspection stopped after the user questioned computer access. Do not describe this release as visually verified.
+The interface includes 44-pixel focus controls, 16-pixel input text, safe-area spacing, keyboard controls, focus handling, and accessible meters. LinkeDOM checks validate DOM behavior, not real browser layout or touch interactions. A real-browser visual check was not completed for this release. Do not describe this release as visually verified.
 
 Use Node 24 as specified in [.nvmrc](.nvmrc):
 
