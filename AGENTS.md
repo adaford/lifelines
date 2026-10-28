@@ -25,7 +25,7 @@ Lifelines is a phone-first, generational life simulator. Read `HANDOFF.md` for t
 ## Preserve the game's intent
 
 - Keep the phone layout, bottom navigation, accessible touch targets, and safe-area spacing.
-- Show health, mental stability, lifestyle, and height once in the top status strip on Year; keep the five skill bars below and the complete stats grid in You. All four top vitals open You. Retain wellbeing/lifestyle forecast segments and the height-only percentile.
+- Preserve Year order: top health, mental stability, lifestyle, and height strip; five skill bars; then cry/focus controls with parent bars. Keep the complete stats grid in You. All four top vitals open You. Retain wellbeing/lifestyle forecast segments and the height-only percentile.
 - Before 18, Career shows a disabled **Unlocks at age 18** bar. Keep the redundant global Career heading removed at every age.
 - Use lifestyle 1-10 as the only player-facing financial number; do not add salary, income, spending, savings, or inheritance amounts to the UI.
 - Label the wellbeing stat **mental stability**, 1-10 with higher better; preserve its internal `stability` save key. Discipline and relaxation are not traits.

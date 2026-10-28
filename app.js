@@ -5,8 +5,8 @@ import {
   offeredJobs, needsEducationChoice, pendingEventSubject,
   relationshipOdds, meetingChances, proposalChance, pregnancyChance, oneNightChance,
   respondToEncounter, proposeMarriage, endRelationship, normalizeSurname, heightPercentile, statPercentiles
-} from './engine.js?v=top-vitals-1';
-import { annotateNarrative } from './narrative.js?v=top-vitals-1';
+} from './engine.js?v=stats-first-1';
+import { annotateNarrative } from './narrative.js?v=stats-first-1';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const app = document.querySelector('#app');
@@ -227,11 +227,10 @@ function yearView() {
   if (needsEducationChoice(state)) return `<section class="panel education-prompt"><div class="panel-heading"><h3>${labelWithHelp('Your next chapter','college')}</h3><span class="tag">A NEW CHOICE</span></div><p class="decision-required">Choose college or a career before your next year.</p><button class="button primary" data-action="tab" data-tab="career">College or career? ${icon('arrow')}</button></section>${retirementNotice()}${connectionNotice()}${journalView()}`;
   const baby = state.age < 3;
   const disabled = state.ended || state.needsSuccession || state.pendingEvents.length>0;
-  return `${state.education.status==='college'?collegeProgressView():''}<section class="panel focus-panel"><div class="panel-heading"><h3>${labelWithHelp(baby?'Cry level':'Focus',baby?'cry':'focus')}</h3><span class="tag">${baby ? 'AGES 0–2' : `${focusUsed()} / 12 POINTS`}</span></div>
+  return `${statsView(true)}${state.education.status==='college'?collegeProgressView():''}<section class="panel focus-panel"><div class="panel-heading"><h3>${labelWithHelp(baby?'Cry level':'Focus',baby?'cry':'focus')}</h3><span class="tag">${baby ? 'AGES 0–2' : `${focusUsed()} / 12 POINTS`}</span></div>
     ${baby ? `<div class="cry-control" role="group" aria-label="Cry level"><div class="cry-levels">${[1,2,3,4,5].map(level=>`<button class="cry-level ${state.cryLevel===level?'selected':''}" data-action="baby" data-level="${level}" aria-label="Cry level ${level} of 5" aria-pressed="${state.cryLevel===level}" ${disabled?'disabled':''}>${level}</button>`).join('')}</div><div class="cry-scale-labels"><span>Low</span><span>High</span></div></div>` : focusView(disabled)}
     ${parentStatusView()}
     </section>
-    ${statsView(true)}
     ${state.effects.length?`<button class="effect-summary button secondary" data-action="tab" data-tab="character">${icon('spark')} ${state.effects.length} active life effect${state.effects.length===1?'':'s'} · View ${icon('arrow')}</button>`:''}
     ${retirementNotice()}${connectionNotice()}${journalView()}`;
 }
