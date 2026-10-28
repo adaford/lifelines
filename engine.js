@@ -1,15 +1,15 @@
 // Lifelines: deterministic, browser-independent simulation rules.
 // All public actions mutate their state and return { ok, reason? }.
-import { JOBS } from './jobs.js?v=life-details-1';
-import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=life-details-1';
-import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=life-details-1';
-import { mortalityRisk, rollMortality } from './mortality.js?v=life-details-1';
-import { heightReference, advanceGrowth } from './growth.js?v=life-details-1';
-import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=life-details-1';
-export { heightPercentile } from './growth.js?v=life-details-1';
-export { mortalityRisk } from './mortality.js?v=life-details-1';
-import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=life-details-1';
-export { JOBS, JOB_CATEGORIES } from './jobs.js?v=life-details-1';
+import { JOBS } from './jobs.js?v=parent-bars-1';
+import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=parent-bars-1';
+import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=parent-bars-1';
+import { mortalityRisk, rollMortality } from './mortality.js?v=parent-bars-1';
+import { heightReference, advanceGrowth } from './growth.js?v=parent-bars-1';
+import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=parent-bars-1';
+export { heightPercentile } from './growth.js?v=parent-bars-1';
+export { mortalityRisk } from './mortality.js?v=parent-bars-1';
+import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=parent-bars-1';
+export { JOBS, JOB_CATEGORIES } from './jobs.js?v=parent-bars-1';
 export const EVENTS = [...PERSONAL_EVENTS, ...FAMILY_EVENTS];
 
 export const SKILLS = [
@@ -166,7 +166,7 @@ export function createGame({ name, surname: chosenSurname, firstName, seed, gend
   state.stats = randomStats(state, true);
   state.aptitudes = Object.fromEntries(CORE.map(key => [key, clamp(Math.round((state.parents[0].aptitudes[key] + state.parents[1].aptitudes[key]) / 2) + integer(state, -1, 1), -3, 3)]));
   newbornGrowth(state, state, state.parents);
-  log(state, 'A life begins', `${state.name} arrives in the world. For now, a cry or a quiet moment is enough to shape the day.`, 'milestone');
+  log(state, 'A life begins', `${state.name} is born.`, 'milestone');
   return state;
 }
 
@@ -256,8 +256,8 @@ export function chooseEducation(state, path) {
   if (path === 'college') {
     state.jobOffers = [];
     state.jobId = null; state.jobYears = 0; state.performance = 0;
-    log(state, 'A place to learn', 'You begin four years of college. Study focus develops your abilities, and graduation brings 15 career options.', 'milestone');
-  } else log(state, 'Ready for work', 'You choose to begin your working life. Explore your 10 career options and build your skills along the way.', 'career');
+    log(state, 'A place to learn', 'You start college.', 'milestone');
+  } else log(state, 'Ready for work', 'You start looking for work.', 'career');
   return ok();
 }
 export function canTakeJob(state, job) {
@@ -279,7 +279,7 @@ export function takeJob(state, id) {
   const status = canTakeJob(state, job); if (!status.ok) return status;
   if (needsEducationChoice(state)) chooseEducation(state, 'work');
   state.jobId = id; state.jobYears = 0; state.performance = round(jobFit(state, job));
-  log(state, 'A new direction', `You start work as a ${job.name.toLowerCase()}. Your skills and career focus will help support your lifestyle.`, 'career');
+  log(state, 'A new direction', `You start as a ${job.name.toLowerCase()}.`, 'career');
   return ok();
 }
 export function quitJob(state) {
@@ -301,7 +301,7 @@ function startPregnancy(state, otherParent, casual = false) {
   const carrier = gestatingActor(state, otherParent);
   if (!carrier || state.pregnancy || state.children.length >= 6 || state.age >= 84) return false;
   state.pregnancy = { carrierId: carrier.id, carrierName: carrier.name, otherParent: clone(otherParent), dueAge: state.age + 1, startedAge: state.age, casual };
-  log(state, 'A baby on the way', `${carrier.id === state.id ? 'You are' : `${carrier.name} is`} expecting a child. The baby is due next year.`, 'family');
+  log(state, 'A baby on the way', `${carrier.id === state.id ? 'You are' : `${carrier.name} is`} expecting a baby next year.`, 'family');
   return true;
 }
 
@@ -315,26 +315,26 @@ export function respondToEncounter(state, personId, decision) {
   const person = state.encounters[index];
   state.encounters.splice(index, 1);
   if (decision === 'ignore') {
-    log(state, 'Paths pass by', `You decide not to pursue a connection with ${person.name}.`, 'relationship');
+    log(state, 'Paths pass by', `You decide not to pursue ${person.name}.`, 'relationship');
     return { ok: true, ignored: true };
   }
   const chance = decision === 'relationship' ? relationshipOdds(state, person) : oneNightChance(state, person);
   const accepted = random(state) < chance;
   if (!accepted) {
     addStat(state, 'stability', -.1);
-    log(state, 'Not the same spark', `${person.name} does not feel the same connection. You respect the answer and move on.`, 'relationship');
+    log(state, 'Not the same spark', `${person.name} isn't interested.`, 'relationship');
     return { ok: true, accepted: false, chance };
   }
   if (decision === 'relationship') {
     state.partner = { ...person, relationship: integer(state, 3, 7), yearsTogether: 0, married: false, lastProposalAge: -1 };
     state.encounters = [];
     syncFamilyLifestyles(state);
-    log(state, 'A connection becomes a relationship', `You and ${person.name} begin dating. Time together will shape your relationship.`, 'relationship');
+    log(state, 'A connection becomes a relationship', `You and ${person.name} begin dating.`, 'relationship');
   } else {
     const before = effectiveStats(state);
     addStat(state, 'social', .25); addStat(state, 'stability', -.1);
     const after = effectiveStats(state);
-    log(state, 'A brief connection', `You and ${person.name} choose to spend a night together, without starting a relationship. Social ability ${before.social} → ${after.social}; mental stability ${before.stability} → ${after.stability}.`, 'relationship');
+    log(state, 'A brief connection', `You spend a night with ${person.name}. Social ability ${before.social} → ${after.social}; mental stability ${before.stability} → ${after.stability}.`, 'relationship');
     if (random(state) < pregnancyChance(state, person, { casual: true })) startPregnancy(state, person, true);
   }
   return { ok: true, accepted: true, chance };
@@ -351,11 +351,11 @@ export function proposeMarriage(state) {
   const accepted = random(state) < chance;
   if (accepted) {
     partner.married = true; partner.relationship = round(clamp(partner.relationship + .5, 1, 10));
-    log(state, 'A life together', `${partner.name} accepts your proposal. You are married.`, 'relationship');
+    log(state, 'A life together', `You marry ${partner.name}.`, 'relationship');
   } else {
     partner.relationship = round(clamp(partner.relationship - .3, 1, 10));
     addStat(state, 'stability', -.2);
-    log(state, 'Not ready yet', `${partner.name} is not ready for marriage. Your relationship can continue to grow before another proposal next year.`, 'relationship');
+    log(state, 'Not ready yet', `${partner.name} isn't ready for marriage.`, 'relationship');
   }
   syncFamilyLifestyles(state);
   return { ok: true, accepted, chance };
@@ -368,7 +368,7 @@ export function endRelationship(state) {
   state.partner = null; state.encounters = [];
   addStat(state, 'stability', -.4);
   syncFamilyLifestyles(state);
-  log(state, 'Separate paths', `Your relationship with ${name} ends. Any expected child remains part of your family story.`, 'relationship');
+  log(state, 'Separate paths', `You and ${name} break up.`, 'relationship');
   return ok();
 }
 
@@ -640,7 +640,7 @@ function applyDeath(state, person, death) {
   person.alive = false;
   person.death = { cause: death.cause, age: person.age };
   const cause = death.cause === 'accident' ? 'an accident' : 'illness or natural causes';
-  log(state, person === state ? 'A life remembered' : `Remembering ${person.name}`, `${person.name} dies at age ${person.age} from ${cause}. ${person === state ? 'Choose an heir to carry the story forward.' : 'Their place in your life is remembered.'}`, 'family');
+  log(state, person === state ? 'A life remembered' : `Remembering ${person.name}`, `${person.name} dies at ${person.age} from ${cause}.`, 'family');
   if (person === state) {
     state.needsSuccession = true;
     state.pendingEvents = [];
@@ -648,7 +648,7 @@ function applyDeath(state, person, death) {
   } else addStat(state, 'stability', -(person.relationship ?? 5) * .08);
   if (state.pregnancy?.carrierId === person.id) {
     state.pregnancy = null;
-    log(state, 'An expected life is lost', 'The pregnancy ends with the loss of the parent carrying the baby.', 'family');
+    log(state, 'An expected life is lost', 'The pregnancy ends.', 'family');
   }
 }
 
@@ -684,25 +684,25 @@ export function advanceYear(state, { mortalityRandom, growthRandom, parentCareer
     if (event.choices?.length) {
       state.pendingEvents.push({ eventId: event.id, age: state.age, ...context });
       const subject = pendingEventSubject(state, context);
-      log(state, roll.name, `${event.description.replaceAll('{name}', subject.name)} A choice is waiting for you.`, 'choice');
+      log(state, roll.name, event.description.replaceAll('{name}', subject.name), 'choice');
     } else applyOutcome(state, event, event, context);
   }
-  if (!selected.length && !deaths.length && !state.history.some(memory => !oldMemories.has(memory.id))) log(state, 'A quiet year', previousStage === 'baby' ? 'A year of small discoveries and time together with your parents.' : 'A year of everyday moments passes.', 'quiet');
+  if (!selected.length && !deaths.length && !state.history.some(memory => !oldMemories.has(memory.id))) log(state, 'A quiet year', previousStage === 'baby' ? 'Small discoveries fill the year.' : 'Everyday life carries on.', 'quiet');
   syncFamilyLifestyles(state);
-  if (state.age === 3) log(state, 'A bigger little world', 'You can now choose how to spend your year. Divide up to 12 focus points between school, friends, family, and yourself.', 'milestone');
+  if (state.age === 3) log(state, 'A bigger little world', 'You can now choose your yearly focus.', 'milestone');
   if (state.age === 18) {
     state.education = { status: 'undecided', years: 0 };
     state.jobOffers = makeJobOffers(state);
-    log(state, 'Your own way', 'Choose four years of college or begin work from a list of 10 career options.', 'milestone');
+    log(state, 'Your own way', 'You reach adulthood.', 'milestone');
   } else if (state.education.status === 'college') {
     state.education.years += 1;
     if (state.education.years === 4) {
       state.education.status = 'graduate';
       state.jobOffers = makeJobOffers(state, true);
-      log(state, 'Graduation day', 'Four years of college are complete. Explore 15 career options, including roles that require a degree.', 'milestone');
+      log(state, 'Graduation day', 'You graduate from college.', 'milestone');
     }
   }
-  if (state.age === 65) log(state, 'The next chapter', 'You may keep living this chapter or retire. Continue as a child, a sibling if there are no children, or a young beneficiary if neither is available.', 'milestone');
+  if (state.age === 65) log(state, 'The next chapter', "You can retire when you're ready.", 'milestone');
   if (state.pregnancy && state.pregnancy.dueAge <= state.age) {
     const otherParent = state.pregnancy.otherParent;
     state.pregnancy = null;
@@ -711,12 +711,12 @@ export function advanceYear(state, { mortalityRandom, growthRandom, parentCareer
   syncFamilyLifestyles(state);
   state.encounters = state.alive ? createProspects(state, datingHelpers(state), effectiveStats(state)).map(person => demographics(person)) : [];
   state.encounterYear = state.age;
-  if (state.encounters.length) log(state, 'Someone new', `You meet ${state.encounters.length} new ${state.encounters.length === 1 ? 'person' : 'people'} you could get to know. Visit Family to choose a connection.`, 'relationship');
+  if (state.encounters.length) log(state, 'Someone new', `You meet ${state.encounters.length} new ${state.encounters.length === 1 ? 'person' : 'people'}.`, 'relationship');
   if (state.age >= 85) {
     state.encounters = [];
     state.needsSuccession = true;
     state.ended = false;
-    if (state.alive) log(state, 'Time for the next chapter', 'At age 85, you retire from the playable chapter. Choose an heir; you can remain part of their family.', 'milestone');
+    if (state.alive) log(state, 'Time for the next chapter', 'You retire at 85.', 'milestone');
   }
   state.yearSummary = { ...yearChanges(before, state), events: state.history.filter(memory => !oldMemories.has(memory.id)).map(({ title, text, kind }) => ({ title, text, kind })), dismissed: false };
   return { ok: true, eventId: selected[0]?.eventId || selected[0]?.id || null, eventIds: [...state.lastYearEvents] };
@@ -732,7 +732,7 @@ function welcomeChild(state, adopted, otherParent = null) {
   child.parentIds = [state.id, ...(coParent ? [coParent.id] : [])];
   state.children.push(child); state.lastChildAge = state.age;
   syncFamilyLifestyles(state);
-  log(state, adopted ? 'A new beginning' : 'A new branch', adopted ? `You adopt ${child.name}, welcoming a new child into your family.` : `${child.name} joins your family.`, 'family');
+  log(state, adopted ? 'A new beginning' : 'A new branch', adopted ? `You adopt ${child.name}.` : `${child.name} joins your family.`, 'family');
   return { ok: true, childId: child.id };
 }
 
@@ -825,8 +825,8 @@ export function succeed(state, heirId) {
   state.education = { status: state.age < 18 ? 'school' : 'undecided', years: 0 };
   state.jobOffers = state.age < 18 ? [] : makeJobOffers(state);
   syncFamilyLifestyles(state);
-  const inheritance = info.route === 'children' ? 'You receive the same share of the family legacy as each of your siblings.' : 'You receive the legacy as the chosen heir.';
-  log(state, 'The story continues', 'You are now ' + state.name + ', age ' + state.age + '. ' + inheritance + ' Your abilities and affinities carry over.', 'milestone');
+  const inheritance = info.route === 'children' ? 'You inherit an equal share.' : 'You inherit the family legacy.';
+  log(state, 'The story continues', 'You continue as ' + state.name + ', age ' + state.age + '. ' + inheritance, 'milestone');
   return ok();
 }
 

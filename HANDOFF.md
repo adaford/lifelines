@@ -1,8 +1,8 @@
 # Lifelines development handoff
 
-Updated 28 October 2026 for the health, household-career, and interface release (schema v9). Lifelines is a playable, phone-first, generational life simulator inspired by the yearly structure of BitLife. The next developer should extend the existing framework while preserving its saves, lifestyle-only presentation, and GitHub Pages deployment.
+Updated 29 October 2026 for compact parent bars and concise interface copy (schema v9 unchanged). Lifelines is a phone-first, generational life simulator. Preserve saves, lifestyle-only finances, and GitHub Pages deployment.
 
-The earlier gameplay baseline was commit **4da3288**; **6e56897** added portable cloud instructions. This release makes adult height emerge from yearly age/genetics/health/random growth, adds small annual appearance fluctuations, parent careers and changing household lifestyle, distinct gendered parent names, explanation popups, and before → after change displays. Existing mortality, sourced height percentiles, and visual forecasts remain. Cloud setup observations below remain historical records from 26 October. Record the final tested/deployed commit with the release result.
+The earlier gameplay baseline was commit **4da3288**; **6e56897** added portable cloud instructions. Schema v9 makes adult height emerge from yearly age/genetics/health/random growth, adds small annual appearance fluctuations, parent careers and changing household lifestyle, distinct gendered parent names, explanation popups, and before → after change displays. Existing mortality, sourced height percentiles, and visual forecasts remain. Cloud setup observations below remain historical records from 26 October. Record the final tested/deployed commit with the release result.
 
 ## Project access and current status
 
@@ -16,7 +16,7 @@ The earlier gameplay baseline was commit **4da3288**; **6e56897** added portable
 | Cloud environment | lifelines, published privately in the owner's ChatGPT account |
 | Runtime | Node.js 24 for development and tests; static browser files in production |
 | Save schema | Version 9; browser key remains lifelines.save.v1 |
-| Automated checks | 188 tests passed on Node 24.14.0; local HTTP assets returned 200 |
+| Automated checks | 190 tests passed on Node 24.14.0; local HTTP assets returned 200 |
 
 Read [AGENTS.md](AGENTS.md) before changing the project and [README.md](README.md) for the detailed current rules. Game progress lives in the player's browser, not in GitHub or the coding environment.
 
@@ -30,7 +30,8 @@ Read [AGENTS.md](AGENTS.md) before changing the project and [README.md](README.m
 - Child lifestyle follows the shared parent household until 18, with career focus and progress tending to improve it and random job loss causing setbacks.
 - Family focus improves family relationships and children’s development. Parents, children, and partners are individual characters with their own visible stats and relationships.
 - Preview mean routine changes with green/red segments inside stat bars, without numerical forecast deltas or RNG consumption. Persist actual before → after year reviews until dismissed, including parent mental stability and relationships.
-- Keep gameplay explanations in adjacent **?** popups, including newborn skill development, mature starting appearance, health-related height growth, and parent career effects.
+- Keep explanations short and in **?** popups. Explain each rule once; omit repeated labels and tutorial text from stories.
+- Show **Dad:**/**Mom:** mental stability and relationship bars directly on Year, with colored forecast segments. Keep full profiles in Family.
 - Adult height must emerge from yearly gains, never a predetermined target. Preserve inherited `growthFactor`, random maturity between 14 and 18, and annual health/random effects; do not shrink height or repay past growth shortfalls.
 - Apply annual age/stat-based mortality to the player and active family. Preserve generational play after early death; age 85 requires retirement, not automatic death.
 - Keep the player's family surname through male and female heirs. Split a parent's inheritance equally among eligible children, regardless of which child becomes playable.
@@ -165,11 +166,11 @@ State groups include identity/growth profile, stats/aptitudes, focus/cryLevel, p
 
 Keep **lifelines.save.v1** as the storage key. Schema version is **9** and migration accepts valid v1–v8 saves. V9 adds deterministic growth-factor and parent-career defaults while preserving current height, RNG, names, identities, relationships, appearance, pending choices, pregnancy, careers, and year reviews. It discards old adult-height targets: `adultHeight` becomes null for growing people and their current measured height for mature people. Existing growth anchors do not influence future gains. No past health losses are applied. Only duplicate parent names are repaired, deterministically, using gendered name pools. Shared household support is initialized from the recorded household value to prevent artificial jumps when old parent profiles differ. Earlier growth-profile and maturity metadata, old-infant appearance corrections, cry/life-state, stat, education, surname, and succession conversions remain. Unknown old child parentage is not reconstructed. Invalid imports must never overwrite a valid existing life.
 
-Preserve stable job/event IDs and queued family subject IDs. New state fields need validation, defaults/migration, and appropriate save round-trip coverage. The static entry point and module imports use the release cache token **life-details-1**; update cache versions coherently when a release needs to invalidate browser assets.
+Preserve stable job/event IDs and queued family subject IDs. New state fields need validation, defaults/migration, and appropriate save round-trip coverage. The static entry point and module imports use the release cache token **parent-bars-1**; update cache versions coherently when a release needs to invalidate browser assets.
 
 ## Interface and validation
 
-The four bottom tabs are **Year, Career, Family, You**. Year keeps the next-year control near the bottom and shows current stat bars with colored expected-change segments. The header exposes health, mental stability, lifestyle, and gender beside the name. Growing characters show height percentile until their recorded maturity age; adult height is labeled afterward. Babies use cry levels 1–5. Mom/Dad profiles show stats, careers, and relationships in Family. The saved year-review popup displays before → after values, including parent mental stability and relationship. Use **relationship** throughout visible labels. Gameplay explanations belong in adjacent **?** popups; direct labels, controls, and story outcomes remain visible. More opens help, event/mortality odds, export/import, and new-life controls; encounter profiles remain paginated for phones.
+The four bottom tabs are **Year, Career, Family, You**. Year keeps the next-year control near the bottom and shows current stat bars with colored expected-change segments. The header exposes health, mental stability, lifestyle, and gender beside the name. Growing characters show height percentile until their recorded maturity age; adult height is labeled afterward. Babies use cry levels 1–5. Year shows Dad/Mom mental stability and relationship bars with forecast segments. Full profiles stay in Family. The saved year-review popup displays before → after values, including parent mental stability and relationship. Use **relationship** throughout visible labels. Gameplay explanations belong in adjacent **?** popups; direct labels, controls, and story outcomes remain visible. More opens help, event/mortality odds, export/import, and new-life controls; encounter profiles remain paginated for phones.
 
 The interface includes 44-pixel focus controls, 16-pixel input text, safe-area spacing, keyboard controls, focus handling, and accessible meters. LinkeDOM checks validate DOM behavior, not real browser layout or touch interactions. A real-browser visual check was not completed for this release. Do not describe this release as visually verified.
 

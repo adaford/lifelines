@@ -26,8 +26,9 @@ test('context help is a compact accessible dialog that returns focus without sav
   const dialog = ui.query('.help-popup[role="dialog"]');
   assert.equal(dialog.getAttribute('aria-modal'),'true');
   assert.equal(dialog.getAttribute('aria-describedby'),'topic-help-content');
-  assert.match(dialog.textContent,/start low at birth.*increase through childhood and practice/);
-  assert.match(dialog.textContent,/Attractiveness starts near its inherited adult value.*does not grow like a learned skill.*Tiny random changes/);
+  assert.match(dialog.textContent,/start low at birth.*grow with practice/);
+  assert.match(dialog.textContent,/attractiveness starts near its adult value/);
+  assert.ok(ui.query('.modal-body').textContent.split(/\s+/).length<45,'the overview should explain the birth distinction briefly');
   assert.equal(ui.document.activeElement,ui.query('.help-popup [data-action="close"]'));
   assert.ok(ui.query('#app').hasAttribute('inert'));
   ui.key('.help-popup [data-action="close"]','Escape');
@@ -50,15 +51,16 @@ test('context help is a compact accessible dialog that returns focus without sav
 test('health, appearance, growth, crying, and household help contain the requested rules', async () => {
   const ui = await mount(createGame({seed:121}));
   const topics = [
-    ['health',/Poor health while growing reduces that year’s height gain.*Final height emerges.*never shrinks/],
-    ['height',/Final height is not predetermined.*yearly gains.*between ages 14 and 18.*percentile.*Poor health reduces that year’s height gain.*never shrinks/],
-    ['attractiveness',/Tiny random changes.*up or down each year.*after 30 for men and after 22 for women/],
-    ['cry',/1 to 5.*strengthens your relationship.*Harder crying has a larger effect/],
-    ['lifestyle',/Until 18.*parents.*focus can change each year.*losing a job/],
+    ['health',/Poor health raises disease risk and reduces childhood height gains/],
+    ['height',/Final height emerges from yearly growth.*14–18.*Poor health reduces new growth, never existing height.*Percentile.*until growth ends/],
+    ['attractiveness',/tiny random changes each year.*rather than gains from practice.*after 30 for men and 22 for women/],
+    ['cry',/1–5.*builds skills and parent relationships.*harder crying strains their mental stability more/],
+    ['lifestyle',/Until 18.*parents.*changing household lifestyle.*adult.*work, family, events and inheritance/],
   ];
   for(const [topic,content] of topics) {
     ui.click(`[data-topic="${topic}"]`);
     assert.match(ui.query('.help-popup').textContent,content);
+    assert.ok(ui.query('.modal-body').textContent.split(/\s+/).length<60,`${topic} help should stay brief`);
     assertNoMoneyDisplay(ui.query('.help-popup'),`${topic} popup`);
     ui.click('.help-popup [data-action="close"]');
   }
@@ -95,7 +97,7 @@ test('parent profiles show career focus and employment without internal career p
   assert.match(dad.textContent,/Career focus\? 2\/5.*Retired/);
   assert.doesNotMatch(ui.query('.roots-panel').textContent,/3\.1415926|6\.2831853/);
   ui.click('.roots-panel [data-topic="parent-career"]');
-  assert.match(ui.query('.help-popup').textContent,/change a little each year.*Job loss, unemployment, recovery, and retirement/);
+  assert.match(ui.query('.help-popup').textContent,/Higher career focus and experience tend to improve lifestyle.*job loss can set it back/);
   assertNoMoneyDisplay(ui.query('.help-popup'),'parent career help');
 });
 
@@ -211,7 +213,7 @@ test('cry levels update colored stat forecasts without numeric deltas or consumi
   assert.doesNotMatch(ui.query('.forecast-panel').textContent,/expected increase|expected decrease|Growth varies each year/i);
   ui.click('.forecast-panel [data-topic="forecast"]');
   assert.match(ui.query('.help-popup').textContent,/Green: expected increase.*Red: expected decrease/);
-  assert.match(ui.query('.help-popup').textContent,/Actual changes vary/);
+  assert.match(ui.query('.help-popup').textContent,/events and yearly variation can alter the result/);
   ui.click('.help-popup [data-action="close"]');
   assert.equal(ui.saved().rng,initial.rng);
   assert.equal(ui.saved().age,initial.age);
@@ -234,7 +236,8 @@ test('gender is visible next to the name and height percentiles end at individua
     ui.click('.nav-list [data-tab="character"]');
     assert.equal(ui.query('.height-vital .height-percentile').textContent,'Adult height');
     ui.click('.height-vital [data-topic="height"]');
-    assert.match(ui.query('.help-popup').textContent,/reached adult height/);
+    assert.match(ui.query('.help-popup').textContent,/ending at 14–18/);
+    assert.doesNotMatch(ui.query('.help-popup').textContent,/Current position|This person has reached/);
   }
 });
 
@@ -259,7 +262,8 @@ test('new-year review shows actual changes, survives reload, and dismisses persi
   const advanced=ui.saved();
   assert.equal(advanced.yearSummary.dismissed,false);
   assert.equal(ui.all('.year-review-modal').length,1);
-  assert.match(ui.query('.year-review-intro').textContent,/age 0 to 1/);
+  assert.equal(ui.query('.year-review-modal #modal-title').textContent,'Age 0 → 1');
+  assert.equal(ui.all('.year-review-intro').length,0,'the recap heading already identifies the year');
   for(const [key,delta] of Object.entries(advanced.yearSummary.stats)) {
     const digits=delta.before!==delta.after && delta.before.toFixed(1)===delta.after.toFixed(1)?2:1;
     assert.equal(ui.query(`.year-review-modal [data-stat="${key}"] strong`).textContent,`${delta.before.toFixed(digits)} → ${delta.after.toFixed(digits)}`);
@@ -1175,7 +1179,7 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     assert.equal(ui.all('[role="dialog"]').length, 0);
     assert.equal(ui.document.body.style.overflow, '');
     ui.click('[data-action="odds"]');
-    assert.match(ui.query('.modal-body').textContent, /A quiet year/);
+    assert.match(ui.query('.modal-body').textContent, /Quiet year/);
     assert.match(ui.query('.modal-body').textContent, /Under the weather/);
   });
 
@@ -1483,4 +1487,56 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     resolveUIEvents(ui);
     assert.equal(ui.saved().age, 1);
   });
+});
+
+test('Year shows Dad and Mom bars that respond to crying without rerolling the year', async () => {
+  const fixture = createGame({ seed: 121 });
+  fixture.parents.forEach(parent => { parent.stats.stability = 7; parent.relationship = 7; });
+  const ui = await mount(fixture);
+  assert.deepEqual(ui.all('.parent-status h4').map(heading => heading.textContent), ['Dad:', 'Mom:']);
+  assert.equal(ui.all('.parent-status [role="meter"]').length, 4);
+  assert.doesNotMatch(ui.query('.focus-panel').textContent, /See your parents|Ask for attention/);
+  for (const parent of fixture.parents) {
+    const row = ui.query(`[data-parent-id="${parent.id}"]`);
+    for (const key of ['stability', 'relationship']) {
+      assert.equal(row.querySelector(`[data-stat="${key}"] [role="meter"]`).getAttribute('aria-valuenow'), '7');
+      assert.ok(row.querySelector(`[data-stat="${key}"] .stat-projection.increase`));
+    }
+  }
+  const lowRelationshipWidth = parseFloat(ui.query('.parent-status [data-stat="relationship"] .stat-projection').style.width);
+  ui.click('[data-action="baby"][data-level="5"]');
+  for (const row of ui.all('.parent-status')) {
+    assert.ok(row.querySelector('[data-stat="stability"] .stat-projection.decrease'));
+    assert.ok(parseFloat(row.querySelector('[data-stat="relationship"] .stat-projection.increase').style.width) > lowRelationshipWidth);
+    assert.doesNotMatch(row.textContent, /[+−-]\d|→/);
+  }
+  const saved = ui.saved();
+  assert.equal(saved.rng, fixture.rng);
+  assert.equal(saved.age, 0);
+  assert.deepEqual(saved.parents, fixture.parents);
+  assert.equal(saved.cryLevel, 5);
+});
+
+test('Year parent bars preserve remembered parents and handle a missing parent', async () => {
+  const fixture = ageTo(createGame({ seed: 121 }), 8);
+  fixture.parents[0].alive = false;
+  fixture.parents[0].death = { cause: 'disease', age: fixture.parents[0].age };
+  let ui = await mount(fixture);
+  const remembered = ui.query(`[data-parent-id="${fixture.parents[0].id}"]`);
+  assert.match(remembered.textContent, /Mom:.*Deceased/);
+  assert.equal(remembered.querySelectorAll('.stat-projection').length, 0);
+  assert.equal(remembered.querySelectorAll('[role="meter"]').length, 2);
+  assert.deepEqual(ui.saved(), fixture);
+  fixture.parents = fixture.parents.slice(0,1);
+  ui = await mount(fixture);
+  assert.equal(ui.all('.parent-status').length, 1);
+  assert.equal(ui.query('.parent-status h4').textContent, 'Mom:');
+  fixture.parents = [];
+  ui = await mount(fixture);
+  assert.equal(ui.all('.parent-status-list').length, 0);
+  const pending = pendingFixture();
+  ui = await mount(pending);
+  assert.equal(ui.all('.parent-status').length, pending.parents.length);
+  assert.equal(ui.all('.parent-status .stat-projection').length, 0);
+  assert.deepEqual(ui.saved(), pending, 'pending choices do not acquire a routine forecast');
 });

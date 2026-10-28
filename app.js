@@ -5,7 +5,7 @@ import {
   offeredJobs, needsEducationChoice, pendingEventSubject,
   relationshipOdds, meetingChances, proposalChance, pregnancyChance, oneNightChance,
   respondToEncounter, proposeMarriage, endRelationship, normalizeSurname, heightPercentile
-} from './engine.js?v=life-details-1';
+} from './engine.js?v=parent-bars-1';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const app = document.querySelector('#app');
@@ -219,12 +219,25 @@ function yearView() {
   if (needsEducationChoice(state)) return `<section class="panel education-prompt"><div class="panel-heading"><h3>${labelWithHelp('Your next chapter','college')}</h3><span class="tag">A NEW CHOICE</span></div><p class="decision-required">Choose college or a career before your next year.</p><button class="button primary" data-action="tab" data-tab="career">College or career? ${icon('arrow')}</button></section>${retirementNotice()}${connectionNotice()}${journalView()}`;
   const baby = state.age < 3;
   const disabled = state.ended || state.needsSuccession || state.pendingEvents.length>0;
-  return `${state.education.status==='college'?collegeProgressView():''}<section class="panel focus-panel"><div class="panel-heading"><h3>${labelWithHelp(baby?'Ask for attention':'Your focus',baby?'cry':'focus')}</h3><span class="tag">${baby ? 'AGES 0–2' : `${focusUsed()} / 12 POINTS`}</span></div>
-    ${baby ? `<div class="cry-control" role="group" aria-label="Cry level"><div class="cry-heading"><strong>Cry level <span>${state.cryLevel}/5</span></strong><span>${['A little fuss','Gentle cries','Regular cries','Frequent cries','Very frequent cries'][state.cryLevel-1]}</span></div><div class="cry-levels">${[1,2,3,4,5].map(level=>`<button class="cry-level ${state.cryLevel===level?'selected':''}" data-action="baby" data-level="${level}" aria-label="Cry level ${level} of 5" aria-pressed="${state.cryLevel===level}" ${disabled?'disabled':''}>${level}</button>`).join('')}</div><div class="cry-scale-labels"><span>Less crying</span><span>More crying</span></div><button class="button ghost small" data-action="tab" data-tab="family">See your parents & relationships ${icon('arrow')}</button></div>` : focusView(disabled)}
+  return `${state.education.status==='college'?collegeProgressView():''}<section class="panel focus-panel"><div class="panel-heading"><h3>${labelWithHelp(baby?'Cry level':'Focus',baby?'cry':'focus')}</h3><span class="tag">${baby ? 'AGES 0–2' : `${focusUsed()} / 12 POINTS`}</span></div>
+    ${baby ? `<div class="cry-control" role="group" aria-label="Cry level"><div class="cry-levels">${[1,2,3,4,5].map(level=>`<button class="cry-level ${state.cryLevel===level?'selected':''}" data-action="baby" data-level="${level}" aria-label="Cry level ${level} of 5" aria-pressed="${state.cryLevel===level}" ${disabled?'disabled':''}>${level}</button>`).join('')}</div><div class="cry-scale-labels"><span>Low</span><span>High</span></div></div>` : focusView(disabled)}
+    ${parentStatusView()}
     </section>
     ${statsView(true)}
     ${state.effects.length?`<button class="effect-summary button secondary" data-action="tab" data-tab="character">${icon('spark')} ${state.effects.length} active life effect${state.effects.length===1?'':'s'} · View ${icon('arrow')}</button>`:''}
     ${retirementNotice()}${connectionNotice()}${journalView()}`;
+}
+
+function parentStatusView() {
+  if (!state.parents.length) return '';
+  const forecast = !state.ended && !state.needsSuccession && !state.pendingEvents.length && !needsEducationChoice(state) ? annualForecast(state) : null;
+  const order = { Dad: 0, Mom: 1, Parent: 2 };
+  const parents = [...state.parents].sort((a,b) => order[parentLabel(a)] - order[parentLabel(b)]);
+  return `<div class="parent-status-list" aria-label="Parents">${parents.map(parent => {
+    const role = parentLabel(parent);
+    const changes = parent.alive === false ? null : forecast?.parents.find(person => person.id === parent.id);
+    return `<section class="parent-status" data-parent-id="${esc(parent.id)}" aria-label="${esc(role)}"><div class="parent-status-heading"><h4>${role}:</h4>${helpButton('parents',role)}${parent.alive === false?'<span class="parent-status-state">Deceased</span>':''}</div><div class="parent-status-stats">${[['stability','Mental stability',parent.stats.stability],['relationship','Relationship',parent.relationship]].map(([key,label,value]) => `<div class="parent-status-stat" data-stat="${key}"><div class="parent-stat-heading"><span>${label}</span><strong>${number(value)}</strong></div>${projectedMeter(`${role}: ${label}`,value,changes?.[key],key)}</div>`).join('')}</div></section>`;
+  }).join('')}</div>`;
 }
 
 function changesView(changes, lifestyle, height) {
@@ -235,7 +248,7 @@ function changesView(changes, lifestyle, height) {
 function yearSummaryModal() {
   const summary=state.yearSummary;
   if (!summary || summary.dismissed) return;
-  openModal(`Age ${summary.toAge} &middot; Your year`, `<p class="year-review-intro">What changed from age ${summary.fromAge} to ${summary.toAge}.</p>${changesView(summary.stats,summary.lifestyle,summary.height)}${summary.parents?.length?`<details class="forecast-parents"><summary>Your parents' changes</summary>${summary.parents.map(parent=>`<p><strong>${esc(parent.name)}</strong><span>Mental stability ${beforeAfter(parent.stability)}<br>Relationship ${beforeAfter(parent.relationship)}${parent.lifestyle?`<span class="parent-review-lifestyle">Lifestyle ${beforeAfter(parent.lifestyle)}</span>`:''}</span></p>`).join('')}</details>`:''}${summary.events?.length?`<details class="year-review-events" open><summary>Moments from your year</summary><ul>${summary.events.map(event=>`<li><strong>${journalText(event.title)}</strong><p>${journalText(event.text)}</p></li>`).join('')}</ul></details>`:''}${state.pendingEvents.length?'<p class="form-note">You have decisions to make next. Their effects are added after you choose.</p>':''}`, '<button class="button primary" data-action="close">Continue '+icon('arrow')+'</button>');
+  openModal(`Age ${summary.fromAge} → ${summary.toAge}`, `${changesView(summary.stats,summary.lifestyle,summary.height)}${summary.parents?.length?`<details class="forecast-parents"><summary>Parents</summary>${summary.parents.map(parent=>`<p><strong>${esc(parent.name)}</strong><span>Mental stability ${beforeAfter(parent.stability)}<br>Relationship ${beforeAfter(parent.relationship)}${parent.lifestyle?`<span class="parent-review-lifestyle">Lifestyle ${beforeAfter(parent.lifestyle)}</span>`:''}</span></p>`).join('')}</details>`:''}${summary.events?.length?`<details class="year-review-events" open><summary>Events</summary><ul>${summary.events.map(event=>`<li><strong>${journalText(event.title)}</strong><p>${journalText(event.text)}</p></li>`).join('')}</ul></details>`:''}${state.pendingEvents.length?'<p class="form-note">Decisions waiting.</p>':''}`, '<button class="button primary" data-action="close">Continue '+icon('arrow')+'</button>');
   showingYearSummary=true;
   modalRoot.querySelector('.modal').classList.add('year-review-modal');
   modalRoot.querySelector('.modal-backdrop').classList.add('year-review-backdrop');
@@ -254,7 +267,7 @@ function focusView(disabled) {
 
 function journalView() {
   const entries = showAllHistory ? state.history : state.history.slice(0,8);
-  return `<section class="panel journal-panel"><div class="panel-heading"><h3>The story so far</h3><span class="tag">LIFE JOURNAL</span></div><div class="journal-list">${entries.map(entry => `<article class="journal-entry ${esc(entry.kind || 'neutral')}"><div class="journal-age"><strong>${entry.age}</strong><span>${entry.generation===state.generation?'AGE':`GEN ${entry.generation}`}</span></div><span class="journal-marker"></span><div class="journal-content"><h4>${journalText(entry.title)}</h4><p>${journalText(entry.text)}</p></div></article>`).join('')}</div>${state.history.length>8?`<button class="button ghost small" data-action="history">${showAllHistory?'Show recent years':'Read the whole story'} ${icon('arrow')}</button>`:''}</section>`;
+  return `<section class="panel journal-panel"><div class="panel-heading"><h3>Journal</h3></div><div class="journal-list">${entries.map(entry => `<article class="journal-entry ${esc(entry.kind || 'neutral')}"><div class="journal-age"><strong>${entry.age}</strong><span>${entry.generation===state.generation?'AGE':`GEN ${entry.generation}`}</span></div><span class="journal-marker"></span><div class="journal-content"><h4>${journalText(entry.title)}</h4><p>${journalText(entry.text)}</p></div></article>`).join('')}</div>${state.history.length>8?`<button class="button ghost small" data-action="history">${showAllHistory?'Recent years':'Show all'} ${icon('arrow')}</button>`:''}</section>`;
 }
 
 function collegeProgressView() {
@@ -295,8 +308,8 @@ function profileStats(person, forecast) {
 
 function pregnancyView() {
   if (!state.pregnancy) return '';
-  const carrierName = state.pregnancy.carrierId===state.id ? 'You are' : `${esc(state.pregnancy.otherParent.name)} is`;
-  return `<section class="panel pregnancy-panel"><div class="panel-heading"><h3>${labelWithHelp('A new chapter on the way','children')}</h3><span class="tag">EXPECTING</span></div><p class="section-description">${carrierName} expecting a baby. Your family will welcome the new arrival when you reach age ${state.pregnancy.dueAge}.</p></section>`;
+  const carrierName = state.pregnancy.carrierId===state.id ? 'You' : esc(state.pregnancy.otherParent.name);
+  return `<section class="panel pregnancy-panel"><div class="panel-heading"><h3>${labelWithHelp('Pregnancy','pregnancy')}</h3><span class="tag">EXPECTING</span></div><p class="section-description">${carrierName} · Due at your age ${state.pregnancy.dueAge}.</p></section>`;
 }
 
 function loveView() {
@@ -399,11 +412,11 @@ function closeModal() {
 }
 
 function menuModal() {
-  openModal('Your story', `<div class="menu-list"><button data-action="help">${icon('help')} How to play ${icon('arrow')}</button><button data-action="odds">${icon('spark')} This year’s odds ${icon('arrow')}</button><button data-action="export">${icon('download')} Export save ${icon('arrow')}</button><button data-action="import">${icon('year')} Import save ${icon('arrow')}</button><button data-action="new">${icon('plus')} Start a new life ${icon('arrow')}</button></div><p class="menu-note">${saveAvailable?'Your life saves automatically on this device. Export a backup to move it to another phone.':'Browser saving is unavailable. Export your story before leaving.'}</p>`);
+  openModal('Your story', `<div class="menu-list"><button data-action="help">${icon('help')} How to play ${icon('arrow')}</button><button data-action="odds">${icon('spark')} This year’s odds ${icon('arrow')}</button><button data-action="export">${icon('download')} Export save ${icon('arrow')}</button><button data-action="import">${icon('year')} Import save ${icon('arrow')}</button><button data-action="new">${icon('plus')} Start a new life ${icon('arrow')}</button></div><p class="menu-note">${saveAvailable?'Saved on this device. Export to back up or move it.':'Saving unavailable. Export before leaving.'}</p>`);
 }
 
 function newLifeModal(initial = false) {
-  openModal(initial?'Name your family.':'Begin a new family?', `<p class="section-description">${initial?'Your story begins with a surname. Sons and daughters will carry it through the generations.':'This starts a new family and replaces your current saved life when you confirm.'}</p><label class="field-label" for="new-surname">Family surname</label><input class="text-input" id="new-surname" maxlength="30" required aria-required="true" placeholder="Your family name" autocomplete="family-name" autocapitalize="words"><p class="form-note">The first letter is capitalized automatically.</p><label class="field-label" for="new-name">First name <span class="muted">(optional)</span></label><input class="text-input" id="new-name" maxlength="19" placeholder="Leave blank for a surprise" autocomplete="given-name" autocapitalize="words"><p class="form-note">You begin at age 0 with randomized parents, stats, and skill affinities.</p>`, `${initial?'':'<button class="button secondary" data-action="close">Keep my story</button>'}<button class="button primary" data-action="confirm-new">Begin this family ${icon('arrow')}</button>`, initial);
+  openModal(initial?'A new life':'Begin a new family?', `<p class="section-description">${initial?'Your surname carries through the generations.':'This replaces your saved life.'}</p><label class="field-label" for="new-surname">Family surname</label><input class="text-input" id="new-surname" maxlength="30" required aria-required="true" placeholder="Your family name" autocomplete="family-name" autocapitalize="words"><label class="field-label" for="new-name">First name <span class="muted">(optional)</span></label><input class="text-input" id="new-name" maxlength="19" placeholder="Random if blank" autocomplete="given-name" autocapitalize="words">`, `${initial?'':'<button class="button secondary" data-action="close">Cancel</button>'}<button class="button primary" data-action="confirm-new">Begin ${icon('arrow')}</button>`, initial);
 }
 
 function navigate(tab) {
@@ -416,43 +429,40 @@ function navigate(tab) {
 }
 
 function topicHelpModal(topic, id) {
-  const person = [state,...state.parents,...state.children,...state.siblings,...state.encounters,...(state.partner?[state.partner]:[])].find(candidate=>candidate.id===id) || state;
-  const childhood = 'Intelligence, strength, social ability, and creativity start low at birth because a baby has had little time to learn or develop. They increase through childhood and practice, with different growth in each life and each year.';
-  const appearance = 'Attractiveness starts near its inherited adult value. It does not grow like a learned skill. Tiny random changes can move it slightly up or down each year. In this game, gradual aging begins after 30 for men and after 22 for women; events can also affect it. These ratings and thresholds are game rules, not objective measures of people.';
   const help = {
-    stats: ['Your stats', [childhood,appearance,'Stats range from 1 to 10. Health, mental stability, and lifestyle describe wellbeing and circumstances rather than learned skills.']],
-    intelligence: ['Intelligence', [childhood,'School, college, and mentally demanding work help this ability develop. Growth affinity affects the pace.']],
-    strength: ['Strength', [childhood,'Physical development, self-care, and some careers help build strength. Health and age also matter.']],
-    social: ['Social ability', [childhood,'Friends, family, relationships, and people-focused work help this ability develop.']],
-    creativity: ['Creativity', [childhood,'Learning, personal interests, and creative work help this ability develop.']],
-    attractiveness: ['Attractiveness', [appearance]],
-    affinity: ['Growth affinity', ['The small −3 to +3 rating is an inherited, lifelong growth affinity. Positive ratings make a learned skill develop faster; negative ratings mean it takes more practice. The actual change still varies each year.','Attractiveness keeps an inherited affinity rating for consistency, but practice and crying do not raise it.']],
-    forecast: ['Next year’s stat bars', ['The colored segment in a bar previews the average routine change for next year. Green means an increase; striped red means a decrease. The displayed stat number is your current value.','Actual changes vary, and events can change the result. Forecasts do not include random events, deaths, new relationships, or unresolved decisions.']],
-    health: ['Health', ['Higher health means better physical wellbeing and lower disease death risk. Self-care supports it; illness, injuries, and age can reduce it.','Poor health while growing reduces that year’s height gain. Final height emerges from those yearly gains, so less growth can mean a shorter adult height. Health never shrinks height already gained.']],
-    stability: ['Mental stability', ['Higher means calmer and more resilient. Rest, friends, and family can help. Lower mental stability can make conflict and distress more likely.','Parents’ mental stability affects childhood events. Harder crying puts more strain on them. These are simplified game probabilities, not diagnoses.']],
-    lifestyle: ['Lifestyle', ['Lifestyle runs from 1 to 10 and represents everyday comfort. Until 18, you share your parents’ household lifestyle.','Parents’ career focus and experience usually improve their prospects over time. Their focus can change each year, and setbacks such as losing a job can lower lifestyle. Your own career, family responsibilities, events, and inheritance matter in adulthood.']],
-    height: ['Height & percentile', ['Final height is not predetermined. It emerges from yearly gains influenced by age, inherited growth tendencies, health, and random variation. Growth ends at an individual age between ages 14 and 18.','The percentile compares your height with the reference for your age. For example, the 50th percentile is the middle of that reference. It disappears when adult height is reached.','Poor health reduces that year’s height gain and can mean a shorter adult height. It never shrinks height already gained.',heightPercentile(person)===null?'This person has reached adult height.':`Current position: ${heightLabel(person)}.`]],
-    cry: ['Cry level', ['Choose a level from 1 to 5 during ages 0–2. More crying brings attention, helps early learned skills grow, and strengthens your relationship with living parents.','Harder crying has a larger effect on parents’ mental stability. Their wellbeing and circumstances can lead to events that affect you. The outcome varies each year.']],
-    focus: ['Your focus', ['From age 3, divide up to 12 points between school or career, friends, family, and yourself. Each focus takes 0–5.','Focus changes routine development and event chances. Unused points leave more time for rest. Results vary rather than increasing by a fixed amount every year.']],
-    'focus-work': ['School & career focus', ['School and college focus develop learned abilities. After education, career focus supports performance, experience, and lifestyle. Skills and events also influence the result.']],
-    'focus-social': ['Friends focus', ['Time with friends develops social ability and can support mental stability. It also changes the chances of social events and connections.']],
-    'focus-family': ['Family focus', ['Family time strengthens relationships and helps children develop. It can support parents’ mental stability and affects family events.']],
-    'focus-self': ['Yourself focus', ['Time for yourself supports health, learning, and personal development. Rest and self-care also support mental stability.']],
-    parents: ['Your parents', ['Mom and Dad each have their own stats, lifestyle, career focus, and relationship with you. Their wellbeing and career changes can affect your childhood.','Initial relationships vary around 8 out of 10. Crying and family time can strengthen them. Each parent also faces age- and health-related mortality.']],
-    'parent-career': ['Parents’ careers', ['Career focus runs from 0 to 5 and can change a little each year. Experience and higher focus generally improve career progress and lifestyle over time.','Job loss, unemployment, recovery, and retirement can change that trend. While you are a child, the household’s changing lifestyle affects yours too.']],
-    relationship: ['Relationship', ['This 1–10 rating describes your relationship with this person. Higher means closer. Family time, crying in infancy, and shared events can change it.','A partner can support social ability and mental stability, while shared responsibilities affect lifestyle.']],
-    career: ['Careers', [`At 18, choose one of 10 job offers or attend college. There are ${JOBS.length} careers; graduates receive 15 offers, including roles that need a degree.`,'Your skills and a role’s affinities determine skill fit. Career focus, performance, and experience support progress and lifestyle, with annual variation and possible setbacks.']],
-    college: ['College or career', ['Start working from 10 offers at age 18, or attend college for four years. College focus builds skills. Graduation brings 15 offers, including degree-based careers.','Job skill affinities show which skills a role uses most. A +3 rating is central to that role. Career success can raise lifestyle above its starting level.']],
-    children: ['Children', ['Adults can have or adopt up to six children. A pregnancy arrives the following year, and adoption is available once per year.','Family time supports children’s learned skills and your relationship. Dependent children affect household lifestyle; living children also support social ability. All eligible living children share inheritance equally.']],
-    dating: ['People you meet', ['Attractiveness, social ability, and lifestyle influence how often you meet people. You can explore their stats before deciding; either approach may be declined.','Unanswered invitations pass at the next year. A relationship closes other invitations. A one-night stand may lead to pregnancy.']],
-    marriage: ['Marriage', ['You can propose once per year. A stronger relationship and more years together improve the chance of acceptance. Marriage increases the game’s chance of pregnancy.']],
-    pregnancy: ['Pregnancy', ['Pregnancy depends on pregnancy capability, age, health, and relationship status. It is less likely while dating and more likely in marriage. A baby arrives the following year.']],
-    inheritance: ['Retirement & inheritance', ['From age 65, retire and continue as an eligible child. With no eligible children, choose a sibling; with neither, a child from another family can receive your legacy. Death can open succession earlier, and age 85 requires a new playable chapter.','All eligible living children share inheritance equally. With no children, the chosen sibling or unrelated child receives it. Heirs keep their own age, stats, growth affinities, and resources. Children and siblings keep the family surname.']]
+    stats: ['Your stats', ['Intelligence, strength, social ability and creativity start low at birth and grow with practice; attractiveness starts near its adult value.']],
+    intelligence: ['Intelligence', ['School, college and mentally demanding work build this skill.']],
+    strength: ['Strength', ['Physical growth, self-care and active work build strength.']],
+    social: ['Social ability', ['Friends, family and people-focused work build social skills.']],
+    creativity: ['Creativity', ['Learning, personal interests and creative work develop this skill.']],
+    attractiveness: ['Attractiveness', ['Starts near its adult value, with tiny random changes each year rather than gains from practice. In this game, aging lowers it after 30 for men and 22 for women.']],
+    affinity: ['Growth affinity', ['This inherited −3 to +3 rating controls learning speed; positive is faster. It does not increase attractiveness.']],
+    forecast: ['Next year’s stat bars', ['Colored segments preview average routine changes; events and yearly variation can alter the result.']],
+    health: ['Health', ['Self-care supports health; illness and aging reduce it. Poor health raises disease risk and reduces childhood height gains.']],
+    stability: ['Mental stability', ['Higher means calmer; rest and relationships help. Low parental mental stability can lead to difficult childhood events.']],
+    lifestyle: ['Lifestyle', ['Until 18, you share your parents’ changing household lifestyle. As an adult, work, family, events and inheritance shape it.']],
+    height: ['Height & percentile', ['Final height emerges from yearly growth shaped by age, inheritance, health and chance, ending at 14–18. Poor health reduces new growth, never existing height. Percentile compares you with the reference for your age until growth ends.']],
+    cry: ['Cry level', ['More crying (1–5) builds skills and parent relationships, while harder crying strains their mental stability more.']],
+    focus: ['Your focus', ['Allocate 12 points, at most 5 per area; unused points allow rest. Focus shapes growth and event chances.']],
+    'focus-work': ['School & career focus', ['Studying builds skills; career focus supports job performance and lifestyle.']],
+    'focus-social': ['Friends focus', ['Develops social ability, supports mental stability and creates chances to meet people.']],
+    'focus-family': ['Family focus', ['Strengthens relationships, helps children develop and supports parents’ mental stability.']],
+    'focus-self': ['Yourself focus', ['Supports health, learning and mental stability.']],
+    parents: ['Your parents', ['Their wellbeing and careers affect your childhood. Starting relationships vary around 8/10; age and health influence their chance of death.']],
+    'parent-career': ['Parents’ careers', ['Higher career focus and experience tend to improve lifestyle; job loss can set it back.']],
+    relationship: ['Relationship', ['Higher means closer; family time and shared events change this rating. Partners support social ability and mental stability, but lower lifestyle.']],
+    career: ['Careers', ['Your skills determine job fit; career focus and experience improve performance and lifestyle. Start working at 18 or after college.']],
+    college: ['College or career', ['College takes four years, builds skills and opens 15 job offers. Starting work at 18 gives 10 offers.']],
+    children: ['Children', ['Adults can have up to six children, with one adoption per year. Family time helps them develop; dependent children lower lifestyle.']],
+    dating: ['People you meet', ['Attractiveness, social ability and lifestyle affect encounters. Invitations expire next year or when a relationship starts, and either approach can be declined.']],
+    marriage: ['Marriage', ['Propose once per year; a closer relationship and more years together improve acceptance.']],
+    pregnancy: ['Pregnancy', ['Age, health and pregnancy capability affect the odds; marriage makes it more likely. A baby arrives the next year.']],
+    inheritance: ['Retirement & inheritance', ['Succession opens at 65 or on death and is required at 85; choose a child, sibling or unrelated child, in that order. Eligible children share inheritance equally; otherwise the chosen heir receives it.']]
   };
   let entry = help[topic];
   if (topic==='job') {
     const job = JOBS.find(candidate=>candidate.id===id);
-    if (job) entry = [job.name,[job.description,'The skill affinities show what this role uses most; +3 is central. Skill fit reflects how well your current abilities match the role. Career focus and experience can improve performance and lifestyle.']];
+    if (job) entry = [job.name,[job.description,'+3 marks a core skill; skill fit reflects your current match.']];
   }
   if (!entry) return;
   openModal(esc(entry[0]),`${entry[1].map(paragraph=>`<p>${esc(paragraph)}</p>`).join('')}${topic==='forecast'?forecastLegend():''}`);
@@ -463,15 +473,14 @@ function topicHelpModal(topic, id) {
 }
 
 function helpModal() {
-  openModal('A life, one year at a time.', `<div class="help-grid"><div class="help-item"><h4>01 · Start small</h4><p>At ages 0 to 2, set crying from 1 to 5. Crying helps skills and parent relationships grow; higher levels put more strain on parents. Their stress and support can affect your childhood.</p></div><div class="help-item"><h4>02 · Spend your time</h4><p>From age 3, share 12 focus points across school or career, friends, family, and yourself. Each takes 0–5. Press Next year when you’re ready.</p></div><div class="help-item"><h4>03 · Work with your nature</h4><p>Skills range from 1–10. The −3 to +3 rating is growth affinity. Your choices determine where you improve; affinity changes how fast.</p></div><div class="help-item"><h4>04 · Leave room for life</h4><p>There are ${EVENTS.length} possible events. Each has a small, independent yearly chance based on your age, focus, career, and stats. Up to five ordinary events can happen. Death risks are separate and depend on age and wellbeing. Some events ask you to choose, with consequences shown before you decide.</p></div><div class="help-item"><h4>05 · Find your path</h4><p>At 18, choose a job from 10 offers or attend college for four years. Graduates receive 15 offers. There are 100 careers, each with skill affinities and a base lifestyle from 1 to 10.</p></div><div class="help-item"><h4>06 · Grow a legacy</h4><p>Meet people from 18, build a relationship, and propose once a year. Pregnancy is rare while dating and much more likely in marriage; a baby arrives the following year. Adults can also adopt. Family focus develops children’s skills and strengthens everyone’s relationships. Retire from 65 and play as a child. With no children, choose a sibling; with neither, give your legacy to a low-stat child with a different surname. At 85, choose the next chapter. All living children share the inheritance equally. Death can end any chapter early, with an heir available to continue.</p></div></div><p class="form-note">Mortality uses a real-world age baseline with simplified stat adjustments. Other events are fictional. Saves stay in this browser.</p>`, '<button class="button primary" data-action="close">Let’s live a little</button>');
+  openModal('How to play', `<div class="help-grid"><div class="help-item"><h4>Babies</h4><p>Choose a cry level from 1–5.</p></div><div class="help-item"><h4>Each year</h4><p>From age 3, allocate 12 focus points, up to 5 per area, then press Next year.</p></div><div class="help-item"><h4>Stats</h4><p>Growth affinity sets learning speed; tap ? for details.</p></div><div class="help-item"><h4>Events</h4><p>Age, focus and stats affect random events; some require a choice.</p></div><div class="help-item"><h4>Work</h4><p>At 18, choose work or four years of college.</p></div><div class="help-item"><h4>Family</h4><p>Build relationships, raise children and choose an heir when your chapter ends.</p></div></div>`, '<button class="button primary" data-action="close">Got it</button>');
 }
 
 function oddsModal() {
   const odds = eventOdds(state).filter(event=>event.chance>0).sort((a,b)=>b.chance-a.chance);
   const quiet = odds.reduce((chance,event)=>chance*(1-event.chance),1);
   const mortality = mortalityOdds(state);
-  const waiting = state.pendingEvents.length || needsEducationChoice(state) || state.ended || state.needsSuccession;
-  openModal('A little room for chance.', `<p class="section-description">${waiting?'Finish your current decisions to continue. These chances describe your current age and condition.':'Your age, focus, career, and effective stats shape each event’s chance.'} Ordinary events roll separately, with at most five happening in a year. Mortality is checked separately for everyone and is outside that limit.</p><div class="chance-summary"><span>A quiet year<strong>${(quiet*100).toFixed(1)}%</strong></span><span>At least one event<strong>${((1-quiet)*100).toFixed(1)}%</strong></span></div><p class="form-note">Ordinary lives average roughly one event every year or two. These totals describe ordinary events only. Death risks below are separate; a quiet year can still include a bereavement.</p><details class="event-odds"><summary>${odds.length} possible events this year</summary><div class="odds-list">${odds.map(event=>`<div class="odds-row"><span>${journalText(event.name)}${EVENTS.find(candidate=>candidate.id===(event.eventId || event.id))?.choices?'<small>Includes a choice</small>':''}</span><strong>${(event.chance*100).toFixed(2)}%</strong></div>`).join('')}</div></details><p class="form-note">Individual percentages are the roll chances before the five-event limit. They are checked when you press Next year, using your choices and stats for that year.</p><details class="mortality-odds"><summary>Annual death risks</summary><p class="form-note">A real-world age baseline with simplified health and mental stability adjustments. Lower health raises disease risk. These are game estimates, not individual medical predictions.</p><div class="odds-list">${mortality.map(person=>`<div class="mortality-row"><span>${esc(person.name)}<small>Disease ${(person.disease*100).toFixed(3)}% &middot; Accident ${(person.accident*100).toFixed(3)}%</small></span><strong>${(person.total*100).toFixed(3)}%</strong></div>`).join('')}</div></details>`);
+  openModal('Yearly odds', `<p class="section-description">Each event rolls separately; at most five occur per year. Death risks are separate.</p><div class="chance-summary"><span>Quiet year<strong>${(quiet*100).toFixed(1)}%</strong></span><span>At least one event<strong>${((1-quiet)*100).toFixed(1)}%</strong></span></div><details class="event-odds"><summary>${odds.length} possible events</summary><div class="odds-list">${odds.map(event=>`<div class="odds-row"><span>${journalText(event.name)}${EVENTS.find(candidate=>candidate.id===(event.eventId || event.id))?.choices?'<small>Choice</small>':''}</span><strong>${(event.chance*100).toFixed(2)}%</strong></div>`).join('')}</div></details><details class="mortality-odds"><summary>Annual death risks</summary><p class="form-note">Age-based game estimates; poor health raises disease risk, and adult mental stability affects accident risk.</p><div class="odds-list">${mortality.map(person=>`<div class="mortality-row"><span>${esc(person.name)}<small>Disease ${(person.disease*100).toFixed(3)}% &middot; Accident ${(person.accident*100).toFixed(3)}%</small></span><strong>${(person.total*100).toFixed(3)}%</strong></div>`).join('')}</div></details>`);
 }
 
 function update(action, successMessage) {
@@ -496,11 +505,11 @@ document.addEventListener('click', event => {
     const result = update(()=>resolveEventChoice(state,button.dataset.choice,button.dataset.event,button.dataset.subject || undefined));
     if (result?.ok) {
       if (state.pendingEvents.length) focusEventDecision();
-      else { navigate('year'); toast('Your choice becomes part of your story.'); }
+      else { navigate('year'); toast('Choice saved.'); }
     }
   }
   if (action==='education') {
-    update(()=>chooseEducation(state,button.dataset.path),'Your college chapter begins.');
+    update(()=>chooseEducation(state,button.dataset.path),'Started college.');
     if (state.education.status==='college') navigate('year');
   }
   if (action==='baby') {
@@ -533,10 +542,10 @@ document.addEventListener('click', event => {
   }
   if (action==='propose') {
     const result=update(()=>proposeMarriage(state));
-    if (result?.ok) toast(result.accepted?'You are married. A new chapter together.':'Not yet. You can propose again next year.');
+    if (result?.ok) toast(result.accepted?'You are married.':'Not yet. Try again next year.');
   }
   if (action==='breakup' && state.partner) {
-    openModal('End this relationship?', '<p>Close your chapter with <strong>'+esc(state.partner.name)+'</strong>? Your children and any pregnancy remain part of your story.</p>', '<button class="button secondary" data-action="close">Stay together</button><button class="button primary" data-action="confirm-breakup">End relationship</button>');
+    openModal('End this relationship?', '<p>Leave <strong>'+esc(state.partner.name)+'</strong>? Children and any pregnancy remain.</p>', '<button class="button secondary" data-action="close">Stay together</button><button class="button primary" data-action="confirm-breakup">End relationship</button>');
   }
   if (action==='confirm-breakup') { closeModal(); update(()=>endRelationship(state),'Your relationship has ended.'); }
   if (action==='job') update(()=>takeJob(state,button.dataset.id),'A new chapter in your career.');
@@ -546,8 +555,8 @@ document.addEventListener('click', event => {
     const info = successionInfo(state);
     const child = info.candidates.find(person=>person.id===button.dataset.id);
     if (!child || !info.eligible) return;
-    const inheritance = info.route==='children'?'All living children receive equal shares of the inheritance, including those you do not play.':info.route==='siblings'?'With no eligible children, your chosen sibling receives the whole inheritance.':'You give this child the whole inheritance and continue with a different surname: '+esc(child.familyName)+'.';
-    openModal(state.alive===false?'Continue their legacy?':'Retire and continue?', `<p>Play as <strong>${esc(child.name)}</strong>, age ${child.age}, with their own stats and affinities.</p><p>${inheritance}</p><p>This closes ${esc(state.name)}’s playable chapter.</p>`, `<button class="button secondary" data-action="close">${state.alive===false?'Back':'Keep living this chapter'}</button><button class="button primary" data-action="confirm-heir" data-id="${esc(child.id)}">${state.alive===false?'Play next chapter':'Retire & continue'} ${icon('arrow')}</button>`);
+    const inheritance = info.route==='children'?'Living children receive equal shares.':info.route==='siblings'?'Your sibling receives the inheritance.':'This child inherits; their surname remains '+esc(child.familyName)+'.';
+    openModal(state.alive===false?'Continue their legacy?':'Retire and continue?', `<p>Play as <strong>${esc(child.name)}</strong>, age ${child.age}, ending this chapter.</p><p>${inheritance}</p>`, `<button class="button secondary" data-action="close">Back</button><button class="button primary" data-action="confirm-heir" data-id="${esc(child.id)}">${state.alive===false?'Play next chapter':'Retire & continue'} ${icon('arrow')}</button>`);
   }
   if (action==='confirm-heir') { closeModal(); activeTab='year'; update(()=>succeed(state,button.dataset.id),'A new generation. The same story.'); }
   if (action==='history') { showAllHistory=!showAllHistory; render(); }

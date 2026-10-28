@@ -60,7 +60,7 @@ export function advanceParentCareer(person, { random = () => .5, normal = () => 
     if (draw() < recoveryChance) {
       career.status = 'employed';
       career.progress = round(career.progress + .35 + .4 * draw());
-      return { career, event: { title: 'Back at work', text: `${name} found a new job. Your household is starting to recover.`, kind: 'career' } };
+      return { career, event: { title: 'Back at work', text: `${name} found a new job.`, kind: 'career' } };
     }
     career.progress = round(career.progress + routineGain(career) + noise() * .025);
     return { career, event: null };
@@ -70,7 +70,7 @@ export function advanceParentCareer(person, { random = () => .5, normal = () => 
   if (draw() < lossChance) {
     career.status = 'unemployed';
     career.progress = round(career.progress - 1 - draw());
-    return { career, event: { title: 'A parent lost their job', text: `${name} lost their job, putting pressure on your household's lifestyle.`, kind: 'career' } };
+    return { career, event: { title: 'A parent lost their job', text: `${name} lost their job.`, kind: 'career' } };
   }
 
   career.progress = round(career.progress + routineGain(career) + noise() * (.08 + .012 * career.focus));
@@ -78,7 +78,7 @@ export function advanceParentCareer(person, { random = () => .5, normal = () => 
   const promotionChance = .015 + .005 * career.focus;
   if (draw() < promotionChance) {
     career.progress = round(career.progress + .25 + .35 * draw());
-    return { career, event: { title: 'A parent moved ahead at work', text: `${name} earned a promotion, bringing more comfort to your household.`, kind: 'career' } };
+    return { career, event: { title: 'A parent moved ahead at work', text: `${name} earned a promotion.`, kind: 'career' } };
   }
   return { career, event: null };
 }
