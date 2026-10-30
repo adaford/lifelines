@@ -2365,13 +2365,43 @@ test('activity signs compare possible allocations rather than fixed numerical ga
     fixture.focus={work:5,social:0,family:0,self:0,creative:0};
     const ui=await mount(fixture),before=ui.saved();
     maximumGains.push(toddlerChoiceImpacts(before,'work').find(entry=>entry.stat==='strength').change);
-    assert.equal(ui.query('.choice-impact[data-stat="strength"]:not([data-parent-id]) b').textContent,'+++','maximum Play has the strongest relative strength effect for either aptitude');
+    assert.equal(ui.query('.choice-impact[data-stat="strength"]:not([data-parent-id]) b').textContent,'+++','maximum Play is the strongest gain for either aptitude');
     ui.click('[data-action="focus"][data-key="work"][data-delta="-1"]');
-    assert.equal(ui.query('.choice-impact[data-stat="strength"]:not([data-parent-id]) b').textContent,'++','one fewer Play point has a smaller relative effect');
+    assert.equal(ui.query('.choice-impact[data-stat="strength"]:not([data-parent-id]) b').textContent,'+','one fewer Play point is one step above neutral');
     assert.deepEqual(ui.saved().stats,before.stats);
     assert.equal(ui.saved().rng,before.rng);
   }
   assert.ok(maximumGains[0]<.15 && maximumGains[1]>=.3,'the same signs span the former small and large absolute thresholds');
+});
+
+test('Electronics and crafts show the expected signs at every allocation', async () => {
+  const fixture=createGame({seed:121});
+  fixture.age=3;
+  fixture.focus={work:0,social:0,family:0,self:0,creative:0};
+  fixture.stats.social=5;
+  fixture.stats.intelligence=5;
+  const ui=await mount(fixture),before=ui.saved();
+  const social=['++','+',null,'-','--','---'];
+  const intelligence=['--','-',null,'+','++','+++'];
+  const signs=stat=>ui.document.querySelector(`.focus-row[data-focus-key="social"] .choice-impact[data-stat="${stat}"] b`)?.textContent ?? null;
+  for(let points=0;points<=5;points++) {
+    assert.equal(ui.query('.focus-row[data-focus-key="social"] output').textContent,String(points));
+    assert.equal(signs('social'),social[points],`Electronics ${points}: social`);
+    assert.equal(signs('intelligence'),intelligence[points],`Electronics ${points}: intelligence`);
+    if(points<5) ui.click('[data-action="focus"][data-key="social"][data-delta="1"]');
+  }
+  for(let points=4;points>=0;points--) {
+    ui.click('[data-action="focus"][data-key="social"][data-delta="-1"]');
+    assert.equal(signs('social'),social[points]);
+    assert.equal(signs('intelligence'),intelligence[points]);
+  }
+  for(let points=0;points<=5;points++) {
+    const craftSigns=ui.document.querySelector('.focus-row[data-focus-key="creative"] .choice-impact[data-stat="intelligence"] b')?.textContent ?? null;
+    assert.equal(craftSigns,intelligence[points],`Arts & crafts ${points}: intelligence`);
+    if(points<5) ui.click('[data-action="focus"][data-key="creative"][data-delta="1"]');
+  }
+  assert.deepEqual(ui.saved().stats,before.stats);
+  assert.equal(ui.saved().rng,before.rng);
 });
 
 test('infant changes respect displayed limits from retained temporary modifiers', async () => {

@@ -5,11 +5,11 @@ import {
   offeredJobs, needsEducationChoice, pendingEventSubject, focusLimits, focusLimitDetails, caregivers,
   relationshipOdds, meetingChances, proposalChance, pregnancyChance, oneNightChance,
   respondToEncounter, proposeMarriage, endRelationship, normalizeSurname, heightPercentile, statPercentiles
-} from './engine.js?v=review-context-1';
-import { annotateNarrative } from './narrative.js?v=review-context-1';
-import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome } from './display.js?v=review-context-1';
+} from './engine.js?v=activity-ranks-1';
+import { annotateNarrative } from './narrative.js?v=activity-ranks-1';
+import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome } from './display.js?v=activity-ranks-1';
 
-import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts } from './choice-impacts.js?v=review-context-1';
+import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts } from './choice-impacts.js?v=activity-ranks-1';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const app = document.querySelector('#app');
@@ -588,7 +588,7 @@ function topicHelpModal(topic, id) {
     height: ['Height', ['Final height emerges from yearly growth shaped by age, inheritance, health and chance, ending at 14–18. Poor health reduces new growth, never existing height.']],
     cry: ['Cry level', ['Less crying lowers your intelligence and mental stability; more crying raises them. Strength is unaffected. Parent relationships tend to fall at levels 1–2, stay steady at 3, and rise at 4–5, with yearly variation. Harder crying strains their mental stability more.']],
     focus: ['Your focus', ['Allocate 12 points, at most 5 per area; unused points allow rest. Events can temporarily lower these limits. Focused skills can rise, neglected ones can fall, and results vary yearly.']],
-    'toddler-focus': ['Toddler activities', ['Share 12 points among five activities, up to 5 each. Events can temporarily lower these limits. Unused points support mental stability, and results vary each year.', 'Your activity effects are measured from Play 3, Electronics 2, Family time 2, Rest 3, and Arts & crafts 2. Parent relationships are neutral at Family time 3; parent mental stability at 2. Zero effects are hidden.']],
+    'toddler-focus': ['Toddler activities', ['Share 12 points among five activities, up to 5 each. Events can temporarily lower these limits. Unused points support mental stability, and results vary each year.', 'Your activity effects are measured from Play 3, Electronics 2, Family time 2, Rest 3, and Arts & crafts 2. Parent relationships are neutral at Family time 3; parent mental stability at 2. Below neutral, each missing point adds one sign. Above neutral, signs run from one for the weakest option to three for the strongest. Zero effects are hidden.']],
     ...Object.fromEntries(toddlerFocusRows.map(([key,label]) => [`toddler-${key}`, [label,
       toddlerActivityImpacts(key).map(({stat,change,level,target}) => `${(change>0?'+':'-').repeat(level)}${target==='parents'?(caregivers(state).some(person=>person.guardianRole)?'Guardian relationship':'Parent relationships'):skillLabel(stat)}`)
     ]])),

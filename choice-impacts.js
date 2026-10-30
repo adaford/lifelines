@@ -1,5 +1,5 @@
-import { annualForecast, effectiveStats, needsEducationChoice, focusLimits, caregivers } from './engine.js?v=review-context-1';
-import { infantChoiceEffects, wellbeingResponse, toddlerActivityEffects, TODDLER_FOCUS, TODDLER_ACTIVITY_EFFECTS, PARENT_FAMILY_RELATIONSHIP_GAIN } from './development.js?v=review-context-1';
+import { annualForecast, effectiveStats, needsEducationChoice, focusLimits, caregivers } from './engine.js?v=activity-ranks-1';
+import { infantChoiceEffects, wellbeingResponse, toddlerActivityEffects, TODDLER_FOCUS, TODDLER_ACTIVITY_EFFECTS, PARENT_FAMILY_RELATIONSHIP_GAIN } from './development.js?v=activity-ranks-1';
 
 const nonzero = value => Math.abs(value) > .000001;
 const keyOf = entry => `${entry.parentId || 'you'}:${entry.stat}`;
@@ -52,14 +52,21 @@ export function toddlerChoiceImpacts(state, activity) {
   const entries = toddlerChoiceEntries(state, activity, points, true);
   const raw = toddlerChoiceEntries(state, activity, points, false);
   const comparisons = Array.from({ length: 6 }, (_, level) => toddlerChoiceEntries(state, activity, level, false));
-  const help = toddlerActivityImpacts(activity);
   return entries.filter(entry => nonzero(entry.change)).map(entry => {
     const key = keyOf(entry);
     const change = raw.find(candidate => keyOf(candidate) === key).change;
-    const maximum = Math.max(Math.abs(change), ...comparisons.map(options => options.find(option => keyOf(option) === key)?.change || 0)
-      .filter(candidate => Math.sign(candidate) === Math.sign(change)).map(Math.abs));
-    const cap = help.find(effect => effect.stat === entry.stat)?.level || 3;
-    const level = Math.min(cap, Math.max(1, Math.ceil(cap * Math.abs(change) / maximum - 1e-8)));
+    const magnitudes = comparisons.map(options => options.find(option => keyOf(option) === key)?.change || 0)
+      .filter(candidate => nonzero(candidate) && Math.sign(candidate) === Math.sign(change))
+      .map(candidate => Math.round(Math.abs(candidate) * 1e8));
+    // Below neutral, each ranked reduction adds one sign. Above neutral, the
+    // weakest option starts at one and the strongest reaches three; two options
+    // skip the middle strength. This follows points, even for negative effects
+    // such as Electronics on social. Static help must not cap these ranks.
+    const ordered = [...new Set(magnitudes)].sort((a, b) => a - b);
+    const rank = Math.max(0, ordered.indexOf(Math.round(Math.abs(change) * 1e8)));
+    const neutral = entry.parentId ? (entry.stat === 'relationship' ? 3 : 2) : TODDLER_FOCUS[activity];
+    const level = points < neutral ? Math.min(3, rank + 1)
+      : ordered.length < 2 ? 1 : 1 + Math.round(2 * rank / (ordered.length - 1));
     return { ...entry, level };
   });
 }
