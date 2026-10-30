@@ -2130,6 +2130,7 @@ test('parent effects do not cancel each other and remembered parents have no for
 });
 
 function assertChoiceImpacts(ui) {
+  assert.equal(ui.all('.choice-impact[data-stat="lifestyle"]').length,0,'Lifestyle is never an expected activity change');
   const state=ui.saved();
   if (state.age>=2 && state.age<5) {
     assert.equal(ui.all('.choice-impact-summary').length,0);
@@ -2372,6 +2373,30 @@ test('activity signs compare possible allocations rather than fixed numerical ga
     assert.equal(ui.saved().rng,before.rng);
   }
   assert.ok(maximumGains[0]<.15 && maximumGains[1]>=.3,'the same signs span the former small and large absolute thresholds');
+});
+
+test('lifestyle never appears in expected changes even when household or adult lifestyle will change', async () => {
+  for(const age of [0,1,3,5,17,30]) {
+    const fixture=ageTo(createGame({seed:19}),age);
+    fixture.effects=[];
+    fixture.lifestyle=9;
+    if(age<18) {
+      fixture.parents.forEach(parent=>{
+        parent.alive=true;delete parent.death;delete parent.abandonedAt;
+        parent.lifestyle=9;
+        Object.assign(parent.career,{status:'employed',progress:4.6,focus:3});
+      });
+    } else {
+      fixture.jobId=null;fixture.money=0;fixture.income=0;
+    }
+    assert.ok(annualForecast(fixture).lifestyle.change<0,`age ${age} has an actual lifestyle forecast`);
+    const ui=await mount(fixture),before=ui.saved();
+    assert.equal(ui.all('.choice-impact[data-stat="lifestyle"]').length,0,`age ${age} hides all expected Lifestyle entries`);
+    assert.equal(ui.query('.profile-lifestyle .status-value').textContent,'9.0/10','the current rating remains visible');
+    assert.ok(ui.all('.choice-impact').length>0,'other expected changes remain visible');
+    assert.deepEqual(ui.saved(),before);
+    assert.equal(ui.saved().rng,fixture.rng);
+  }
 });
 
 test('Electronics and crafts show the expected signs at every allocation', async () => {

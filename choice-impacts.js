@@ -1,5 +1,5 @@
-import { annualForecast, effectiveStats, needsEducationChoice, focusLimits, caregivers } from './engine.js?v=activity-ranks-1';
-import { infantChoiceEffects, wellbeingResponse, toddlerActivityEffects, TODDLER_FOCUS, TODDLER_ACTIVITY_EFFECTS, PARENT_FAMILY_RELATIONSHIP_GAIN } from './development.js?v=activity-ranks-1';
+import { annualForecast, effectiveStats, needsEducationChoice, focusLimits, caregivers } from './engine.js?v=no-lifestyle-preview-1';
+import { infantChoiceEffects, wellbeingResponse, toddlerActivityEffects, TODDLER_FOCUS, TODDLER_ACTIVITY_EFFECTS, PARENT_FAMILY_RELATIONSHIP_GAIN } from './development.js?v=no-lifestyle-preview-1';
 
 const nonzero = value => Math.abs(value) > .000001;
 const keyOf = entry => `${entry.parentId || 'you'}:${entry.stat}`;
@@ -72,11 +72,12 @@ export function toddlerChoiceImpacts(state, activity) {
 }
 
 function forecastEntries(state, forecast) {
-  const entries = [...Object.entries(forecast.stats), ['lifestyle', forecast.lifestyle]]
+  // Lifestyle remains a household/financial outcome, never an activity preview.
+  const entries = Object.entries(forecast.stats)
     .map(([stat, value]) => ({ stat, change: value.change, group: 'you' }));
   for (const parent of caregivers(state)) {
     const changes = forecast.parents.find(person => person.id === parent.id);
-    for (const stat of ['stability', 'lifestyle', 'relationship']) {
+    for (const stat of ['stability', 'relationship']) {
       if (changes?.[stat]) entries.push({ stat, parentId: parent.id, change: changes[stat].change,
         group: stat === 'relationship' ? 'relationships' : 'others' });
     }
@@ -87,7 +88,7 @@ function forecastEntries(state, forecast) {
 function cryEntries(state, level, clip) {
   const candidate = { ...state, cryLevel: level };
   const entries = forecastEntries(candidate, annualForecast(candidate))
-    .filter(entry => entry.parentId || entry.stat === 'lifestyle');
+    .filter(entry => entry.parentId);
   // Personal crying effects omit unrelated innate development and wellbeing
   // reversion, so an unchanged skill is never presented as an effect of crying.
   const effects = infantChoiceEffects(candidate);
