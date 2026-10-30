@@ -121,7 +121,7 @@ npm ci
 npm test
 ```
 
-The activity-help and Arts & crafts intelligence update passes all **248 tests**, including **65 DOM checks**, on Node **24.14.0**. Regenerating the 4,000-life reference with `--samples 2000 --seed 200001` produced identical data, so no refit was needed. Schema 12 and existing saved values remain unchanged. Visual checks are omitted at the user's request. Manual DOM checks confirm all five popup bodies and preserve saved JSON, RNG, and write count. All 18 local HTTP assets returned 200 and matched disk. Deployment verification is pending.
+The activity-help and Arts & crafts intelligence update passes all **248 tests**, including **65 DOM checks**, on Node **24.14.0**. Regenerating the 4,000-life reference with `--samples 2000 --seed 200001` produced identical data, so no refit was needed. Schema 12 and existing saved values remain unchanged. Visual checks are omitted at the user's request. Manual DOM checks confirm all five popup bodies and preserve saved JSON, RNG, and write count. All 18 local HTTP assets returned 200 and matched disk. GitHub Pages deployed **71f3907** successfully (workflow **41062565342**); all **18 live HTTP assets** returned 200 and matched the release.
 
 The previous baby-height, event-copy, stat-order, and review-color release passed 247 tests. GitHub Pages deployed gameplay commit **05332aa** successfully (workflow **41061818546**), and all 18 live assets matched the release. Its documentation follow-up **e6593b4** also deployed successfully (workflow **41062029826**).
 
