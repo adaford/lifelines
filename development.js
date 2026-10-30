@@ -33,10 +33,11 @@ const number = (value, fallback) => Number.isFinite(value) ? value : fallback;
 const skills = ['intelligence', 'strength', 'social', 'creativity'];
 
 export const TODDLER_FOCUS = { work: 3, social: 2, family: 2, self: 3, creative: 2 };
+export const PARENT_FAMILY_RELATIONSHIP_GAIN = .08;
 export const TODDLER_ACTIVITY_EFFECTS = {
   work: { strength: .1, social: .055 },
-  social: { intelligence: .09, social: -.055 },
-  family: { intelligence: .02, social: .055, stability: .035 },
+  social: { intelligence: .09, social: -.055 / 3 },
+  family: { social: .055 * 2 / 3, stability: .035 },
   self: { health: .1, stability: .08 },
   creative: { creativity: .11, intelligence: .03 },
 };

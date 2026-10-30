@@ -1,5 +1,5 @@
-import { annualForecast, effectiveStats, needsEducationChoice } from './engine.js?v=activity-help-1';
-import { infantChoiceEffects, wellbeingResponse, TODDLER_ACTIVITY_EFFECTS } from './development.js?v=activity-help-1';
+import { annualForecast, effectiveStats, needsEducationChoice } from './engine.js?v=toddler-social-1';
+import { infantChoiceEffects, wellbeingResponse, TODDLER_ACTIVITY_EFFECTS, PARENT_FAMILY_RELATIONSHIP_GAIN } from './development.js?v=toddler-social-1';
 
 const nonzero = value => Math.abs(value) > .000001;
 const keyOf = entry => `${entry.parentId || 'you'}:${entry.stat}`;
@@ -8,11 +8,14 @@ const bounded = (before, change) => Math.max(1, Math.min(10, before + change)) -
 // Activity help compares direct per-point effects for the same stat across
 // activities. The combined forecast separately accounts for selected points.
 export function toddlerActivityImpacts(activity) {
-  return Object.entries(TODDLER_ACTIVITY_EFFECTS[activity] || {}).filter(([,change]) => nonzero(change)).map(([stat,change]) => {
+  const impacts = Object.entries(TODDLER_ACTIVITY_EFFECTS[activity] || {}).filter(([,change]) => nonzero(change)).map(([stat,change]) => {
     const maximum = Math.max(...Object.values(TODDLER_ACTIVITY_EFFECTS).map(effects => Math.abs(effects[stat] || 0)));
     const level = Math.min(3, Math.max(1, Math.ceil(3 * Math.abs(change) / maximum - 1e-8)));
     return { stat, change, level };
   });
+  // Family time is the only toddler activity that improves parent relationships.
+  if (activity === 'family') impacts.push({ stat: 'relationship', change: PARENT_FAMILY_RELATIONSHIP_GAIN, level: 3, target: 'parents' });
+  return impacts;
 }
 
 function forecastEntries(state, forecast) {

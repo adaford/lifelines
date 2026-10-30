@@ -80,6 +80,38 @@ test('crafts develop intelligence at one-third the electronics rate while retain
   }
 });
 
+test('toddler social practice has three, minus one, and two relative units while family time builds parent relationships', () => {
+  for (const age of [2, 3, 4]) {
+    const state = toddler();
+    state.age = age;
+    state.aptitudes.social = 0;
+    state.focus.self = 2;
+    state.parents.forEach(parent => { parent.relationship = 5; });
+    const before = copy(state);
+    const baseline = skillChanges(state);
+    const more = activity => ({ ...state, focus: { ...state.focus, [activity]: state.focus[activity] + 1 } });
+    const play = skillChanges(more('work'));
+    const electronics = skillChanges(more('social'));
+    const family = skillChanges(more('family'));
+    const playGain = play.social - baseline.social;
+    const electronicsGain = electronics.social - baseline.social;
+    const familyGain = family.social - baseline.social;
+    assert.ok(playGain > 0 && electronicsGain < 0 && familyGain > 0);
+    assert.ok(Math.abs(electronicsGain * -3 - playGain) < 1e-12);
+    assert.ok(Math.abs(familyGain * 3 - playGain * 2) < 1e-12);
+    assert.equal(family.intelligence, baseline.intelligence);
+    assert.equal(Object.hasOwn(toddlerActivityEffects(state).family, 'intelligence'), false);
+    const neutral = annualForecast(state);
+    const closer = annualForecast(more('family'));
+    for (const parent of neutral.parents) {
+      const next = closer.parents.find(person => person.id === parent.id);
+      assert.equal(parent.relationship.change, 0);
+      assert.equal(next.relationship.change, .08);
+    }
+    assert.deepEqual(state, before, 'practice and forecast reads preserve the save and RNG');
+  }
+});
+
 test('age two unlocks five activities and the school transition preserves the completed choices', () => {
   const infant = createGame({ seed: 42111 });
   infant.age = 1;

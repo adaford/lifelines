@@ -5,11 +5,11 @@ import {
   offeredJobs, needsEducationChoice, pendingEventSubject,
   relationshipOdds, meetingChances, proposalChance, pregnancyChance, oneNightChance,
   respondToEncounter, proposeMarriage, endRelationship, normalizeSurname, heightPercentile, statPercentiles
-} from './engine.js?v=activity-help-1';
-import { annotateNarrative } from './narrative.js?v=activity-help-1';
-import { formatRating, formatHeight, heightDescription, formatStatNarrative } from './display.js?v=activity-help-1';
+} from './engine.js?v=toddler-social-1';
+import { annotateNarrative } from './narrative.js?v=toddler-social-1';
+import { formatRating, formatHeight, heightDescription, formatStatNarrative } from './display.js?v=toddler-social-1';
 
-import { choiceImpacts, toddlerActivityImpacts } from './choice-impacts.js?v=activity-help-1';
+import { choiceImpacts, toddlerActivityImpacts } from './choice-impacts.js?v=toddler-social-1';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const app = document.querySelector('#app');
@@ -513,7 +513,7 @@ function topicHelpModal(topic, id) {
     focus: ['Your focus', ['Allocate 12 points, at most 5 per area; unused points allow rest. Focused skills can rise, neglected ones can fall, and results vary yearly.']],
     'toddler-focus': ['Toddler activities', ['Share 12 points among five activities, up to 5 each. Unused points support mental stability, and results vary each year.']],
     ...Object.fromEntries(toddlerFocusRows.map(([key,label]) => [`toddler-${key}`, [label,
-      toddlerActivityImpacts(key).map(({stat,change,level}) => `${(change>0?'+':'-').repeat(level)}${skillLabel(stat)}`)
+      toddlerActivityImpacts(key).map(({stat,change,level,target}) => `${(change>0?'+':'-').repeat(level)}${target==='parents'?'Parent relationships':skillLabel(stat)}`)
     ]])),
     'focus-work': ['School & career focus', ['Study and work exercise relevant abilities; career focus also supports performance and lifestyle.']],
     'focus-social': ['Friends focus', ['Can improve social, support mental stability and create chances to meet people.']],

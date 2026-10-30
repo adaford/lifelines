@@ -1,19 +1,19 @@
 // Lifelines: deterministic, browser-independent simulation rules.
 // All public actions mutate their state and return { ok, reason? }.
-import { JOBS } from './jobs.js?v=activity-help-1';
-import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=activity-help-1';
-import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=activity-help-1';
-import { mortalityRisk, rollMortality } from './mortality.js?v=activity-help-1';
-import { heightReference, advanceGrowth } from './growth.js?v=activity-help-1';
-import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=activity-help-1';
-import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, DEVELOPMENT_BALANCE, BIRTH_VARIATION, TODDLER_FOCUS } from './development.js?v=activity-help-1';
-import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=activity-help-1';
-import { normalPercentile } from './percentiles.js?v=activity-help-1';
+import { JOBS } from './jobs.js?v=toddler-social-1';
+import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=toddler-social-1';
+import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=toddler-social-1';
+import { mortalityRisk, rollMortality } from './mortality.js?v=toddler-social-1';
+import { heightReference, advanceGrowth } from './growth.js?v=toddler-social-1';
+import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=toddler-social-1';
+import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, DEVELOPMENT_BALANCE, BIRTH_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN } from './development.js?v=toddler-social-1';
+import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=toddler-social-1';
+import { normalPercentile } from './percentiles.js?v=toddler-social-1';
 export { DEVELOPMENT_BALANCE };
-export { heightPercentile } from './growth.js?v=activity-help-1';
-export { mortalityRisk } from './mortality.js?v=activity-help-1';
-import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=activity-help-1';
-export { JOBS, JOB_CATEGORIES } from './jobs.js?v=activity-help-1';
+export { heightPercentile } from './growth.js?v=toddler-social-1';
+export { mortalityRisk } from './mortality.js?v=toddler-social-1';
+import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=toddler-social-1';
+export { JOBS, JOB_CATEGORIES } from './jobs.js?v=toddler-social-1';
 export const EVENTS = [...PERSONAL_EVENTS, ...FAMILY_EVENTS];
 
 export const SKILLS = [
@@ -435,7 +435,7 @@ function growYear(state) {
   if (studying) state.schoolProgress = round(clamp(state.schoolProgress + f.work * .9, 0, 100));
   for (const parent of state.parents.filter(p => p.alive !== false)) {
     addStat(parent, 'stability', .08 * (5 - parent.stats.stability) + wellbeingResponse(parent, 'stability', (f.family - 3) * .025));
-    parent.relationship = round(clamp(parent.relationship + (f.family - 2) * .08, 1, 10));
+    parent.relationship = round(clamp(parent.relationship + (f.family - 2) * PARENT_FAMILY_RELATIONSHIP_GAIN, 1, 10));
   }
 }
 // Money remains internal: the player sees only a 1–10 lifestyle score.
