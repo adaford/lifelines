@@ -4,6 +4,8 @@ Updated 30 October 2026 for numeric stat summaries and a combined choices-box fo
 
 Prior release verification, 30 October 2026: gameplay commit **a0a2b6a** was pushed to `main` and GitHub Pages reported `built` for that exact commit. The live entry point and seven updated assets returned HTTP 200 and matched the released files at https://adaford.github.io/lifelines/. All 231 tests passed, including 57 DOM checks. The numeric-stats/combined-forecast update still requires its own release verification.
 
+Release verification, 30 October 2026: commit **2746c82** replaced stat bars with numeric ratings and combined choice forecasts. GitHub Pages reported `built` for that exact commit; the live entry point, app, engine and stylesheet returned HTTP 200 and matched the released files. Validation: 232 tests including 58 DOM checks, plus 17 matching local HTTP assets. Browser visual verification remains unavailable.
+
 The earlier gameplay baseline was commit **4da3288**; **6e56897** added portable cloud instructions. New characters have broad natural ratings across 1–10, with focus and aptitude shaping lifelong gains or losses. Under-18 abilities describe ability relative to peers, not adult knowledge or strength. Only height shows a percentile. Reviews record the choices actually used for the completed year, and stories identify known people's relationships. Blank name fields use defaults. Existing saves, parent ratings, stochastic growth, mortality, and before → after reviews remain. Cloud setup observations below remain historical records from 26 October. Record the final tested/deployed commit with the release result.
 
 ## Project access and current status
