@@ -1,19 +1,19 @@
 // Lifelines: deterministic, browser-independent simulation rules.
 // All public actions mutate their state and return { ok, reason? }.
-import { JOBS } from './jobs.js?v=aptitude-emoji-1';
-import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=aptitude-emoji-1';
-import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=aptitude-emoji-1';
-import { mortalityRisk, rollMortality } from './mortality.js?v=aptitude-emoji-1';
-import { heightReference, advanceGrowth } from './growth.js?v=aptitude-emoji-1';
-import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=aptitude-emoji-1';
-import { naturalSkillRating, skillChanges, childhoodWellbeing, DEVELOPMENT_BALANCE, BIRTH_VARIATION, TODDLER_FOCUS } from './development.js?v=aptitude-emoji-1';
-import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=aptitude-emoji-1';
-import { normalPercentile } from './percentiles.js?v=aptitude-emoji-1';
+import { JOBS } from './jobs.js?v=aptitude-number-1';
+import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=aptitude-number-1';
+import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=aptitude-number-1';
+import { mortalityRisk, rollMortality } from './mortality.js?v=aptitude-number-1';
+import { heightReference, advanceGrowth } from './growth.js?v=aptitude-number-1';
+import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=aptitude-number-1';
+import { naturalSkillRating, skillChanges, childhoodWellbeing, DEVELOPMENT_BALANCE, BIRTH_VARIATION, TODDLER_FOCUS } from './development.js?v=aptitude-number-1';
+import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=aptitude-number-1';
+import { normalPercentile } from './percentiles.js?v=aptitude-number-1';
 export { DEVELOPMENT_BALANCE };
-export { heightPercentile } from './growth.js?v=aptitude-emoji-1';
-export { mortalityRisk } from './mortality.js?v=aptitude-emoji-1';
-import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=aptitude-emoji-1';
-export { JOBS, JOB_CATEGORIES } from './jobs.js?v=aptitude-emoji-1';
+export { heightPercentile } from './growth.js?v=aptitude-number-1';
+export { mortalityRisk } from './mortality.js?v=aptitude-number-1';
+import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=aptitude-number-1';
+export { JOBS, JOB_CATEGORIES } from './jobs.js?v=aptitude-number-1';
 export const EVENTS = [...PERSONAL_EVENTS, ...FAMILY_EVENTS];
 
 export const SKILLS = [

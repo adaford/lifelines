@@ -1,5 +1,5 @@
-import { annualForecast, effectiveStats, needsEducationChoice } from './engine.js?v=aptitude-emoji-1';
-import { infantChoiceEffects } from './development.js?v=aptitude-emoji-1';
+import { annualForecast, effectiveStats, needsEducationChoice } from './engine.js?v=aptitude-number-1';
+import { infantChoiceEffects } from './development.js?v=aptitude-number-1';
 
 const nonzero = value => Math.abs(value) > .000001;
 const keyOf = entry => `${entry.parentId || 'you'}:${entry.stat}`;
