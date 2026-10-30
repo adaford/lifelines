@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { naturalSkillRating, skillChanges, childhoodWellbeing, infantChoiceEffects, wellbeingResponse, TODDLER_FOCUS } from '../development.js';
-import { createGame, advanceYear, resolveEventChoice, EVENTS, effectiveStats } from '../engine.js';
+import { createGame, advanceYear, resolveEventChoice, EVENTS, effectiveStats, focusLimits } from '../engine.js';
 import { eventChances } from '../events.js';
 
 test('newborn ratings span the scale around five with broad variation and aptitude correlation', () => {
@@ -217,7 +217,9 @@ test('independent game lives reach age 18 with average ratings near five and ret
     state.cryLevel = 3;
     let choiceSeed = (seed ^ 0xA5A5A5A5) >>> 0;
     while (state.age < 18 && state.alive) {
-      state.focus = state.age >= 2 && state.age < 5 ? { ...TODDLER_FOCUS } : { work: 3, social: 3, family: 3, self: 3 };
+      const target = state.age >= 2 && state.age < 5 ? TODDLER_FOCUS : { work: 3, social: 3, family: 3, self: 3 };
+      const limits = focusLimits(state);
+      state.focus = Object.fromEntries(Object.entries(target).map(([key, points]) => [key, Math.min(points, limits[key] ?? 5)]));
       assert.equal(advanceYear(state).ok, true);
       while (state.pendingEvents.length) {
         const pending = state.pendingEvents[0];

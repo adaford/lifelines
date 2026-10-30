@@ -2,14 +2,14 @@ import {
   SKILLS, JOBS, EVENTS, resolveEventChoice, createGame, advanceYear, setFocus, setCryLevel, dismissYearSummary, jobFit,
   canTakeJob, takeJob, quitJob, haveChild, successionInfo, succeed,
   effectiveStats, eventOdds, mortalityOdds, stage, migrateSave, chooseEducation,
-  offeredJobs, needsEducationChoice, pendingEventSubject,
+  offeredJobs, needsEducationChoice, pendingEventSubject, focusLimits, focusLimitDetails,
   relationshipOdds, meetingChances, proposalChance, pregnancyChance, oneNightChance,
   respondToEncounter, proposeMarriage, endRelationship, normalizeSurname, heightPercentile, statPercentiles
-} from './engine.js?v=activity-rows-1';
-import { annotateNarrative } from './narrative.js?v=activity-rows-1';
-import { formatRating, formatHeight, heightDescription, formatStatNarrative } from './display.js?v=activity-rows-1';
+} from './engine.js?v=event-limits-1';
+import { annotateNarrative } from './narrative.js?v=event-limits-1';
+import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome } from './display.js?v=event-limits-1';
 
-import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts } from './choice-impacts.js?v=activity-rows-1';
+import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts } from './choice-impacts.js?v=event-limits-1';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const app = document.querySelector('#app');
@@ -201,11 +201,21 @@ function statsView() {
   }).join('')}<div class="vital height-vital" data-stat="height"><span class="vital-label">${labelWithHelp('Height','height',state.id)}</span><span class="vital-value" aria-label="${heightDescription(state.height,state.age)}">${formatHeight(state.height,state.age)}</span>${percentiles?percentileTag(percentiles,'height'):state.age>=18?'<span class="height-percentile">Adult height</span>':''}</div></div></section>`;
 }
 
+function focusLabel(key) {
+  if (state.age < 5) return toddlerFocusRows.find(([area])=>area===key)?.[1] || key;
+  return ({work:state.age<18?'School':state.education.status==='college'?'College':'Career',social:'Friends',family:'Family',self:'Yourself'})[key] || key;
+}
+
+function outcomeLimits(outcome) {
+  const limits = state.age<2?{}:outcome.focusLimits?.[state.age<5?'toddler':'standard'] || {};
+  return Object.entries(limits).filter(([,max])=>max<5).map(([key,max])=>`${focusLabel(key)} max ${max}`);
+}
+
 function outcomeSummary(outcome, subject, pending) {
   const keys = [...new Set([...Object.keys(outcome.statChanges || {}), ...Object.keys(outcome.playerChanges || {}), ...Object.keys(outcome.modifiers || {}), ...(outcome.lifestyle?['lifestyle']:[])])];
   if (!pending) {
     const current = effectiveStats(state);
-    return keys.map(key => `${skillLabel(key)} ${number(key==='lifestyle'?state.lifestyle:current[key])}`).join(' · ');
+    return [...keys.map(key => `${skillLabel(key)} ${number(key==='lifestyle'?state.lifestyle:current[key])}`), ...outcomeLimits(outcome)].join(' · ');
   }
   const preview = structuredClone(state);
   const result = resolveEventChoice(preview,outcome.id,pending.eventId,pending.subjectId || undefined);
@@ -216,7 +226,8 @@ function outcomeSummary(outcome, subject, pending) {
   const nextSubject = pendingEventSubject(preview,pending);
   for (const key of Object.keys(outcome.subjectChanges || {})) changes.push(change(`${subject?.name || 'Your loved one'}: ${skillLabel(key)}`,subject?.stats[key],nextSubject?.stats[key]));
   if (outcome.relationship) changes.push(change(`Relationship with ${subject?.name || 'your loved one'}`,subject?.relationship,nextSubject?.relationship));
-  if (outcome.years && (outcome.modifiers || outcome.lifestyle)) changes.push(`${outcome.years} year${outcome.years===1?'':'s'}`);
+  changes.push(...outcomeLimits(outcome));
+  if (outcome.years && (Object.keys(outcome.modifiers || {}).length || outcome.lifestyle || outcome.focusLimits)) changes.push(`${outcome.years} year${outcome.years===1?'':'s'}`);
   return changes.join(' · ');
 }
 
@@ -237,7 +248,7 @@ function focusEventDecision() {
 }
 
 function effectsView() {
-  return `<section class="panel"><div class="panel-heading"><h3>Life’s little twists</h3><span class="tag">${state.effects.length} active</span></div>${state.effects.length ? `<div class="effect-list">${state.effects.map(effect => `<div class="effect-card ${Object.values(effect.modifiers || {}).some(value => value<0)||effect.lifestyle<0?'negative':'positive'}"><div class="effect-title">${icon('spark')} ${journalText(effect.name)}</div><p>${journalText(effect.description)}</p><div class="effect-meta">${esc(outcomeSummary(effect))}<br>${effect.years} year${effect.years===1?'':'s'} remaining</div></div>`).join('')}</div>` : `<div class="empty-state">${icon('spark')}<p>A clean slate.<br>No active buffs or setbacks.</p></div>`}<button class="button ghost small" data-action="odds">View this year’s odds ${icon('arrow')}</button></section>`;
+  return `<section class="panel"><div class="panel-heading"><h3>Active effects</h3><span class="tag">${state.effects.length} active</span></div>${state.effects.length ? `<div class="effect-list">${state.effects.map(effect => `<div class="effect-card ${Object.values(effect.modifiers || {}).some(value => value<0)||effect.lifestyle<0||outcomeLimits(effect).length?'negative':'positive'}"><div class="effect-title">${icon('spark')} ${journalText(effect.name)}</div><div class="effect-meta">${esc(outcomeSummary(effect))}<br>${effect.years} year${effect.years===1?'':'s'} remaining</div></div>`).join('')}</div>` : `<div class="empty-state">${icon('spark')}<p>None</p></div>`}<button class="button ghost small" data-action="odds">View this year’s odds ${icon('arrow')}</button></section>`;
 }
 
 function yearView() {
@@ -310,7 +321,11 @@ function completedEventCopy(entry) {
 }
 function yearEventsView(summary) {
   const events = (summary.events || []).filter(event => !isNoEventEntry(event));
-  return `<details class="year-review-events" open><summary>Events</summary>${events.length?`<ul>${events.map(event=>`<li><strong>${journalText(completedEventCopy(event).title,summary.toAge)}</strong><p>${journalText(completedEventCopy(event).text,summary.toAge)}</p></li>`).join('')}</ul>`:'<p>None</p>'}</details>`;
+  return `<details class="year-review-events" open><summary>Events</summary>${events.length?`<ul>${events.map(event=>`<li><strong>${journalText(completedEventCopy(event).title,summary.toAge)}</strong><p>${eventOutcomeText(completedEventCopy(event).text,summary.toAge)}</p></li>`).join('')}</ul>`:'<p>None</p>'}</details>`;
+}
+
+function eventOutcomeText(text, age) {
+  return splitEventOutcome(text).map(line=>journalText(line,age)).join('<br>');
 }
 
 function yearSummaryModal() {
@@ -365,12 +380,17 @@ function focusView(disabled) {
   const studying = state.age<18 || state.education.status==='college';
   const rows = toddler?toddlerFocusRows:[['work',state.age<18?'School':studying?'College':'Career',studying?'school':'career'],['social','Friends','social'],['family','Family','family'],['self','Yourself','self']];
   const mode = toddler?'activity':'focus';
-  return `<div class="focus-list">${rows.map(([key,label,ico]) => `<div class="focus-row" data-focus-key="${key}"><span class="focus-icon">${icon(ico)}</span><div class="focus-copy"><h4>${labelWithHelp(label,`${toddler?'toddler':'focus'}-${key}`)}</h4><div class="focus-scale" aria-hidden="true">${Array.from({length:5},(_,i)=>`<span class="${i<(state.focus[key] ?? 0)?'filled':''}"></span>`).join('')}</div></div><div class="stepper" role="group" aria-label="${esc(label)} ${mode}"><button data-action="focus" data-key="${key}" data-delta="-1" aria-label="Decrease ${esc(label.toLowerCase())} ${mode}" ${(state.focus[key] ?? 0)<=0||disabled?'disabled':''}>${icon('minus')}</button><output aria-label="${esc(label)} ${mode} level">${state.focus[key] ?? 0}</output><button data-action="focus" data-key="${key}" data-delta="1" aria-label="Increase ${esc(label.toLowerCase())} ${mode}" ${(state.focus[key] ?? 0)>=5||focusUsed()>=12||disabled?'disabled':''}>${icon('plus')}</button></div>${toddler&&!disabled?activityEffectsView(key,label):''}</div>`).join('')}</div><div class="budget-bar"><div class="budget-summary"><span>${12-focusUsed()} ${mode} point${12-focusUsed()===1?'':'s'} available</span><strong>${focusUsed()} / 12</strong></div><div class="budget-track"><span style="width:${focusUsed()/12*100}%"></span></div></div>`;
+  const limits = focusLimits(state), details = focusLimitDetails(state);
+  return `<div class="focus-list">${rows.map(([key,label,ico]) => {
+    const restrictions = details.filter(limit=>limit.key===key);
+    const limitText = restrictions.length?'Max '+limits[key]+' · '+restrictions.map(limit=>limit.name+' ('+(limit.years===1?'this year':limit.years+' years left')+')').join('; '):'';
+    return `<div class="focus-row" data-focus-key="${key}"><span class="focus-icon">${icon(ico)}</span><div class="focus-copy"><h4>${labelWithHelp(label,`${toddler?'toddler':'focus'}-${key}`)}</h4><div class="focus-scale" aria-hidden="true">${Array.from({length:5},(_,i)=>`<span class="${i<(state.focus[key] ?? 0)?'filled':i>=limits[key]?'limited':''}"></span>`).join('')}</div>${limitText?`<div class="focus-limit" id="focus-limit-${key}">${esc(limitText)}</div>`:''}</div><div class="stepper" role="group" aria-label="${esc(label)} ${mode}" ${limitText?`aria-describedby="focus-limit-${key}"`:''}><button data-action="focus" data-key="${key}" data-delta="-1" aria-label="Decrease ${esc(label.toLowerCase())} ${mode}" ${(state.focus[key] ?? 0)<=0||disabled?'disabled':''}>${icon('minus')}</button><output aria-label="${esc(label)} ${mode} level">${state.focus[key] ?? 0}</output><button data-action="focus" data-key="${key}" data-delta="1" aria-label="Increase ${esc(label.toLowerCase())} ${mode}" ${(state.focus[key] ?? 0)>=limits[key]||focusUsed()>=12||disabled?'disabled':''}>${icon('plus')}</button></div>${toddler&&!disabled?activityEffectsView(key,label):''}</div>`;
+  }).join('')}</div><div class="budget-bar"><div class="budget-summary"><span>${12-focusUsed()} ${mode} point${12-focusUsed()===1?'':'s'} available</span><strong>${focusUsed()} / 12</strong></div><div class="budget-track"><span style="width:${focusUsed()/12*100}%"></span></div></div>`;
 }
 
 function journalView() {
   const entries = showAllHistory ? state.history : state.history.slice(0,8);
-  return `<section class="panel journal-panel"><div class="panel-heading"><h3>Journal</h3></div><div class="journal-list">${entries.map(entry => `<article class="journal-entry ${esc(entry.kind || 'neutral')}"><div class="journal-age"><strong>${entry.age}</strong><span>${entry.generation===state.generation?'AGE':`GEN ${entry.generation}`}</span></div><span class="journal-marker"></span><div class="journal-content"><h4>${journalText(completedEventCopy(entry).title,entry.age)}</h4><p>${journalText(completedEventCopy(entry).text,entry.age)}</p></div></article>`).join('')}</div>${state.history.length>8?`<button class="button ghost small" data-action="history">${showAllHistory?'Recent years':'Show all'} ${icon('arrow')}</button>`:''}</section>`;
+  return `<section class="panel journal-panel"><div class="panel-heading"><h3>Journal</h3></div><div class="journal-list">${entries.map(entry => `<article class="journal-entry ${esc(entry.kind || 'neutral')}"><div class="journal-age"><strong>${entry.age}</strong><span>${entry.generation===state.generation?'AGE':`GEN ${entry.generation}`}</span></div><span class="journal-marker"></span><div class="journal-content"><h4>${journalText(completedEventCopy(entry).title,entry.age)}</h4><p>${eventOutcomeText(completedEventCopy(entry).text,entry.age)}</p></div></article>`).join('')}</div>${state.history.length>8?`<button class="button ghost small" data-action="history">${showAllHistory?'Recent years':'Show all'} ${icon('arrow')}</button>`:''}</section>`;
 }
 
 function collegeProgressView() {
@@ -546,8 +566,8 @@ function topicHelpModal(topic, id) {
     lifestyle: ['Lifestyle', ['Until 18, you share your parents’ changing household lifestyle. As an adult, work, family, events and inheritance shape it.']],
     height: ['Height', ['Final height emerges from yearly growth shaped by age, inheritance, health and chance, ending at 14–18. Poor health reduces new growth, never existing height.']],
     cry: ['Cry level', ['Less crying lowers your intelligence and mental stability; more crying raises them. Strength is unaffected. Parent relationships tend to fall at levels 1–2, stay steady at 3, and rise at 4–5, with yearly variation. Harder crying strains their mental stability more.']],
-    focus: ['Your focus', ['Allocate 12 points, at most 5 per area; unused points allow rest. Focused skills can rise, neglected ones can fall, and results vary yearly.']],
-    'toddler-focus': ['Toddler activities', ['Share 12 points among five activities, up to 5 each. Unused points support mental stability, and results vary each year.', 'Activity effects are measured from Play 3, Electronics 2, Family time 2, Rest 3, and Arts & crafts 2. Zero effects are hidden.']],
+    focus: ['Your focus', ['Allocate 12 points, at most 5 per area; unused points allow rest. Events can temporarily lower these limits. Focused skills can rise, neglected ones can fall, and results vary yearly.']],
+    'toddler-focus': ['Toddler activities', ['Share 12 points among five activities, up to 5 each. Events can temporarily lower these limits. Unused points support mental stability, and results vary each year.', 'Your activity effects are measured from Play 3, Electronics 2, Family time 2, Rest 3, and Arts & crafts 2. Parent relationships are neutral at Family time 3; parent mental stability at 2. Zero effects are hidden.']],
     ...Object.fromEntries(toddlerFocusRows.map(([key,label]) => [`toddler-${key}`, [label,
       toddlerActivityImpacts(key).map(({stat,change,level,target}) => `${(change>0?'+':'-').repeat(level)}${target==='parents'?'Parent relationships':skillLabel(stat)}`)
     ]])),

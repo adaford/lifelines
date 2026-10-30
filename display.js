@@ -41,6 +41,37 @@ const heightPair = new RegExp(`(\\bHeight(?:\\s*:\\s*|\\s+))(${amount})(?:\\s*${
 const heightSingle = new RegExp(`(\\bHeight(?:\\s*:\\s*|\\s+))(${amount})\\s*${heightUnit}\\b`, 'gi');
 const heightInches = (value, unit) => Number(value) / (unit.toLowerCase() === 'cm' ? 2.54 : 1);
 
+const outcomeStat = '(?:Intelligence|Strength|Attractiveness|Social(?: ability)?|Creativity|Health|(?:Mental\\s+)?stability|Lifestyle|Relationships?)';
+const outcomePart = new RegExp(`^(?:(?<person>.+?):\\s*${outcomeStat}|(?<prefix>.*?)Your\\s+${outcomeStat}|(?<lifestylePrefix>.*?)Lifestyle)\\s+(?<before>${amount})${arrow}(?<after>${amount})(?<suffix>[.!?](?:\\s.*)?)?$`, 'iu');
+
+// Separate recorded effects by person without changing saved prose or treating
+// an ordinary semicolon in a custom story as an effect boundary.
+export function splitEventOutcome(text) {
+  const source = String(text ?? '');
+  const parts = source.split(';');
+  if (parts.length < 2) return [source];
+  const parsed = parts.map((part, index) => {
+    const match = outcomePart.exec(part.trim());
+    if (!match || [match.groups.before, match.groups.after].some(value => Number(value) < 1 || Number(value) > 10)) return null;
+    const { person, prefix, lifestylePrefix, suffix } = match.groups;
+    if (index > 0 && (prefix || lifestylePrefix) || index < parts.length - 1 && suffix) return null;
+    return { person: person?.trim() || null };
+  });
+  if (parsed.some(part => !part)) return [source];
+  // A selected option can precede the first named person's recorded effects.
+  // A later exact name lets us keep that person's following effects together.
+  if (parsed[0].person) {
+    const repeated = parsed.slice(1).find(part => part.person && parsed[0].person.endsWith(`. ${part.person}`));
+    if (repeated) parsed[0].person = repeated.person;
+  }
+  const lines = [parts[0]];
+  for (let index = 1; index < parts.length; index++) {
+    if (parsed[index].person === parsed[index - 1].person) lines[lines.length - 1] += `;${parts[index]}`;
+    else lines.push(parts[index].trimStart());
+  }
+  return lines;
+}
+
 function formatValues(text, age) {
   return text
     .replace(/\bsocial ability\b/gi, match => match[0] === 'S' ? 'Social' : 'social')

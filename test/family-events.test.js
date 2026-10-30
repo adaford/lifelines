@@ -90,7 +90,7 @@ test('family focus supports connection and reduces neglected relationships', () 
   assert.ok(chanceFor(low, 'household_child_school') > chanceFor(high, 'household_child_school') * 7);
 });
 
-test('all retained subject traits influence events, with small ordinary household frequency', () => {
+test('all retained subject traits influence events, with more frequent but bounded household events', () => {
   for (const subjectType of ['partner', 'child']) {
     for (const key of traits) {
       const event = FAMILY_EVENTS.find(event => event.subjectType === subjectType && event.statFactors?.some(([trait]) => trait === key));
@@ -111,7 +111,7 @@ test('all retained subject traits influence events, with small ordinary househol
     assert.equal(JSON.stringify(state), before, 'viewing chances does not mutate the save');
     assert.ok(rolls.every(roll => Number.isFinite(roll.chance) && roll.chance >= 0 && roll.chance <= .12));
     const expected = rolls.reduce((sum, roll) => sum + roll.chance, 0);
-    assert.ok(expected >= .14 && expected <= .3, `ordinary household expectation ${expected}`);
+    assert.ok(expected >= .35 && expected <= .75, `ordinary household expectation ${expected}`);
   }
 });
 
@@ -167,12 +167,12 @@ test('parent stress, health and bonds influence their own childhood events', () 
   assert.ok(rolls.every(roll => roll.chance >= 0 && roll.chance <= .12));
 });
 
-test('ordinary childhood leaves room for quiet years and supportive parent experiences', () => {
+test('more frequent childhood experiences still include support and recovery', () => {
   for (const age of [0, 2, 3, 10, 17]) {
     const state = childhood(age);
     const rolls = familyEventChances(state);
     const expected = rolls.reduce((sum, roll) => sum + roll.chance, 0);
-    assert.ok(expected > .05 && expected < .2, `ordinary parent experience expectation ${expected}`);
+    assert.ok(expected > .125 && expected < .5, `ordinary parent experience expectation ${expected}`);
     const positive = rolls.filter(roll => FAMILY_EVENTS.find(event => event.id === roll.eventId).kind === 'positive').reduce((sum, roll) => sum + roll.chance, 0);
     assert.ok(positive > expected / 2, 'care includes positive and recovering moments, not just stress');
   }

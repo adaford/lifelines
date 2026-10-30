@@ -183,6 +183,8 @@ button svg { pointer-events: none; }
 .focus-scale { display: flex; gap: 4px; margin-top: 8px; }
 .focus-scale span { width: 13px; height: 4px; display: block; border-radius: 3px; background: #e5e8dc; }
 .focus-scale span.filled, .focus-scale span.active { background: #7e9b71; }
+.focus-scale span.limited { background: repeating-linear-gradient(135deg, #dec9c0 0 2px, transparent 2px 4px); outline: 1px solid #c5a391; }
+.focus-limit { margin-top: 6px; color: #865b48; font-size: 12px; line-height: 1.4; }
 .stepper { display: inline-flex; align-items: center; border: 1px solid #d6ddcd; border-radius: 9px; background: var(--surface); overflow: hidden; }
 .stepper button { border: 0; background: transparent; width: 44px; height: 44px; min-width: 44px; padding: 0; display: grid; place-items: center; color: var(--green); }
 .stepper button:active:not(:disabled) { background: #e6eddf; }

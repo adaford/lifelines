@@ -7,8 +7,37 @@ const temporary = (modifiers, years = 1, lifestyle = 0) => ({ modifiers, years, 
 const change = statChanges => ({ statChanges });
 const choice = (id, label, description, outcome) => ({ id, label, description, ...outcome });
 const group = (category, defaults, entries) => entries.map(entry => ({ category, years: 1, modifiers: {}, ...defaults, ...entry }));
+export const PERSONAL_EVENT_RATE_MULTIPLIER = 3;
 
 export const EVENTS = [
+  ...group('Changing plans', { minAge: 2, baseChance: .018, kind: 'neutral' }, [
+    { id: 'broken_bone', name: 'Broken bone', description: 'A broken bone means less active play and fewer outings while you recover.', kind: 'negative', focusFactors: ['self'], toddlerFocusFactors: ['work'], ...temporary({ health: -.6, strength: -.4 }), focusLimits: { toddler: { work: 2 }, standard: { social: 2 } } },
+    { id: 'broken_tablet', name: 'Broken tablet', description: 'Your tablet stops working.', maxAge: 3, kind: 'negative', toddlerFocusFactors: ['social'], choices: [
+      choice('borrow', 'Borrow a shared tablet', 'Sharing limits your screen time.', { ...temporary({ stability: -.2 }), focusLimits: { toddler: { social: 2 } } }),
+      choice('screen_break', 'Take a screen break', 'Put screen time into other activities.', { ...change({ health: .2 }), ...temporary({}), focusLimits: { toddler: { social: 0 } } }),
+    ] },
+    { id: 'art_workshop', name: 'Art workshop', description: 'An art workshop overlaps with playtime.', maxAge: 3, kind: 'positive', toddlerFocusFactors: ['creative'], choices: [
+      choice('join', 'Join the workshop', 'Develop your art skills with less time for play.', { ...change({ creativity: .5, intelligence: .15 }), ...temporary({}), focusLimits: { toddler: { work: 2 } } }),
+      choice('skip', 'Keep your playtime', 'Spend the time playing with others.', change({ social: .2 })),
+    ] },
+    { id: 'extra_lessons', name: 'Extra lessons', description: 'Extra lessons would take time away from friends.', minAge: 5, maxAge: 16, conditions: ['school'], focusFactors: ['work'], choices: [
+      choice('study', 'Take the lessons', 'Study more with less time for friends.', { ...change({ intelligence: .5 }), ...temporary({ stability: -.2 }), focusLimits: { standard: { social: 2 } } }),
+      choice('decline', 'Keep your schedule', 'Keep your free time.', change({ stability: .15 })),
+    ] },
+    { id: 'rehearsal_commitment', name: 'Rehearsal commitment', description: 'A performance needs rehearsals during study time.', minAge: 5, maxAge: 16, conditions: ['school'], focusFactors: ['social'], choices: [
+      choice('perform', 'Commit to rehearsals', 'Practice performing with less time for schoolwork.', { ...change({ creativity: .5, social: .2 }), ...temporary({}), focusLimits: { standard: { work: 2 } } }),
+      choice('backstage', 'Help at one performance', 'Contribute without regular rehearsals.', change({ creativity: .2 })),
+    ] },
+    { id: 'demanding_project', name: 'Demanding work project', description: 'Leading a project would reduce your family time.', minAge: 18, conditions: ['employed'], focusFactors: ['work'], choices: [
+      choice('lead', 'Lead the project', 'Build skills with less time for family.', { ...change({ intelligence: .4, social: .2 }), ...temporary({ stability: -.2 }), focusLimits: { standard: { family: 2 } } }),
+      choice('share', 'Share the workload', 'Develop your skills with a lighter commitment.', change({ intelligence: .2 })),
+    ] },
+    { id: 'disrupted_sleep', name: 'Disrupted sleep', description: 'Poor sleep reduces your capacity for school or work.', minAge: 5, baseChance: .012, kind: 'negative', statFactors: [low('stability')], ...temporary({ health: -.3, stability: -.3 }), focusLimits: { standard: { work: 2 } } },
+    { id: 'relative_needs_help', name: 'A relative needs help', description: 'A relative needs regular help during your usual work time.', minAge: 18, focusFactors: ['family'], choices: [
+      choice('help', 'Help regularly', 'Support your relative with less time for work.', { ...change({ social: .4, stability: .2 }), ...temporary({}), focusLimits: { standard: { work: 2 } } }),
+      choice('arrange', 'Arrange other support', 'Find help while keeping your routine.', change({ social: .15 })),
+    ] },
+  ]),
   ...group('Early years', { minAge: 0, maxAge: 2, baseChance: .025, kind: 'positive' }, [
     { id: 'first_words', name: 'Words find their way', description: 'A familiar sound becomes a word, and your family celebrates the discovery.', statFactors: [high('intelligence')], ...change({ intelligence: .35, social: .2 }) },
     { id: 'wobbly_steps', name: 'Wobbly steps', description: 'You find your balance and explore a little farther under watchful eyes.', statFactors: [high('strength')], ...change({ strength: .35 }) },
@@ -197,7 +226,7 @@ export function eventChances(state, stats, job) {
   const inactive = state.ended || state.needsSuccession;
   const focus = state.age < 2 ? { work: 0, social: 0, family: 0, self: 0 } : state.focus;
   return EVENTS.map(event => {
-    let chance = inactive || !eligible(event, state, job) ? 0 : event.baseChance;
+    let chance = inactive || !eligible(event, state, job) ? 0 : event.baseChance * PERSONAL_EVENT_RATE_MULTIPLIER;
     const focusFactors = state.age < 5 && event.toddlerFocusFactors || event.focusFactors || [];
     for (const key of focusFactors) chance *= .4 + (focus[key] ?? 0) * .25;
     for (const key of event.neglectFactors || []) chance *= .25 + (5 - focus[key]) * .35;

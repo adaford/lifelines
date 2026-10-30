@@ -4,7 +4,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { BIRTH_VARIATION, TODDLER_FOCUS } from '../development.js';
 import {
-  createGame, advanceYear, resolveEventChoice, EVENTS, effectiveStats,
+  createGame, advanceYear, resolveEventChoice, EVENTS, effectiveStats, focusLimits,
   DEVELOPMENT_BALANCE,
 } from '../engine.js';
 
@@ -47,7 +47,9 @@ function cohort(measureAges) {
       state.focus = { ...focus };
       const choose = choiceRng(seed);
       while (state.age < 18 && state.alive) {
-        state.focus = { ...(state.age >= 2 && state.age < 5 ? TODDLER_FOCUS : focus) };
+        const desired = state.age >= 2 && state.age < 5 ? TODDLER_FOCUS : focus;
+        const limits = focusLimits(state);
+        state.focus = Object.fromEntries(Object.entries(desired).map(([key, points]) => [key, Math.min(points, limits[key] ?? 5)]));
         // Same-age peers include everyone currently alive, irrespective of
         // whether they survive later years. No future projection is involved.
         if (measureAges) {
@@ -109,6 +111,7 @@ const reference = {
   calibration: {
     samplesPerSex: samples, seedStart, survivors: result.survivors,
     cryLevel: 3, cryThroughAge: 1, focus, toddlerFocus: TODDLER_FOCUS, choices: 'uniform, independent seeded draws',
+    focusPolicy: 'balanced targets capped by active event limits; freed points left unused',
     heightUnit: 'inches',
     conditionedOn: 'alive at the observed age',
     observationsByAge: [...result.ageStats.map(stats => stats.health.count), result.stats.health.count],

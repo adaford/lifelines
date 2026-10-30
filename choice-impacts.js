@@ -1,5 +1,5 @@
-import { annualForecast, effectiveStats, needsEducationChoice } from './engine.js?v=activity-rows-1';
-import { infantChoiceEffects, wellbeingResponse, toddlerActivityEffects, TODDLER_FOCUS, TODDLER_ACTIVITY_EFFECTS, PARENT_FAMILY_RELATIONSHIP_GAIN } from './development.js?v=activity-rows-1';
+import { annualForecast, effectiveStats, needsEducationChoice, focusLimits } from './engine.js?v=event-limits-1';
+import { infantChoiceEffects, wellbeingResponse, toddlerActivityEffects, TODDLER_FOCUS, TODDLER_ACTIVITY_EFFECTS, PARENT_FAMILY_RELATIONSHIP_GAIN } from './development.js?v=event-limits-1';
 
 const nonzero = value => Math.abs(value) > .000001;
 const keyOf = entry => `${entry.parentId || 'you'}:${entry.stat}`;
@@ -34,8 +34,8 @@ function toddlerChoiceEntries(state, activity, points, clip) {
   const entries = Object.entries(effects).map(([stat, change]) => ({ stat, change: clip ? after[stat] - before[stat] : change, group: 'you' }));
   if (activity === 'family') {
     for (const parent of state.parents.filter(person => person.alive !== false)) {
-      const stability = wellbeingResponse(parent, 'stability', .025 * (points - 3));
-      const relationship = PARENT_FAMILY_RELATIONSHIP_GAIN * (points - 2);
+      const stability = wellbeingResponse(parent, 'stability', .025 * (points - 2));
+      const relationship = PARENT_FAMILY_RELATIONSHIP_GAIN * (points - 3);
       entries.push({ stat: 'stability', parentId: parent.id, group: 'others', change: clip ? bounded(parent.stats.stability, stability) : stability });
       entries.push({ stat: 'relationship', parentId: parent.id, group: 'relationships', change: clip ? bounded(parent.relationship, relationship) : relationship });
     }
@@ -109,21 +109,21 @@ function cryEntries(state, level, clip) {
   return entries;
 }
 
-// Vertices of the legal 12-point/5-per-area allocation space. Routine focus
+// Vertices of the legal 12-point allocation space, including temporary caps. Routine focus
 // effects reach their positive/negative extremes at these allocations; including
 // the current allocation also covers discontinuities such as career thresholds.
-function focusExtremes(keys) {
+function focusExtremes(keys, limits) {
   const result = new Map();
   const add = values => result.set(values.join(','), Object.fromEntries(keys.map((key, i) => [key, values[i]])));
   for (let mask = 0; mask < 2 ** keys.length; mask++) {
-    const values = keys.map((_, i) => mask & (1 << i) ? 5 : 0);
+    const values = keys.map((key, i) => mask & (1 << i) ? limits[key] : 0);
     const used = values.reduce((sum, value) => sum + value, 0);
     if (used > 12) continue;
     add(values);
     const remaining = 12 - used;
-    if (remaining > 0 && remaining < 5) {
+    if (remaining > 0) {
       values.forEach((value, i) => {
-        if (!value) add(values.map((v, j) => j === i ? remaining : v));
+        if (!value && remaining < limits[keys[i]]) add(values.map((v, j) => j === i ? remaining : v));
       });
     }
   }
@@ -138,7 +138,7 @@ function focusComparisons(state) {
   const cacheKey = JSON.stringify({ ...state, focus: null });
   if (cacheKey !== cachedFocusKey) {
     const keys = state.age < 5 ? ['work', 'social', 'family', 'self', 'creative'] : ['work', 'social', 'family', 'self'];
-    cachedFocusEntries = focusExtremes(keys).map(focus => {
+    cachedFocusEntries = focusExtremes(keys, focusLimits(state)).map(focus => {
       const candidate = { ...state, focus };
       return forecastEntries(candidate, annualForecast(candidate));
     });

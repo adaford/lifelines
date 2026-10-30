@@ -1,4 +1,4 @@
-import { naturalSkillRating, BIRTH_VARIATION } from './development.js?v=activity-rows-1';
+import { naturalSkillRating, BIRTH_VARIATION } from './development.js?v=event-limits-1';
 // Fictional relationship balance. These are game rules, not real-world estimates.
 // Actor identity and pregnancy capability are separate so future playable genders
 // can use the same relationship system. The current default is men meeting women.

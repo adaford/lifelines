@@ -184,9 +184,29 @@ test('legacy journal and review text hides signed changes and tutorial suffixes 
   assert.ok(journal.includes(`${fixture.parents[1].name} (Dad)`));
   assert.doesNotMatch(journal,/\bbonds?\b|instability|[+−-](?:\d|\.)|Family focus will help/i);
   ui.click('.nav-list [data-tab="character"]');
-  assert.match(ui.query('.effect-card').textContent,/A stronger relationship.*relationship increased.*Mental stability decreased/);
+  assert.match(ui.query('.effect-card').textContent,/A stronger relationship.*Mental stability \d\.\d.*2 years remaining/);
+  assert.doesNotMatch(ui.query('.effect-card').textContent,/relationship increased|Mental stability decreased/,'active effects show current ratings and duration without old flavor');
   assert.deepEqual(ui.saved().history,fixture.history,'display normalization must preserve original saved history');
   assert.deepEqual(ui.saved().effects,fixture.effects);
+});
+
+test('event outcomes put each person on a separate line in the review and journal', async () => {
+  const fixture = ageTo(createGame({ seed: 78123 }), 1);
+  const dad = fixture.parents.find(parent=>parent.role==='Dad') || fixture.parents[1];
+  const entry = { title: `${dad.name}: Tired days after broken nights`, text: `Your mental stability 5.2 → 5; ${dad.name}: Mental stability 6.3 → 6; ${dad.name}: Health 7.1 → 7.`, kind: 'negative' };
+  fixture.history[0] = { ...fixture.history[0], ...entry };
+  fixture.yearSummary.events = [entry];
+  fixture.yearSummary.dismissed = false;
+  const ui = await mount(fixture);
+  const paragraphs = [ui.query('.year-review-events li p'), ui.query('.journal-entry p')];
+  for (const paragraph of paragraphs) {
+    const lines = paragraph.innerHTML.split('<br>');
+    assert.equal(lines.length, 2, 'one line per person, not one line per stat');
+    assert.match(lines[0], /Your Mental stability 5\.2 → 5\.0/);
+    assert.ok(lines[1].includes(`${dad.name} (Dad)`));
+    assert.match(lines[1], /Mental stability 6\.3 → 6\.0; .*Health 7\.1 → 7\.0/);
+  }
+  assert.deepEqual(ui.saved(), fixture, 'line breaks do not rewrite event history or ratings');
 });
 
 test('first launch accepts a blank surname and preserves supplied multiword names', async () => {
@@ -452,9 +472,10 @@ test('new-year review shows actual changes, survives reload, and dismisses persi
     assert.deepEqual(ui.saved(),older);
   }
   const child=ageTo(createGame({seed:123}),7);
+  for (const effect of child.effects) delete effect.focusLimits;
   child.focus={work:5,social:1,family:2,self:2};
   assert.equal(advanceYear(child,{mortalityRandom:()=>1,growthRandom:()=>0}).ok,true);
-  child.focus={work:3,social:3,family:3,self:3};
+  child.focus={work:2,social:1,family:2,self:2};
   ui=await mount(child);
   assert.match(ui.query('.year-decisions').textContent,/School5\/5Friends1\/5Family2\/5Yourself2\/5Rest2 points/);
   assert.doesNotMatch(ui.query('.year-decisions').textContent,/Cry level/);
@@ -597,6 +618,7 @@ test('a previously finished v5 childless life can continue through a beneficiary
   const old=ageTo(createGame({name:'Morgan Brooks',seed:2094}),85);
   toLegacyCentimeters(old);
   old.version=5; old.ended=true; old.needsSuccession=false;
+  for (const effect of old.effects) delete effect.focusLimits;
   // The pre-mortality schema capped every relative at 85.
   for(const person of [...old.parents,...old.children,...old.siblings]) {
     if(person.age>=85) { person.age=85; person.alive=false; }
@@ -650,6 +672,70 @@ test('event decisions show consequences, block time, and persist across navigati
   assert.equal(ui.all('.event-decision').length,0);
   assert.equal(ui.all('.bottom-dock [data-action="advance"]').length,1);
   assert.equal(validateSave(ui.saved()),true);
+});
+
+test('temporary activity limits show their cause, enforce the cap, and survive reloads', async () => {
+  const fixture = createGame({ seed: 78121 });
+  fixture.age = 3;
+  fixture.focus = { work: 2, social: 2, family: 2, self: 3, creative: 2 };
+  fixture.effects = [{ id: 'broken_bone', name: 'Broken bone', description: 'Recovery at home.', years: 1, modifiers: { health: -.5 }, kind: 'negative', focusLimits: { toddler: { work: 2 }, standard: { social: 2 } } }];
+  assert.equal(validateSave(fixture), true);
+  let ui = await mount(fixture);
+  const original = ui.saved();
+  const row = '.focus-row[data-focus-key="work"]';
+  assert.match(ui.query(`${row} .focus-limit`).textContent, /Max 2.*Broken bone.*this year/);
+  assert.equal(ui.query(`${row} .stepper`).getAttribute('aria-describedby'), 'focus-limit-work');
+  assert.equal(ui.all(`${row} .focus-scale .limited`).length, 3);
+  assert.equal(ui.query(`${row} [data-delta="1"]`).disabled, true);
+  ui.click(`${row} [data-delta="1"]`);
+  assert.deepEqual(ui.saved(), original, 'disabled controls cannot exceed the limit');
+  ui.click('.focus-row[data-focus-key="creative"] [data-delta="1"]');
+  assert.equal(ui.saved().focus.creative, 3, 'freed points remain available elsewhere');
+  ui.click('.nav-list [data-tab="character"]');
+  assert.match(ui.query('.effect-list').textContent, /Play max 2.*1 year remaining/);
+  assert.doesNotMatch(ui.query('.effect-list').textContent, /Recovery at home/);
+  const persisted = ui.saved();
+  ui = await mount(persisted);
+  assert.match(ui.query(`${row} .focus-limit`).textContent, /Max 2.*this year/);
+  assert.deepEqual(ui.saved(), persisted, 'reading restrictions never changes the save');
+
+  const recovered = structuredClone(persisted);
+  recovered.effects = [];
+  recovered.focus.creative = 2;
+  ui = await mount(recovered);
+  assert.equal(ui.all('.focus-limit').length, 0);
+  assert.equal(ui.query(`${row} [data-delta="1"]`).disabled, false);
+  ui.click(`${row} [data-delta="1"]`);
+  assert.equal(ui.saved().focus.work, 3);
+});
+
+test('a new event previews activity tradeoffs and frees points when the choice applies', async () => {
+  const fixture = createGame({ seed: 78122 });
+  fixture.age = 3;
+  fixture.focus = { work: 3, social: 4, family: 2, self: 1, creative: 2 };
+  fixture.pendingEvents = [{ eventId: 'broken_tablet', age: 3 }];
+  fixture.lastYearEvents = ['broken_tablet'];
+  let ui = await mount(fixture);
+  const event = EVENTS.find(event=>event.id==='broken_tablet');
+  for (const choice of event.choices) {
+    const consequences = ui.query(`[data-choice="${choice.id}"] .event-consequences`).textContent;
+    const cap = choice.focusLimits?.toddler?.social;
+    if (cap !== undefined) assert.ok(consequences.includes(`Electronics max ${cap}`));
+    if (choice.focusLimits) assert.match(consequences, /1 year/);
+  }
+  assert.deepEqual(ui.saved(), fixture, 'previewing tradeoffs does not apply them or consume RNG');
+  const choice = event.choices.find(choice=>choice.focusLimits?.toddler?.social<4);
+  assert.ok(choice, 'the broken tablet requires an allocation tradeoff');
+  ui.click(`[data-action="event-choice"][data-choice="${choice.id}"]`);
+  const saved = ui.saved();
+  assert.equal(saved.age, 3);
+  assert.equal(saved.rng, fixture.rng);
+  assert.equal(saved.focus.social, choice.focusLimits.toddler.social);
+  assert.match(ui.query('.focus-row[data-focus-key="social"] .focus-limit').textContent, /Max \d.*this year/);
+  assert.equal(validateSave(saved), true);
+  ui = await mount(saved);
+  assert.equal(ui.query('.focus-row[data-focus-key="social"] [data-delta="1"]').disabled, true);
+  assert.deepEqual(ui.saved(), saved);
 });
 
 test('every displayed option applies its own lasting consequences without advancing time', async () => {
@@ -953,7 +1039,7 @@ describe('Dating and family DOM integration', {concurrency:false},()=>{
   });
 
   test('pursuit can be declined or become a relationship with displayed bonuses',async()=>{
-    const fixture=encounterFixture();fixture.stats.social=5;fixture.stats.stability=5;fixture.effects=[];
+    const fixture=encounterFixture();fixture.stats.social=5;fixture.stats.stability=5;
     for(const accepted of [false,true]) {
       const branch=actionOutcome(fixture,s=>respondToEncounter(s,s.encounters[0].id,'relationship'),(s,result)=>result.accepted===accepted);
       const prospect=branch.before.encounters[0];
@@ -1856,6 +1942,7 @@ test('parent ratings stay numeric while crying updates their separate choice imp
 
 test('parent effects do not cancel each other and remembered parents have no forecast', async () => {
   const fixture=ageTo(createGame({seed:121}),8);
+  for (const effect of fixture.effects) delete effect.focusLimits;
   fixture.focus={work:3,social:3,family:3,self:3};
   fixture.parents[0].stats.stability=2;
   fixture.parents[1].stats.stability=8;
@@ -2060,11 +2147,12 @@ test('activity signs compare possible allocations rather than fixed numerical ga
   const maximumGains=[];
   for(const aptitude of [-3,3]) {
     const fixture=ageTo(createGame({seed:121}),3);
+    fixture.effects=[];
     fixture.aptitudes.strength=aptitude;
     fixture.stats.strength=5+.8*aptitude;
     fixture.focus={work:5,social:0,family:0,self:0,creative:0};
     const ui=await mount(fixture),before=ui.saved();
-    maximumGains.push(annualForecast(before).stats.strength.change);
+    maximumGains.push(toddlerChoiceImpacts(before,'work').find(entry=>entry.stat==='strength').change);
     assert.equal(ui.query('.choice-impact[data-stat="strength"]:not([data-parent-id]) b').textContent,'+++','maximum Play has the strongest relative strength effect for either aptitude');
     ui.click('[data-action="focus"][data-key="work"][data-delta="-1"]');
     assert.equal(ui.query('.choice-impact[data-stat="strength"]:not([data-parent-id]) b').textContent,'++','one fewer Play point has a smaller relative effect');

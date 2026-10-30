@@ -10,7 +10,7 @@ test('new lives inherit bounded wellbeing aptitudes and all generation routes re
   const observed = { health: new Set(), stability: new Set() };
   for (let seed = 1; seed <= 120; seed++) {
     const state = createGame({ seed });
-    assert.equal(state.version, 13);
+    assert.equal(state.version, 14);
     for (const key of wellbeing) {
       const average = (state.parents[0].aptitudes[key] + state.parents[1].aptitudes[key]) / 2;
       const inherited = Math.sign(average) * Math.round(Math.abs(average));
@@ -44,7 +44,7 @@ test('v11 migration adds neutral wellbeing aptitude without changing any saved p
   const before = copy(legacy);
   const migrated = migrateSave(legacy);
   const expected = neutralWellbeingAptitudes(copy(before));
-  expected.version = 13;
+  expected.version = 14;
   assert.deepEqual(migrated, expected);
   assert.deepEqual(legacy, before);
   assert.equal(migrated.focus.creative, 3, 'v11 crafts choices are not reset');

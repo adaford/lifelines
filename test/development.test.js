@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { infantChoiceEffects } from '../development.js';
 import { toLegacyCentimeters } from './helpers/legacy-height.js';
 import {
   EVENTS, SKILLS, createGame, advanceYear, annualForecast, setCryLevel,
@@ -99,6 +100,7 @@ test('crying has neutral parent mental stability at two and distinct increasing 
   for (const age of [0, 1]) {
     for (let level = 1; level <= 5; level++) {
       const state = createGame({ seed: 57 });
+      state.rng = 5; // Isolate routine development from ordinary events.
       state.age = age;
       state.parents.forEach(parent => { parent.stats.stability = 7; parent.aptitudes.stability = 0; parent.relationship = 7; });
       setCryLevel(state, level);
@@ -140,6 +142,7 @@ test('infant crying supports intelligence and mental stability without training 
     const changes = [];
     for (let level = 1; level <= 5; level++) {
       const state = createGame({ seed: 57 });
+      state.rng = 5; // Isolate routine development from ordinary events.
       state.age = age;
       for (const key of Object.keys(state.stats)) state.stats[key] = 5;
       for (const key of Object.keys(state.aptitudes)) state.aptitudes[key] = 0;
@@ -148,9 +151,10 @@ test('infant crying supports intelligence and mental stability without training 
       const forecast = annualForecast(state);
       assert.deepEqual(state, before, 'the complete mean forecast is pure');
       changes.push(forecast.stats);
+      const contribution = infantChoiceEffects(state);
       for (const key of ['intelligence', 'stability']) {
-        assert.ok(level <= 2 ? forecast.stats[key].change < 0 : forecast.stats[key].change > 0,
-          `age ${age}, cry ${level}: ${key} follows the low/high crying choice`);
+        assert.ok(level <= 2 ? contribution[key] < 0 : contribution[key] > 0,
+          `age ${age}, cry ${level}: ${key} choice contribution follows low/high crying independently of background development`);
       }
       assert.equal(advanceYear(state, { ...meanYear, parentCareerRandom: () => 1 }).ok, true);
       assert.deepEqual(state.lastYearEvents, [], 'the fixture isolates routine means');
@@ -178,7 +182,7 @@ test('annual development varies around the pure mean forecast and is reproducibl
   assert.deepEqual(template, beforePreview, 'forecast does not alter state or RNG');
   const gains = [];
   const stressChanges = [];
-  for (let rng = 1; rng <= 160; rng++) {
+  for (let rng = 1; rng <= 400; rng++) {
     const state = copy(template);
     state.rng = rng;
     const reloaded = migrateSave(JSON.parse(JSON.stringify(state)));
@@ -207,7 +211,7 @@ test('v7 migration preserves existing height, bonds, random state and non-infant
   const before = copy(legacy);
   const migrated = migrateSave(legacy);
   assert.ok(migrated);
-  assert.equal(migrated.version, 13);
+  assert.equal(migrated.version, 14);
   for (const key of ['rng', 'seed', 'nextId', 'age', 'stats', 'pendingEvents', 'history']) assert.deepEqual(migrated[key], before[key], key);
   assert.equal(migrated.height, round(before.height / 2.54));
   assert.equal(migrated.yearSummary.height.before, round(before.yearSummary.height.before / 2.54));

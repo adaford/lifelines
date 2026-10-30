@@ -3,6 +3,7 @@
 // Individual rolls join the ordinary event pool and share its five-event cap.
 const low = key => [key, 'low'];
 const high = key => [key, 'high'];
+export const FAMILY_EVENT_RATE_MULTIPLIER = 2.5;
 const option = (id, label, description, outcome) => ({ id, label, description, ...outcome });
 const group = (subjectType, defaults, entries) => entries.map(event => ({
   subjectType, category: subjectType === 'parent' ? 'Growing up at home' : subjectType === 'partner' ? 'Your relationship' : 'Your children',
@@ -128,7 +129,7 @@ export function familyEventChances(state) {
   const result = [];
   for (const { subjectType, person } of actors) {
     for (const event of FAMILY_EVENTS.filter(event => event.subjectType === subjectType)) {
-      let chance = eligible(event, state, person) ? event.baseChance : 0;
+      let chance = eligible(event, state, person) ? event.baseChance * FAMILY_EVENT_RATE_MULTIPLIER : 0;
       for (const [key, direction] of event.statFactors || []) chance *= traitFactor(person.stats[key], direction);
       for (const key of event.focusFactors || []) chance *= .4 + focus[key] * .25;
       for (const key of event.neglectFactors || []) chance *= .25 + (5 - focus[key]) * .35;

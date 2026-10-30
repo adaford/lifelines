@@ -83,9 +83,14 @@ test('Family time separates personal wellbeing, parent wellbeing and relationshi
     const entries = high.filter(entry => entry.parentId === parent.id);
     assert.deepEqual(entries.map(entry => [entry.group, entry.stat]), [['others', 'stability'], ['relationships', 'relationship']]);
   }
-  assert.ok(toddlerChoiceImpacts(state, 'family').every(entry => entry.stat === 'stability' && entry.parentId), 'two Family points are neutral for relationships and personal effects');
+  const two = toddlerChoiceImpacts(state, 'family');
+  assert.equal(two.length, state.parents.length);
+  assert.ok(two.every(entry => entry.stat === 'relationship' && entry.parentId && entry.change < 0), 'two Family points reduce parent relationships without changing parent mental stability');
+  const one = toddlerChoiceImpacts(selected(state, 'family', 1), 'family');
+  assert.ok(one.filter(entry=>entry.parentId && entry.stat==='stability').every(entry=>entry.change<0), 'one Family point reduces parent mental stability');
   const three = toddlerChoiceImpacts(selected(state, 'family', 3), 'family');
-  assert.ok(!three.some(entry => entry.parentId && entry.stat === 'stability'));
+  assert.ok(!three.some(entry => entry.parentId && entry.stat === 'relationship'), 'three Family points are neutral for parent relationships');
+  assert.ok(three.filter(entry=>entry.parentId && entry.stat==='stability').every(entry=>entry.change>0));
   state.parents[0].alive = false;
   assert.ok(!toddlerChoiceImpacts(selected(state, 'family', 5), 'family').some(entry => entry.parentId === state.parents[0].id));
 });
