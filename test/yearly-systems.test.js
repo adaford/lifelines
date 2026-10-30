@@ -113,9 +113,9 @@ test('crying respects stat and relationship limits and never changes deceased pa
   const deceased = clone(state.parents[1]);
   setCryLevel(state, 5);
   const preview = annualForecast(state);
-  assert.ok(preview.stats.intelligence.after >= 1 && preview.stats.intelligence.after <= 10);
+  assert.ok(preview.stats.intelligence.after >= 0 && preview.stats.intelligence.after <= 10);
   assert.equal(preview.parents[0].relationship.after, 10);
-  assert.equal(preview.parents[0].stability.after, 1);
+  assert.equal(preview.parents[0].stability.after, 0);
   assert.equal(preview.parents[1].relationship.change, 0);
   assert.equal(preview.parents[1].stability.change, 0);
   advanceYear(state, { ...survives, growthRandom: () => 3 });
@@ -232,7 +232,7 @@ test('v6 saves gain cry level and parent bonds without rerolling progress or que
   const before = clone(legacy);
   const migrated = migrateSave(legacy);
   assert.ok(migrated);
-  assert.equal(migrated.version, 14);
+  assert.equal(migrated.version, 15);
   assert.equal(migrated.cryLevel, 5);
   assert.equal(migrated.alive, true);
   assert.equal(migrated.yearSummary, null);

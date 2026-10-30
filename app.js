@@ -2,14 +2,14 @@ import {
   SKILLS, JOBS, EVENTS, resolveEventChoice, createGame, advanceYear, setFocus, setCryLevel, dismissYearSummary, jobFit,
   canTakeJob, takeJob, quitJob, haveChild, successionInfo, succeed,
   effectiveStats, eventOdds, mortalityOdds, stage, migrateSave, chooseEducation,
-  offeredJobs, needsEducationChoice, pendingEventSubject, focusLimits, focusLimitDetails,
+  offeredJobs, needsEducationChoice, pendingEventSubject, focusLimits, focusLimitDetails, caregivers,
   relationshipOdds, meetingChances, proposalChance, pregnancyChance, oneNightChance,
   respondToEncounter, proposeMarriage, endRelationship, normalizeSurname, heightPercentile, statPercentiles
-} from './engine.js?v=event-variety-1';
-import { annotateNarrative } from './narrative.js?v=event-variety-1';
-import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome } from './display.js?v=event-variety-1';
+} from './engine.js?v=zero-care-1';
+import { annotateNarrative } from './narrative.js?v=zero-care-1';
+import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome } from './display.js?v=zero-care-1';
 
-import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts } from './choice-impacts.js?v=event-variety-1';
+import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts } from './choice-impacts.js?v=zero-care-1';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const app = document.querySelector('#app');
@@ -97,7 +97,8 @@ const career = () => JOBS.find(j => j.id === state.jobId);
 const focusUsed = () => Object.values(state.focus).reduce((a,b) => a+b, 0);
 const genderLabel = person => ({ male: 'Male', female: 'Female', nonbinary: 'Nonbinary' }[person.gender] || 'Unspecified');
 const genderBadge = person => `<span class="gender-label" aria-label="Gender: ${genderLabel(person)}">${genderLabel(person)}</span>`;
-const parentLabel = person => ({ mom: 'Mom', mother: 'Mom', dad: 'Dad', father: 'Dad', parent: 'Parent' }[String(person.parentRole || '').toLowerCase()] || (person.gender==='female'?'Mom':person.gender==='male'?'Dad':'Parent'));
+const parentLabel = person => ({ aunt: 'Aunt', uncle: 'Uncle', relative: 'Relative' }[person?.guardianRole] || { mom: 'Mom', mother: 'Mom', dad: 'Dad', father: 'Dad', parent: 'Parent' }[String(person?.parentRole || '').toLowerCase()] || (person?.gender==='female'?'Mom':person?.gender==='male'?'Dad':'Parent'));
+const familyCareProfiles = () => [...state.parents, ...(state.guardian ? [state.guardian] : [])];
 function percentileLabel(percentile) {
   const rank = Math.round(percentile);
   if (rank < 1) return 'Below 1st percentile';
@@ -168,10 +169,10 @@ function statEffectDescription(key) {
 }
 
 function ratingBar(label, value, statKey) {
-  const rating = Math.max(1, Math.min(10, Number(value)));
-  const hue = Math.round((rating - 1) / 9 * 120);
+  const rating = Math.max(0, Math.min(10, Number(value)));
+  const hue = Math.round(rating / 10 * 120);
   const effects = statEffectGroups(statKey);
-  return `<span class="rating-track${effects.length?' has-active-effects':''}" role="meter" aria-label="${esc(label)}" aria-valuemin="1" aria-valuemax="10" aria-valuenow="${number(rating)}" ${effects.length?`aria-valuetext="${number(rating)} out of 10. ${esc(statEffectDescription(statKey))}"`:''}><span class="rating-fill" style="width:${rating*10}%;background:hsl(${hue}, 60%, 40%)"></span>${effects.length?`<span class="stat-effect-indicators" aria-hidden="true">${effects.map(({direction,emoji,description})=>`<span class="stat-effect-indicator" data-direction="${direction}" title="${esc(description)}">${emoji}</span>`).join('')}</span>`:''}</span>`;
+  return `<span class="rating-track${effects.length?' has-active-effects':''}" role="meter" aria-label="${esc(label)}" aria-valuemin="0" aria-valuemax="10" aria-valuenow="${number(rating)}" ${effects.length?`aria-valuetext="${number(rating)} out of 10. ${esc(statEffectDescription(statKey))}"`:''}><span class="rating-fill" style="width:${rating*10}%;background:hsl(${hue}, 60%, 40%)"></span>${effects.length?`<span class="stat-effect-indicators" aria-hidden="true">${effects.map(({direction,emoji,description})=>`<span class="stat-effect-indicator" data-direction="${direction}" title="${esc(description)}">${emoji}</span>`).join('')}</span>`:''}</span>`;
 }
 
 function profileLifestyleView() {
@@ -274,12 +275,12 @@ function yearView() {
 }
 
 function parentStatusView() {
-  if (!state.parents.length) return '';
+  if (!familyCareProfiles().length) return '';
   const order = { Dad: 0, Mom: 1, Parent: 2 };
-  const parents = [...state.parents].sort((a,b) => order[parentLabel(a)] - order[parentLabel(b)]);
-  return `<div class="parent-status-list" aria-label="Parents">${parents.map(parent => {
+  const parents = familyCareProfiles().sort((a,b) => (order[parentLabel(a)] ?? 3) - (order[parentLabel(b)] ?? 3));
+  return `<div class="parent-status-list" aria-label="Parents and guardians">${parents.map(parent => {
     const role = parentLabel(parent);
-    return `<section class="parent-status" data-parent-id="${esc(parent.id)}" aria-label="${esc(role)}"><div class="parent-status-heading"><h4>${role}:</h4>${helpButton('parents',role)}${parent.alive === false?'<span class="parent-status-state">Deceased</span>':''}</div><div class="parent-status-stats">${[['stability','Mental stability',parent.stats.stability],['relationship','Relationship',parent.relationship]].map(([key,label,value]) => `<div class="parent-status-stat" data-stat="${key}"><div class="parent-stat-heading"><span>${label}${statEmoji(key)}</span><span class="stat-reading"><strong>${number(value)}<small>/10</small></strong>${aptitudeBadge(parent.aptitudes[key],`${label} natural aptitude`)}</span></div>${ratingBar(`${role}: ${label}`,value)}</div>`).join('')}</div></section>`;
+    return `<section class="parent-status" data-parent-id="${esc(parent.id)}" aria-label="${esc(role)}"><div class="parent-status-heading"><h4>${role}:</h4>${helpButton('parents',role)}${parent.abandonedAt!=null?'<span class="parent-status-state">Left the family</span>':parent.alive === false?'<span class="parent-status-state">Deceased</span>':parent.guardianRole?'<span class="parent-status-state">Guardian</span>':''}</div><div class="parent-status-stats">${[['stability','Mental stability',parent.stats.stability],['relationship','Relationship',parent.relationship]].map(([key,label,value]) => `<div class="parent-status-stat" data-stat="${key}"><div class="parent-stat-heading"><span>${label}${statEmoji(key)}</span><span class="stat-reading"><strong>${number(value)}<small>/10</small></strong>${aptitudeBadge(parent.aptitudes[key],`${label} natural aptitude`)}</span></div>${ratingBar(`${role}: ${label}`,value)}</div>`).join('')}</div></section>`;
   }).join('')}</div>`;
 }
 
@@ -339,15 +340,15 @@ function eventOutcomeText(text, age) {
 function yearSummaryModal() {
   const summary=state.yearSummary;
   if (!summary || summary.dismissed) return;
-  openModal(`Age ${summary.fromAge} → ${summary.toAge}`, `${yearDecisionsView(summary.decisions)}${changesView(summary.stats,summary.lifestyle,summary.height,summary.fromAge,summary.toAge)}${summary.parents?.length?`<details class="forecast-parents" open><summary>Parents</summary>${summary.parents.map(parent=>`<p><strong>${narrativeText(parent.name)}</strong><span>Mental stability${statEmoji('stability')} ${beforeAfter(parent.stability)}<br>Relationship${statEmoji('relationship')} ${beforeAfter(parent.relationship)}${parent.lifestyle?`<span class="parent-review-lifestyle">Lifestyle${statEmoji('lifestyle')} ${beforeAfter(parent.lifestyle)}</span>`:''}</span></p>`).join('')}</details>`:''}${yearEventsView(summary)}${state.pendingEvents.length?'<p class="form-note">Decisions waiting.</p>':''}`, '<button class="button primary" data-action="close">Continue '+icon('arrow')+'</button>');
+  openModal(`Age ${summary.fromAge} → ${summary.toAge}`, `${yearDecisionsView(summary.decisions)}${changesView(summary.stats,summary.lifestyle,summary.height,summary.fromAge,summary.toAge)}${summary.parents?.length?`<details class="forecast-parents" open><summary>Parents & guardians</summary>${summary.parents.map(parent=>`<p><strong>${narrativeText(parent.name)}</strong><span>Mental stability${statEmoji('stability')} ${beforeAfter(parent.stability)}<br>Relationship${statEmoji('relationship')} ${beforeAfter(parent.relationship)}${parent.lifestyle?`<span class="parent-review-lifestyle">Lifestyle${statEmoji('lifestyle')} ${beforeAfter(parent.lifestyle)}</span>`:''}</span></p>`).join('')}</details>`:''}${yearEventsView(summary)}${state.pendingEvents.length?'<p class="form-note">Decisions waiting.</p>':''}`, '<button class="button primary" data-action="close">Continue '+icon('arrow')+'</button>');
   showingYearSummary=true;
   modalRoot.querySelector('.modal').classList.add('year-review-modal');
   modalRoot.querySelector('.modal-backdrop').classList.add('year-review-backdrop');
 }
 
 function lifestyleView() {
-  const descriptions = ['The essentials', 'A little breathing room', 'Finding your footing', 'Everyday comfort', 'Living well', 'Room to enjoy life', 'A comfortable abundance', 'A taste of luxury', 'An exceptional life', 'Every comfort imaginable'];
-  return `<section class="lifestyle-summary" aria-label="Lifestyle"><div><span class="eyebrow">EVERYDAY COMFORT</span><h3>${labelWithHelp('Lifestyle','lifestyle')} <strong>${number(state.lifestyle)}<small>/10</small></strong></h3><p>${descriptions[Math.round(state.lifestyle)-1]}</p>${ratingBar('Lifestyle',state.lifestyle)}</div></section>`;
+  const descriptions = ['Basic needs unmet', 'The essentials', 'A little breathing room', 'Finding your footing', 'Everyday comfort', 'Living well', 'Room to enjoy life', 'A comfortable abundance', 'A taste of luxury', 'An exceptional life', 'Every comfort imaginable'];
+  return `<section class="lifestyle-summary" aria-label="Lifestyle"><div><span class="eyebrow">EVERYDAY COMFORT</span><h3>${labelWithHelp('Lifestyle','lifestyle')} <strong>${number(state.lifestyle)}<small>/10</small></strong></h3><p>${descriptions[Math.round(state.lifestyle)]}</p>${ratingBar('Lifestyle',state.lifestyle)}</div></section>`;
 }
 
 function choiceImpactGroups(changes, compact = false) {
@@ -359,9 +360,9 @@ function choiceImpactGroups(changes, compact = false) {
     return `<section class="choice-impact-group" data-impact-group="${group}" aria-label="${title}">${headings?`<h5>${title}</h5>`:''}<ul class="choice-impact-list">${entries.map(({stat,change,level,parentId}) => {
       let label = skillLabel(stat);
       if (parentId) {
-        const parent = state.parents.find(person => person.id === parentId);
+        const parent = familyCareProfiles().find(person => person.id === parentId);
         const role = parentLabel(parent);
-        const name = state.parents.filter(person => parentLabel(person) === role).length > 1 ? `${role}: ${parent.name}` : role;
+        const name = familyCareProfiles().filter(person => parentLabel(person) === role).length > 1 ? `${role}: ${parent.name}` : role;
         label += ` (${name})`;
       }
       const direction = change > 0 ? 'increase' : 'decrease';
@@ -484,12 +485,12 @@ function retirementView() {
 
 function personCard(person, role, child = false, parent = false) {
   const employment = {employed:'Employed',unemployed:'Unemployed',retired:'Retired'}[person.career?.status] || 'Employed';
-  return `<article class="family-card" data-person-id="${esc(person.id)}"><div class="family-header"><div class="family-avatar">${avatar(person,true)}</div><div class="family-meta"><span class="eyebrow">${esc(role)}</span><div class="profile-name-row"><h3>${esc(person.name)}</h3>${genderBadge(person)}</div><p>${person.age} years old${person.alive===false?' · Remembered':''}</p></div></div>${parent?'':`<p class="family-lifestyle">${labelWithHelp('Lifestyle','lifestyle')} <strong>${number(person.lifestyle)}/10</strong>${person.age<18?' · Family household':''}</p>`}${parent?`<div class="parent-career"><span>${labelWithHelp('Career focus','parent-career')} <strong>${person.career?.focus ?? 0}/5</strong></span><span class="employment-status">${employment}</span></div>`:''}${Number.isFinite(person.relationship)?relationshipView(person):''}<details class="family-details" ${parent?'open':''}><summary>${parent?'Wellbeing':'Skills & wellbeing'}</summary>${profileStats(person,parent)}</details>${child&&person.alive===false?'<div class="family-card-footer"><span>Remembered with love</span></div>':''}</article>`;
+  return `<article class="family-card" data-person-id="${esc(person.id)}"><div class="family-header"><div class="family-avatar">${avatar(person,true)}</div><div class="family-meta"><span class="eyebrow">${esc(role)}</span><div class="profile-name-row"><h3>${esc(person.name)}</h3>${genderBadge(person)}</div><p>${person.age} years old${person.abandonedAt!=null?' · Left the family':person.guardianRole&&person.alive!==false?' · Guardian':''}${person.alive===false?' · Remembered':''}</p></div></div>${parent?'':`<p class="family-lifestyle">${labelWithHelp('Lifestyle','lifestyle')} <strong>${number(person.lifestyle)}/10</strong>${person.age<18?' · Family household':''}</p>`}${parent?`<div class="parent-career"><span>${labelWithHelp('Career focus','parent-career')} <strong>${person.career?.focus ?? 0}/5</strong></span><span class="employment-status">${employment}</span></div>`:''}${Number.isFinite(person.relationship)?relationshipView(person):''}<details class="family-details" ${parent?'open':''}><summary>${parent?'Wellbeing':'Skills & wellbeing'}</summary>${profileStats(person,parent)}</details>${child&&person.alive===false?'<div class="family-card-footer"><span>Remembered with love</span></div>':''}</article>`;
 }
 
 function parentsView() {
-  if (!state.parents.length) return '';
-  return `<details class="panel roots-panel" ${state.age<18?'open':''}><summary>The people who raised you</summary><div class="stat-help-links">${labelWithHelp('Parents','parents')}</div><div class="family-grid">${state.parents.map(person=>personCard(person,parentLabel(person),false,true)).join('')}</div></details>`;
+  if (!familyCareProfiles().length) return '';
+  return `<details class="panel roots-panel" ${state.age<18?'open':''}><summary>The people who raised you</summary><div class="stat-help-links">${labelWithHelp('Parents','parents')}</div><div class="family-grid">${familyCareProfiles().map(person=>personCard(person,parentLabel(person),false,true)).join('')}</div></details>`;
 }
 
 function familyView() {
@@ -557,7 +558,7 @@ function navigate(tab) {
 
 function topicHelpModal(topic, id) {
   const help = {
-    stats: ['Your stats', ['Before 18, ability ratings compare you with others your age: high infant intelligence means strong natural potential. Focus can raise skills; neglect can lower them.']],
+    stats: ['Your stats', ['Ratings range from 0.0 to 10.0. Before 18, ability ratings compare you with others your age: high infant intelligence means strong natural potential. Focus can raise skills; neglect can lower them.']],
     intelligence: ['Intelligence', ['Reasoning ability for your age; school and mental practice can strengthen it.']],
     strength: ['Strength', ['A 7.0/10 baby is strong for a baby. Exercise can maintain or raise this rating; inactivity can lower it.']],
     social: ['Social', ['Ease with people for your age; social practice can improve it.']],
@@ -567,19 +568,19 @@ function topicHelpModal(topic, id) {
     forecast: ['Expected changes', ['Signs compare increases and decreases with the other choices for that stat. Zero changes are hidden. Your infant stats show crying effects; later stats show routine changes. Background development, events and yearly variation can alter the result.']],
     health: ['Health', ['Self-care supports health; illness and aging reduce it. Poor health raises disease risk and reduces childhood height gains.']],
     stability: ['Mental stability', ['Higher means calmer; rest and relationships help. Low parental mental stability can lead to difficult childhood events.']],
-    lifestyle: ['Lifestyle', ['Until 18, you share your parents’ changing household lifestyle. As an adult, work, family, events and inheritance shape it.']],
+    lifestyle: ['Lifestyle', ['Until 18, you share your parents’ or guardian’s changing household lifestyle. As an adult, work, family, events and inheritance shape it.']],
     height: ['Height', ['Final height emerges from yearly growth shaped by age, inheritance, health and chance, ending at 14–18. Poor health reduces new growth, never existing height.']],
     cry: ['Cry level', ['Less crying lowers your intelligence and mental stability; more crying raises them. Strength is unaffected. Parent relationships tend to fall at levels 1–2, stay steady at 3, and rise at 4–5, with yearly variation. Harder crying strains their mental stability more.']],
     focus: ['Your focus', ['Allocate 12 points, at most 5 per area; unused points allow rest. Events can temporarily lower these limits. Focused skills can rise, neglected ones can fall, and results vary yearly.']],
     'toddler-focus': ['Toddler activities', ['Share 12 points among five activities, up to 5 each. Events can temporarily lower these limits. Unused points support mental stability, and results vary each year.', 'Your activity effects are measured from Play 3, Electronics 2, Family time 2, Rest 3, and Arts & crafts 2. Parent relationships are neutral at Family time 3; parent mental stability at 2. Zero effects are hidden.']],
     ...Object.fromEntries(toddlerFocusRows.map(([key,label]) => [`toddler-${key}`, [label,
-      toddlerActivityImpacts(key).map(({stat,change,level,target}) => `${(change>0?'+':'-').repeat(level)}${target==='parents'?'Parent relationships':skillLabel(stat)}`)
+      toddlerActivityImpacts(key).map(({stat,change,level,target}) => `${(change>0?'+':'-').repeat(level)}${target==='parents'?(caregivers(state).some(person=>person.guardianRole)?'Guardian relationship':'Parent relationships'):skillLabel(stat)}`)
     ]])),
     'focus-work': ['School & career focus', ['Study and work exercise relevant abilities; career focus also supports performance and lifestyle.']],
     'focus-social': ['Friends focus', ['Can improve social, support mental stability and create chances to meet people.']],
     'focus-family': ['Family focus', ['Strengthens relationships, helps children develop and supports parents’ mental stability.']],
     'focus-self': ['Yourself focus', ['Exercise, learning and self-care support strength, creativity, health and mental stability.']],
-    parents: ['Your parents', ['Their wellbeing and careers affect your childhood. Starting relationships vary around 8.0/10; age and health influence their chance of death.']],
+    parents: ['Parents & guardians', ['Their wellbeing and careers affect your childhood. Low mental stability and a weak relationship raise the rare chance of abandonment. The other parent takes over; if neither can care for you, an adult relative adopts you. Departures cause severe setbacks.']],
     'parent-career': ['Parents’ careers', ['Higher career focus and experience tend to improve lifestyle; job loss can set it back.']],
     relationship: ['Relationship', ['Higher means closer; family time and shared events change this rating. Partners support social and mental stability, but lower lifestyle.']],
     career: ['Careers', ['Your skills determine job fit; career focus and experience improve performance and lifestyle. Start working at 18 or after college.']],

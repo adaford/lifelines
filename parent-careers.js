@@ -1,16 +1,16 @@
 // Household career progression is a fictional game model, not measured employment
-// or income data. Continuous progress supports the visible 1–10 lifestyle score.
+// or income data. Continuous progress supports the visible 0–10 lifestyle score.
 // Keep random draws caller-owned so saves and annual previews stay deterministic.
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
 const finite = (value, fallback) => Number.isFinite(value) ? value : fallback;
-const round = value => Math.round(clamp(value, 1, 10) * 10000) / 10000;
+const round = value => Math.round(clamp(value, 0, 10) * 10000) / 10000;
 const statuses = new Set(['employed', 'unemployed', 'retired']);
 
 export function initialParentCareer(person, focus = 3) {
   return {
     focus: clamp(Math.round(finite(focus, 3)), 0, 5),
     status: person.age >= 65 ? 'retired' : 'employed',
-    progress: clamp(finite(person.lifestyle, 4), 1, 10),
+    progress: clamp(finite(person.lifestyle, 4), 0, 10),
     years: Math.max(0, Math.floor(finite(person.age, 22)) - 22),
   };
 }
@@ -21,7 +21,7 @@ function currentCareer(person) {
   return {
     focus: clamp(Math.round(finite(saved.focus, initial.focus)), 0, 5),
     status: statuses.has(saved.status) ? saved.status : initial.status,
-    progress: clamp(finite(saved.progress, initial.progress), 1, 10),
+    progress: clamp(finite(saved.progress, initial.progress), 0, 10),
     years: Math.max(0, Math.floor(finite(saved.years, initial.years))),
   };
 }
@@ -51,8 +51,8 @@ export function advanceParentCareer(person, { random = () => .5, normal = () => 
   if (career.status === 'retired') return { career, event: null };
   const draw = () => clamp(finite(random(), .5), 0, 1);
   const noise = () => clamp(finite(normal(), 0), -3, 3);
-  const health = clamp(finite(person.stats?.health, 5), 1, 10);
-  const stability = clamp(finite(person.stats?.stability, 5), 1, 10);
+  const health = clamp(finite(person.stats?.health, 5), 0, 10);
+  const stability = clamp(finite(person.stats?.stability, 5), 0, 10);
   const name = person.name || 'Your parent';
 
   if (career.status === 'unemployed') {

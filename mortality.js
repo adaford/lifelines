@@ -33,7 +33,7 @@ const LIFE_TABLE = [
 ];
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
-const stat = (person, key) => clamp(Number.isFinite(person.stats?.[key]) ? person.stats[key] : 5, 1, 10);
+const stat = (person, key) => clamp(Number.isFinite(person.stats?.[key]) ? person.stats[key] : 5, 0, 10);
 
 export function baselineAnnualMortality(age) {
   // Keep the final observed rate beyond the source's horizon rather than

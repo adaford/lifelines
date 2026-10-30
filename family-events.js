@@ -11,6 +11,9 @@ const group = (subjectType, defaults, entries) => entries.map(event => ({
 }));
 
 export const FAMILY_EVENTS = [
+  ...group('parent', { minAge: 18, maxAge: 200, minPlayerAge: 0, maxPlayerAge: 17, baseChance: .00005 }, [
+    { id: 'household_parent_abandonment', name: 'Abandons you', description: '{name} leaves the family. Your remaining parent takes over; otherwise an adult relative adopts you.', kind: 'negative', years: 3, modifiers: { stability: -3, social: -1.5, health: -1 }, relationship: -10 },
+  ]),
   // These are experiences of the child, not responsibilities placed on them.
   // Stability represents the caregiver's current stress and capacity; support
   // can help an overwhelmed parent recover, and no outcome is inevitable.
@@ -139,11 +142,13 @@ export const FAMILY_EVENTS = [
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 function traitFactor(value, direction) {
-  const scaled = direction === 'low' ? (10 - clamp(value, 1, 10)) / 9 : (clamp(value, 1, 10) - 1) / 9;
+  const scaled = direction === 'low' ? (10 - clamp(value, 0, 10)) / 9 : Math.max(0, (clamp(value, 0, 10) - 1) / 9);
   return direction === 'low' ? .08 + 3.68 * scaled ** 2 : .12 + 3.52 * scaled ** 2;
 }
 function eligible(event, state, subject) {
   if (subject.alive === false || subject.age < event.minAge || subject.age > event.maxAge) return false;
+  if (event.subjectType === 'parent' && subject.abandonedAt !== undefined) return false;
+  if (event.id === 'household_parent_abandonment' && !(state.parents || []).includes(subject)) return false;
   if (state.age < (event.minPlayerAge ?? 0) || state.age > (event.maxPlayerAge ?? Infinity)) return false;
   if (event.subjectType === 'partner' && state.age < 18) return false;
   return (event.conditions || []).every(condition => {
@@ -154,10 +159,20 @@ function eligible(event, state, subject) {
   });
 }
 
+// Fictional rarity curve, independent of the ordinary event multiplier. Both
+// low stability and a weak relationship increase risk; even the maximum is 2%.
+export function abandonmentChance(state, parent) {
+  if (!parent || state.age >= 18 || state.ended || state.needsSuccession || parent.alive === false || parent.abandonedAt !== undefined || !(state.parents || []).includes(parent)) return 0;
+  const strain = (10 - clamp(parent.stats.stability, 0, 10)) / 10;
+  const distance = (10 - clamp(parent.relationship, 0, 10)) / 10;
+  return .00005 + .01995 * strain ** 2 * distance ** 2;
+}
+
 export function familyEventChances(state) {
   if (state.ended || state.needsSuccession) return [];
   const actors = [
     ...(state.parents || []).map(person => ({ subjectType: 'parent', person })),
+    ...(state.guardian && !(state.parents || []).some(person => person.alive !== false && person.abandonedAt === undefined) ? [{ subjectType: 'parent', person: state.guardian }] : []),
     ...(state.partner ? [{ subjectType: 'partner', person: state.partner }] : []),
     ...(state.children || []).map(person => ({ subjectType: 'child', person })),
   ];
@@ -165,7 +180,7 @@ export function familyEventChances(state) {
   const result = [];
   for (const { subjectType, person } of actors) {
     for (const event of FAMILY_EVENTS.filter(event => event.subjectType === subjectType)) {
-      let chance = eligible(event, state, person) ? event.baseChance * FAMILY_EVENT_RATE_MULTIPLIER : 0;
+      let chance = eligible(event, state, person) ? event.id === 'household_parent_abandonment' ? abandonmentChance(state, person) : event.baseChance * FAMILY_EVENT_RATE_MULTIPLIER : 0;
       for (const [key, direction] of event.statFactors || []) chance *= traitFactor(person.stats[key], direction);
       for (const key of event.focusFactors || []) chance *= .4 + focus[key] * .25;
       for (const key of event.neglectFactors || []) chance *= .25 + (5 - focus[key]) * .35;

@@ -1,4 +1,4 @@
-import { naturalSkillRating, BIRTH_VARIATION } from './development.js?v=event-variety-1';
+import { naturalSkillRating, BIRTH_VARIATION } from './development.js?v=zero-care-1';
 // Fictional relationship balance. These are game rules, not real-world estimates.
 // Actor identity and pregnancy capability are separate so future playable genders
 // can use the same relationship system. The current default is men meeting women.
@@ -6,7 +6,7 @@ const CORE = ['intelligence', 'strength', 'attractiveness', 'social', 'creativit
 const TRAITS = [...CORE, 'health', 'stability'];
 const clamp = (value, minimum, maximum) => Math.max(minimum, Math.min(maximum, value));
 const round = value => Math.round(value * 100) / 100;
-const rating = value => clamp(Number.isFinite(value) ? value : 1, 1, 10);
+const rating = value => clamp(Number.isFinite(value) ? value : 1, 0, 10);
 
 export function desirability(state, stats = state.stats) {
   return (rating(stats.attractiveness) + rating(stats.social) + rating(state.lifestyle)) / 3;
@@ -17,7 +17,7 @@ export function meetingChances(state, stats = state.stats) {
   if (state.age < 18 || state.age >= 85 || (state.partner && state.partner.alive !== false) || state.ended || state.needsSuccession) {
     return { desirability: score, slots: 0, chance: 0, expected: 0 };
   }
-  const strength = (score - 1) / 9;
+  const strength = clamp((score - 1) / 9, 0, 1);
   const slots = 1 + Math.floor(strength * 4 + 1e-9);
   const socialFocus = clamp(state.focus?.social ?? 3, 0, 5);
   const chance = clamp((.22 + .7 * strength) * (.7 + socialFocus * .1), .05, .95);
@@ -95,24 +95,24 @@ export function createProspects(state, helpers, stats = state.stats) {
   const availableGenders = preference.filter(gender => ['male', 'female', 'nonbinary'].includes(gender));
   if (!availableGenders.length) return [];
   const prospects = [];
-  const center = 2.6 + (chance.desirability - 1) / 9 * 5.5;
+  const center = 2.6 + clamp((chance.desirability - 1) / 9, 0, 1) * 5.5;
   for (let slot = 0; slot < chance.slots; slot++) {
     if (random() >= chance.chance) continue;
     const gender = availableGenders[integer(0, availableGenders.length - 1)];
-    const actorStats = Object.fromEntries(CORE.map(key => [key, round(clamp(center + (random() - .5) * 4.4, 1, 10))]));
+    const actorStats = Object.fromEntries(CORE.map(key => [key, round(clamp(center + (random() - .5) * 4.4, 0, 10))]));
     const aptitudes = helpers.randomAptitudes ? helpers.randomAptitudes() : Object.fromEntries(TRAITS.map(key => [key, integer(-3, 3)]));
-    actorStats.health = round(clamp(naturalSkillRating(aptitudes.health) + normal() * BIRTH_VARIATION.health, 1, 10));
-    actorStats.stability = round(clamp(naturalSkillRating(aptitudes.stability) + normal() * BIRTH_VARIATION.stability, 1, 10));
+    actorStats.health = round(clamp(naturalSkillRating(aptitudes.health) + normal() * BIRTH_VARIATION.health, 0, 10));
+    actorStats.stability = round(clamp(naturalSkillRating(aptitudes.stability) + normal() * BIRTH_VARIATION.stability, 0, 10));
     const age = integer(Math.max(18, state.age - 5), Math.min(84, Math.max(18, state.age + 5)));
     const height = round(integer(150, 195) / 2.54);
     const appearancePeakAge = appearanceDeclineAge({ gender });
     for (let pastAge = appearancePeakAge; pastAge < age; pastAge++) {
-      actorStats.attractiveness = clamp(actorStats.attractiveness + attractivenessAgeChange({age:pastAge,gender}),1,10);
+      actorStats.attractiveness = clamp(actorStats.attractiveness + attractivenessAgeChange({age:pastAge,gender}),0,10);
     }
     actorStats.attractiveness = round(actorStats.attractiveness);
     prospects.push({
       id: uid('prospect'), name: personName(gender), age, stats: actorStats, aptitudes,
-      height, adultHeight: height, lifestyle: round(clamp(center + (random() - .5) * 4, 1, 10)), alive: true,
+      height, adultHeight: height, lifestyle: round(clamp(center + (random() - .5) * 4, 0, 10)), alive: true,
       gender, canGestate: gender === 'female', attractedTo: [state.gender || 'male'], appearancePeakAge,
     });
   }

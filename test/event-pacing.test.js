@@ -47,7 +47,7 @@ test('ordinary events occur in most balanced years without approaching the five-
 });
 
 test('higher rates retain hard probability caps and inactive or ineligible events never roll', () => {
-  for (const rating of [1, 10]) {
+  for (const rating of [0, 1, 10]) {
     const state = balancedLife(15);
     for (const person of [state, ...state.parents]) for (const key of keys) person.stats[key] = rating;
     const personal = chances(state);

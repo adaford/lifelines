@@ -74,7 +74,7 @@ test('new families have a mom and dad with varied bonds centered near eight', ()
   assert.ok(Math.abs(median(bonds) - 8) < .2, `median ${median(bonds)}`);
   assert.ok(standardDeviation(bonds) > .7 && standardDeviation(bonds) < 1.2);
   assert.ok(new Set(bonds).size > 100, 'bonds vary across families');
-  assert.ok(appearances.every(value => value >= 1 && value <= 10));
+  assert.ok(appearances.every(value => value >= 0 && value <= 10));
   assert.ok(median(appearances) >= 4 && median(appearances) <= 8);
   assert.ok(standardDeviation(appearances) > 1.7 && standardDeviation(appearances) < 2.4, 'appearance starts with a broad spread');
   assert.ok(appearances.some(value => value <= 2) && appearances.some(value => value >= 9));
@@ -132,7 +132,7 @@ test('crying has neutral parent mental stability at two and distinct increasing 
 });
 
 test('crying previews respect parent rating bounds and remembered parents', () => {
-  for (const [starting, level, ending] of [[9.9, 1, 10], [1.1, 5, 1], [1, 5, 1], [10, 1, 10], [5, 2, 5]]) {
+  for (const [starting, level, ending] of [[9.9, 1, 10], [1.1, 5, 0], [0, 5, 0], [10, 1, 10], [5, 2, 5]]) {
     const state = createGame({ seed: 57 });
     const [living, remembered] = state.parents;
     living.stats.stability = starting;
@@ -191,7 +191,7 @@ test('annual development varies around the pure mean forecast and is reproducibl
   assert.deepEqual(template, beforePreview, 'forecast does not alter state or RNG');
   const gains = [];
   const stressChanges = [];
-  for (let rng = 1; rng <= 400; rng++) {
+  for (let rng = 1; rng <= 600; rng++) {
     const state = copy(template);
     state.rng = rng;
     const reloaded = migrateSave(JSON.parse(JSON.stringify(state)));
@@ -220,7 +220,7 @@ test('v7 migration preserves existing height, bonds, random state and non-infant
   const before = copy(legacy);
   const migrated = migrateSave(legacy);
   assert.ok(migrated);
-  assert.equal(migrated.version, 14);
+  assert.equal(migrated.version, 15);
   for (const key of ['rng', 'seed', 'nextId', 'age', 'stats', 'pendingEvents', 'history']) assert.deepEqual(migrated[key], before[key], key);
   assert.equal(migrated.height, round(before.height / 2.54));
   assert.equal(migrated.yearSummary.height.before, round(before.yearSummary.height.before / 2.54));

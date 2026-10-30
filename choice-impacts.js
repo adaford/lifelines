@@ -1,9 +1,9 @@
-import { annualForecast, effectiveStats, needsEducationChoice, focusLimits } from './engine.js?v=event-variety-1';
-import { infantChoiceEffects, wellbeingResponse, toddlerActivityEffects, TODDLER_FOCUS, TODDLER_ACTIVITY_EFFECTS, PARENT_FAMILY_RELATIONSHIP_GAIN } from './development.js?v=event-variety-1';
+import { annualForecast, effectiveStats, needsEducationChoice, focusLimits, caregivers } from './engine.js?v=zero-care-1';
+import { infantChoiceEffects, wellbeingResponse, toddlerActivityEffects, TODDLER_FOCUS, TODDLER_ACTIVITY_EFFECTS, PARENT_FAMILY_RELATIONSHIP_GAIN } from './development.js?v=zero-care-1';
 
 const nonzero = value => Math.abs(value) > .000001;
 const keyOf = entry => `${entry.parentId || 'you'}:${entry.stat}`;
-const bounded = (before, change) => Math.max(1, Math.min(10, before + change)) - before;
+const bounded = (before, change) => Math.max(0, Math.min(10, before + change)) - before;
 
 // Activity help compares direct per-point effects for the same stat across
 // activities. The activity rows separately account for selected points.
@@ -33,7 +33,7 @@ function toddlerChoiceEntries(state, activity, points, clip) {
   } }) : null;
   const entries = Object.entries(effects).map(([stat, change]) => ({ stat, change: clip ? after[stat] - before[stat] : change, group: 'you' }));
   if (activity === 'family') {
-    for (const parent of state.parents.filter(person => person.alive !== false)) {
+    for (const parent of caregivers(state)) {
       const stability = wellbeingResponse(parent, 'stability', .025 * (points - 2));
       const relationship = PARENT_FAMILY_RELATIONSHIP_GAIN * (points - 3);
       entries.push({ stat: 'stability', parentId: parent.id, group: 'others', change: clip ? bounded(parent.stats.stability, stability) : stability });
@@ -67,7 +67,7 @@ export function toddlerChoiceImpacts(state, activity) {
 function forecastEntries(state, forecast) {
   const entries = [...Object.entries(forecast.stats), ['lifestyle', forecast.lifestyle]]
     .map(([stat, value]) => ({ stat, change: value.change, group: 'you' }));
-  for (const parent of state.parents.filter(person => person.alive !== false)) {
+  for (const parent of caregivers(state)) {
     const changes = forecast.parents.find(person => person.id === parent.id);
     for (const stat of ['stability', 'lifestyle', 'relationship']) {
       if (changes?.[stat]) entries.push({ stat, parentId: parent.id, change: changes[stat].change,
@@ -97,7 +97,7 @@ function cryEntries(state, level, clip) {
   }
   for (const entry of entries) {
     if (!entry.parentId) continue;
-    const parent = state.parents.find(person => person.id === entry.parentId);
+    const parent = caregivers(state).find(person => person.id === entry.parentId);
     if (entry.stat === 'stability') {
       const effect = wellbeingResponse(parent, 'stability', [.2, 0, -.6, -1.2, -1.8][level - 1]);
       entry.change = clip ? bounded(parent.stats.stability, effect) : effect;

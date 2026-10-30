@@ -13,14 +13,14 @@ export const DEVELOPMENT_BALANCE = {
   "innateScale": 0.8,
   "skillReversion": 0.012,
   "childhoodBias": {
-    "intelligence": -0.095997,
-    "strength": -0.020439,
-    "social": -0.088969,
-    "creativity": -0.097668
+    "intelligence": -0.095658,
+    "strength": -0.018549,
+    "social": -0.085243,
+    "creativity": -0.096566
   },
   "wellbeingTarget": {
-    "health": 5.14703,
-    "stability": 4.220116
+    "health": 5.150338,
+    "stability": 4.224217
   },
   "wellbeingReversion": {
     "health": 0.06,
@@ -109,7 +109,7 @@ export function toddlerActivityEffects(person) {
 
 // This is a weak innate tendency, not a destination or a preselected final score.
 export function naturalSkillRating(aptitude = 0) {
-  return clamp(5 + DEVELOPMENT_BALANCE.innateScale * clamp(number(aptitude, 0), -3, 3), 1, 10);
+  return clamp(5 + DEVELOPMENT_BALANCE.innateScale * clamp(number(aptitude, 0), -3, 3), 0, 10);
 }
 
 // Pure annual means; the engine adds seeded individual variation afterwards.

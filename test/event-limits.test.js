@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { legacyRatingFloor } from './helpers/legacy-height.js';
 import {
   EVENTS, createGame, setFocus, focusLimits, focusLimitDetails, advanceYear,
   annualForecast, resolveEventChoice, validateSave, migrateSave,
@@ -168,7 +169,7 @@ test('over-limit states cannot advance or import and malformed limit maps are re
 });
 
 test('schema 13 migration preserves ratings, effects, pending choices, history and RNG exactly', () => {
-  const state = child(6);
+  const state = legacyRatingFloor(child(6));
   state.version = 13;
   state.lifestyle = 5.37;
   state.effects = [{ id: 'old', name: 'Existing effect', description: 'Saved text', years: 2, modifiers: { stability: .3 }, kind: 'positive' }];
@@ -176,7 +177,7 @@ test('schema 13 migration preserves ratings, effects, pending choices, history a
   const before = copy(state);
   assert.equal(validateSave(state), false);
   const migrated = migrateSave(state);
-  assert.deepEqual(migrated, { ...before, version: 14 });
+  assert.deepEqual(migrated, { ...before, version: 15 });
   assert.deepEqual(state, before);
   assert.equal(validateSave(migrated), true);
 });

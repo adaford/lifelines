@@ -1,10 +1,11 @@
 const genderRole = (person, female, male, neutral) => person.gender === 'female' ? female : person.gender === 'male' ? male : neutral;
 const parentRole = person => ({ mom: 'Mom', mother: 'Mom', dad: 'Dad', father: 'Dad', parent: 'Parent' }[String(person.parentRole || '').toLowerCase()] || genderRole(person, 'Mom', 'Dad', 'Parent'));
+const guardianRole = person => ({ aunt: 'Aunt', uncle: 'Uncle' }[person.guardianRole] || 'Relative');
 const siblingRole = person => genderRole(person, 'Sister', 'Brother', 'Sibling');
 const childRole = person => genderRole(person, 'Daughter', 'Son', 'Child');
 const partnerRole = person => person.married ? genderRole(person, 'Wife', 'Husband', 'Partner') : genderRole(person, 'Girlfriend', 'Boyfriend', 'Partner');
 const escapePattern = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const roles = ['You', 'Mom', 'Dad', 'Parent', 'Sister', 'Brother', 'Sibling', 'Daughter', 'Son', 'Child', 'Wife', 'Husband', 'Partner', 'Spouse', 'Girlfriend', 'Boyfriend', 'Acquaintance', 'Co-parent', 'Grandmother', 'Grandfather', 'Grandparent', 'Ancestor', 'Benefactor', 'Predecessor'];
+const roles = ['You', 'Mom', 'Dad', 'Parent', 'Aunt', 'Uncle', 'Relative', 'Sister', 'Brother', 'Sibling', 'Daughter', 'Son', 'Child', 'Wife', 'Husband', 'Partner', 'Spouse', 'Girlfriend', 'Boyfriend', 'Acquaintance', 'Co-parent', 'Grandmother', 'Grandfather', 'Grandparent', 'Ancestor', 'Benefactor', 'Predecessor'];
 
 function ancestorDistances(state, people) {
   const parentsByChild = new Map();
@@ -37,7 +38,7 @@ export function annotateNarrative(text, state) {
   const source = String(text ?? '');
   if (!source || !state) return source;
   const lineage = state.lineage || [];
-  const people = [state, ...(state.parents || []), ...(state.siblings || []), ...(state.children || []), state.partner, ...(state.encounters || []), state.pregnancy?.otherParent, ...lineage].filter(Boolean);
+  const people = [state, ...(state.parents || []), state.guardian, ...(state.siblings || []), ...(state.children || []), state.partner, ...(state.encounters || []), state.pregnancy?.otherParent, ...lineage].filter(Boolean);
   const distances = ancestorDistances(state, people);
   const identities = new Map();
   const names = new Map();
@@ -52,6 +53,7 @@ export function annotateNarrative(text, state) {
   };
   add(state, 'You');
   for (const person of state.parents || []) add(person, parentRole(person));
+  if (state.guardian) add(state.guardian, guardianRole(state.guardian));
   for (const person of state.siblings || []) add(person, siblingRole(person));
   for (const person of state.children || []) add(person, childRole(person));
   if (state.partner) add(state.partner, partnerRole(state.partner));

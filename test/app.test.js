@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { afterEach, describe, test } from 'node:test';
 import { parseHTML } from 'linkedom';
-import { toLegacyCentimeters, stripWellbeingAptitudes } from './helpers/legacy-height.js';
+import { toLegacyCentimeters, stripWellbeingAptitudes, legacyRatingFloor } from './helpers/legacy-height.js';
 import { choiceImpacts, toddlerChoiceImpacts } from '../choice-impacts.js';
 import { SKILLS, JOBS, EVENTS, resolveEventChoice, eventOdds, canTakeJob, chooseEducation, offeredJobs, needsEducationChoice, createGame, advanceYear, annualForecast, haveChild, takeJob, successionInfo, succeed, validateSave, respondToEncounter, proposeMarriage, effectiveStats, relationshipOdds, proposalChance, statPercentiles } from '../engine.js';
 
@@ -904,6 +904,7 @@ function legacySave(state) {
   }
   for (const effect of legacy.effects) {
     delete effect.lifestyle;
+    delete effect.focusLimits;
     if ('stability' in effect.modifiers) {
       effect.modifiers.instability = -effect.modifiers.stability;
       delete effect.modifiers.stability;
@@ -1491,6 +1492,7 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     resolvePending(fixture);
     fixture.focus = { work: 4, social: 2, family: 3, self: 3 };
     fixture.effects = [{ id: 'burnout', name: 'Running on empty', description: 'A difficult stretch.', years: 2, modifiers: { stability: -1.2 }, kind: 'negative' }];
+    legacyRatingFloor(fixture);
     const legacy = legacySave(fixture);
     assert.equal(legacy.version, 1);
     assert.ok('instability' in legacy.stats);
@@ -2056,6 +2058,8 @@ test('parent ratings stay numeric while crying updates their separate choice imp
 
 test('parent effects do not cancel each other and remembered parents have no forecast', async () => {
   const fixture=ageTo(createGame({seed:121}),8);
+  fixture.parents.forEach(parent=>{parent.alive=true;delete parent.death;delete parent.abandonedAt;});
+  fixture.guardian=null;
   for (const effect of fixture.effects) delete effect.focusLimits;
   fixture.focus={work:3,social:3,family:3,self:3};
   fixture.parents[0].stats.stability=2;
@@ -2144,9 +2148,9 @@ function assertCurrentRatingBars(ui) {
   for(const track of ui.all('.rating-track')) {
     const value=Number(track.getAttribute('aria-valuenow'));
     assert.equal(track.getAttribute('role'),'meter');
-    assert.equal(Number(track.getAttribute('aria-valuemin')),1);
+    assert.equal(Number(track.getAttribute('aria-valuemin')),0);
     assert.equal(Number(track.getAttribute('aria-valuemax')),10);
-    assert.ok(value>=1&&value<=10);
+    assert.ok(value>=0&&value<=10);
     assert.ok(track.getAttribute('aria-label'));
     const fill=track.querySelector('.rating-fill');
     assert.ok(fill,'the fixed full track contains a separate filled portion');
@@ -2157,14 +2161,14 @@ function assertCurrentRatingBars(ui) {
 
 test('rating bars distinguish low and high values and preserve displayed ratings and saves', async () => {
   const fixture=createGame({seed:121});
-  fixture.stats.health=1;
+  fixture.stats.health=0;
   fixture.stats.intelligence=5.5;
   fixture.stats.strength=10;
   const ui=await mount(fixture),before=ui.saved();
   assertCurrentRatingBars(ui);
   const fill=key=>ui.query(`.status-strip [data-stat="${key}"] .rating-fill`);
   const hue=key=>Number(fill(key).getAttribute('style').match(/hsl\(\s*([\d.]+)/)[1]);
-  assert.equal(parseFloat(fill('health').style.width),10);
+  assert.equal(parseFloat(fill('health').style.width),0);
   assert.equal(parseFloat(fill('strength').style.width),100);
   assert.equal(hue('health'),0,'minimum rating is red');
   assert.equal(hue('strength'),120,'maximum rating is green');
@@ -2180,10 +2184,65 @@ test('rating bars distinguish low and high values and preserve displayed ratings
   assert.deepEqual(ui.saved(),before);
 });
 
+test('zero ratings stay readable in the header, family, and event outcomes', async () => {
+  const fixture=createGame({seed:121});
+  fixture.stats.health=0;
+  fixture.lifestyle=0;
+  fixture.parents.forEach(parent=>{parent.lifestyle=0;parent.relationship=0;parent.stats.stability=0;});
+  fixture.history.unshift({id:'zero-outcome',age:0,generation:1,title:'A difficult year',text:`Your health 1.3 → 0; ${fixture.parents[0].name}: Mental stability 1 → 0.`,kind:'negative'});
+  const ui=await mount(fixture);
+  assert.equal(ui.query('.status-strip [data-stat="health"] .status-value').textContent,'0.0/10');
+  assert.equal(ui.query('.profile-lifestyle .status-value').textContent,'0.0/10');
+  assert.match(ui.query('#app').textContent,/Your health 1\.3 → 0\.0/);
+  assertCurrentRatingBars(ui);
+  ui.click('.nav-list [data-tab="family"]');
+  for(const card of ui.all('.roots-panel .family-card')) {
+    assert.equal(card.querySelector('.relationship-summary strong').textContent,'0.0/10');
+    assert.equal(card.querySelector('[data-skill="stability"] strong').textContent,'0.0/10');
+  }
+  assert.deepEqual(ui.saved().stats,fixture.stats);
+});
+
+test('departed parents remain identified and the guardian receives care previews', async () => {
+  const fixture=createGame({seed:121});
+  fixture.age=3;
+  fixture.focus={work:3,social:2,family:2,self:3,creative:2};
+  fixture.parents.forEach(parent=>{parent.abandonedAt=0;});
+  fixture.guardian={...structuredClone(fixture.parents[0]),id:'relative-guardian',name:'Anna Reed',guardianRole:'aunt',adoptedAt:0};
+  delete fixture.guardian.abandonedAt;
+  delete fixture.guardian.parentRole;
+  fixture.guardian.relationship=7;
+  fixture.guardian.stats.stability=7;
+  const ui=await mount(fixture),before=ui.saved();
+  assert.equal(ui.query('.parent-status[data-parent-id="relative-guardian"] h4').textContent,'Aunt:');
+  assert.equal(ui.query('.parent-status[data-parent-id="relative-guardian"] .parent-status-state').textContent,'Guardian');
+  for(const parent of fixture.parents) {
+    assert.equal(ui.query(`.parent-status[data-parent-id="${parent.id}"] .parent-status-state`).textContent,'Left the family');
+    assert.equal(ui.all(`.choice-impact[data-parent-id="${parent.id}"]`).length,0);
+  }
+  assert.ok(ui.all('.choice-impact[data-parent-id="relative-guardian"]').length>0);
+  assert.match(ui.query('.choice-impact[data-parent-id="relative-guardian"]').textContent,/Aunt/);
+  ui.click('[data-topic="toddler-family"]');
+  assert.match(ui.query('.help-popup').textContent,/Guardian relationship/);
+  ui.click('.help-popup [data-action="close"]');
+  ui.click('.nav-list [data-tab="family"]');
+  const guardian=ui.query('.roots-panel [data-person-id="relative-guardian"]');
+  assert.equal(guardian.querySelector('.eyebrow').textContent,'Aunt');
+  assert.match(guardian.textContent,/Guardian/);
+  assert.equal(guardian.querySelectorAll('.rating-track').length,3);
+  for(const parent of fixture.parents) {
+    const card=ui.query(`.roots-panel [data-person-id="${parent.id}"]`);
+    assert.match(card.textContent,/Left the family/);
+    assert.doesNotMatch(card.textContent,/Remembered/);
+  }
+  assert.deepEqual(ui.saved().guardian,before.guardian);
+  assert.equal(ui.saved().rng,before.rng);
+});
+
 test('crying parent stability signs hide effects blocked by rating bounds', async () => {
   const fixture=createGame({seed:121});
   fixture.parents[0].stats.stability=10;
-  fixture.parents[1].stats.stability=1;
+  fixture.parents[1].stats.stability=0;
   const ui=await mount(fixture),before=ui.saved();
   ui.click('[data-action="baby"][data-level="1"]');
   assertChoiceImpacts(ui);
@@ -2245,7 +2304,7 @@ test('expected changes separate personal stats, other people and relationships, 
 test('zero personal effects at rating limits are omitted without changing remaining relative signs', async () => {
   const fixture=createGame({seed:121});
   fixture.stats.intelligence=10;
-  fixture.stats.stability=1;
+  fixture.stats.stability=0;
   const ui=await mount(fixture);
   ui.click('[data-action="baby"][data-level="5"]');
   assert.equal(ui.all('.choice-impact[data-stat="intelligence"]:not([data-parent-id])').length,0);
@@ -2285,7 +2344,7 @@ test('infant changes respect displayed limits from retained temporary modifiers'
   ui.click('[data-action="baby"][data-level="5"]');
   assert.equal(ui.all('.choice-impact[data-stat="intelligence"]:not([data-parent-id])').length,0,'a retained boost blocks gains beyond displayed 10');
   ui.click('[data-action="baby"][data-level="1"]');
-  assert.equal(ui.all('.choice-impact[data-stat="stability"]:not([data-parent-id])').length,0,'a retained penalty blocks losses below displayed 1');
+  assert.equal(ui.all('.choice-impact[data-stat="stability"]:not([data-parent-id])').length,0,'a retained penalty blocks losses below displayed 0');
   assert.deepEqual(ui.saved().effects,before.effects);
   assert.deepEqual(ui.saved().stats,before.stats);
   assert.equal(ui.saved().rng,before.rng);

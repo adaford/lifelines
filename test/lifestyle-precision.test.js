@@ -82,7 +82,7 @@ test('new prospective partners have bounded lifestyle ratings with hundredth pre
   assert.ok(people.length > 0);
   assert.ok(people.some(person => !Number.isInteger(person.lifestyle)));
   for (const person of people) {
-    assert.ok(person.lifestyle >= 1 && person.lifestyle <= 10);
+    assert.ok(person.lifestyle >= 0 && person.lifestyle <= 10);
     assert.equal(person.lifestyle, round(person.lifestyle));
   }
 });

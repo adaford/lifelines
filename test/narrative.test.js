@@ -20,6 +20,19 @@ test('explicit parent roles override gender and missing gender uses neutral role
   assert.equal(annotateNarrative('Alex Ford and Casey Ford.', state), 'Alex Ford (Mom) and Casey Ford (Parent).');
 });
 
+test('adoption labels the relative while retaining biological parent roles', () => {
+  const state = family({
+    parents: [person('mom', 'Olivia Ford', 'female', { abandonedAt: 2 }), person('dad', 'Noah Ford', 'male', { abandonedAt: 3 })],
+    guardian: person('guardian', 'Anna Ford', 'female', { guardianRole: 'aunt', adoptedAt: 3 }),
+  });
+  const source = 'Olivia Ford left. Noah Ford left. Anna Ford adopted you.';
+  const expected = 'Olivia Ford (Mom) left. Noah Ford (Dad) left. Anna Ford (Aunt) adopted you.';
+  assert.equal(annotateNarrative(source, state), expected);
+  assert.equal(annotateNarrative(expected, state), expected, 'labels are idempotent');
+  state.guardian.guardianRole = 'uncle';
+  assert.equal(annotateNarrative('Anna Ford', state), 'Anna Ford (Uncle)');
+});
+
 test('partner roles reflect gender and marriage; encounters stay acquaintances', () => {
   for (const [gender, married, role] of [
     ['female', false, 'Girlfriend'], ['male', false, 'Boyfriend'], ['nonbinary', false, 'Partner'],

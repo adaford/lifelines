@@ -23,7 +23,7 @@ test('newborn ratings span the scale around five with broad variation and aptitu
     const sd = Math.sqrt(mean(values.all.map(value => (value - average) ** 2)));
     assert.ok(Math.abs(average - 5) < .2, `${key} starts around five: ${average}`);
     assert.ok(sd > 1.75 && sd < 2.7, `${key} has broad variation: ${sd}`);
-    assert.equal(Math.min(...values.all), 1, `${key} can start at the bottom of the scale`);
+    assert.equal(Math.min(...values.all), 0, `${key} can start at the bottom of the scale`);
     assert.equal(Math.max(...values.all), 10, `${key} can start at the top of the scale`);
     if (learned.includes(key) || ['health', 'stability'].includes(key)) {
       assert.ok(mean(values.high) > mean(values.low) + 2, `${key} aptitude shifts the distribution`);
@@ -46,7 +46,7 @@ test('lifetime focus produces substantial gains, losses, and reversals without f
   const advance = (state, focus, years) => {
     state.focus = focus;
     for (let year = 0; year < years; year++) {
-      for (const [key, change] of Object.entries(skillChanges(state))) state.stats[key] = Math.max(1, Math.min(10, state.stats[key] + change));
+      for (const [key, change] of Object.entries(skillChanges(state))) state.stats[key] = Math.max(0, Math.min(10, state.stats[key] + change));
       state.age++;
     }
     return state;
@@ -211,7 +211,10 @@ test('independent game lives reach age 18 with average ratings near five and ret
   const keys = ['intelligence', 'strength', 'attractiveness', 'social', 'creativity', 'health', 'stability'];
   const samples = Object.fromEntries(keys.map(key => [key, []]));
   const events = new Map(EVENTS.map(event => [event.id, event]));
-  for (const [index, gender] of ['male', 'female'].entries()) for (let sample = 0; sample < 400; sample++) {
+  // Keep the original held-out seeds and expand the cohort: broad 0-10 skill
+  // variation otherwise makes a 0.2 mean tolerance sensitive to sampling noise.
+  const samplesPerProfile = 800;
+  for (const [index, gender] of ['male', 'female'].entries()) for (let sample = 0; sample < samplesPerProfile; sample++) {
     const seed = 750001 + index * 1000000 + sample;
     const state = createGame({ seed, gender });
     state.cryLevel = 3;
@@ -234,7 +237,7 @@ test('independent game lives reach age 18 with average ratings near five and ret
     for (const key of keys) samples[key].push(stats[key]);
   }
   for (const [key, values] of Object.entries(samples)) {
-    assert.ok(values.length > 750);
+    assert.ok(values.length > samplesPerProfile * 2 * .95);
     const average = values.reduce((sum, value) => sum + value, 0) / values.length;
     const sd = Math.sqrt(values.reduce((sum, value) => sum + (value - average) ** 2, 0) / values.length);
     assert.ok(Math.abs(average - 5) < .2, `${key} mean ${average}`);

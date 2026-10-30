@@ -109,11 +109,32 @@ test('activity previews hide blocked effects without reranking partial gains or 
   state.effects[0].years = 1;
   assert.ok(toddlerChoiceImpacts(state, 'work').some(entry => entry.stat === 'strength'), 'expiring modifiers do not hide next year activity gains');
   const low = selected(toddler(), 'work', 0);
-  low.stats.strength = 1;
+  low.stats.strength = 0;
   assert.ok(!toddlerChoiceImpacts(low, 'work').some(entry => entry.stat === 'strength'));
+  low.stats.strength = .01;
+  const nearZero = toddlerChoiceImpacts(low, 'work').find(entry => entry.stat === 'strength');
+  assert.equal(nearZero.change, -.01);
+  assert.equal(nearZero.level, 3, 'partial clipping near zero retains the strongest loss sign');
   const family = selected(toddler(), 'family', 5);
   family.parents.forEach(parent => { parent.relationship = 10; parent.stats.stability = 10; });
   assert.ok(toddlerChoiceImpacts(family, 'family').every(entry => !entry.parentId));
+});
+
+test('family activity previews follow the remaining caregiver and adopted relative', () => {
+  const state = selected(toddler(), 'family', 5);
+  state.parents[0].abandonedAt = 2;
+  let entries = toddlerChoiceImpacts(state, 'family').filter(entry => entry.parentId);
+  assert.ok(entries.length > 0);
+  assert.ok(entries.every(entry => entry.parentId === state.parents[1].id));
+  state.parents[1].abandonedAt = 2;
+  state.guardian = { ...structuredClone(state.parents[0]), id: 'guardian-test', guardianRole: 'aunt', adoptedAt: 2 };
+  delete state.guardian.abandonedAt;
+  const before = structuredClone(state);
+  entries = toddlerChoiceImpacts(state, 'family').filter(entry => entry.parentId);
+  assert.deepEqual(entries.map(entry => [entry.parentId, entry.stat]), [
+    ['guardian-test', 'stability'], ['guardian-test', 'relationship'],
+  ]);
+  assert.deepEqual(state, before, 'caregiver previews do not consume RNG or alter saves');
 });
 
 test('activity previews survive reloads, preserve saves and RNG, and disappear when progression is blocked', () => {

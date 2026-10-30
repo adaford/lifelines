@@ -23,7 +23,7 @@ function category(name, rows) {
       id, name: title, category: name, description, minAge, requirements, affinities,
       requiresCollege: COLLEGE_ROLES.has(id),
       weights: Object.fromEntries(Object.entries(affinities).map(([skill, value]) => [skill, value / total])),
-      baseLifestyle: Math.round(Math.max(1, Math.min(10, 1 + baseSalary / 22000)) * 100) / 100,
+      baseLifestyle: Math.round(Math.max(0, Math.min(10, 1 + baseSalary / 22000)) * 100) / 100,
       baseSalary,
     };
   });

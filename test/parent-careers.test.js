@@ -15,7 +15,7 @@ function sequence(...values) {
 }
 
 test('initial careers preserve household support without rerolling migration values', () => {
-  for (let lifestyle = 1; lifestyle <= 10; lifestyle++) {
+  for (let lifestyle = 0; lifestyle <= 10; lifestyle++) {
     const person = parent({ lifestyle });
     const before = structuredClone(person);
     assert.deepEqual(initialParentCareer(person, 5), { focus: 5, status: 'employed', progress: lifestyle, years: 8 });
@@ -102,7 +102,11 @@ test('career progress is bounded and promotions are separate from ordinary growt
   assert.equal(promoted.career.progress, 10);
   assert.equal(promoted.event.title, 'A parent moved ahead at work');
   person.career = { ...person.career, progress: 1.1 };
-  assert.equal(advanceParentCareer(person, { random: sequence(0, 1) }).career.progress, 1);
+  assert.equal(advanceParentCareer(person, { random: sequence(0, 1) }).career.progress, 0);
+  person.career = { ...person.career, progress: 0, status: 'unemployed' };
+  assert.equal(careerForecast(person).progress, 0);
+  assert.equal(advanceParentCareer(person, { random: sequence(.9), normal: () => -3 }).career.progress, 0);
+  assert.ok(advanceParentCareer(person, { random: sequence(0, .5) }).career.progress > 0);
 });
 
 test('dead and retired parents preserve support without consuming random draws', () => {

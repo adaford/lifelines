@@ -315,8 +315,8 @@ export function eventChances(state, stats, job) {
     for (const key of focusFactors) chance *= .4 + (focus[key] ?? 0) * .25;
     for (const key of event.neglectFactors || []) chance *= .25 + (5 - focus[key]) * .35;
     for (const [key, direction] of event.statFactors || []) {
-      const value = Math.max(1, Math.min(10, key === 'lifestyle' ? state.lifestyle : stats[key]));
-      const fraction = direction === 'low' ? (10 - value) / 9 : (value - 1) / 9;
+      const value = Math.max(0, Math.min(10, key === 'lifestyle' ? state.lifestyle : stats[key]));
+      const fraction = direction === 'low' ? (10 - value) / 9 : Math.max(0, (value - 1) / 9);
       chance *= direction === 'low' ? .08 + 3.68 * fraction ** 2 : .12 + 3.52 * fraction ** 2;
     }
     if (job && event.jobFactors?.[job.id]) chance *= event.jobFactors[job.id];

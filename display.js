@@ -52,7 +52,7 @@ export function splitEventOutcome(text) {
   if (parts.length < 2) return [source];
   const parsed = parts.map((part, index) => {
     const match = outcomePart.exec(part.trim());
-    if (!match || [match.groups.before, match.groups.after].some(value => Number(value) < 1 || Number(value) > 10)) return null;
+    if (!match || [match.groups.before, match.groups.after].some(value => Number(value) < 0 || Number(value) > 10)) return null;
     const { person, prefix, lifestylePrefix, suffix } = match.groups;
     if (index > 0 && (prefix || lifestylePrefix) || index < parts.length - 1 && suffix) return null;
     return { person: person?.trim() || null };
@@ -79,7 +79,7 @@ function formatValues(text, age) {
     .replace(heightSingle, (_, prefix, value, unit) => `${prefix}${formatHeight(heightInches(value, unit), age)}`)
     .replace(ratingPattern, (match, prefix, before, separator, after) => {
       const values = [before, after].filter(value => value !== undefined).map(Number);
-      if (values.some(value => value < 1 || value > 10)) return match;
+      if (values.some(value => value < 0 || value > 10)) return match;
       return `${prefix}${formatRating(before)}${separator === undefined ? '' : `${separator}${formatRating(after)}`}`;
     });
 }
@@ -91,7 +91,7 @@ const escapePattern = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 export function formatStatNarrative(text, state, age = state?.age) {
   const source = String(text ?? '');
   if (!source) return source;
-  const people = [state, ...(state?.parents || []), ...(state?.siblings || []), ...(state?.children || []), state?.partner, ...(state?.encounters || []), state?.pregnancy?.otherParent, ...(state?.lineage || []), ...(state?.yearSummary?.parents || [])].filter(Boolean);
+  const people = [state, state?.guardian, ...(state?.parents || []), ...(state?.siblings || []), ...(state?.children || []), state?.partner, ...(state?.encounters || []), state?.pregnancy?.otherParent, ...(state?.lineage || []), ...(state?.yearSummary?.parents || [])].filter(Boolean);
   const names = new Set(people.flatMap(person => [person.name, person.familyName, ...(person.children || []).map(child => child.name)]).filter(name => typeof name === 'string' && name.trim()).map(name => name.trim()));
   if (!names.size) return formatValues(source, age);
   const pattern = new RegExp(`(?<![\\p{L}\\p{M}\\p{N}_-])(?:${[...names].sort((a, b) => b.length - a.length).map(escapePattern).join('|')})(?![\\p{L}\\p{M}\\p{N}_-])`, 'gu');

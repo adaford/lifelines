@@ -44,7 +44,7 @@ test('health changes disease risk and stability has only a modest adult accident
 
 test('all risks are bounded and causes partition rather than duplicate annual mortality', () => {
   for (let age = 0; age <= 130; age++) {
-    for (const health of [1, 5, 10]) {
+    for (const health of [0, 1, 5, 10]) {
       const risk = mortalityRisk(person(age, health, 1));
       assert.ok(risk.total > 0 && risk.total < 1);
       assert.ok(risk.disease > 0 && risk.accident > 0);
