@@ -57,6 +57,29 @@ test('rest doubles the former toddler health response and crafts spend the share
   assert.equal(setFocus(state, 'creative', 1).ok, false);
 });
 
+test('crafts develop intelligence at one-third the electronics rate while retaining creativity', () => {
+  for (const age of [2, 3, 4]) {
+    const state = toddler();
+    state.age = age;
+    state.aptitudes.intelligence = 0;
+    state.focus.work = 2;
+    const before = copy(state);
+    const baseline = skillChanges(state);
+    const crafts = skillChanges({ ...state, focus: { ...state.focus, creative: 3 } });
+    const electronics = skillChanges({ ...state, focus: { ...state.focus, social: 3 } });
+    const craftsGain = crafts.intelligence - baseline.intelligence;
+    const electronicsGain = electronics.intelligence - baseline.intelligence;
+    assert.ok(craftsGain > 0);
+    assert.ok(Math.abs(craftsGain * 3 - electronicsGain) < 1e-12);
+    assert.ok(crafts.creativity > baseline.creativity);
+    assert.equal(crafts.social, baseline.social);
+    assert.equal(crafts.strength, baseline.strength);
+    const effects = toddlerActivityEffects(state);
+    assert.ok(Math.abs(effects.creative.intelligence * 3 - effects.social.intelligence) < 1e-12);
+    assert.deepEqual(state, before, 'development and activity reads preserve the save and RNG');
+  }
+});
+
 test('age two unlocks five activities and the school transition preserves the completed choices', () => {
   const infant = createGame({ seed: 42111 });
   infant.age = 1;

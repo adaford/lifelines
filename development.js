@@ -33,16 +33,16 @@ const number = (value, fallback) => Number.isFinite(value) ? value : fallback;
 const skills = ['intelligence', 'strength', 'social', 'creativity'];
 
 export const TODDLER_FOCUS = { work: 3, social: 2, family: 2, self: 3, creative: 2 };
-const toddlerCoefficients = {
+export const TODDLER_ACTIVITY_EFFECTS = {
   work: { strength: .1, social: .055 },
   social: { intelligence: .09, social: -.055 },
   family: { intelligence: .02, social: .055, stability: .035 },
   self: { health: .1, stability: .08 },
-  creative: { creativity: .11 },
+  creative: { creativity: .11, intelligence: .03 },
 };
 const toddlerFocus = person => Object.fromEntries(Object.keys(TODDLER_FOCUS).map(key => [key, clamp(number(person.focus?.[key], key === 'creative' ? 0 : 3), 0, 5)]));
 function toddlerPractice(focus) {
-  return Object.fromEntries(skills.map(skill => [skill, Object.entries(toddlerCoefficients).reduce((sum, [key, coefficients]) => sum + (coefficients[skill] || 0) * (focus[key] - TODDLER_FOCUS[key]), 0)]));
+  return Object.fromEntries(skills.map(skill => [skill, Object.entries(TODDLER_ACTIVITY_EFFECTS).reduce((sum, [key, coefficients]) => sum + (coefficients[skill] || 0) * (focus[key] - TODDLER_FOCUS[key]), 0)]));
 }
 function practiceResponse(effort, aptitude) {
   return effort * (effort >= 0 ? 1 + aptitude * .12 : 1 - aptitude * .1);
@@ -57,8 +57,8 @@ export function wellbeingResponse(person, key, amount) {
 
 function toddlerWellbeingPractice(focus) {
   return {
-    health: .1 * (focus.self - 3),
-    stability: .08 * (focus.self - 3) + .035 * (focus.family - 2),
+    health: TODDLER_ACTIVITY_EFFECTS.self.health * (focus.self - TODDLER_FOCUS.self),
+    stability: TODDLER_ACTIVITY_EFFECTS.self.stability * (focus.self - TODDLER_FOCUS.self) + TODDLER_ACTIVITY_EFFECTS.family.stability * (focus.family - TODDLER_FOCUS.family),
   };
 }
 
@@ -95,7 +95,7 @@ export function toddlerActivityEffects(person) {
   const focus = toddlerFocus(person);
   const practice = toddlerPractice(focus);
   const wellbeing = toddlerWellbeingPractice(focus);
-  return Object.fromEntries(Object.entries(toddlerCoefficients).map(([key, coefficients]) => {
+  return Object.fromEntries(Object.entries(TODDLER_ACTIVITY_EFFECTS).map(([key, coefficients]) => {
     const without = toddlerPractice({ ...focus, [key]: 0 });
     const withoutWellbeing = toddlerWellbeingPractice({ ...focus, [key]: 0 });
     return [key, Object.fromEntries(Object.entries(coefficients).map(([stat, coefficient]) => {
