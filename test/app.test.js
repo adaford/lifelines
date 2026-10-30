@@ -1213,7 +1213,7 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
         assert.equal(ui.all('.cry-level').length,0);
         assert.match(ui.query('.focus-panel .panel-heading').textContent,/Toddler activities/);
         assert.deepEqual(ui.all('.focus-copy h4').map(heading=>[...heading.firstChild.childNodes].filter(node=>node.nodeType===3).map(node=>node.textContent).join('')),['Play','Electronics','Family time','Rest','Arts & crafts']);
-        assert.match(ui.query('.profile-copy > .muted').textContent,/Toddler/);
+        assert.match(ui.query('.profile-age .profile-stage').textContent,/Toddler/);
         assert.doesNotMatch(ui.query('.focus-panel').textContent,/School|Career/);
       }
       if(year===2) {
@@ -1234,7 +1234,7 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     assert.equal(ui.query('.status-strip [data-stat="intelligence"] .status-value').firstChild.textContent,ui.saved().stats.intelligence.toFixed(1),'the changing age-relative rating remains synchronized with the save');
     assert.ok(ui.saved().parents[0].stats.stability < initial.parents[0].stats.stability);
     assert.deepEqual(ui.all('.focus-copy h4').map(heading=>[...heading.firstChild.childNodes].filter(node=>node.nodeType===3).map(node=>node.textContent).join('')),['School','Friends','Family','Yourself']);
-    assert.equal(ui.query('.profile-copy > .muted').textContent,'Student');
+    assert.equal(ui.query('.profile-age .profile-stage').textContent,'Student');
     assert.equal(validateSave(ui.saved()), true);
     assert.doesNotMatch(ui.query('#app').textContent, /undefined|NaN/);
     ui.click('.nav-list [data-tab="character"]');
