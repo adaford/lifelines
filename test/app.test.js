@@ -249,7 +249,7 @@ test('cry levels update the combined choice impact list without numeric deltas o
   assertChoiceImpacts(ui);
   const high=annualForecast(ui.saved()).stats.intelligence.change;
   assert.ok(high>low,'crying changes the net annual expectation');
-  assert.equal(ui.all('[role="meter"], .stat-track, .stat-projection, .year-stats').length,0);
+  assert.equal(ui.all('.stat-projection, .year-stats').length,0);
   assert.equal(ui.query('.status-strip [data-stat="intelligence"] .status-value').firstChild.textContent,'5.0');
   ui.click('.choice-impact-summary [data-topic="forecast"]');
   assert.match(ui.query('.help-popup').textContent,/routine changes/);
@@ -262,7 +262,7 @@ test('cry levels update the combined choice impact list without numeric deltas o
   assert.deepEqual(ui.saved().stats,initial.stats);
   assertNoMoneyDisplay(ui.query('.choice-impact-summary'),'annual forecast');
   ui.click('.nav-list [data-tab="family"]');
-  assert.equal(ui.all('[role="meter"], .stat-track, .stat-projection, .relationship-meter').length,0);
+  assert.equal(ui.all('.stat-projection').length,0);
   assert.match(ui.query('.roots-panel [data-skill="stability"] strong').textContent,/^\d+\.\d\/10$/);
 });
 
@@ -274,14 +274,16 @@ test('gender is visible next to the name and player height percentiles continue 
     baby.birthHeight=17;
     let ui=await mount(baby);
     assert.equal(ui.query('.profile-name-row .person-name').textContent,baby.name);
-    assert.equal(ui.query('.profile-name-row .gender-label').textContent,gender==='nonbinary'?'Nonbinary':gender[0].toUpperCase()+gender.slice(1));
-    assert.equal(ui.query('.status-strip [data-stat="height"] .status-value').textContent,"1'5");
-    assert.match(ui.query('.status-strip [data-stat="height"]').getAttribute('aria-label'),/1 foot 5 inches/);
-    assert.match(ui.query('.status-strip [data-stat="height"]').textContent,/1'5.*percentile/);
+    assert.equal(ui.all('.profile-copy > .muted').length,0,'infants have no filler subtitle');
+    assert.doesNotMatch(ui.query('.profile-copy').textContent,/A whole life ahead/);
+    assert.equal(ui.query('.profile-identity .gender-label').textContent,gender==='nonbinary'?'Nonbinary':gender[0].toUpperCase()+gender.slice(1));
+    assert.equal(ui.query('.profile-height .status-value').textContent,"1'5");
+    assert.match(ui.query('.profile-height').getAttribute('aria-label'),/1 foot 5 inches/);
+    assert.match(ui.query('.profile-height').textContent,/1'5.*percentile/);
     assert.equal(ui.all('.year-stats .vitals-grid').length,0,'Year keeps vitals in the top strip without a duplicate bottom grid');
-    assert.deepEqual(ui.all('.status-pill').map(pill=>pill.dataset.stat).sort(),[...SKILLS.map(skill=>skill.key),'health','stability','lifestyle','height'].sort());
+    assert.deepEqual(ui.all('.status-pill').map(pill=>pill.dataset.stat).sort(),[...SKILLS.map(skill=>skill.key),'health','stability','lifestyle'].sort());
     for(const key of [...SKILLS.map(skill=>skill.key),'health','stability','lifestyle','height']) {
-      ui.click(`.status-strip [data-stat="${key}"]`);
+      ui.click(key==='height'?'.profile-height':`.status-strip [data-stat="${key}"]`);
       assert.equal(ui.query('.nav-list [data-tab="character"]').getAttribute('aria-current'),'page');
       assert.equal(ui.all('.stats-panel .vitals-grid').length,1,'You retains the complete detailed stats');
       ui.click('.nav-list [data-tab="year"]');
@@ -292,8 +294,8 @@ test('gender is visible next to the name and player height percentiles continue 
     grown.height=storedInches;
     grown.adultHeight=storedInches;
     ui=await mount(grown);
-    assert.equal(ui.query('.status-strip [data-stat="height"] .status-value').textContent,displayHeight,'height rounds to a whole inch and carries twelve inches into a foot');
-    if(gender==='male') assert.match(ui.query('.status-strip [data-stat="height"]').getAttribute('aria-label'),/5 feet 9 inches/);
+    assert.equal(ui.query('.profile-height .status-value').textContent,displayHeight,'height rounds to a whole inch and carries twelve inches into a foot');
+    if(gender==='male') assert.match(ui.query('.profile-height').getAttribute('aria-label'),/5 feet 9 inches/);
     ui.click('.nav-list [data-tab="character"]');
     assert.equal(ui.query('.height-vital .vital-value').textContent,displayHeight);
     assert.doesNotMatch(ui.query('.height-vital').textContent,/cm|centimetres/);
@@ -329,10 +331,10 @@ test('only height shows a percentile before eighteen without changing current va
     for(const tab of ['year','character','year']) {
       ui.click(`.nav-list [data-tab="${tab}"]`);
       assert.equal(ui.all('.stats-panel .stat-percentile').length,age<18&&tab==='character'?1:0);
-      assert.equal(ui.all('.status-strip .stat-percentile').length,age<18?1:0);
+      assert.equal(ui.all('.profile-height .stat-percentile').length,age<18?1:0);
       for(const key of keys) {
         const inHeader=tab==='year';
-        const row=ui.query(`${inHeader?'.status-strip':'.stats-panel'} [data-stat="${key}"]`);
+        const row=ui.query(inHeader&&key==='height'?'.profile-height':`${inHeader?'.status-strip':'.stats-panel'} [data-stat="${key}"]`);
         const value=row.querySelector('.stat-value, .vital-value, strong');
         if(key==='height') {
           assert.match(value.textContent,/^\d+'(?:[0-9]|1[01])$/);
@@ -356,9 +358,9 @@ test('only height shows a percentile before eighteen without changing current va
     assert.deepEqual(ui.saved(),saved);
     assert.equal(ui.writes(),writes,'refreshing percentile displays must not save or reroll');
     if(age<18) {
-      const ranks=ui.all('.status-strip .stat-percentile').map(label=>label.textContent);
+      const ranks=ui.all('.profile-height .stat-percentile').map(label=>label.textContent);
       ui.click(age<2?'[data-action="baby"][data-level="5"]':'[data-action="focus"][data-key="self"][data-delta="-1"]');
-      assert.deepEqual(ui.all('.status-strip .stat-percentile').map(label=>label.textContent),ranks,'changing future focus leaves current same-age ranks unchanged');
+      assert.deepEqual(ui.all('.profile-height .stat-percentile').map(label=>label.textContent),ranks,'changing future focus leaves current same-age ranks unchanged');
       assert.equal(ui.saved().rng,saved.rng);
       assert.equal(ui.saved().age,saved.age);
     }
@@ -459,7 +461,7 @@ test('a death before retirement opens a playable next chapter', async () => {
   ui.click('.year-review-modal [data-action="close"]');
   assert.match(ui.query('#main-content').textContent,/died at age 1/);
   assert.equal(ui.all('.stats-panel .stat-percentile').length,0,'a closed life no longer shows peer ranks');
-  assert.doesNotMatch(ui.query('.status-strip [data-stat="height"]').textContent,/Adult height/,'a baby’s final height is not adult height');
+  assert.doesNotMatch(ui.query('.profile-height').textContent,/Adult height/,'a baby’s final height is not adult height');
   ui.click('.bottom-dock .advance-button');
   assert.ok(ui.query('.beneficiary-preview'));
   ui.click('[data-action="heir"]');
@@ -1758,18 +1760,21 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
   });
 });
 
-test('all eight ratings stay at the top without stat bars across every section', async () => {
+test('all eight ratings keep current-value bars across every section and height stays beside gender', async () => {
   for(const fixture of [createGame({seed:121}),ageTo(createGame({seed:19}),3),partnerFixture()]) {
     const ui=await mount(fixture), original=ui.saved(), writes=ui.writes();
     for(const tab of ['year','character','family','career']) {
       ui.click(`.nav-list [data-tab="${tab}"]`);
       const stats=effectiveStats(original);
-      assert.equal(ui.all('.status-strip .status-pill').length,9,'eight ratings and one physical height');
+      assert.equal(ui.all('.status-strip .status-pill').length,8,'height leaves the rated-stat grid');
+      assert.equal(ui.all('.profile-identity .profile-height').length,1);
+      assert.equal(ui.all('.profile-identity .gender-label').length,1);
       for(const key of [...SKILLS.map(skill=>skill.key),'health','stability','lifestyle']) {
         const value=ui.query(`.status-strip [data-stat="${key}"] .status-value`);
         assert.equal(value.textContent,`${(key==='lifestyle'?original.lifestyle:stats[key]).toFixed(1)}/10`);
       }
-      assert.equal(ui.all('[role="meter"], .stat-track, .stat-projection, .relationship-meter, .lifestyle-scale').length,0);
+      assert.equal(ui.all('.stat-projection').length,0,'rating bars show the current value, not future segments');
+      assertCurrentRatingBars(ui);
       assert.equal(ui.all('.year-stats').length,0,'the old skills panel is not repeated below the ratings');
     }
     assert.deepEqual(ui.saved(),original);
@@ -1786,7 +1791,7 @@ test('parent ratings stay numeric while crying updates their separate choice imp
   fixture.parents.forEach(parent=>{parent.stats.stability=7;parent.relationship=7;});
   const ui=await mount(fixture);
   assert.deepEqual(ui.all('.parent-status h4').map(heading=>heading.textContent),['Dad:','Mom:']);
-  assert.equal(ui.all('.parent-status [role="meter"]').length,0);
+  assert.equal(ui.all('.parent-status [role="meter"]').length,fixture.parents.length*2);
   for(const parent of fixture.parents) {
     const row=ui.query(`.parent-status[data-parent-id="${parent.id}"]`);
     for(const key of ['stability','relationship']) assert.equal(row.querySelector(`[data-stat="${key}"] strong`).textContent,'7.0/10');
@@ -1795,6 +1800,8 @@ test('parent ratings stay numeric while crying updates their separate choice imp
     ui.click(`[data-action="baby"][data-level="${level}"]`);
     assertChoiceImpacts(ui);
     for(const parent of fixture.parents) {
+      const stability=ui.query(`.choice-impact[data-parent-id="${parent.id}"][data-stat="stability"]`);
+      assert.equal(stability.querySelector('b').textContent,['+','0','-','--','---'][level-1]);
       const effects=ui.all(`.choice-impact[data-parent-id="${parent.id}"][data-stat="relationship"]`);
       assert.equal(effects.length,level===3?0:1,'zero routine relationship changes are omitted');
       if(effects.length) assert.equal(effects[0].dataset.direction,level<3?'decrease':'increase');
@@ -1822,7 +1829,7 @@ test('parent effects do not cancel each other and remembered parents have no for
   ui=await mount(fixture);
   const remembered=ui.query(`.parent-status[data-parent-id="${fixture.parents[0].id}"]`);
   assert.match(remembered.textContent,/Mom:.*Deceased/);
-  assert.equal(remembered.querySelectorAll('[role="meter"]').length,0);
+  assert.equal(remembered.querySelectorAll('[role="meter"]').length,2,'remembered parents keep their recorded ratings');
   assert.equal(ui.all(`.choice-impact[data-parent-id="${fixture.parents[0].id}"]`).length,0);
   assert.deepEqual(ui.saved(),fixture);
   fixture.parents=fixture.parents.slice(0,1);
@@ -1846,25 +1853,86 @@ function assertChoiceImpacts(ui) {
   for(const parent of forecast.parents) {
     if(state.parents.find(person=>person.id===parent.id)?.alive===false) continue;
     for(const key of ['stability','relationship','lifestyle']) {
-      if(parent[key]?.change) expected.push({key,change:parent[key].change,parentId:parent.id});
+      if(parent[key]?.change || state.age<2&&key==='stability') expected.push({key,change:parent[key].change,parentId:parent.id});
     }
   }
   assert.equal(ui.all('.focus-panel .choice-impact-summary').length,1);
   assert.equal(ui.query('.choice-impact-summary').getAttribute('aria-label'),'Expected changes');
-  assert.equal(ui.all('.choice-impact-list .choice-impact').length,expected.length,'every nonzero net routine change appears once');
+  assert.equal(ui.all('.choice-impact-list .choice-impact').length,expected.length,'net routine changes and neutral infant parent stability appear once');
   for(const {key,change,parentId} of expected) {
     const selector=`.choice-impact[data-stat="${key}"]${parentId?`[data-parent-id="${parentId}"]`:':not([data-parent-id])'}`;
     const entries=ui.all(selector);
     assert.equal(entries.length,1,`${key} has one net impact for ${parentId||'player'}`);
     const entry=entries[0];
-    assert.equal(entry.dataset.direction,change>0?'increase':'decrease');
-    assert.ok([1,2,3].includes(Number(entry.dataset.level)));
-    assert.match(entry.textContent,change>0?/\+{1,3}/:/-{1,3}/);
+    const direction=change===0?'steady':change>0?'increase':'decrease';
+    assert.equal(entry.dataset.direction,direction);
+    const magnitude=Math.abs(change);
+    const level=change===0?0:state.age<2&&parentId&&key==='stability'?(magnitude>=1.5?3:magnitude>=.9?2:1):(magnitude>=.3?3:magnitude>=.15?2:1);
+    assert.equal(Number(entry.dataset.level),level);
+    assert.equal(entry.querySelector('b').textContent,change===0?'0':(change>0?'+':'-').repeat(level));
     const spoken=entry.querySelector('[role="img"]');
     assert.ok(spoken,'the signed impact has an accessible description');
-    assert.match(spoken.getAttribute('aria-label'),new RegExp(`(?:small|medium|large).*${change>0?'increase':'decrease'}`));
+    assert.match(spoken.getAttribute('aria-label'),change===0?/steady/:new RegExp(`(?:small|medium|large).*${direction}`));
     assert.doesNotMatch(entry.textContent,/[+\u2212-]\d|\+{4}|-{4}|\u2192/,'forecasts use qualitative signs without numerical deltas');
     if(parentId) assert.match(entry.textContent,/Dad|Mom|Parent/);
   }
   assert.equal(ui.all('.choice-impact[data-stat="height"]').length,0,'height keeps its separate physical unit');
 }
+
+
+function assertCurrentRatingBars(ui) {
+  const header=ui.all('.status-strip .rating-track');
+  assert.equal(header.length,8,'every top rating has a bar underneath it');
+  for(const track of ui.all('.rating-track')) {
+    const value=Number(track.getAttribute('aria-valuenow'));
+    assert.equal(track.getAttribute('role'),'meter');
+    assert.equal(Number(track.getAttribute('aria-valuemin')),1);
+    assert.equal(Number(track.getAttribute('aria-valuemax')),10);
+    assert.ok(value>=1&&value<=10);
+    assert.ok(track.getAttribute('aria-label'));
+    const fill=track.querySelector('.rating-fill');
+    assert.ok(fill,'the fixed full track contains a separate filled portion');
+    assert.ok(Math.abs(parseFloat(fill.style.width)-value*10)<.51,'fill length matches the current rating');
+    assert.match(fill.getAttribute('style'),/hsl\(/,'fill color varies with the rating');
+  }
+}
+
+test('rating bars distinguish low and high values and preserve displayed ratings and saves', async () => {
+  const fixture=createGame({seed:121});
+  fixture.stats.health=1;
+  fixture.stats.intelligence=5.5;
+  fixture.stats.strength=10;
+  const ui=await mount(fixture),before=ui.saved();
+  assertCurrentRatingBars(ui);
+  const fill=key=>ui.query(`.status-strip [data-stat="${key}"] .rating-fill`);
+  const hue=key=>Number(fill(key).getAttribute('style').match(/hsl\(\s*([\d.]+)/)[1]);
+  assert.equal(parseFloat(fill('health').style.width),10);
+  assert.equal(parseFloat(fill('strength').style.width),100);
+  assert.equal(hue('health'),0,'minimum rating is red');
+  assert.equal(hue('strength'),120,'maximum rating is green');
+  assert.ok(hue('intelligence')>hue('health')&&hue('intelligence')<hue('strength'));
+  ui.click('.nav-list [data-tab="character"]');
+  assert.equal(ui.all('.stats-panel .rating-track').length,8);
+  assertCurrentRatingBars(ui);
+  ui.click('.nav-list [data-tab="family"]');
+  for(const card of ui.all('.roots-panel .family-card')) {
+    assert.equal(card.querySelectorAll('.rating-track').length,9,'all eight parent ratings and relationship have bars');
+  }
+  assertCurrentRatingBars(ui);
+  assert.deepEqual(ui.saved(),before);
+});
+
+test('crying parent stability signs respect capped ratings and retain neutral effects', async () => {
+  const fixture=createGame({seed:121});
+  fixture.parents[0].stats.stability=10;
+  fixture.parents[1].stats.stability=1;
+  const ui=await mount(fixture),before=ui.saved();
+  ui.click('[data-action="baby"][data-level="1"]');
+  assertChoiceImpacts(ui);
+  assert.equal(ui.query(`.choice-impact[data-parent-id="${fixture.parents[0].id}"][data-stat="stability"] b`).textContent,'0','a parent at the ceiling cannot gain more stability');
+  ui.click('[data-action="baby"][data-level="5"]');
+  assertChoiceImpacts(ui);
+  assert.equal(ui.query(`.choice-impact[data-parent-id="${fixture.parents[1].id}"][data-stat="stability"] b`).textContent,'0','a parent at the floor cannot lose more stability');
+  assert.deepEqual(ui.saved().parents,before.parents);
+  assert.equal(ui.saved().rng,before.rng);
+});

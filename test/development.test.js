@@ -94,19 +94,45 @@ test('mean attractiveness stays at its initial level and declines only after the
   }
 });
 
-test('hard crying has a larger mental-stability cost and relationships change around neutral level three', () => {
-  const state = createGame({ seed: 57 });
-  state.parents.forEach(parent => { parent.stats.stability = 7; parent.relationship = 7; });
-  const changes = [];
-  for (let level = 1; level <= 5; level++) {
-    setCryLevel(state, level);
-    const forecast = annualForecast(state);
-    assert.ok(forecast.parents.every(parent => Math.sign(parent.relationship.change) === Math.sign(level - 3)));
-    changes.push(forecast.parents[0].stability.change);
+test('crying has neutral parent mental stability at two and distinct increasing costs after it', () => {
+  const expected = [.2, 0, -.6, -1.2, -1.8];
+  for (const age of [0, 1]) {
+    for (let level = 1; level <= 5; level++) {
+      const state = createGame({ seed: 57 });
+      state.age = age;
+      state.parents.forEach(parent => { parent.stats.stability = 7; parent.relationship = 7; });
+      setCryLevel(state, level);
+      const before = copy(state);
+      const forecast = annualForecast(state);
+      assert.deepEqual(state, before, 'reading every cry forecast preserves ratings, history, and RNG');
+      assert.deepEqual(annualForecast(state), forecast);
+      assert.ok(forecast.parents.every(parent => parent.stability.change === expected[level - 1]));
+      assert.ok(forecast.parents.every(parent => parent.relationship.change === round(.2 * (level - 3))));
+      assert.equal(advanceYear(state, { ...meanYear, parentCareerRandom: () => 1 }).ok, true);
+      assert.deepEqual(state.lastYearEvents, [], 'quiet fixture isolates routine development');
+      for (const parent of state.parents) {
+        const predicted = forecast.parents.find(person => person.id === parent.id);
+        assert.equal(parent.stats.stability, predicted.stability.after, 'actual mean development agrees with the preview');
+        assert.equal(parent.relationship, predicted.relationship.after);
+      }
+    }
   }
-  assert.equal(changes[0], .2);
-  assert.equal(changes[4], -1.8);
-  assert.ok(changes[3] - changes[4] > changes[0] - changes[1], 'higher crying levels have increasing strain');
+});
+
+test('crying previews respect parent rating bounds and remembered parents', () => {
+  for (const [starting, level, ending] of [[9.9, 1, 10], [1.1, 5, 1], [1, 5, 1], [10, 1, 10], [5, 2, 5]]) {
+    const state = createGame({ seed: 57 });
+    const [living, remembered] = state.parents;
+    living.stats.stability = starting;
+    remembered.alive = false;
+    remembered.death = { age: remembered.age, cause: 'disease' };
+    setCryLevel(state, level);
+    const before = copy(state);
+    const forecast = annualForecast(state);
+    assert.equal(forecast.parents.find(person => person.id === living.id).stability.after, ending);
+    assert.equal(forecast.parents.find(person => person.id === remembered.id).stability.change, 0);
+    assert.deepEqual(state, before);
+  }
 });
 
 test('annual development varies around the pure mean forecast and is reproducible from a saved seed', () => {

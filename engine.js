@@ -1,19 +1,19 @@
 // Lifelines: deterministic, browser-independent simulation rules.
 // All public actions mutate their state and return { ok, reason? }.
-import { JOBS } from './jobs.js?v=ratings-summary-1';
-import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=ratings-summary-1';
-import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=ratings-summary-1';
-import { mortalityRisk, rollMortality } from './mortality.js?v=ratings-summary-1';
-import { heightReference, advanceGrowth } from './growth.js?v=ratings-summary-1';
-import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=ratings-summary-1';
-import { naturalSkillRating, skillChanges, childhoodWellbeing, DEVELOPMENT_BALANCE, BIRTH_VARIATION, TODDLER_FOCUS } from './development.js?v=ratings-summary-1';
-import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=ratings-summary-1';
-import { normalPercentile } from './percentiles.js?v=ratings-summary-1';
+import { JOBS } from './jobs.js?v=readable-ratings-1';
+import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=readable-ratings-1';
+import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=readable-ratings-1';
+import { mortalityRisk, rollMortality } from './mortality.js?v=readable-ratings-1';
+import { heightReference, advanceGrowth } from './growth.js?v=readable-ratings-1';
+import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=readable-ratings-1';
+import { naturalSkillRating, skillChanges, childhoodWellbeing, DEVELOPMENT_BALANCE, BIRTH_VARIATION, TODDLER_FOCUS } from './development.js?v=readable-ratings-1';
+import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=readable-ratings-1';
+import { normalPercentile } from './percentiles.js?v=readable-ratings-1';
 export { DEVELOPMENT_BALANCE };
-export { heightPercentile } from './growth.js?v=ratings-summary-1';
-export { mortalityRisk } from './mortality.js?v=ratings-summary-1';
-import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=ratings-summary-1';
-export { JOBS, JOB_CATEGORIES } from './jobs.js?v=ratings-summary-1';
+export { heightPercentile } from './growth.js?v=readable-ratings-1';
+export { mortalityRisk } from './mortality.js?v=readable-ratings-1';
+import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=readable-ratings-1';
+export { JOBS, JOB_CATEGORIES } from './jobs.js?v=readable-ratings-1';
 export const EVENTS = [...PERSONAL_EVENTS, ...FAMILY_EVENTS];
 
 export const SKILLS = [
@@ -411,10 +411,12 @@ export function eventOdds(state) {
 function growYear(state) {
   developSkills(state, state, JOBS.find(candidate => candidate.id === state.jobId));
   if (state.age < 2) {
-    const intensity = (state.cryLevel - 1) / 4;
+    // Low crying offers a little relief; level two is neutral, then strain
+    // rises in even steps. These means also drive the pure yearly preview.
+    const parentStabilityChange = [.2, 0, -.6, -1.2, -1.8][state.cryLevel - 1];
     for (const [key, amount] of Object.entries(childhoodWellbeing(state))) addStat(state, key, amount);
     for (const parent of state.parents.filter(p => p.alive !== false)) {
-      addStat(parent, 'stability', .2 - 2 * intensity ** 1.35);
+      addStat(parent, 'stability', parentStabilityChange);
       parent.relationship = round(clamp(parent.relationship + .2 * (state.cryLevel - 3), 1, 10));
     }
     return;
