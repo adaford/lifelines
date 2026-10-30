@@ -145,7 +145,7 @@ test('v10 toddler saves gain an empty crafts allocation without rewriting progre
   const migrated = migrateSave(state);
   assert.deepEqual(state, before);
   assert.ok(migrated);
-  const expected = { ...copy(before), version: 12, focus: { ...before.focus, creative: 0 } };
+  const expected = { ...copy(before), version: 13, focus: { ...before.focus, creative: 0 } };
   neutralWellbeingAptitudes(expected);
   assert.deepEqual(migrated, expected);
   assert.equal(Object.hasOwn(migrated.yearSummary.decisions.focus, 'creative'), false);

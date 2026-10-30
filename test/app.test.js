@@ -145,11 +145,17 @@ test('opening help while a decision is pending preserves the choice and accurate
 test('parent lifestyle recaps show before and after while older summaries remain readable', async () => {
   const fixture=ageTo(createGame({seed:121}),1);
   fixture.yearSummary.dismissed=false;
-  fixture.yearSummary.parents[0].lifestyle={before:6,after:5,change:-1};
+  fixture.lifestyle=6.21;
+  fixture.yearSummary.lifestyle={before:6.24,after:6.21,change:-.03};
+  fixture.yearSummary.parents[0].lifestyle={before:6.24,after:6.31,change:.07};
   delete fixture.yearSummary.parents[1].lifestyle;
   const ui=await mount(fixture);
   assert.equal(ui.all('.parent-review-lifestyle').length,1);
-  assert.equal(ui.query('.parent-review-lifestyle').textContent,'Lifestyle 6.0 → 5.0');
+  assert.equal(ui.query('.parent-review-lifestyle').textContent,'Lifestyle 6.2 → 6.3');
+  const lifestyle=ui.query('.year-review-modal [data-stat="lifestyle"] strong');
+  assert.equal(lifestyle.textContent,'6.2 → 6.2');
+  assert.equal(lifestyle.className,'unchanged');
+  assert.equal(ui.saved().lifestyle,6.21,'display rounding preserves stored hundredths');
   assert.match(ui.query('.forecast-parents').textContent,/Mental stability.*Relationship.*Lifestyle/);
   assert.doesNotMatch(ui.query('.forecast-parents').textContent,/undefined|NaN|[+−-]\d/);
   assert.deepEqual(ui.saved().yearSummary,fixture.yearSummary);
@@ -328,6 +334,8 @@ test('only height shows a percentile before eighteen without changing current va
   for(const age of [0,1,2,17,18]) {
     const fixture=ageTo(createGame({seed:121}),age);
     if(age===18) chooseEducation(fixture,'work');
+    fixture.lifestyle=4.26;
+    fixture.parents.forEach(parent=>{parent.lifestyle=4.26;});
     const current=effectiveStats(fixture), percentiles=statPercentiles(fixture);
     const ui=await mount(fixture), saved=ui.saved(), writes=ui.writes();
     for(const tab of ['year','character','year']) {
@@ -960,7 +968,7 @@ describe('Dating and family DOM integration', {concurrency:false},()=>{
         assert.equal(ui.query('.partner-panel .relationship-summary strong').textContent,`${ui.saved().partner.relationship.toFixed(1)}/10`);
         assert.ok(effectiveStats(ui.saved()).social>effectiveStats(branch.before).social);
         assert.ok(effectiveStats(ui.saved()).stability>effectiveStats(branch.before).stability);
-        assert.equal(ui.saved().lifestyle,branch.before.lifestyle-1);
+        assert.equal(ui.saved().lifestyle,Math.round((branch.before.lifestyle-1)*100)/100);
         assert.match(ui.query('.partner-panel').textContent,/Girlfriend/i);
       } else {
         assert.equal(ui.saved().partner,null);
@@ -1335,7 +1343,7 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
       const parentLifestyle=(saved.parents.find(parent=>parent.alive!==false) || saved.parents[0]).lifestyle;
       assert.equal(saved.age, age);
       assert.equal(saved.lifestyle, parentLifestyle);
-      assert.equal(parseFloat(ui.query('.profile-lifestyle .status-value').textContent),parentLifestyle);
+      assert.equal(parseFloat(ui.query('.profile-lifestyle .status-value').textContent),Number(parentLifestyle.toFixed(1)));
       assert.equal(ui.query('.profile-lifestyle .status-value small').textContent,'/10');
       if (age === 0 || age === 17) {
         ui.click('.nav-list [data-tab="family"]');
@@ -1603,7 +1611,7 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     assert.equal(restored.version, fixture.version);
     assert.equal(restored.education.status, 'workforce');
     for (const key of ['id', 'name', 'age', 'rng', 'jobId', 'jobYears', 'money', 'lifestyle']) {
-      assert.equal(restored[key], fixture[key], `${key} must survive the education migration`);
+      assert.equal(restored[key], legacy[key], `${key} must survive the education migration`);
     }
     assert.deepEqual(restored.stats, fixture.stats);
     assert.deepEqual(restored.history, fixture.history);
@@ -1715,7 +1723,7 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     assert.equal(ui.saved().generation, 2);
     assertNoMoneyDisplay(ui.query('#app'), 'next generation');
     assertNoMoneyDisplay(ui.query('.journal-list'), 'succession journal');
-    assert.equal(parseFloat(ui.query('.profile-lifestyle .status-value').textContent),ui.saved().lifestyle);
+    assert.equal(parseFloat(ui.query('.profile-lifestyle .status-value').textContent),Number(ui.saved().lifestyle.toFixed(1)));
     assert.equal(ui.query('.profile-lifestyle .status-value small').textContent,'/10');
     ui.click('[data-action="history"]');
     assertNoMoneyDisplay(ui.query('.journal-list'), 'complete family journal');

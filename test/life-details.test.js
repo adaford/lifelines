@@ -66,7 +66,7 @@ test('v8 migration adds career and growth state without rerolling existing lives
   const before = copy(legacy);
   const migrated = migrateSave(legacy);
   assert.ok(migrated);
-  assert.equal(migrated.version, 12);
+  assert.equal(migrated.version, 13);
   assert.equal(validateSave(migrated), true);
   assert.deepEqual(legacy, before, 'migration does not mutate the imported object');
   for (const key of ['rng', 'seed', 'nextId', 'age', 'maturityAge', 'stats', 'pendingEvents', 'history', 'yearSummary', 'lifestyle']) {
@@ -110,10 +110,12 @@ test('v8 mixed parent lifestyles retain the recorded child household support aft
   assert.equal(validateSave(state), true);
   assert.equal(state.lifestyle, 2);
   assert.ok(state.parents.every(parent => parent.career.progress === 2));
-  assert.equal(annualForecast(state).lifestyle.after, 2, 'introducing shared support does not average incompatible old profiles');
+  const forecast = annualForecast(state);
+  assert.equal(forecast.lifestyle.before, 2);
+  assert.ok(forecast.lifestyle.after > 2 && forecast.lifestyle.after < 2.25, 'only normal career progress changes the migrated household');
   quietYear(state);
-  assert.equal(state.lifestyle, 2);
-  assert.ok(state.parents.every(parent => parent.lifestyle === 2));
+  assert.equal(state.lifestyle, forecast.lifestyle.after);
+  assert.ok(state.parents.every(parent => parent.lifestyle === state.lifestyle));
 });
 
 test('attractiveness has small positive and negative annual variation with no juvenile mean drift', () => {
@@ -211,11 +213,11 @@ test('parent career growth previews and updates shared household lifestyle for m
   const before = copy(state);
   const preview = annualForecast(state);
   assert.equal(preview.lifestyle.before, 4);
-  assert.equal(preview.lifestyle.after, 5);
+  assert.equal(preview.lifestyle.after, 4.66);
   assert.deepEqual(state, before, 'career forecasting never changes RNG, household support, or parent career state');
   quietYear(state);
-  assert.equal(state.lifestyle, 5);
-  assert.equal(householdLifestyle(state), 5);
+  assert.equal(state.lifestyle, 4.66);
+  assert.equal(householdLifestyle(state), 4.66);
   assert.ok(state.parents.every(parent => parent.lifestyle === state.lifestyle && parent.career.progress > 4.45));
   assert.deepEqual(state.yearSummary.lifestyle, preview.lifestyle);
   assert.equal(validateSave(state), true);
@@ -260,7 +262,7 @@ test('household career support ends when the player becomes financially independ
   quietYear(state);
   assert.equal(state.age, 18);
   assert.equal(state.lifestyle, 1);
-  assert.equal(householdLifestyle(state), 8);
+  assert.equal(householdLifestyle(state), 8.08);
   assert.equal(validateSave(state), true);
 });
 
@@ -285,8 +287,10 @@ test('a child handoff preserves household support when the known co-parent had a
   assert.equal(state.parents.length, 2, 'the known co-parent follows the child');
   assert.equal(state.lifestyle, 2);
   assert.ok(state.parents.every(parent => parent.career.progress === 2));
-  assert.equal(annualForecast(state).lifestyle.after, 2);
+  const forecast = annualForecast(state);
+  assert.equal(forecast.lifestyle.before, 2);
+  assert.ok(forecast.lifestyle.after > 2 && forecast.lifestyle.after < 2.25);
   quietYear(state);
-  assert.equal(state.lifestyle, 2, 'the first year after handoff has no artificial support jump');
+  assert.equal(state.lifestyle, forecast.lifestyle.after, 'the first year after handoff follows normal career progress');
   assert.equal(validateSave(state), true);
 });

@@ -207,7 +207,7 @@ test('v7 migration preserves existing height, bonds, random state and non-infant
   const before = copy(legacy);
   const migrated = migrateSave(legacy);
   assert.ok(migrated);
-  assert.equal(migrated.version, 12);
+  assert.equal(migrated.version, 13);
   for (const key of ['rng', 'seed', 'nextId', 'age', 'stats', 'pendingEvents', 'history']) assert.deepEqual(migrated[key], before[key], key);
   assert.equal(migrated.height, round(before.height / 2.54));
   assert.equal(migrated.yearSummary.height.before, round(before.yearSummary.height.before / 2.54));

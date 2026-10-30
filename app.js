@@ -5,11 +5,11 @@ import {
   offeredJobs, needsEducationChoice, pendingEventSubject,
   relationshipOdds, meetingChances, proposalChance, pregnancyChance, oneNightChance,
   respondToEncounter, proposeMarriage, endRelationship, normalizeSurname, heightPercentile, statPercentiles
-} from './engine.js?v=focused-tabs-1';
-import { annotateNarrative } from './narrative.js?v=focused-tabs-1';
-import { formatRating, formatHeight, heightDescription, formatStatNarrative } from './display.js?v=focused-tabs-1';
+} from './engine.js?v=lifestyle-precision-1';
+import { annotateNarrative } from './narrative.js?v=lifestyle-precision-1';
+import { formatRating, formatHeight, heightDescription, formatStatNarrative } from './display.js?v=lifestyle-precision-1';
 
-import { choiceImpacts, toddlerActivityImpacts } from './choice-impacts.js?v=focused-tabs-1';
+import { choiceImpacts, toddlerActivityImpacts } from './choice-impacts.js?v=lifestyle-precision-1';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const app = document.querySelector('#app');

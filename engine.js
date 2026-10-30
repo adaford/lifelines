@@ -1,19 +1,19 @@
 // Lifelines: deterministic, browser-independent simulation rules.
 // All public actions mutate their state and return { ok, reason? }.
-import { JOBS } from './jobs.js?v=focused-tabs-1';
-import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=focused-tabs-1';
-import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=focused-tabs-1';
-import { mortalityRisk, rollMortality } from './mortality.js?v=focused-tabs-1';
-import { heightReference, advanceGrowth } from './growth.js?v=focused-tabs-1';
-import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=focused-tabs-1';
-import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, DEVELOPMENT_BALANCE, BIRTH_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN } from './development.js?v=focused-tabs-1';
-import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=focused-tabs-1';
-import { normalPercentile } from './percentiles.js?v=focused-tabs-1';
+import { JOBS } from './jobs.js?v=lifestyle-precision-1';
+import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=lifestyle-precision-1';
+import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=lifestyle-precision-1';
+import { mortalityRisk, rollMortality } from './mortality.js?v=lifestyle-precision-1';
+import { heightReference, advanceGrowth } from './growth.js?v=lifestyle-precision-1';
+import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=lifestyle-precision-1';
+import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, DEVELOPMENT_BALANCE, BIRTH_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN } from './development.js?v=lifestyle-precision-1';
+import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=lifestyle-precision-1';
+import { normalPercentile } from './percentiles.js?v=lifestyle-precision-1';
 export { DEVELOPMENT_BALANCE };
-export { heightPercentile } from './growth.js?v=focused-tabs-1';
-export { mortalityRisk } from './mortality.js?v=focused-tabs-1';
-import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=focused-tabs-1';
-export { JOBS, JOB_CATEGORIES } from './jobs.js?v=focused-tabs-1';
+export { heightPercentile } from './growth.js?v=lifestyle-precision-1';
+export { mortalityRisk } from './mortality.js?v=lifestyle-precision-1';
+import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=lifestyle-precision-1';
+export { JOBS, JOB_CATEGORIES } from './jobs.js?v=lifestyle-precision-1';
 export const EVENTS = [...PERSONAL_EVENTS, ...FAMILY_EVENTS];
 
 export const SKILLS = [
@@ -171,7 +171,7 @@ function active(state) {
 
 export function createGame({ name, surname: chosenSurname, firstName, seed, gender = 'male', canGestate, attractedTo } = {}) {
   const initialSeed = Number.isFinite(seed) ? seed >>> 0 : (Date.now() ^ Math.floor(Math.random() * 0xFFFFFFFF)) >>> 0;
-  const state = { version: 12, seed: initialSeed, rng: initialSeed, nextId: 0, id: `life-${initialSeed}`, age: 0, generation: 1,
+  const state = { version: 13, seed: initialSeed, rng: initialSeed, nextId: 0, id: `life-${initialSeed}`, age: 0, generation: 1,
     name: '', stats: {}, aptitudes: {}, height: fromCentimeters(50), adultHeight: null,
     focus: { work: 3, social: 3, family: 3, self: 3 }, babyChoice: 'quiet', cryLevel: 1, alive: true, death: null, yearSummary: null,
     parents: [], children: [], siblings: [], money: 0, income: 0, expenses: 0, lifestyle: 1,
@@ -439,25 +439,25 @@ function growYear(state) {
   }
 }
 // Money remains internal: the player sees only a 1–10 lifestyle score.
-// Earnings support one tier per 22,000; reserves support logarithmic tiers,
-// beginning at 25,000 and then requiring progressively more security.
+// Earnings and reserves support continuous lifestyle ratings. Keep hundredths
+// internally; display formatting rounds the visible rating to one decimal.
 export function lifestyleFromResources(income = 0, money = 0) {
   const earnings = Number.isFinite(income) ? Math.max(0, income) : 0;
   const reserves = Number.isFinite(money) ? Math.max(0, money) : 0;
-  const earnedTier = 1 + Math.floor(earnings / 22000);
-  const reserveTier = 1 + Math.floor(Math.log2(1 + reserves / 25000));
-  return clamp(Math.max(earnedTier, reserveTier), 1, 10);
+  const earnedRating = 1 + earnings / 22000;
+  const reserveRating = 1 + Math.log2(1 + reserves / 25000);
+  return round(clamp(Math.max(earnedRating, reserveRating), 1, 10));
 }
 export function householdLifestyle(state) {
   // Both original parents share one household. A young heir keeps that
   // household's support through guardianship if their parent has died.
   const parent = state.parents.find(person => person.alive !== false) || state.parents[0];
-  return Number.isInteger(parent?.lifestyle) ? clamp(parent.lifestyle, 1, 10) : clamp(state.lifestyle, 1, 10);
+  return round(clamp(Number.isFinite(parent?.lifestyle) ? parent.lifestyle : state.lifestyle, 1, 10));
 }
 function syncFamilyLifestyles(state) {
   const modifier = state.effects.reduce((sum, effect) => sum + (effect.years > 0 ? effect.lifestyle || 0 : 0), 0);
   const familyCost = (livingPartner(state) ? 1 : 0) + dependents(state).length;
-  state.lifestyle = state.age < 18 ? householdLifestyle(state) : clamp(lifestyleFromResources(state.income, state.money) + modifier - familyCost, 1, 10);
+  state.lifestyle = state.age < 18 ? householdLifestyle(state) : round(clamp(lifestyleFromResources(state.income, state.money) + modifier - familyCost, 1, 10));
   for (const child of state.children) if (child.alive !== false) child.lifestyle = child.age < 18 ? state.lifestyle : lifestyleFromResources(0, child.money);
   for (const sibling of state.siblings) if (sibling.alive !== false) sibling.lifestyle = sibling.age < 18 ? householdLifestyle(state) : lifestyleFromResources(0, sibling.money);
 }
@@ -475,7 +475,7 @@ function parentCareersForYear(state, careerRandom, growthRandom) {
   }
   const living = state.parents.filter(parent => parent.alive !== false);
   if (living.length) {
-    const lifestyle = clamp(Math.round(living.reduce((sum, parent) => sum + parent.career.progress, 0) / living.length), 1, 10);
+    const lifestyle = round(clamp(living.reduce((sum, parent) => sum + parent.career.progress, 0) / living.length, 1, 10));
     for (const parent of living) parent.lifestyle = lifestyle;
   }
   return events.map(event => ({ ...event, text: `${event.text} Household lifestyle ${before} → ${householdLifestyle(state)}.` }));
@@ -902,7 +902,7 @@ function validSchema(raw, version) {
     const coreKeys = legacy ? [...CORE, 'discipline'] : CORE;
     const statKeys = [...coreKeys, 'health', version === 1 ? 'instability' : 'stability', ...(legacy ? ['relaxation'] : [])];
     const validStats = stats => stats && Object.keys(stats).length === statKeys.length && statKeys.every(key => finite(stats[key], 1, 10));
-    const validLifestyle = value => Number.isInteger(value) && finite(value, 1, 10);
+    const validLifestyle = value => finite(value, 1, 10) && (version >= 13 || Number.isInteger(value));
     const aptitudeKeys = version >= 12 ? STAT_KEYS : coreKeys;
     const validAptitudes = aptitude => aptitude && Object.keys(aptitude).length === aptitudeKeys.length && aptitudeKeys.every(key => Number.isInteger(aptitude[key]) && finite(aptitude[key], -3, 3));
     const validGeneration = value => Number.isInteger(value) && finite(value, 1, 100000);
@@ -964,7 +964,7 @@ function validSchema(raw, version) {
         if (!carrier || carrier.id !== pregnancy.carrierId || carrier.age < 18 || carrier.age > 45) return false;
       }
     }
-    if (![raw.money, raw.income, raw.expenses].every(value => finite(value, 0, 1e15)) || !Number.isInteger(raw.lifestyle) || !finite(raw.lifestyle, 1, 10)) return false;
+    if (![raw.money, raw.income, raw.expenses].every(value => finite(value, 0, 1e15)) || !validLifestyle(raw.lifestyle)) return false;
     if (raw.jobId !== null && !JOBS.some(job => job.id === raw.jobId)) return false;
     if (version >= 3) {
       const education = raw.education;
@@ -1000,7 +1000,7 @@ function validSchema(raw, version) {
       })) return false;
     }
     if (!Array.isArray(raw.history) || raw.history.length > 500 || !raw.history.every(memory => text(memory.id, 100) && finite(memory.age, 0, 85) && finite(memory.generation, 1, 100000) && text(memory.title, 200) && text(memory.text, 2000) && text(memory.kind, 50))) return false;
-    if (!Array.isArray(raw.lineage) || !raw.lineage.every(person => validPerson(person) && validGeneration(person.generation) && typeof person.alive === 'boolean' && Number.isInteger(person.lifestyle) && finite(person.lifestyle, 1, 10) && finite(person.money, 0, 1e15) && finite(person.estate, 0, 1e15) && finite(person.share, 0, 1e15) && Array.isArray(person.children) && person.children.length <= 6 && person.children.every(child => child && text(child.id, 100) && text(child.name, 50) && finite(child.inheritance, 0, 1e15)))) return false;
+    if (!Array.isArray(raw.lineage) || !raw.lineage.every(person => validPerson(person) && validGeneration(person.generation) && typeof person.alive === 'boolean' && validLifestyle(person.lifestyle) && finite(person.money, 0, 1e15) && finite(person.estate, 0, 1e15) && finite(person.share, 0, 1e15) && Array.isArray(person.children) && person.children.length <= 6 && person.children.every(child => child && text(child.id, 100) && text(child.name, 50) && finite(child.inheritance, 0, 1e15)))) return false;
     if (raw.needsSuccession && ((raw.age < 85 && (version < 7 || raw.alive)) || raw.ended || version < 6 && !raw.children.some(child => child.alive !== false && child.age < 85))) return false;
     if (version >= 6 && raw.ended) return false;
     if (raw.ended && raw.age < 85) return false;
@@ -1009,7 +1009,7 @@ function validSchema(raw, version) {
   } catch { return false; }
 }
 
-export function validateSave(raw) { return validSchema(raw, 12); }
+export function validateSave(raw) { return validSchema(raw, 13); }
 
 // Version 10 stores every measurement in inches. Source growth tables stay in
 // centimetres; historical prose is rendered separately without rewriting it.
@@ -1028,7 +1028,7 @@ function convertSavedHeights(value) {
 export function migrateSave(raw) {
   try {
     if (validateSave(raw)) return clone(raw);
-    if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].some(version => validSchema(raw, version))) return null;
+    if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].some(version => validSchema(raw, version))) return null;
     const state = clone(raw);
     // Existing lives receive neutral wellbeing aptitudes without rerolling
     // ratings or consuming random numbers, including saved pregnancy copies.
@@ -1037,11 +1037,13 @@ export function migrateSave(raw) {
       if (value.aptitudes) Object.assign(value.aptitudes, { health: 0, stability: 0 });
       Object.values(value).forEach(addWellbeingAptitudes);
     };
-    addWellbeingAptitudes(state);
+    if (state.version < 12) addWellbeingAptitudes(state);
     if (state.version < 11 && state.age >= 2 && state.age < 5) state.focus.creative = 0;
     if (state.version < 10) convertSavedHeights(state);
     if (state.version >= 9) {
-      state.version = 12;
+      // Version 13 permits fractional lifestyle ratings. Existing whole ratings
+      // and every other saved value survive unchanged.
+      state.version = 13;
       return validateSave(state) ? state : null;
     }
     if (state.version === 1) {
@@ -1123,7 +1125,7 @@ export function migrateSave(raw) {
       }
       names.add(parent.name.toLocaleLowerCase());
     });
-    state.version = 12;
+    state.version = 13;
     return validateSave(state) ? state : null;
   } catch { return null; }
 }

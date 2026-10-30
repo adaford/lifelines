@@ -1,4 +1,4 @@
-import { naturalSkillRating, BIRTH_VARIATION } from './development.js?v=focused-tabs-1';
+import { naturalSkillRating, BIRTH_VARIATION } from './development.js?v=lifestyle-precision-1';
 // Fictional relationship balance. These are game rules, not real-world estimates.
 // Actor identity and pregnancy capability are separate so future playable genders
 // can use the same relationship system. The current default is men meeting women.
@@ -112,7 +112,7 @@ export function createProspects(state, helpers, stats = state.stats) {
     actorStats.attractiveness = round(actorStats.attractiveness);
     prospects.push({
       id: uid('prospect'), name: personName(gender), age, stats: actorStats, aptitudes,
-      height, adultHeight: height, lifestyle: Math.round(clamp(center + (random() - .5) * 4, 1, 10)), alive: true,
+      height, adultHeight: height, lifestyle: round(clamp(center + (random() - .5) * 4, 1, 10)), alive: true,
       gender, canGestate: gender === 'female', attractedTo: [state.gender || 'male'], appearancePeakAge,
     });
   }

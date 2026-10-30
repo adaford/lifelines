@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { toLegacyCentimeters, neutralWellbeingAptitudes } from './helpers/legacy-height.js';
+import { toLegacyCentimeters, neutralWellbeingAptitudes, integerLifestyleForLegacy } from './helpers/legacy-height.js';
 import { SKILLS, JOBS, EVENTS, createGame, stage, advanceYear as advanceYearAction, setBabyChoice, setFocus, effectiveStats, currentEffects, eventOdds, jobFit, canTakeJob, takeJob, quitJob, haveChild, successionInfo, succeed, lifestyleFromResources, householdLifestyle, validateSave, migrateSave, chooseEducation, needsEducationChoice, offeredJobs, resolveEventChoice, respondToEncounter, proposeMarriage, endRelationship, relationshipOdds, oneNightChance, meetingChances, proposalChance, pregnancyChance, pendingEventSubject, normalizeSurname } from '../engine.js';
 
 const copy = value => JSON.parse(JSON.stringify(value));
@@ -88,7 +88,7 @@ test('all five stats exist at birth with established natural ratings and average
     const baby = createGame({ seed });
     for (const { key } of SKILLS) assert.ok(baby.stats[key] >= 1 && baby.stats[key] <= 10, `${key} at birth`);
     assert.ok(baby.stats.attractiveness >= 1 && baby.stats.attractiveness <= 10);
-    assert.equal(baby.version, 12);
+    assert.equal(baby.version, 13);
     for (const key of ['health', 'stability']) {
       assert.ok(baby.stats[key] >= 1 && baby.stats[key] <= 10);
       wellbeing[key].push(baby.stats[key]);
@@ -284,7 +284,7 @@ test('the hundred careers have distinct titles, valid skill affinities, and life
     categories.set(job.category, (categories.get(job.category) || 0) + 1);
     assert.ok(Number.isInteger(job.minAge) && job.minAge >= 18 && job.minAge <= 35);
     assert.equal(typeof job.requiresCollege, 'boolean');
-    assert.ok(Number.isInteger(job.baseLifestyle) && job.baseLifestyle >= 1 && job.baseLifestyle <= 10);
+    assert.ok(Number.isFinite(job.baseLifestyle) && job.baseLifestyle >= 1 && job.baseLifestyle <= 10);
     assert.ok(Number.isFinite(job.baseSalary) && job.baseSalary > 0);
     assert.equal(job.baseLifestyle, lifestyleFromResources(job.baseSalary, 0), `${job.name} lifestyle matches its base resources`);
     const entries = Object.entries(job.affinities);
@@ -326,7 +326,7 @@ test('every career can be entered, simulated, and restored with a qualified adul
     assert.equal(state.jobId, job.id);
     assert.equal(state.jobYears, 1);
     assert.ok(Number.isFinite(state.income) && state.income > 0);
-    assert.ok(Number.isInteger(state.lifestyle) && state.lifestyle >= 1 && state.lifestyle <= 10);
+    assert.ok(Number.isFinite(state.lifestyle) && state.lifestyle >= 1 && state.lifestyle <= 10);
     assert.equal(validateSave(state), true, `${job.name} leaves a valid save`);
     const restored = migrateSave(copy(state));
     assert.equal(restored.jobId, job.id);
@@ -471,13 +471,13 @@ test('v2 upgrades preserve school, current careers, and adults without consuming
       const snapshot = copy(old);
       const upgraded = migrateSave(old);
       assert.equal(validateSave(upgraded), true);
-      assert.equal(upgraded.version, 12);
+      assert.equal(upgraded.version, 13);
       assert.equal(upgraded.education.status, status);
       assert.equal(upgraded.education.years, status === 'graduate' ? 4 : 0);
       assert.equal(upgraded.jobOffers.length, count);
       assert.deepEqual(old, snapshot);
       for (const key of ['age', 'rng', 'seed', 'id', 'nextId', 'jobId', 'jobYears', 'performance', 'schoolProgress', 'money']) assert.equal(upgraded[key], state[key]);
-      const expected = neutralWellbeingAptitudes(copy(state));
+      const expected = integerLifestyleForLegacy(neutralWellbeingAptitudes(copy(state)));
       for (const key of ['stats', 'aptitudes', 'history', 'effects']) assert.deepEqual(upgraded[key], expected[key]);
       if (old.version === 2) for (const key of ['parents', 'children', 'siblings', 'lineage']) assert.deepEqual(upgraded[key], expected[key]);
       if (upgraded.jobId) assert.ok(upgraded.jobOffers.includes(upgraded.jobId));
@@ -720,9 +720,9 @@ test('v1 saves migrate every family member and active effects without resetting 
   assert.equal(effectiveStats(migrated).stability, 4.75);
   for (const key of ['parents','children','siblings','lineage']) {
     assert.deepEqual(migrated[key].map(person => person.stats), state[key].map(person => person.stats));
-    assert.ok(migrated[key].every(person => Number.isInteger(person.lifestyle) && person.lifestyle >= 1 && person.lifestyle <= 10));
+    assert.ok(migrated[key].every(person => Number.isFinite(person.lifestyle) && person.lifestyle >= 1 && person.lifestyle <= 10));
   }
-  assert.equal(migrated.parents[0].lifestyle, state.lineage.at(-1).lifestyle);
+  assert.equal(migrated.parents[0].lifestyle, Math.round(state.lineage.at(-1).lifestyle));
   const roundTrip = migrateSave(migrated);
   assert.deepEqual(roundTrip, migrated);
   advanceYear(migrated); advanceYear(roundTrip);
@@ -1434,7 +1434,7 @@ test('old childless endings become valid retirement choices without resetting th
   for (const parent of previous.parents) { parent.age = Math.min(85, parent.age); if (parent.age === 85) parent.alive = false; }
   for(const person of [previous,...previous.parents,...previous.children,...previous.siblings,...previous.lineage,...previous.encounters,previous.partner,previous.pregnancy?.otherParent].filter(Boolean)) { delete person.familyName; person.appearancePeakAge = 30; }
   const migrated=migrateSave(previous);
-  assert.equal(validateSave(migrated),true); assert.equal(migrated.version,12);
+  assert.equal(validateSave(migrated),true); assert.equal(migrated.version,13);
   assert.equal(migrated.ended,false); assert.equal(migrated.needsSuccession,true);
   for(const key of ['id','name','age','rng','nextId','stats','aptitudes','history','money','education','jobOffers','effects','pendingEvents']) assert.deepEqual(migrated[key],neutralWellbeingAptitudes(copy(previous))[key]);
   const info=successionInfo(migrated);
@@ -1460,4 +1460,71 @@ test('v5 family migration preserves partnership, pregnancy, offers, and future s
   assert.equal(migrated.children.at(-1).familyName,familyName);
   assert.ok(migrated.children.at(-1).name.endsWith(' '+familyName));
   assert.equal(validateSave(migrated),true);
+});
+
+
+test('v12 upgrades only the schema version and preserves wellbeing aptitudes and pending progress', () => {
+  const legacy = createGame({ seed: 91301 });
+  advanceYear(legacy);
+  legacy.age = 4;
+  legacy.focus = { work: 2, social: 3, family: 2, self: 2, creative: 3 };
+  legacy.yearSummary.fromAge = 3;
+  legacy.yearSummary.toAge = 4;
+  legacy.yearSummary.decisions = { workLabel: 'Play', focus: copy(legacy.focus) };
+  legacy.pendingEvents = [{ eventId: 'school_play', age: 4 }];
+  legacy.lastYearEvents = ['school_play'];
+  legacy.aptitudes.health = 3;
+  legacy.aptitudes.stability = -2;
+  legacy.parents[0].aptitudes.health = -3;
+  legacy.parents[0].career.progress = 4.625;
+  integerLifestyleForLegacy(legacy);
+  legacy.version = 12;
+  const original = copy(legacy);
+  const upgraded = migrateSave(legacy);
+  assert.deepEqual(upgraded, { ...original, version: 13 });
+  assert.deepEqual(legacy, original, 'migration preserves its source');
+  assert.equal(validateSave(upgraded), true);
+  assert.deepEqual(migrateSave(JSON.parse(JSON.stringify(upgraded))), upgraded);
+  const invalid = copy(legacy);
+  invalid.parents[0].lifestyle = 4.25;
+  assert.equal(migrateSave(invalid), null, 'old schemas retain their whole-lifestyle contract');
+});
+
+test('fractional lifestyle survives schema13 round trips across every saved person', () => {
+  const family = adult(91302);
+  assert.equal(haveChild(family).ok, true);
+  advanceYear(family);
+  assert.equal(haveChild(family).ok, true);
+  while (family.age < 65) advanceYear(family);
+  assert.equal(succeed(family, family.children[0].id).ok, true);
+  assert.equal(haveChild(family).ok, true);
+  assert.ok(family.children.length && family.siblings.length && family.lineage.length);
+  const pregnant = coupledLife(3106);
+  pregnant.partner.married = true;
+  while (!pregnant.pregnancy && pregnant.age < 42) advanceYear(pregnant);
+  assert.ok(pregnant.pregnancy);
+  const dating = datingLife(2102);
+  assert.ok(dating.encounters.length);
+  for (const state of [family, pregnant, dating]) {
+    const actors = [state, ...state.parents, ...state.children, ...state.siblings, ...state.lineage,
+      state.partner, ...state.encounters, state.pregnancy?.otherParent].filter(Boolean);
+    actors.forEach((person, index) => { person.lifestyle = 4.23 + (index % 4) * .25; });
+    if (state.yearSummary) {
+      state.yearSummary.lifestyle = { before: 4.23, after: 4.29, change: .06 };
+      for (const parent of state.yearSummary.parents) parent.lifestyle = { before: 4.23, after: 4.29, change: .06 };
+    }
+    assert.equal(validateSave(state), true);
+    const original = copy(state);
+    assert.deepEqual(migrateSave(JSON.parse(JSON.stringify(state))), original);
+    assert.deepEqual(state, original, 'validation and migration do not alter fractional ratings');
+    for (const person of actors) {
+      const value = person.lifestyle;
+      for (const invalid of [NaN, Infinity, .99, 10.01, '4.23']) {
+        person.lifestyle = invalid;
+        assert.equal(validateSave(state), false);
+        assert.equal(migrateSave(state), null);
+      }
+      person.lifestyle = value;
+    }
+  }
 });
