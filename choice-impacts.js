@@ -1,12 +1,12 @@
-import { annualForecast, effectiveStats, needsEducationChoice } from './engine.js?v=age-label-1';
-import { infantChoiceEffects, wellbeingResponse, TODDLER_ACTIVITY_EFFECTS, PARENT_FAMILY_RELATIONSHIP_GAIN } from './development.js?v=age-label-1';
+import { annualForecast, effectiveStats, needsEducationChoice } from './engine.js?v=activity-rows-1';
+import { infantChoiceEffects, wellbeingResponse, toddlerActivityEffects, TODDLER_FOCUS, TODDLER_ACTIVITY_EFFECTS, PARENT_FAMILY_RELATIONSHIP_GAIN } from './development.js?v=activity-rows-1';
 
 const nonzero = value => Math.abs(value) > .000001;
 const keyOf = entry => `${entry.parentId || 'you'}:${entry.stat}`;
 const bounded = (before, change) => Math.max(1, Math.min(10, before + change)) - before;
 
 // Activity help compares direct per-point effects for the same stat across
-// activities. The combined forecast separately accounts for selected points.
+// activities. The activity rows separately account for selected points.
 export function toddlerActivityImpacts(activity) {
   const impacts = Object.entries(TODDLER_ACTIVITY_EFFECTS[activity] || {}).filter(([,change]) => nonzero(change)).map(([stat,change]) => {
     const maximum = Math.max(...Object.values(TODDLER_ACTIVITY_EFFECTS).map(effects => Math.abs(effects[stat] || 0)));
@@ -16,6 +16,52 @@ export function toddlerActivityImpacts(activity) {
   // Family time is the only toddler activity that improves parent relationships.
   if (activity === 'family') impacts.push({ stat: 'relationship', change: PARENT_FAMILY_RELATIONSHIP_GAIN, level: 2, target: 'parents' });
   return impacts;
+}
+
+function toddlerChoiceEntries(state, activity, points, clip) {
+  const candidate = { ...state, focus: { ...state.focus, [activity]: points } };
+  const balanced = { ...candidate, focus: { ...candidate.focus, [activity]: TODDLER_FOCUS[activity] } };
+  const contributions = toddlerActivityEffects(candidate)[activity];
+  const reference = toddlerActivityEffects(balanced)[activity];
+  const effects = Object.fromEntries(Object.entries(contributions).map(([stat, change]) => [stat, change - reference[stat]]));
+  // Retained modifiers can hide an otherwise possible change at the displayed
+  // bounds. Expiring modifiers are background changes, not activity effects.
+  const next = { ...state, effects: state.effects.filter(effect => effect.years > 1) };
+  const before = clip ? effectiveStats(next) : null;
+  const after = clip ? effectiveStats({ ...next, stats: { ...state.stats,
+    ...Object.fromEntries(Object.entries(effects).map(([stat, change]) => [stat, state.stats[stat] + bounded(state.stats[stat], change)])),
+  } }) : null;
+  const entries = Object.entries(effects).map(([stat, change]) => ({ stat, change: clip ? after[stat] - before[stat] : change, group: 'you' }));
+  if (activity === 'family') {
+    for (const parent of state.parents.filter(person => person.alive !== false)) {
+      const stability = wellbeingResponse(parent, 'stability', .025 * (points - 3));
+      const relationship = PARENT_FAMILY_RELATIONSHIP_GAIN * (points - 2);
+      entries.push({ stat: 'stability', parentId: parent.id, group: 'others', change: clip ? bounded(parent.stats.stability, stability) : stability });
+      entries.push({ stat: 'relationship', parentId: parent.id, group: 'relationships', change: clip ? bounded(parent.relationship, relationship) : relationship });
+    }
+  }
+  return entries;
+}
+
+// Each row shows its own contribution relative to the balanced activity points.
+// Comparing all 0–5 choices keeps the signs stable while reallocating a budget;
+// unrelated household changes and unused-point rest do not belong to any row.
+export function toddlerChoiceImpacts(state, activity) {
+  if (state.age < 2 || state.age >= 5 || !Object.hasOwn(TODDLER_FOCUS, activity) || state.ended || state.alive === false || state.needsSuccession || state.pendingEvents.length || needsEducationChoice(state)) return [];
+  const points = Math.max(0, Math.min(5, state.focus[activity] ?? 0));
+  const entries = toddlerChoiceEntries(state, activity, points, true);
+  const raw = toddlerChoiceEntries(state, activity, points, false);
+  const comparisons = Array.from({ length: 6 }, (_, level) => toddlerChoiceEntries(state, activity, level, false));
+  const help = toddlerActivityImpacts(activity);
+  return entries.filter(entry => nonzero(entry.change)).map(entry => {
+    const key = keyOf(entry);
+    const change = raw.find(candidate => keyOf(candidate) === key).change;
+    const maximum = Math.max(Math.abs(change), ...comparisons.map(options => options.find(option => keyOf(option) === key)?.change || 0)
+      .filter(candidate => Math.sign(candidate) === Math.sign(change)).map(Math.abs));
+    const cap = help.find(effect => effect.stat === entry.stat)?.level || 3;
+    const level = Math.min(cap, Math.max(1, Math.ceil(cap * Math.abs(change) / maximum - 1e-8)));
+    return { ...entry, level };
+  });
 }
 
 function forecastEntries(state, forecast) {

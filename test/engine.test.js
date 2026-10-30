@@ -984,7 +984,7 @@ test('both peer-pressure choices have different visible stat consequences and pe
   assert.equal(state.stats.social, 7);
   assert.equal(state.stats.intelligence, 5);
   assert.equal(state.stats.health, 5.7);
-  assert.match(state.history[0].text, /social 6 → 7; Your intelligence 6 → 5/);
+  assert.equal(state.history[0].text, 'Go along with it. Your social 6 → 7; Your intelligence 6 → 5; Your health 6 → 5.7.');
   assert.equal(resolveEventChoice(declined, 'decline', 'peer_drinking').ok, true);
   assert.equal(declined.stats.stability, 6.5);
   assert.equal(declined.stats.social, 5.8);
@@ -1029,6 +1029,11 @@ test('lifestyle consequences are temporary, bounded, and shared by dependent chi
   assert.equal(state.lifestyle, baseline - 1);
   assert.equal(state.children[0].lifestyle, state.lifestyle);
   assert.equal(state.effects.find(effect => effect.id === 'investment_pitch').years, 2);
+  const outcome = EVENTS.find(event => event.id === 'investment_pitch').choices.find(choice => choice.id === 'accept');
+  assert.equal(state.effects.find(effect => effect.id === 'investment_pitch').description, outcome.description);
+  assert.ok(!state.history[0].text.includes(outcome.description));
+  assert.ok(state.history[0].text.startsWith(`${outcome.label}. `));
+  assert.match(state.history[0].text, /Lifestyle [\d.]+ → [\d.]+\. Temporary effects: 2 years\.$/);
   assert.equal(validateSave(state), true);
   const saved = migrateSave(state);
   assert.equal(saved.lifestyle, state.lifestyle);

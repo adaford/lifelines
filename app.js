@@ -5,11 +5,11 @@ import {
   offeredJobs, needsEducationChoice, pendingEventSubject,
   relationshipOdds, meetingChances, proposalChance, pregnancyChance, oneNightChance,
   respondToEncounter, proposeMarriage, endRelationship, normalizeSurname, heightPercentile, statPercentiles
-} from './engine.js?v=age-label-1';
-import { annotateNarrative } from './narrative.js?v=age-label-1';
-import { formatRating, formatHeight, heightDescription, formatStatNarrative } from './display.js?v=age-label-1';
+} from './engine.js?v=activity-rows-1';
+import { annotateNarrative } from './narrative.js?v=activity-rows-1';
+import { formatRating, formatHeight, heightDescription, formatStatNarrative } from './display.js?v=activity-rows-1';
 
-import { choiceImpacts, toddlerActivityImpacts } from './choice-impacts.js?v=age-label-1';
+import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts } from './choice-impacts.js?v=activity-rows-1';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const app = document.querySelector('#app');
@@ -247,7 +247,7 @@ function yearView() {
   const disabled = state.ended || state.needsSuccession || state.pendingEvents.length>0;
   return `${state.education.status==='college'?collegeProgressView():''}<section class="panel focus-panel"><div class="panel-heading"><h3>${labelWithHelp(baby?'Cry level':toddler?'Toddler activities':'Focus',baby?'cry':toddler?'toddler-focus':'focus')}</h3><span class="tag">${baby ? 'AGES 0–1' : `${focusUsed()} / 12 POINTS`}</span></div>
     ${baby ? `<div class="cry-control" role="group" aria-label="Cry level"><div class="cry-levels">${[1,2,3,4,5].map(level=>`<button class="cry-level ${state.cryLevel===level?'selected':''}" data-action="baby" data-level="${level}" aria-label="Cry level ${level} of 5" aria-pressed="${state.cryLevel===level}" ${disabled?'disabled':''}>${level}</button>`).join('')}</div><div class="cry-scale-labels"><span>Low</span><span>High</span></div></div>` : focusView(disabled)}
-    ${choiceImpactSummary()}
+    ${toddler?'':choiceImpactSummary()}
     ${parentStatusView()}
     </section>
     ${state.effects.length?`<button class="effect-summary button secondary" data-action="tab" data-tab="character">${icon('spark')} ${state.effects.length} active life effect${state.effects.length===1?'':'s'} · View ${icon('arrow')}</button>`:''}
@@ -285,9 +285,32 @@ function yearDecisionsView(decisions) {
 }
 
 const isNoEventEntry = entry => entry.title === 'A quiet year' || entry.kind === 'quiet' && entry.title === 'Events' && entry.text === 'None';
+function completedEventCopy(entry) {
+  if (isNoEventEntry(entry)) return { title: 'Events', text: 'None' };
+  const milestones = {
+    'A bigger little world': ['Toddler activities unlocked','No stat changes.'],
+    'The first school year': ['School started','No stat changes.'],
+    'Your own way': ['Adulthood reached','College and career choices unlocked. No stat changes.'],
+    'Graduation day': ['College completed','Graduate job offers unlocked. No stat changes.'],
+    'The next chapter': ['Retirement unlocked','No stat changes.'],
+  };
+  if (entry.kind==='milestone' && milestones[entry.title]) {
+    const [title,text] = milestones[entry.title];
+    return {title,text};
+  }
+  const event = EVENTS.find(event=>entry.title===event.name || entry.title.endsWith(`: ${event.name}`));
+  if (!event) return entry;
+  const subject = entry.title===event.name?'Your family member':entry.title.slice(0,-event.name.length-2);
+  const choice = event.choices?.find(choice=>entry.text.startsWith(`${choice.label}: `));
+  const description = (choice?.description || event.description).replaceAll('{name}',subject);
+  const prefix = choice?`${choice.label}: ${description}`:description;
+  if (!entry.text.startsWith(prefix)) return entry;
+  const changes = entry.text.slice(prefix.length).trim();
+  return {title:entry.title,text:`${choice?`${choice.label}. `:''}${changes || 'No stat changes.'}`};
+}
 function yearEventsView(summary) {
   const events = (summary.events || []).filter(event => !isNoEventEntry(event));
-  return `<details class="year-review-events" open><summary>Events</summary>${events.length?`<ul>${events.map(event=>`<li><strong>${journalText(event.title,summary.toAge)}</strong><p>${journalText(event.text,summary.toAge)}</p></li>`).join('')}</ul>`:'<p>None</p>'}</details>`;
+  return `<details class="year-review-events" open><summary>Events</summary>${events.length?`<ul>${events.map(event=>`<li><strong>${journalText(completedEventCopy(event).title,summary.toAge)}</strong><p>${journalText(completedEventCopy(event).text,summary.toAge)}</p></li>`).join('')}</ul>`:'<p>None</p>'}</details>`;
 }
 
 function yearSummaryModal() {
@@ -304,14 +327,13 @@ function lifestyleView() {
   return `<section class="lifestyle-summary" aria-label="Lifestyle"><div><span class="eyebrow">EVERYDAY COMFORT</span><h3>${labelWithHelp('Lifestyle','lifestyle')} <strong>${number(state.lifestyle)}<small>/10</small></strong></h3><p>${descriptions[Math.round(state.lifestyle)-1]}</p>${ratingBar('Lifestyle',state.lifestyle)}</div></section>`;
 }
 
-function choiceImpactSummary() {
-  if (state.ended || state.needsSuccession || state.pendingEvents.length || needsEducationChoice(state)) return '';
-  const changes = choiceImpacts(state);
+function choiceImpactGroups(changes, compact = false) {
   const groups = [['you','You'],['others','Other people'],['relationships','Relationships']];
-  return `<section class="choice-impact-summary" aria-label="Expected changes"><h4>${labelWithHelp('Expected changes','forecast')}</h4>${changes.length?groups.map(([group,title]) => {
+  const headings = !compact || changes.some(entry=>entry.group!=='you');
+  return groups.map(([group,title]) => {
     const entries = changes.filter(entry => entry.group === group);
     if (!entries.length) return '';
-    return `<section class="choice-impact-group" data-impact-group="${group}" aria-label="${title}"><h5>${title}</h5><ul class="choice-impact-list">${entries.map(({stat,change,level,parentId}) => {
+    return `<section class="choice-impact-group" data-impact-group="${group}" aria-label="${title}">${headings?`<h5>${title}</h5>`:''}<ul class="choice-impact-list">${entries.map(({stat,change,level,parentId}) => {
       let label = skillLabel(stat);
       if (parentId) {
         const parent = state.parents.find(person => person.id === parentId);
@@ -324,7 +346,18 @@ function choiceImpactSummary() {
       const magnitude = ['small','medium','large'][level-1];
       return `<li class="choice-impact" data-stat="${stat}" data-level="${level}" data-direction="${direction}" ${parentId?`data-parent-id="${esc(parentId)}"`:''}><span role="img" aria-label="${esc(label)}: ${magnitude} expected ${direction}"><b aria-hidden="true">${signs}</b> ${esc(label)}${statEmoji(stat)}</span></li>`;
     }).join('')}</ul></section>`;
-  }).join(''):'<p class="muted">No routine changes expected.</p>'}</section>`;
+  }).join('');
+}
+
+function choiceImpactSummary() {
+  if (state.ended || state.needsSuccession || state.pendingEvents.length || needsEducationChoice(state)) return '';
+  const changes = choiceImpacts(state);
+  return `<section class="choice-impact-summary" aria-label="Expected changes"><h4>${labelWithHelp('Expected changes','forecast')}</h4>${changes.length?choiceImpactGroups(changes):'<p class="muted">No routine changes expected.</p>'}</section>`;
+}
+
+function activityEffectsView(activity, label) {
+  const changes = toddlerChoiceImpacts(state,activity);
+  return changes.length?`<div class="activity-effects" aria-label="${esc(label)} expected changes">${choiceImpactGroups(changes,true)}</div>`:'';
 }
 
 function focusView(disabled) {
@@ -332,12 +365,12 @@ function focusView(disabled) {
   const studying = state.age<18 || state.education.status==='college';
   const rows = toddler?toddlerFocusRows:[['work',state.age<18?'School':studying?'College':'Career',studying?'school':'career'],['social','Friends','social'],['family','Family','family'],['self','Yourself','self']];
   const mode = toddler?'activity':'focus';
-  return `<div class="focus-list">${rows.map(([key,label,ico]) => `<div class="focus-row" data-focus-key="${key}"><span class="focus-icon">${icon(ico)}</span><div class="focus-copy"><h4>${labelWithHelp(label,`${toddler?'toddler':'focus'}-${key}`)}</h4><div class="focus-scale" aria-hidden="true">${Array.from({length:5},(_,i)=>`<span class="${i<(state.focus[key] ?? 0)?'filled':''}"></span>`).join('')}</div></div><div class="stepper" role="group" aria-label="${esc(label)} ${mode}"><button data-action="focus" data-key="${key}" data-delta="-1" aria-label="Decrease ${esc(label.toLowerCase())} ${mode}" ${(state.focus[key] ?? 0)<=0||disabled?'disabled':''}>${icon('minus')}</button><output aria-label="${esc(label)} ${mode} level">${state.focus[key] ?? 0}</output><button data-action="focus" data-key="${key}" data-delta="1" aria-label="Increase ${esc(label.toLowerCase())} ${mode}" ${(state.focus[key] ?? 0)>=5||focusUsed()>=12||disabled?'disabled':''}>${icon('plus')}</button></div></div>`).join('')}</div><div class="budget-bar"><div class="budget-summary"><span>${12-focusUsed()} ${mode} point${12-focusUsed()===1?'':'s'} available</span><strong>${focusUsed()} / 12</strong></div><div class="budget-track"><span style="width:${focusUsed()/12*100}%"></span></div></div>`;
+  return `<div class="focus-list">${rows.map(([key,label,ico]) => `<div class="focus-row" data-focus-key="${key}"><span class="focus-icon">${icon(ico)}</span><div class="focus-copy"><h4>${labelWithHelp(label,`${toddler?'toddler':'focus'}-${key}`)}</h4><div class="focus-scale" aria-hidden="true">${Array.from({length:5},(_,i)=>`<span class="${i<(state.focus[key] ?? 0)?'filled':''}"></span>`).join('')}</div></div><div class="stepper" role="group" aria-label="${esc(label)} ${mode}"><button data-action="focus" data-key="${key}" data-delta="-1" aria-label="Decrease ${esc(label.toLowerCase())} ${mode}" ${(state.focus[key] ?? 0)<=0||disabled?'disabled':''}>${icon('minus')}</button><output aria-label="${esc(label)} ${mode} level">${state.focus[key] ?? 0}</output><button data-action="focus" data-key="${key}" data-delta="1" aria-label="Increase ${esc(label.toLowerCase())} ${mode}" ${(state.focus[key] ?? 0)>=5||focusUsed()>=12||disabled?'disabled':''}>${icon('plus')}</button></div>${toddler&&!disabled?activityEffectsView(key,label):''}</div>`).join('')}</div><div class="budget-bar"><div class="budget-summary"><span>${12-focusUsed()} ${mode} point${12-focusUsed()===1?'':'s'} available</span><strong>${focusUsed()} / 12</strong></div><div class="budget-track"><span style="width:${focusUsed()/12*100}%"></span></div></div>`;
 }
 
 function journalView() {
   const entries = showAllHistory ? state.history : state.history.slice(0,8);
-  return `<section class="panel journal-panel"><div class="panel-heading"><h3>Journal</h3></div><div class="journal-list">${entries.map(entry => `<article class="journal-entry ${esc(entry.kind || 'neutral')}"><div class="journal-age"><strong>${entry.age}</strong><span>${entry.generation===state.generation?'AGE':`GEN ${entry.generation}`}</span></div><span class="journal-marker"></span><div class="journal-content"><h4>${isNoEventEntry(entry)?'Events':journalText(entry.title,entry.age)}</h4><p>${isNoEventEntry(entry)?'None':journalText(entry.text,entry.age)}</p></div></article>`).join('')}</div>${state.history.length>8?`<button class="button ghost small" data-action="history">${showAllHistory?'Recent years':'Show all'} ${icon('arrow')}</button>`:''}</section>`;
+  return `<section class="panel journal-panel"><div class="panel-heading"><h3>Journal</h3></div><div class="journal-list">${entries.map(entry => `<article class="journal-entry ${esc(entry.kind || 'neutral')}"><div class="journal-age"><strong>${entry.age}</strong><span>${entry.generation===state.generation?'AGE':`GEN ${entry.generation}`}</span></div><span class="journal-marker"></span><div class="journal-content"><h4>${journalText(completedEventCopy(entry).title,entry.age)}</h4><p>${journalText(completedEventCopy(entry).text,entry.age)}</p></div></article>`).join('')}</div>${state.history.length>8?`<button class="button ghost small" data-action="history">${showAllHistory?'Recent years':'Show all'} ${icon('arrow')}</button>`:''}</section>`;
 }
 
 function collegeProgressView() {
@@ -372,8 +405,9 @@ function relationshipView(person) {
   return `<div class="relationship-summary">${labelWithHelp('Relationship','relationship')}<strong>${number(person.relationship)}<small>/10</small></strong></div>${ratingBar(`Relationship with ${person.name}`,person.relationship)}`;
 }
 
-function profileStats(person) {
-  return `<div class="profile-stats">${DISPLAY_STATS.map(skill=>`<div class="profile-stat" data-skill="${skill.key}"><span>${labelWithHelp(skill.label,skill.key)}</span><span class="stat-reading"><strong>${number(person.stats[skill.key])}<small>/10</small></strong>${aptitudeBadge(person.aptitudes[skill.key],`${skill.label} natural aptitude`)}</span>${ratingBar(skill.label,person.stats[skill.key])}</div>`).join('')}<div class="profile-stat"><span>${labelWithHelp('Lifestyle','lifestyle')}</span><strong>${number(person.lifestyle)}<small>/10</small></strong>${ratingBar('Lifestyle',person.lifestyle)}</div><div class="profile-stat"><span>${labelWithHelp('Height','height',person.id)}</span><strong aria-label="${heightDescription(person.height,person.age)}">${formatHeight(person.height,person.age)}</strong><span class="height-percentile">${heightLabel(person)}</span></div></div><div class="stat-help-links">${labelWithHelp('Natural aptitude','affinity')}</div>`;
+function profileStats(person, parent = false) {
+  const stats = parent ? DISPLAY_STATS.filter(skill=>['health','stability'].includes(skill.key)) : DISPLAY_STATS;
+  return `<div class="profile-stats">${stats.map(skill=>`<div class="profile-stat" data-skill="${skill.key}"><span>${labelWithHelp(skill.label,skill.key)}</span><span class="stat-reading"><strong>${number(person.stats[skill.key])}<small>/10</small></strong>${aptitudeBadge(person.aptitudes[skill.key],`${skill.label} natural aptitude`)}</span>${ratingBar(skill.label,person.stats[skill.key])}</div>`).join('')}${parent?'':`<div class="profile-stat"><span>${labelWithHelp('Lifestyle','lifestyle')}</span><strong>${number(person.lifestyle)}<small>/10</small></strong>${ratingBar('Lifestyle',person.lifestyle)}</div>`}<div class="profile-stat"><span>${labelWithHelp('Height','height',person.id)}</span><strong aria-label="${heightDescription(person.height,person.age)}">${formatHeight(person.height,person.age)}</strong><span class="height-percentile">${heightLabel(person)}</span></div></div><div class="stat-help-links">${labelWithHelp('Natural aptitude','affinity')}</div>`;
 }
 
 function pregnancyView() {
@@ -422,7 +456,7 @@ function retirementView() {
 
 function personCard(person, role, child = false, parent = false) {
   const employment = {employed:'Employed',unemployed:'Unemployed',retired:'Retired'}[person.career?.status] || 'Employed';
-  return `<article class="family-card" data-person-id="${esc(person.id)}"><div class="family-header"><div class="family-avatar">${avatar(person,true)}</div><div class="family-meta"><span class="eyebrow">${esc(role)}</span><div class="profile-name-row"><h3>${esc(person.name)}</h3>${genderBadge(person)}</div><p>${person.age} years old${person.alive===false?' · Remembered':''}</p></div></div><p class="family-lifestyle">${labelWithHelp('Lifestyle','lifestyle')} <strong>${number(person.lifestyle)}/10</strong>${person.age<18?' · Family household':''}</p>${parent?`<div class="parent-career"><span>${labelWithHelp('Career focus','parent-career')} <strong>${person.career?.focus ?? 0}/5</strong></span><span class="employment-status">${employment}</span></div>`:''}${Number.isFinite(person.relationship)?relationshipView(person):''}<details class="family-details" ${parent?'open':''}><summary>Skills & wellbeing</summary>${profileStats(person)}</details>${child&&person.alive===false?'<div class="family-card-footer"><span>Remembered with love</span></div>':''}</article>`;
+  return `<article class="family-card" data-person-id="${esc(person.id)}"><div class="family-header"><div class="family-avatar">${avatar(person,true)}</div><div class="family-meta"><span class="eyebrow">${esc(role)}</span><div class="profile-name-row"><h3>${esc(person.name)}</h3>${genderBadge(person)}</div><p>${person.age} years old${person.alive===false?' · Remembered':''}</p></div></div>${parent?'':`<p class="family-lifestyle">${labelWithHelp('Lifestyle','lifestyle')} <strong>${number(person.lifestyle)}/10</strong>${person.age<18?' · Family household':''}</p>`}${parent?`<div class="parent-career"><span>${labelWithHelp('Career focus','parent-career')} <strong>${person.career?.focus ?? 0}/5</strong></span><span class="employment-status">${employment}</span></div>`:''}${Number.isFinite(person.relationship)?relationshipView(person):''}<details class="family-details" ${parent?'open':''}><summary>${parent?'Wellbeing':'Skills & wellbeing'}</summary>${profileStats(person,parent)}</details>${child&&person.alive===false?'<div class="family-card-footer"><span>Remembered with love</span></div>':''}</article>`;
 }
 
 function parentsView() {
@@ -513,7 +547,7 @@ function topicHelpModal(topic, id) {
     height: ['Height', ['Final height emerges from yearly growth shaped by age, inheritance, health and chance, ending at 14–18. Poor health reduces new growth, never existing height.']],
     cry: ['Cry level', ['Less crying lowers your intelligence and mental stability; more crying raises them. Strength is unaffected. Parent relationships tend to fall at levels 1–2, stay steady at 3, and rise at 4–5, with yearly variation. Harder crying strains their mental stability more.']],
     focus: ['Your focus', ['Allocate 12 points, at most 5 per area; unused points allow rest. Focused skills can rise, neglected ones can fall, and results vary yearly.']],
-    'toddler-focus': ['Toddler activities', ['Share 12 points among five activities, up to 5 each. Unused points support mental stability, and results vary each year.']],
+    'toddler-focus': ['Toddler activities', ['Share 12 points among five activities, up to 5 each. Unused points support mental stability, and results vary each year.', 'Activity effects are measured from Play 3, Electronics 2, Family time 2, Rest 3, and Arts & crafts 2. Zero effects are hidden.']],
     ...Object.fromEntries(toddlerFocusRows.map(([key,label]) => [`toddler-${key}`, [label,
       toddlerActivityImpacts(key).map(({stat,change,level,target}) => `${(change>0?'+':'-').repeat(level)}${target==='parents'?'Parent relationships':skillLabel(stat)}`)
     ]])),

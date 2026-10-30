@@ -1,19 +1,19 @@
 // Lifelines: deterministic, browser-independent simulation rules.
 // All public actions mutate their state and return { ok, reason? }.
-import { JOBS } from './jobs.js?v=age-label-1';
-import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=age-label-1';
-import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=age-label-1';
-import { mortalityRisk, rollMortality } from './mortality.js?v=age-label-1';
-import { heightReference, advanceGrowth } from './growth.js?v=age-label-1';
-import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=age-label-1';
-import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, DEVELOPMENT_BALANCE, BIRTH_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN } from './development.js?v=age-label-1';
-import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=age-label-1';
-import { normalPercentile } from './percentiles.js?v=age-label-1';
+import { JOBS } from './jobs.js?v=activity-rows-1';
+import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=activity-rows-1';
+import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=activity-rows-1';
+import { mortalityRisk, rollMortality } from './mortality.js?v=activity-rows-1';
+import { heightReference, advanceGrowth } from './growth.js?v=activity-rows-1';
+import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=activity-rows-1';
+import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, DEVELOPMENT_BALANCE, BIRTH_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN } from './development.js?v=activity-rows-1';
+import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=activity-rows-1';
+import { normalPercentile } from './percentiles.js?v=activity-rows-1';
 export { DEVELOPMENT_BALANCE };
-export { heightPercentile } from './growth.js?v=age-label-1';
-export { mortalityRisk } from './mortality.js?v=age-label-1';
-import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=age-label-1';
-export { JOBS, JOB_CATEGORIES } from './jobs.js?v=age-label-1';
+export { heightPercentile } from './growth.js?v=activity-rows-1';
+export { mortalityRisk } from './mortality.js?v=activity-rows-1';
+import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=activity-rows-1';
+export { JOBS, JOB_CATEGORIES } from './jobs.js?v=activity-rows-1';
 export const EVENTS = [...PERSONAL_EVENTS, ...FAMILY_EVENTS];
 
 export const SKILLS = [
@@ -558,12 +558,14 @@ function applyOutcome(state, event, outcome = event, context = {}) {
     for (const [key, amount] of Object.entries(outcome.subjectChanges || {})) addStat(subject, key, amount);
     if (outcome.relationship) subject.relationship = round(clamp(subject.relationship + outcome.relationship, 1, 10));
   }
+  let temporaryYears = 0;
   if (outcome.years > 0 && (Object.keys(outcome.modifiers || {}).length || outcome.lifestyle)) {
     const old = state.effects.find(effect => effect.id === key);
     const effect = { id: key, name: `${context.subjectId ? `${subject.name}: ` : ''}${event.name}`, description, years: Math.max(old?.years || 0, outcome.years), modifiers: { ...outcome.modifiers }, kind: event.kind };
     if (outcome.lifestyle) effect.lifestyle = outcome.lifestyle;
     if (old) Object.assign(old, { lifestyle: 0 }, effect);
     else state.effects.push(effect);
+    temporaryYears = effect.years;
   }
   syncFamilyLifestyles(state);
   const label = key => SKILLS.find(skill => skill.key === key)?.label || ({ health: 'Health', stability: 'Mental stability' }[key]);
@@ -575,8 +577,10 @@ function applyOutcome(state, event, outcome = event, context = {}) {
     if (outcome.relationship) changes.push(`${subject.name}: Relationship ${before.relationship} → ${subject.relationship}`);
   }
   if (outcome.lifestyle) changes.push(`Lifestyle ${before.lifestyle} → ${state.lifestyle}`);
-  const story = outcome === event ? description : `${outcome.label}: ${description}`;
-  log(state, `${context.subjectId ? `${subject.name}: ` : ''}${event.name}`, `${story}${changes.length ? ` ${changes.join('; ')}.` : ''}`, event.kind);
+  const decision = outcome === event ? '' : `${outcome.label}. `;
+  const result = changes.length ? `${changes.join('; ')}.` : 'No stat changes.';
+  const duration = temporaryYears ? ` Temporary effects: ${temporaryYears} ${temporaryYears === 1 ? 'year' : 'years'}.` : '';
+  log(state, `${context.subjectId ? `${subject.name}: ` : ''}${event.name}`, `${decision}${result}${duration}`, event.kind);
 }
 
 export function resolveEventChoice(state, choiceId, expectedEventId, expectedSubjectId) {
@@ -744,21 +748,21 @@ export function advanceYear(state, { mortalityRandom, growthRandom, parentCareer
   }
   if (!selected.length && !deaths.length && !state.history.some(memory => !oldMemories.has(memory.id))) log(state, 'Events', 'None', 'quiet');
   syncFamilyLifestyles(state);
-  if (state.age === 2) log(state, 'A bigger little world', 'Play, little creations and family time fill your days.', 'milestone');
-  if (state.age === 5) log(state, 'The first school year', 'You are ready to begin school.', 'milestone');
+  if (state.age === 2) log(state, 'Toddler activities unlocked', 'No stat changes.', 'milestone');
+  if (state.age === 5) log(state, 'School started', 'No stat changes.', 'milestone');
   if (state.age === 18) {
     state.education = { status: 'undecided', years: 0 };
     state.jobOffers = makeJobOffers(state);
-    log(state, 'Your own way', 'You reach adulthood.', 'milestone');
+    log(state, 'Adulthood reached', 'College and career choices unlocked. No stat changes.', 'milestone');
   } else if (state.education.status === 'college') {
     state.education.years += 1;
     if (state.education.years === 4) {
       state.education.status = 'graduate';
       state.jobOffers = makeJobOffers(state, true);
-      log(state, 'Graduation day', 'You graduate from college.', 'milestone');
+      log(state, 'College completed', 'Graduate job offers unlocked. No stat changes.', 'milestone');
     }
   }
-  if (state.age === 65) log(state, 'The next chapter', "You can retire when you're ready.", 'milestone');
+  if (state.age === 65) log(state, 'Retirement unlocked', 'No stat changes.', 'milestone');
   if (state.pregnancy && state.pregnancy.dueAge <= state.age) {
     const otherParent = state.pregnancy.otherParent;
     state.pregnancy = null;

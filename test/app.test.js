@@ -5,7 +5,7 @@ import { readFile } from 'node:fs/promises';
 import { afterEach, describe, test } from 'node:test';
 import { parseHTML } from 'linkedom';
 import { toLegacyCentimeters, stripWellbeingAptitudes } from './helpers/legacy-height.js';
-import { choiceImpacts } from '../choice-impacts.js';
+import { choiceImpacts, toddlerChoiceImpacts } from '../choice-impacts.js';
 import { SKILLS, JOBS, EVENTS, resolveEventChoice, eventOdds, canTakeJob, chooseEducation, offeredJobs, needsEducationChoice, createGame, advanceYear, annualForecast, haveChild, takeJob, successionInfo, succeed, validateSave, respondToEncounter, proposeMarriage, effectiveStats, relationshipOdds, proposalChance, statPercentiles } from '../engine.js';
 
 const SAVE_KEY = 'lifelines.save.v1';
@@ -230,8 +230,10 @@ test('all parent stats, affinities, and relationships are visible from childhood
   assert.doesNotMatch(ui.query('.roots-panel').textContent,/PARENT ONE|PARENT TWO/);
   for(const parent of fixture.parents) {
     const card=ui.query(`.roots-panel [data-person-id="${parent.id}"]`);
-    assert.equal(card.querySelectorAll('.profile-stat[data-skill]').length,7);
-    assert.equal(card.querySelectorAll('.aptitude').length,7);
+    assert.deepEqual([...card.querySelectorAll('.profile-stat[data-skill]')].map(row=>row.dataset.skill),['health','stability']);
+    assert.equal(card.querySelectorAll('.aptitude').length,2);
+    assert.equal(card.querySelectorAll('[data-topic="lifestyle"], .family-lifestyle').length,0);
+    assert.ok(card.querySelector('[data-topic="height"]'));
     for(const aptitude of card.querySelectorAll('.aptitude')) assert.match(aptitude.getAttribute('aria-label'),/natural aptitude/);
     assert.ok(card.querySelector('.family-details').hasAttribute('open'));
     assert.equal(card.querySelector('.relationship-summary strong').textContent,`${parent.relationship.toFixed(1)}/10`);
@@ -1260,12 +1262,15 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     assert.match(ui.query('.budget-summary').textContent, /12\s*\/\s*12/);
   });
 
-  test('the choices list combines toddler activities into net effects and preserves current state', async () => {
+  test('toddler choices show their own point-sensitive effects without household changes or save mutation', async () => {
     const fixture=ageTo(createGame({seed:19}),3);
     fixture.focus={work:0,social:0,family:0,self:0,creative:0};
+    fixture.lifestyle=5;
+    fixture.parents.forEach(parent=>{parent.lifestyle=5;Object.assign(parent.career,{status:'employed',progress:4.6,focus:3});});
+    assert.ok(annualForecast(fixture).lifestyle.change<0,'legacy whole ratings can exceed projected career support even with employed parents');
     for(const key of ['intelligence','strength','social','creativity']) fixture.aptitudes[key]=0;
     const ui=await mount(fixture);
-    assert.equal(ui.all('.activity-effects, .activity-effect').length,0,'the combined list replaces repeated per-activity labels');
+    assert.equal(ui.all('.choice-impact-summary').length,0,'toddler previews appear beneath individual choices');
     assertChoiceImpacts(ui);
     const initialStrength=annualForecast(ui.saved()).stats.strength.change;
     for(let points=1;points<=5;points++) {
@@ -1348,8 +1353,7 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
       if (age === 0 || age === 17) {
         ui.click('.nav-list [data-tab="family"]');
         for (const card of ui.all('.roots-panel .family-card')) {
-          const parent=saved.parents.find(parent=>parent.id===card.dataset.personId);
-          assert.equal(card.querySelector('.family-lifestyle strong').textContent,`${parent.lifestyle.toFixed(1)}/10`);
+          assert.equal(card.querySelectorAll('.family-lifestyle, [data-topic="lifestyle"]').length,0,'parent lifestyle is omitted from Family cards');
         }
         ui.click('.nav-list [data-tab="year"]');
       }
@@ -1882,7 +1886,28 @@ test('parent effects do not cancel each other and remembered parents have no for
 });
 
 function assertChoiceImpacts(ui) {
-  const state=ui.saved(), expected=choiceImpacts(state);
+  const state=ui.saved();
+  if (state.age>=2 && state.age<5) {
+    assert.equal(ui.all('.choice-impact-summary').length,0);
+    for(const activity of ['work','social','family','self','creative']) {
+      const row=ui.query(`.focus-row[data-focus-key="${activity}"]`);
+      const expected=toddlerChoiceImpacts(state,activity);
+      assert.equal(row.querySelectorAll('.choice-impact').length,expected.length);
+      assert.equal(row.querySelectorAll('.activity-effects').length,expected.length?1:0);
+      for(const {stat,parentId,change,level,group} of expected) {
+        const selector=`.choice-impact[data-stat="${stat}"]${parentId?`[data-parent-id="${parentId}"]`:':not([data-parent-id])'}`;
+        const entry=row.querySelector(selector);
+        assert.ok(entry,`${activity} shows its ${stat} effect`);
+        assert.equal(entry.querySelector('b').textContent,(change>0?'+':'-').repeat(level));
+        assert.equal(entry.closest('.choice-impact-group').dataset.impactGroup,group);
+        assert.ok(entry.querySelector('[role="img"]').getAttribute('aria-label'));
+      }
+    }
+    assert.equal(ui.all('.activity-effects [data-stat="lifestyle"], .activity-effects [data-stat="height"]').length,0);
+    assert.deepEqual(ui.saved(),state);
+    return;
+  }
+  const expected=choiceImpacts(state);
   assert.equal(ui.all('.focus-panel .choice-impact-summary').length,1);
   assert.equal(ui.query('.choice-impact-summary').getAttribute('aria-label'),'Expected changes');
   assert.equal(ui.all('.choice-impact-list .choice-impact').length,expected.length,'each nonzero expected effect appears once');
@@ -1948,7 +1973,7 @@ test('rating bars distinguish low and high values and preserve displayed ratings
   assertCurrentRatingBars(ui);
   ui.click('.nav-list [data-tab="family"]');
   for(const card of ui.all('.roots-panel .family-card')) {
-    assert.equal(card.querySelectorAll('.rating-track').length,9,'all eight parent ratings and relationship have bars');
+    assert.equal(card.querySelectorAll('.rating-track').length,3,'parents retain health, mental stability, and relationship bars');
   }
   assertCurrentRatingBars(ui);
   assert.deepEqual(ui.saved(),before);
