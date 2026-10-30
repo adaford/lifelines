@@ -5,11 +5,11 @@ import {
   offeredJobs, needsEducationChoice, pendingEventSubject, focusLimits, focusLimitDetails, caregivers,
   relationshipOdds, meetingChances, proposalChance, pregnancyChance, oneNightChance,
   respondToEncounter, proposeMarriage, endRelationship, normalizeSurname, heightPercentile, statPercentiles
-} from './engine.js?v=decision-choice-rows-1';
-import { annotateNarrative } from './narrative.js?v=decision-choice-rows-1';
-import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome, splitJournalEventOutcome } from './display.js?v=decision-choice-rows-1';
+} from './engine.js?v=stat-buffs-balance-1';
+import { annotateNarrative } from './narrative.js?v=stat-buffs-balance-1';
+import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome, splitJournalEventOutcome } from './display.js?v=stat-buffs-balance-1';
 
-import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=decision-choice-rows-1';
+import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=stat-buffs-balance-1';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const app = document.querySelector('#app');
@@ -58,7 +58,7 @@ const journalText = (value, age = state.age) => narrativeText(String(value ?? ''
   .replace(/\bbonds\b/gi, 'relationships').replace(/\bbond\b/gi, 'relationship')
   // Older journal entries have deltas but no historical starting value. Keep
   // their direction without inventing a before/after pair or rewriting saves.
-  .replace(/\b(Intelligence|Strength|Attractiveness|Social(?: ability)?|Creativity|Health|Mental stability|Lifestyle|Relationships?)\s+([+−-])(\d+(?:\.\d+)?|\.\d+)/gi, (_,label,sign,value) => `${label} ${Number(value)===0?'stayed steady':sign==='+'?'increased':'decreased'}`)
+  .replace(/\b(Intelligence|Strength|Attractiveness|Social(?: ability)?|Creativity|Health|Mental stability|Lifestyle|Relationships?)\s+([+−-])(\d+(?:\.\d+)?|\.\d+)(?![\d.]|\s*(?:→|->))/gi, (_,label,sign,value) => `${label} ${Number(value)===0?'stayed steady':sign==='+'?'increased':'decreased'}`)
   // Tutorial suffixes in existing saves belong in contextual help, not the
   // journal. Event narratives and recorded outcomes remain visible.
   .replace(/\s*For now, a cry or a quiet moment is enough to shape the day\./g, '')
@@ -78,7 +78,7 @@ const beforeAfter = ({before,after}) => `${number(before)} → ${number(after)}`
 const pct = value => `${Math.round((Number(value) || 0) * 100)}%`;
 const aptitude = value => value > 0 ? `+${value}` : String(value);
 function aptitudeBadge(value, label = 'Natural aptitude') {
-  if (!Number.isInteger(value) || value < -3 || value > 3) return '';
+  if (!Number.isInteger(value) || value === 0 || value < -3 || value > 3) return '';
   const description = `${label} ${aptitude(value)}`;
   return `<span class="aptitude ${value>0?'positive':value<0?'negative':''}" role="img" aria-label="${esc(description)}" title="${esc(description)}"><span aria-hidden="true">${aptitude(value)}</span></span>`;
 }
@@ -90,7 +90,7 @@ const STAT_EMOJI = {
 };
 const statEmoji = key => STAT_EMOJI[key] ? `<span class="stat-emoji" data-emoji="${STAT_EMOJI[key]}" aria-hidden="true"></span>` : '';
 const DISPLAY_STATS = [{ key:'health', label:'Health' }, { key:'stability', label:'Mental stability' }, ...SKILLS.filter(skill => skill.key === 'attractiveness'), ...SKILLS.filter(skill => skill.key !== 'attractiveness')];
-const stageNames = {baby:'The beginning',toddler:'Small discoveries',child:'Growing roots',teen:'Finding your way',adult:'A life of your own',elder:'What you leave behind'};
+const stageNames = {baby:'The beginning',toddler:'',child:'Growing roots',teen:'Finding your way',adult:'A life of your own',elder:'What you leave behind'};
 const toddlerFocusRows = [['work','Play','sprout'],['social','Electronics','electronics'],['family','Family time','family'],['self','Rest','self'],['creative','Arts & crafts','spark']];
 const legacyToddlerFocusRows = [['work','Play'],['social','Explore'],['family','Family time'],['self','Rest']];
 const career = () => JOBS.find(j => j.id === state.jobId);
@@ -151,32 +151,34 @@ function avatar(person, small = false) {
   </svg>`;
 }
 
-function statEffectGroups(key) {
+const signedModifier = value => {
+  const rounded = Math.round(Number(value) * 10) / 10;
+  return `${rounded > 0 ? '+' : rounded < 0 ? '-' : ''}${Math.abs(rounded).toFixed(1).replace(/^0(?=\.)/, '').replace(/\.0$/, '')}`;
+};
+function statEffects(key) {
   if (!key || key==='height' || key==='lifestyle' && state.age<18) return [];
-  const affected = state.effects.filter(effect=>effect.years>0).map(effect=>({
+  return state.effects.filter(effect=>effect.years>0).map(effect=>({
     effect, amount:key==='lifestyle'?effect.lifestyle:effect.modifiers?.[key],
   })).filter(({amount})=>Number.isFinite(amount) && amount!==0);
-  return [['buff','⬆️',1],['debuff','⬇️',-1]].flatMap(([direction,emoji,sign])=>{
-    const effects = affected.filter(({amount})=>Math.sign(amount)===sign).map(({effect})=>effect);
-    if (!effects.length) return [];
-    const description = `Active ${direction}: ${effects.map(effect=>`${effect.name} (${effect.years} year${effect.years===1?'':'s'} remaining)`).join('; ')}`;
-    return [{direction,emoji,description}];
-  });
 }
-
 function statEffectDescription(key) {
-  return statEffectGroups(key).map(({description})=>description).join('. ');
+  return statEffects(key).map(({effect,amount})=>`${effect.name}: ${signedModifier(amount)} ${skillLabel(key)} (${effect.years} year${effect.years===1?'':'s'} remaining)`).join('; ');
 }
-
+function statEffectBadge(key) {
+  const amount = Math.round(statEffects(key).reduce((total,item)=>total+item.amount,0)*10)/10;
+  if (!amount) return '';
+  const description = `Temporary ${skillLabel(key)} ${signedModifier(amount)}. ${statEffectDescription(key)}`;
+  return `<span class="stat-effect-indicator ${amount>0?'positive':'negative'}" data-direction="${amount>0?'buff':'debuff'}" role="img" aria-label="${esc(description)}" title="${esc(description)}"><span aria-hidden="true">${signedModifier(amount)}</span></span>`;
+}
 function ratingBar(label, value, statKey) {
   const rating = Math.max(0, Math.min(10, Number(value)));
   const hue = Math.round(rating / 10 * 120);
-  const effects = statEffectGroups(statKey);
-  return `<span class="rating-track${effects.length?' has-active-effects':''}" role="meter" aria-label="${esc(label)}" aria-valuemin="0" aria-valuemax="10" aria-valuenow="${number(rating)}" ${effects.length?`aria-valuetext="${number(rating)} out of 10. ${esc(statEffectDescription(statKey))}"`:''}><span class="rating-fill" style="width:${rating*10}%;background:hsl(${hue}, 60%, 40%)"></span>${effects.length?`<span class="stat-effect-indicators" aria-hidden="true">${effects.map(({direction,emoji,description})=>`<span class="stat-effect-indicator" data-direction="${direction}" title="${esc(description)}">${emoji}</span>`).join('')}</span>`:''}</span>`;
+  const effects = statEffectDescription(statKey);
+  return `<span class="rating-track" role="meter" aria-label="${esc(label)}" aria-valuemin="${Math.min(0,Number(value))}" aria-valuemax="${Math.max(10,Number(value))}" aria-valuenow="${number(value)}" aria-valuetext="${number(value)} out of 10.${effects?` ${esc(effects)}`:''}"><span class="rating-fill" style="width:${rating*10}%;background:hsl(${hue}, 60%, 40%)"></span></span>`;
 }
 
 function profileLifestyleView() {
-  return `<button class="status-pill profile-lifestyle" data-stat="lifestyle" data-action="topic-help" data-topic="lifestyle" data-id="${esc(state.id)}" aria-haspopup="dialog" aria-label="Lifestyle ${number(state.lifestyle)} out of 10. ${esc(statEffectDescription('lifestyle'))} Open help."><span class="profile-lifestyle-heading"><span class="status-label">Lifestyle${statEmoji('lifestyle')}</span><strong class="status-value">${number(state.lifestyle)}<small>/10</small></strong></span>${ratingBar('Lifestyle',state.lifestyle,'lifestyle')}</button>`;
+  return `<button class="status-pill profile-lifestyle" data-stat="lifestyle" data-action="topic-help" data-topic="lifestyle" data-id="${esc(state.id)}" aria-haspopup="dialog" aria-label="Lifestyle ${number(state.lifestyle)} out of 10. ${esc(statEffectDescription('lifestyle'))} Open help."><span class="profile-lifestyle-heading"><span class="status-label">Lifestyle${statEmoji('lifestyle')}</span><strong class="status-value">${number(state.lifestyle)}<small>/10</small></strong>${statEffectBadge('lifestyle')}</span>${ratingBar('Lifestyle',state.lifestyle,'lifestyle')}</button>`;
 }
 
 function render() {
@@ -191,11 +193,10 @@ function render() {
     </header>
     ${isYear ? `
     <section class="profile-bar" aria-label="Your life"><div class="portrait">${avatar(state)}</div><div class="profile-copy"><p class="eyebrow">GENERATION ${state.generation}</p><div class="profile-name-row"><h1 class="person-name">${esc(state.name)}</h1></div><div class="profile-identity">${genderBadge(state)}<button class="profile-height" data-stat="height" data-action="topic-help" data-topic="height" data-id="${esc(state.id)}" aria-haspopup="dialog" aria-label="Height ${heightDescription(state.height,state.age)}. Open help."><strong class="status-value">${formatHeight(state.height,state.age)}</strong>${percentiles?percentileTag(percentiles,'height'):state.age>=18?'<span class="height-percentile">Adult height</span>':''}</button></div>${profileLifestyleView()}</div><div class="profile-age"><strong>${state.age}</strong>${state.age<2?'':`<p class="profile-stage">${state.age<5?'Toddler':state.age<18?'Student':state.education.status==='college'?'College student':career()?.name || 'Finding a path'}</p>`}<span>YEARS OLD</span></div></section>
-    <div class="status-strip" aria-label="At a glance">${DISPLAY_STATS.map(skill=>[skill.key,skill.label,stats[skill.key]]).map(([key,label,value])=>`<button class="status-pill" data-stat="${key}" data-action="topic-help" data-topic="${key}" data-id="${esc(state.id)}" aria-haspopup="dialog" aria-label="${label} ${number(value)} out of 10.${Number.isInteger(state.aptitudes[key])?` Natural aptitude ${aptitude(state.aptitudes[key])}.`: ''} ${esc(statEffectDescription(key))} Open help."><span class="status-label">${label}${statEmoji(key)}</span><span class="status-reading"><strong class="status-value">${number(value)}<small>/10</small></strong>${aptitudeBadge(state.aptitudes[key])}</span>${ratingBar(label,value,key)}</button>`).join('')}</div>
-    <div class="stat-help-links year-stat-help">${labelWithHelp('Stats','stats')}${labelWithHelp('Natural aptitude','affinity')}</div>
+    <div class="status-strip" aria-label="At a glance">${DISPLAY_STATS.map(skill=>[skill.key,skill.label,stats[skill.key]]).map(([key,label,value])=>`<button class="status-pill" data-stat="${key}" data-action="topic-help" data-topic="${key}" data-id="${esc(state.id)}" aria-haspopup="dialog" aria-label="${label} ${number(value)} out of 10.${Number.isInteger(state.aptitudes[key]) && state.aptitudes[key]!==0?` Natural aptitude ${aptitude(state.aptitudes[key])}.`: ''} ${esc(statEffectDescription(key))} Open help."><span class="status-label">${label}${statEmoji(key)}</span><span class="status-reading"><strong class="status-value">${number(value)}<small>/10</small></strong>${aptitudeBadge(state.aptitudes[key])}${statEffectBadge(key)}</span>${ratingBar(label,value,key)}</button>`).join('')}</div>
     ` : ''}
-      <main class="main-column" id="main-content">${activeTab==='career'?'':`<div class="chapter-heading"><h2>${isYear ? stageNames[lifeStage] : ({family:'A life, connected'}[activeTab])}<span style="color:var(--orange)">.</span></h2></div>`}
-      ${eventDecisionView()}${state.ended ? endPanel() : ''}${state.needsSuccession ? successionPanel() : ''}
+      <main class="main-column" id="main-content">${activeTab==='career'||isYear&&!stageNames[lifeStage]?'':`<div class="chapter-heading"><h2>${isYear ? stageNames[lifeStage] : ({family:'A life, connected'}[activeTab])}<span style="color:var(--orange)">.</span></h2></div>`}
+      ${isYear&&familyCareProfiles().length?`<section class="panel parent-status-panel">${parentStatusView()}</section>`:''}${eventDecisionView()}${state.ended ? endPanel() : ''}${state.needsSuccession ? successionPanel() : ''}
       ${activeTab==='year' ? yearView() : activeTab==='career' ? careerView() : familyView()}</main>
     <footer class="bottom-dock" aria-label="Game controls">${isYear?advanceControls():''}<nav class="nav-list" aria-label="Game sections">${[['year','Year'],['career','Career'],['family','Family']].map(([id,label])=>`<button class="nav-button ${activeTab===id?'active':''}" data-action="tab" data-tab="${id}" ${activeTab===id?'aria-current="page"':''}><span class="nav-icon">${icon(id)}</span><span class="nav-label">${label}</span>${id==='family'&&state.children.length?`<span class="nav-count">${state.children.length}</span>`:''}</button>`).join('')}</nav></footer>
   </div>`;
@@ -206,7 +207,7 @@ function advanceControls() {
   if (state.ended) return `<div class="advance-row"><button class="button primary advance-button" data-action="new">Begin another life ${icon('arrow')}</button></div>`;
   if (state.needsSuccession) return `<div class="advance-row"><button class="button primary advance-button" data-action="tab" data-tab="family">Choose your heir ${icon('arrow')}</button></div>`;
   if (needsEducationChoice(state)) return `<div class="advance-row"><button class="button primary advance-button" data-action="tab" data-tab="career">Choose your path ${icon('arrow')}</button></div>`;
-  return `<div class="advance-row"><div class="advance-copy"><strong>Age ${state.age} → ${state.age+1}</strong><span>${state.age<2?`Cry level ${state.cryLevel}/5`:`${focusUsed()}/12 ${state.age<5?'activity points':'focus'} used`}</span></div><button class="button primary advance-button" data-action="advance">Next year ${icon('arrow')}</button></div>`;
+  return `<div class="advance-row"><div class="advance-copy"><strong>Age ${state.age} → ${state.age+1}</strong>${state.age<2?`<span>Cry level ${state.cryLevel}/5</span>`:''}</div><button class="button primary advance-button" data-action="advance">Next year ${icon('arrow')}</button></div>`;
 }
 
 function focusLabel(key) {
@@ -220,17 +221,19 @@ function outcomeLimits(outcome) {
 }
 
 function outcomeSummary(outcome, subject, pending) {
-  const keys = [...new Set([...Object.keys(outcome.statChanges || {}), ...Object.keys(outcome.playerChanges || {}), ...Object.keys(outcome.modifiers || {}), ...(outcome.lifestyle?['lifestyle']:[])])];
   if (!pending) {
-    const current = effectiveStats(state);
-    return [...keys.map(key => `${skillLabel(key)} ${number(key==='lifestyle'?state.lifestyle:current[key])}`), ...outcomeLimits(outcome)].join(' · ');
+    return [...Object.entries(outcome.modifiers || {}).filter(([,amount])=>amount).map(([key,amount])=>`${signedModifier(amount)} ${skillLabel(key)}`), ...(outcome.lifestyle?[`${signedModifier(outcome.lifestyle)} Lifestyle`]:[]), ...outcomeLimits(outcome)].join(' \u00b7 ');
   }
   const preview = structuredClone(state);
   const result = resolveEventChoice(preview,outcome.id,pending.eventId,pending.subjectId || undefined);
   if (!result.ok) return '';
-  const before = effectiveStats(state), after = effectiveStats(preview);
   const change = (label,start,end) => `${label} ${beforeAfter({before:start,after:end})}`;
-  const changes = keys.map(key => change(skillLabel(key),key==='lifestyle'?state.lifestyle:before[key],key==='lifestyle'?preview.lifestyle:after[key]));
+  const permanentKeys = [...new Set([...Object.keys(outcome.statChanges || {}),...Object.keys(outcome.playerChanges || {})])];
+  const before = effectiveStats(state);
+  const afterPermanent = effectiveStats({ ...preview, effects: state.effects });
+  const changes = permanentKeys.map(key => change(skillLabel(key),before[key],afterPermanent[key]));
+  changes.push(...Object.entries(outcome.modifiers || {}).filter(([,amount])=>amount).map(([key,amount])=>`${signedModifier(amount)} ${skillLabel(key)}`));
+  if (outcome.lifestyle) changes.push(`${signedModifier(outcome.lifestyle)} Lifestyle`);
   const nextSubject = pendingEventSubject(preview,pending);
   for (const key of Object.keys(outcome.subjectChanges || {})) changes.push(change(`${subject?.name || 'Your loved one'}: ${skillLabel(key)}`,subject?.stats[key],nextSubject?.stats[key]));
   if (outcome.relationship) changes.push(change(`Relationship with ${subject?.name || 'your loved one'}`,subject?.relationship,nextSubject?.relationship));
@@ -256,8 +259,9 @@ function focusEventDecision() {
 }
 
 function effectsView() {
-  if (!state.effects.length) return '';
-  return `<details class="panel active-effects"><summary>Active effects <span class="tag">${state.effects.length}</span></summary><div class="effect-list">${state.effects.map(effect => `<div class="effect-card ${Object.values(effect.modifiers || {}).some(value => value<0)||effect.lifestyle<0||outcomeLimits(effect).length?'negative':'positive'}"><div class="effect-title">${icon('spark')} ${journalText(effect.name)}</div><div class="effect-meta">${esc(outcomeSummary(effect))}<br>${effect.years} year${effect.years===1?'':'s'} remaining</div></div>`).join('')}</div><button class="button ghost small" data-action="odds">View this year’s odds ${icon('arrow')}</button></details>`;
+  const activeEffects = state.effects.filter(effect=>effect.years>0);
+  if (!activeEffects.length) return '';
+  return `<details class="panel active-effects"><summary>Active effects <span class="tag">${activeEffects.length}</span></summary><div class="effect-list">${activeEffects.map(effect => `<div class="effect-card ${Object.values(effect.modifiers || {}).some(value => value<0)||effect.lifestyle<0||outcomeLimits(effect).length?'negative':'positive'}"><div class="effect-title">${icon('spark')} ${journalText(effect.name)}</div><div class="effect-meta">${esc(outcomeSummary(effect))}<br>${effect.years} year${effect.years===1?'':'s'} remaining</div></div>`).join('')}</div><button class="button ghost small" data-action="odds">View this year’s odds ${icon('arrow')}</button></details>`;
 }
 
 function yearView() {
@@ -268,7 +272,6 @@ function yearView() {
   return `${state.education.status==='college'?collegeProgressView():''}<section class="panel focus-panel"><div class="panel-heading"><h3>${labelWithHelp(baby?'Cry level':toddler?'Toddler activities':'Focus',baby?'cry':toddler?'toddler-focus':'focus')}</h3><span class="tag">${baby ? 'AGES 0–1' : `${focusUsed()} / 12 POINTS`}</span></div>
     ${baby ? `<div class="cry-control" role="group" aria-label="Cry level"><div class="cry-levels">${[1,2,3,4,5].map(level=>`<button class="cry-level ${state.cryLevel===level?'selected':''}" data-action="baby" data-level="${level}" aria-label="Cry level ${level} of 5" aria-pressed="${state.cryLevel===level}" ${disabled?'disabled':''}>${level}</button>`).join('')}</div><div class="cry-scale-labels"><span>Low</span><span>High</span></div></div>` : focusView(disabled)}
     ${!baby&&(state.age<18||state.education.status==='college')?'':choiceImpactSummary()}
-    ${parentStatusView()}
     </section>
     ${effectsView()}
     ${retirementNotice()}${connectionNotice()}${journalView()}`;
@@ -424,7 +427,7 @@ function focusView(disabled) {
     const restrictions = details.filter(limit=>limit.key===key);
     const limitText = restrictions.length?'Max '+limits[key]+' · '+restrictions.map(limit=>limit.name+' ('+(limit.years===1?'this year':limit.years+' years left')+')').join('; '):'';
     return `<div class="focus-row" data-focus-key="${key}"><span class="focus-icon">${icon(ico)}</span><div class="focus-copy"><h4>${labelWithHelp(label,`${toddler?'toddler':'focus'}-${key}`)}</h4><div class="focus-scale" aria-hidden="true">${Array.from({length:5},(_,i)=>`<span class="${i<(state.focus[key] ?? 0)?'filled':i>=limits[key]?'limited':''}"></span>`).join('')}</div>${limitText?`<div class="focus-limit" id="focus-limit-${key}">${esc(limitText)}</div>`:''}</div><div class="stepper" role="group" aria-label="${esc(label)} ${mode}" ${limitText?`aria-describedby="focus-limit-${key}"`:''}><button data-action="focus" data-key="${key}" data-delta="-1" aria-label="Decrease ${esc(label.toLowerCase())} ${mode}" ${(state.focus[key] ?? 0)<=0||disabled?'disabled':''}>${icon('minus')}</button><output aria-label="${esc(label)} ${mode} level">${state.focus[key] ?? 0}</output><button data-action="focus" data-key="${key}" data-delta="1" aria-label="Increase ${esc(label.toLowerCase())} ${mode}" ${(state.focus[key] ?? 0)>=limits[key]||focusUsed()>=12||disabled?'disabled':''}>${icon('plus')}</button></div>${(toddler||studying)&&!disabled?activityEffectsView(key,label):''}</div>`;
-  }).join('')}</div><div class="budget-bar"><div class="budget-summary"><span>${12-focusUsed()} ${mode} point${12-focusUsed()===1?'':'s'} available</span><strong>${focusUsed()} / 12</strong></div><div class="budget-track"><span style="width:${focusUsed()/12*100}%"></span></div></div>`;
+  }).join('')}</div>`;
 }
 
 function journalView() {
@@ -466,7 +469,7 @@ function relationshipView(person) {
 
 function profileStats(person, parent = false) {
   const stats = parent ? DISPLAY_STATS.filter(skill=>['health','stability'].includes(skill.key)) : DISPLAY_STATS;
-  return `<div class="profile-stats">${stats.map(skill=>`<div class="profile-stat" data-skill="${skill.key}"><span>${labelWithHelp(skill.label,skill.key)}</span><span class="stat-reading"><strong>${number(person.stats[skill.key])}<small>/10</small></strong>${aptitudeBadge(person.aptitudes[skill.key],`${skill.label} natural aptitude`)}</span>${ratingBar(skill.label,person.stats[skill.key])}</div>`).join('')}${parent?'':`<div class="profile-stat"><span>${labelWithHelp('Lifestyle','lifestyle')}</span><strong>${number(person.lifestyle)}<small>/10</small></strong>${ratingBar('Lifestyle',person.lifestyle)}</div>`}<div class="profile-stat"><span>${labelWithHelp('Height','height',person.id)}</span><strong aria-label="${heightDescription(person.height,person.age)}">${formatHeight(person.height,person.age)}</strong><span class="height-percentile">${heightLabel(person)}</span></div></div><div class="stat-help-links">${labelWithHelp('Natural aptitude','affinity')}</div>`;
+  return `<div class="profile-stats">${stats.map(skill=>`<div class="profile-stat" data-skill="${skill.key}"><span>${labelWithHelp(skill.label,skill.key)}</span><span class="stat-reading"><strong>${number(person.stats[skill.key])}<small>/10</small></strong>${aptitudeBadge(person.aptitudes[skill.key],`${skill.label} natural aptitude`)}</span>${ratingBar(skill.label,person.stats[skill.key])}</div>`).join('')}${parent?'':`<div class="profile-stat"><span>${labelWithHelp('Lifestyle','lifestyle')}</span><strong>${number(person.lifestyle)}<small>/10</small></strong>${ratingBar('Lifestyle',person.lifestyle)}</div>`}<div class="profile-stat"><span>${labelWithHelp('Height','height',person.id)}</span><strong aria-label="${heightDescription(person.height,person.age)}">${formatHeight(person.height,person.age)}</strong><span class="height-percentile">${heightLabel(person)}</span></div></div>`;
 }
 
 function pregnancyView() {
@@ -602,7 +605,7 @@ function topicHelpModal(topic, id) {
     height: ['Height', ['Final height emerges from yearly growth shaped by age, inheritance, health and chance, ending at 14–18. Poor health reduces new growth, never existing height.']],
     cry: ['Cry level', ['Less crying lowers your intelligence and mental stability; more crying raises them. Strength is unaffected. Parent relationships tend to fall at levels 1–2, stay steady at 3, and rise at 4–5, with yearly variation. Harder crying strains their mental stability more.']],
     focus: ['Your focus', ['Allocate 12 points, at most 5 per area; unused points allow rest. Events can temporarily lower these limits. Focused skills can rise, neglected ones can fall, and results vary yearly.', ...(state.age<18||state.education.status==='college'?['Each row shows that choice compared with 3 points; family relationships are neutral at 2. Signs run from one for the weakest effect to three for the strongest. Zero effects are hidden, and shared family effects appear once.']:[])]],
-    'toddler-focus': ['Toddler activities', ['Share 12 points among five activities, up to 5 each. Events can temporarily lower these limits. Unused points support mental stability, and results vary each year.', 'Your activity effects are measured from Play 3, Electronics 2, Family time 2, Rest 3, and Arts & crafts 2. Parent relationships are neutral at Family time 3; parent mental stability at 2. Below neutral, each missing point adds one sign. Above neutral, signs run from one for the weakest option to three for the strongest. Zero effects are hidden.']],
+    'toddler-focus': ['Toddler activities', ['Share 12 points among five activities, up to 5 each. Events can temporarily lower these limits. Unused points support mental stability, and results vary each year.', 'Your activity effects are measured from Play 3, Electronics 2, Family time 2, Rest 3, and Arts & crafts 2. All Family time effects are neutral at 2; Electronics Social is neutral at 3. Zero Arts & crafts gives the strongest creativity loss. Signs compare effect strength, and zero effects are hidden.']],
     ...Object.fromEntries(toddlerFocusRows.map(([key,label]) => [`toddler-${key}`, [label,
       toddlerActivityImpacts(key).map(({stat,change,level,target}) => `${(change>0?'+':'-').repeat(level)}${target==='parents'?(caregivers(state).some(person=>person.guardianRole)?'Guardian relationship':'Parent relationships'):skillLabel(stat)}`)
     ]])),
@@ -628,7 +631,7 @@ function topicHelpModal(topic, id) {
     if (job) entry = [job.name,[job.description,'+3 marks a core skill; skill fit reflects your current match.']];
   }
   if (!entry) return;
-  if (id===state.id) entry=[entry[0],[...entry[1],...statEffectGroups(topic).map(({description})=>description)]];
+  if (id===state.id) entry=[entry[0],[...entry[1],...statEffects(topic).map(({effect,amount})=>`${effect.name}: ${signedModifier(amount)} ${skillLabel(topic)} (${effect.years} year${effect.years===1?'':'s'} remaining)`)]];
   openModal(esc(entry[0]),`${entry[1].map(paragraph=>`<p>${esc(paragraph)}</p>`).join('')}`);
   modalRoot.querySelector('.modal').classList.add('help-popup');
   modalRoot.querySelector('.modal').setAttribute('aria-describedby','topic-help-content');

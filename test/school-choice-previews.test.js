@@ -129,7 +129,7 @@ test('school rows respect active caps and rating limits without reranking signs'
   assert.ok(!schoolChoiceImpacts(state, 'work').some(entry => entry.stat === 'intelligence'));
   state.stats.intelligence = 9;
   state.effects = [{ id: 'bright', years: 2, modifiers: { intelligence: 1 } }];
-  assert.ok(!schoolChoiceImpacts(state, 'work').some(entry => entry.stat === 'intelligence'));
+  assert.ok(schoolChoiceImpacts(state, 'work').some(entry => entry.stat === 'intelligence'), 'a retained buff does not cap the effective rating at ten');
   state.effects[0].years = 1;
   assert.ok(schoolChoiceImpacts(state, 'work').some(entry => entry.stat === 'intelligence'), 'expiry is separate from the upcoming choice');
   const low = selected(student(), 'work', 0);

@@ -70,7 +70,7 @@ test('resolving an event clamps only over-limit allocations and records restrict
     assert.equal(state.rng, rng);
     assert.equal(state.effects.at(-1).years, 1);
     assert.match(state.history[0].text, /School max 2; Friends max 1\. Temporary effects: 1 year\./);
-    assert.match(state.history[0].text, /Your health .* → /);
+    assert.match(state.history[0].text, /-\.4 Health/);
     assert.doesNotMatch(state.history[0].text, /Filler/);
     assert.equal(validateSave(state), true);
     assert.deepEqual(migrateSave(copy(state)), state);
@@ -177,7 +177,7 @@ test('schema 13 migration preserves ratings, effects, pending choices, history a
   const before = copy(state);
   assert.equal(validateSave(state), false);
   const migrated = migrateSave(state);
-  assert.deepEqual(migrated, { ...before, version: 15 });
+  assert.deepEqual(migrated, { ...before, version: 16 });
   assert.deepEqual(state, before);
   assert.equal(validateSave(migrated), true);
 });

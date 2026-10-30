@@ -105,8 +105,8 @@ test('toddler social practice has three, minus one, and two relative units while
     const closer = annualForecast(more('family'));
     for (const parent of neutral.parents) {
       const next = closer.parents.find(person => person.id === parent.id);
-      assert.equal(parent.relationship.change, -.04);
-      assert.equal(next.relationship.change, 0);
+      assert.equal(parent.relationship.change, 0);
+      assert.equal(next.relationship.change, .04);
     }
     assert.deepEqual(state, before, 'practice and forecast reads preserve the save and RNG');
   }
@@ -145,7 +145,7 @@ test('v10 toddler saves gain an empty crafts allocation without rewriting progre
   const migrated = migrateSave(state);
   assert.deepEqual(state, before);
   assert.ok(migrated);
-  const expected = { ...copy(before), version: 15, focus: { ...before.focus, creative: 0 } };
+  const expected = { ...copy(before), version: 16, focus: { ...before.focus, creative: 0 } };
   neutralWellbeingAptitudes(expected);
   assert.deepEqual(migrated, expected);
   assert.equal(Object.hasOwn(migrated.yearSummary.decisions.focus, 'creative'), false);

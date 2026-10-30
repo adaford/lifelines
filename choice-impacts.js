@@ -1,5 +1,5 @@
-import { annualForecast, effectiveStats, needsEducationChoice, focusLimits, caregivers } from './engine.js?v=decision-choice-rows-1';
-import { infantChoiceEffects, wellbeingResponse, toddlerActivityEffects, schoolFocusEffects, TODDLER_FOCUS, TODDLER_ACTIVITY_EFFECTS, PARENT_FAMILY_RELATIONSHIP_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=decision-choice-rows-1';
+import { annualForecast, effectiveStats, needsEducationChoice, focusLimits, caregivers } from './engine.js?v=stat-buffs-balance-1';
+import { infantChoiceEffects, wellbeingResponse, toddlerActivityEffects, toddlerActivityNeutral, schoolFocusEffects, TODDLER_FOCUS, TODDLER_ACTIVITY_EFFECTS, PARENT_FAMILY_RELATIONSHIP_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=stat-buffs-balance-1';
 
 const nonzero = value => Math.abs(value) > .000001;
 const keyOf = entry => `${entry.parentId || 'you'}:${entry.stat}`;
@@ -19,8 +19,8 @@ export function toddlerActivityImpacts(activity) {
 }
 
 function personalChoiceEntries(state, effects, clip) {
-  // Retained modifiers can hide an otherwise possible change at the displayed
-  // bounds. Expiring modifiers are background changes, not activity effects.
+  // Clip underlying ratings at their limits; temporary modifiers can carry the
+  // displayed total beyond them. Expiration is not part of an activity effect.
   const next = { ...state, effects: state.effects.filter(effect => effect.years > 1) };
   const before = clip ? effectiveStats(next) : null;
   const after = clip ? effectiveStats({ ...next, stats: { ...state.stats,
@@ -31,15 +31,16 @@ function personalChoiceEntries(state, effects, clip) {
 
 function toddlerChoiceEntries(state, activity, points, clip) {
   const candidate = { ...state, focus: { ...state.focus, [activity]: points } };
-  const balanced = { ...candidate, focus: { ...candidate.focus, [activity]: TODDLER_FOCUS[activity] } };
   const contributions = toddlerActivityEffects(candidate)[activity];
-  const reference = toddlerActivityEffects(balanced)[activity];
-  const effects = Object.fromEntries(Object.entries(contributions).map(([stat, change]) => [stat, change - reference[stat]]));
+  const effects = Object.fromEntries(Object.entries(contributions).map(([stat, change]) => {
+    const balanced = { ...candidate, focus: { ...candidate.focus, [activity]: toddlerActivityNeutral(activity, stat) } };
+    return [stat, change - toddlerActivityEffects(balanced)[activity][stat]];
+  }));
   const entries = personalChoiceEntries(state, effects, clip);
   if (activity === 'family') {
     for (const parent of caregivers(state)) {
       const stability = wellbeingResponse(parent, 'stability', .025 * (points - 2));
-      const relationship = PARENT_FAMILY_RELATIONSHIP_GAIN * (points - 3);
+      const relationship = PARENT_FAMILY_RELATIONSHIP_GAIN * (points - 2);
       entries.push({ stat: 'stability', parentId: parent.id, group: 'others', change: clip ? bounded(parent.stats.stability, stability) : stability });
       entries.push({ stat: 'relationship', parentId: parent.id, group: 'relationships', change: clip ? bounded(parent.relationship, relationship) : relationship });
     }
@@ -57,7 +58,13 @@ export function toddlerChoiceImpacts(state, activity) {
   const raw = toddlerChoiceEntries(state, activity, points, false);
   const comparisons = Array.from({ length: 6 }, (_, level) => toddlerChoiceEntries(state, activity, level, false));
   return rankedChoiceEntries(entries, raw, comparisons, points,
-    entry => entry.parentId ? (entry.stat === 'relationship' ? 3 : 2) : TODDLER_FOCUS[activity]);
+    entry => entry.parentId ? 2 : toddlerActivityNeutral(activity, entry.stat)).map(entry => {
+    // Crafts' strongest creativity loss uses three signs. Electronics Social
+    // uses one sign per point away from three, so four/five show - and --.
+    if (!entry.parentId && activity === 'creative' && entry.stat === 'creativity' && points < 2) return { ...entry, level: points === 0 ? 3 : 1 };
+    if (!entry.parentId && activity === 'social' && entry.stat === 'social') return { ...entry, level: Math.abs(points - 3) };
+    return entry;
+  });
 }
 
 function rankedChoiceEntries(entries, raw, comparisons, points, neutralFor) {
@@ -129,9 +136,8 @@ function cryEntries(state, level, clip) {
   // Personal crying effects omit unrelated innate development and wellbeing
   // reversion, so an unchanged skill is never presented as an effect of crying.
   const effects = infantChoiceEffects(candidate);
-  // Evaluate the contribution with next year's retained modifiers. This keeps
-  // boosts at the displayed ceiling from advertising an impossible increase,
-  // while excluding the independent effect of a modifier expiring this year.
+  // Evaluate with next year's retained modifiers, clipping only the underlying
+  // rating and excluding the independent effect of a modifier expiring.
   const next = { ...state, effects: state.effects.filter(effect => effect.years > 1) };
   const before = clip ? effectiveStats(next) : null;
   const after = clip ? effectiveStats({ ...next, stats: { ...state.stats,

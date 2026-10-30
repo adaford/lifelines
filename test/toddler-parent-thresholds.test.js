@@ -16,14 +16,14 @@ function familyTime(age, points) {
   return state;
 }
 
-test('toddler Family time loses parent relationships below 3 and mental stability below 2', () => {
+test('toddler Family time has neutral parent relationships and mental stability at two points', () => {
   for (const age of [2, 3, 4]) for (let points = 0; points <= 5; points++) {
     const state = familyTime(age, points);
     const before = structuredClone(state);
     const forecast = annualForecast(state);
     for (const parent of forecast.parents) {
-      assert.equal(parent.relationship.after, round(5 + (points - 3) * .04), `age ${age}, Family ${points}, relationship`);
-      assert.equal(parent.relationship.change, round((points - 3) * .04));
+      assert.equal(parent.relationship.after, round(5 + (points - 2) * .04), `age ${age}, Family ${points}, relationship`);
+      assert.equal(parent.relationship.change, round((points - 2) * .04));
       assert.equal(parent.stability.after, round(5 + (points - 2) * .0125), `age ${age}, Family ${points}, mental stability`);
       assert.equal(parent.stability.change, round(round(5 + (points - 2) * .0125) - 5));
     }

@@ -32,17 +32,20 @@ export function heightDescription(inches, age) {
 }
 
 const amount = '\\d+(?:\\.\\d+)?';
+const ratingAmount = `-?${amount}`;
 const arrow = '\\s*(?:→|->)\\s*';
 const label = '\\b(?:Intelligence|Strength|Attractiveness|Social(?: ability)?|Creativity|Health|(?:Mental\\s+)?stability|Lifestyle|Relationships?)(?:\\s*:\\s*|\\s+)';
 const valueEnd = '(?![\\p{L}\\p{M}\\p{N}_]|\\.\\d)(?!\\s*(?:→|->|%|percent\\b|per cent\\b|focus\\b|points?\\b|years?\\b|months?\\b|chance\\b|probability\\b))';
-const ratingPattern = new RegExp(`(${label})(${amount})(?:(${arrow})(${amount}))?${valueEnd}`, 'giu');
+const ratingPattern = new RegExp(`(${label})(${ratingAmount})(?:(${arrow})(${ratingAmount}))?${valueEnd}`, 'giu');
 const heightUnit = '(cm|inches|inch)';
 const heightPair = new RegExp(`(\\bHeight(?:\\s*:\\s*|\\s+))(${amount})(?:\\s*${heightUnit})?(${arrow})(${amount})\\s*${heightUnit}\\b`, 'gi');
 const heightSingle = new RegExp(`(\\bHeight(?:\\s*:\\s*|\\s+))(${amount})\\s*${heightUnit}\\b`, 'gi');
 const heightInches = (value, unit) => Number(value) / (unit.toLowerCase() === 'cm' ? 2.54 : 1);
 
 const outcomeStat = '(?:Intelligence|Strength|Attractiveness|Social(?: ability)?|Creativity|Health|(?:Mental\\s+)?stability|Lifestyle|Relationships?)';
-const outcomePart = new RegExp(`^(?:(?<person>.+?):\\s*${outcomeStat}|(?<prefix>.*?)Your\\s+${outcomeStat}|(?<lifestylePrefix>.*?)Lifestyle)\\s+(?<before>${amount})${arrow}(?<after>${amount})(?<suffix>[.!?](?:\\s.*)?)?$`, 'iu');
+const outcomePart = new RegExp(`^(?:(?<person>.+?):\\s*${outcomeStat}|(?<prefix>.*?)Your\\s+${outcomeStat}|(?<lifestylePrefix>.*?)Lifestyle)\\s+(?<before>${ratingAmount})${arrow}(?<after>${ratingAmount})(?<suffix>[.!?](?:\\s.*)?)?$`, 'iu');
+const buffPart = new RegExp(`^(?<prefix>.*?)(?<buff>[+-](?:${amount}|\\.\\d+))\\s+${outcomeStat}(?<suffix>[.!?](?:\\s.*)?)?$`, 'iu');
+const parseOutcome = text => outcomePart.exec(text) || buffPart.exec(text);
 
 // Separate recorded effects by person without changing saved prose or treating
 // an ordinary semicolon in a custom story as an effect boundary.
@@ -51,8 +54,8 @@ export function splitEventOutcome(text) {
   const parts = source.split(';');
   if (parts.length < 2) return [source];
   const parsed = parts.map((part, index) => {
-    const match = outcomePart.exec(part.trim());
-    if (!match || [match.groups.before, match.groups.after].some(value => Number(value) < 0 || Number(value) > 10)) return null;
+    const match = parseOutcome(part.trim());
+    if (!match) return null;
     const { person, prefix, lifestylePrefix, suffix } = match.groups;
     if (index > 0 && (prefix || lifestylePrefix) || index < parts.length - 1 && suffix) return null;
     return { person: person?.trim() || null };
@@ -81,9 +84,8 @@ export function splitJournalEventOutcome(text) {
   if (parts.length < 2) return [source];
   const lines = [];
   for (let index = 0; index < parts.length; index++) {
-    const match = outcomePart.exec(parts[index].trim());
-    const valid = match && [match.groups.before, match.groups.after].every(value => Number(value) >= 0 && Number(value) <= 10)
-      && (index === 0 || !match.groups.prefix && !match.groups.lifestylePrefix);
+    const match = parseOutcome(parts[index].trim());
+    const valid = match && (index === 0 || !match.groups.prefix && !match.groups.lifestylePrefix);
     if (!valid) {
       if (lines.length < 2) return [source];
       lines[lines.length - 1] += `;${parts.slice(index).join(';')}`;
@@ -105,7 +107,9 @@ function formatValues(text, age) {
     .replace(heightSingle, (_, prefix, value, unit) => `${prefix}${formatHeight(heightInches(value, unit), age)}`)
     .replace(ratingPattern, (match, prefix, before, separator, after) => {
       const values = [before, after].filter(value => value !== undefined).map(Number);
-      if (values.some(value => value < 0 || value > 10)) return match;
+      // Singles outside the base range may be ordinary prose. Explicit rating
+      // transitions also describe effective totals beyond the base bounds.
+      if (separator === undefined && values.some(value => value < 0 || value > 10)) return match;
       return `${prefix}${formatRating(before)}${separator === undefined ? '' : `${separator}${formatRating(after)}`}`;
     });
 }

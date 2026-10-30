@@ -10,17 +10,17 @@ export const BIRTH_VARIATION = {
 };
 
 export const DEVELOPMENT_BALANCE = {
-  "innateScale": 0.8,
+  "innateScale": 0.6,
   "skillReversion": 0.012,
   "childhoodBias": {
-    "intelligence": -0.095118,
-    "strength": -0.018873,
-    "social": -0.087305,
-    "creativity": -0.097331
+    "intelligence": -0.094083,
+    "strength": -0.014534,
+    "social": -0.098102,
+    "creativity": -0.097077
   },
   "wellbeingTarget": {
-    "health": 5.144981,
-    "stability": 4.321297
+    "health": 5.161767,
+    "stability": 4.292949
   },
   "wellbeingReversion": {
     "health": 0.06,
@@ -44,12 +44,15 @@ export const TODDLER_ACTIVITY_EFFECTS = {
   self: { health: .1, stability: .08 },
   creative: { creativity: .11, intelligence: .03 },
 };
+// Electronics supports learning from two points; its social cost starts only
+// beyond three. Other activity effects keep the balanced allocation neutral.
+export const toddlerActivityNeutral = (activity, stat) => activity === 'social' && stat === 'social' ? 3 : TODDLER_FOCUS[activity];
 const toddlerFocus = person => Object.fromEntries(Object.keys(TODDLER_FOCUS).map(key => [key, clamp(number(person.focus?.[key], key === 'creative' ? 0 : 3), 0, 5)]));
 function toddlerPractice(focus) {
-  return Object.fromEntries(skills.map(skill => [skill, Object.entries(TODDLER_ACTIVITY_EFFECTS).reduce((sum, [key, coefficients]) => sum + (coefficients[skill] || 0) * (focus[key] - TODDLER_FOCUS[key]), 0)]));
+  return Object.fromEntries(skills.map(skill => [skill, Object.entries(TODDLER_ACTIVITY_EFFECTS).reduce((sum, [key, coefficients]) => sum + (coefficients[skill] || 0) * (focus[key] - toddlerActivityNeutral(key, skill)), 0)]));
 }
 function practiceResponse(effort, aptitude) {
-  return effort * (effort >= 0 ? 1 + aptitude * .12 : 1 - aptitude * .1);
+  return effort * (effort >= 0 ? 1 + aptitude * .08 : 1 - aptitude * .07);
 }
 
 // Natural resilience changes responses to routine choices, not the background

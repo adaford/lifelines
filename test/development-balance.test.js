@@ -80,6 +80,20 @@ test('aptitude helps learning and retention while care and older-age focus still
   assert.deepEqual(skillChanges({ ...person(0), alive: false }), { intelligence: 0, strength: 0, social: 0, creativity: 0 });
 });
 
+test('aptitude has a gentler influence on starting ratings, practice and routine resilience', () => {
+  assert.equal(naturalSkillRating(-3), 3.2);
+  assert.equal(naturalSkillRating(0), 5);
+  assert.equal(naturalSkillRating(3), 6.8);
+  for (const aptitude of [-3, 0, 3]) {
+    const person = { age: 25, stats: { strength: naturalSkillRating(aptitude) }, aptitudes: { strength: aptitude, health: aptitude }, focus: { self: 5 } };
+    assert.ok(Math.abs(skillChanges(person).strength - .1 * (1 + aptitude * .08)) < 1e-12);
+    person.focus.self = 1;
+    assert.ok(Math.abs(skillChanges(person).strength + .1 * (1 - aptitude * .07)) < 1e-12);
+    assert.ok(Math.abs(wellbeingResponse(person, 'health', .2) - .1 * (1 + aptitude * .08)) < 1e-12);
+    assert.ok(Math.abs(wellbeingResponse(person, 'health', -.2) + .1 * (1 - aptitude * .07)) < 1e-12);
+  }
+});
+
 test('childhood wellbeing recovers toward its usual range while choices still matter', () => {
   const child = { age: 10, alive: true, stats: { health: 5, stability: 5 }, focus: { work: 3, social: 3, family: 3, self: 3 } };
   const low = childhoodWellbeing({ ...child, stats: { health: 2, stability: 2 } });

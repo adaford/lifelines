@@ -1,19 +1,19 @@
 // Lifelines: deterministic, browser-independent simulation rules.
 // All public actions mutate their state and return { ok, reason? }.
-import { JOBS } from './jobs.js?v=decision-choice-rows-1';
-import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=decision-choice-rows-1';
-import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=decision-choice-rows-1';
-import { mortalityRisk, rollMortality } from './mortality.js?v=decision-choice-rows-1';
-import { heightReference, advanceGrowth } from './growth.js?v=decision-choice-rows-1';
-import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=decision-choice-rows-1';
-import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, DEVELOPMENT_BALANCE, BIRTH_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=decision-choice-rows-1';
-import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=decision-choice-rows-1';
-import { normalPercentile } from './percentiles.js?v=decision-choice-rows-1';
+import { JOBS } from './jobs.js?v=stat-buffs-balance-1';
+import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=stat-buffs-balance-1';
+import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=stat-buffs-balance-1';
+import { mortalityRisk, rollMortality } from './mortality.js?v=stat-buffs-balance-1';
+import { heightReference, advanceGrowth } from './growth.js?v=stat-buffs-balance-1';
+import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=stat-buffs-balance-1';
+import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, DEVELOPMENT_BALANCE, BIRTH_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=stat-buffs-balance-1';
+import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=stat-buffs-balance-1';
+import { normalPercentile } from './percentiles.js?v=stat-buffs-balance-1';
 export { DEVELOPMENT_BALANCE };
-export { heightPercentile } from './growth.js?v=decision-choice-rows-1';
-export { mortalityRisk } from './mortality.js?v=decision-choice-rows-1';
-import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=decision-choice-rows-1';
-export { JOBS, JOB_CATEGORIES } from './jobs.js?v=decision-choice-rows-1';
+export { heightPercentile } from './growth.js?v=stat-buffs-balance-1';
+export { mortalityRisk } from './mortality.js?v=stat-buffs-balance-1';
+import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=stat-buffs-balance-1';
+export { JOBS, JOB_CATEGORIES } from './jobs.js?v=stat-buffs-balance-1';
 export const EVENTS = [...PERSONAL_EVENTS, ...FAMILY_EVENTS];
 
 export const SKILLS = [
@@ -180,7 +180,7 @@ function active(state) {
 
 export function createGame({ name, surname: chosenSurname, firstName, seed, gender = 'male', canGestate, attractedTo } = {}) {
   const initialSeed = Number.isFinite(seed) ? seed >>> 0 : (Date.now() ^ Math.floor(Math.random() * 0xFFFFFFFF)) >>> 0;
-  const state = { version: 15, seed: initialSeed, rng: initialSeed, nextId: 0, id: `life-${initialSeed}`, age: 0, generation: 1,
+  const state = { version: 16, seed: initialSeed, rng: initialSeed, nextId: 0, id: `life-${initialSeed}`, age: 0, generation: 1,
     name: '', stats: {}, aptitudes: {}, height: fromCentimeters(50), adultHeight: null,
     focus: { work: 3, social: 3, family: 3, self: 3 }, babyChoice: 'quiet', cryLevel: 1, alive: true, death: null, yearSummary: null,
     parents: [], guardian: null, children: [], siblings: [], money: 0, income: 0, expenses: 0, lifestyle: 1,
@@ -213,11 +213,14 @@ export function stage(state) {
 }
 export function effectiveStats(state) {
   const result = { ...state.stats };
-  for (const effect of state.effects) if (effect.years > 0) for (const [key, value] of Object.entries(effect.modifiers)) result[key] += value;
   const partner = livingPartner(state);
   if (partner) { result.social += partner.married ? .9 : .7; result.stability += partner.married ? .8 : .6; }
   result.social += Math.min(1.2, dependents(state).length * .2);
   for (const key of STAT_KEYS) result[key] = round(clamp(result[key], 0, 10));
+  // Base ratings and ongoing family benefits remain bounded. Timed event
+  // modifiers are a separate layer, so their full amount survives the bounds.
+  for (const effect of state.effects) if (effect.years > 0) for (const [key, value] of Object.entries(effect.modifiers)) result[key] += value;
+  for (const key of STAT_KEYS) result[key] = round(result[key]);
   return result;
 }
 export function currentEffects(state) { return state.effects.filter(effect => effect.years > 0); }
@@ -474,7 +477,7 @@ function growYear(state) {
   const toddler = state.age < 5;
   for (const parent of caregivers(state)) {
     addStat(parent, 'stability', .08 * (5 - parent.stats.stability) + wellbeingResponse(parent, 'stability', (f.family - (toddler ? 2 : 3)) * .025));
-    parent.relationship = round(clamp(parent.relationship + (f.family - (toddler ? 3 : 2)) * PARENT_FAMILY_RELATIONSHIP_GAIN, 0, 10));
+    parent.relationship = round(clamp(parent.relationship + (f.family - 2) * PARENT_FAMILY_RELATIONSHIP_GAIN, 0, 10));
   }
 }
 // Money remains internal: the player sees only a 0–10 lifestyle score.
@@ -496,7 +499,7 @@ export function householdLifestyle(state) {
 function syncFamilyLifestyles(state) {
   const modifier = state.effects.reduce((sum, effect) => sum + (effect.years > 0 ? effect.lifestyle || 0 : 0), 0);
   const familyCost = (livingPartner(state) ? 1 : 0) + dependents(state).length;
-  state.lifestyle = state.age < 18 ? householdLifestyle(state) : round(clamp(lifestyleFromResources(state.income, state.money) + modifier - familyCost, 0, 10));
+  state.lifestyle = state.age < 18 ? householdLifestyle(state) : round(clamp(lifestyleFromResources(state.income, state.money) - familyCost, 0, 10) + modifier);
   for (const child of state.children) if (child.alive !== false) child.lifestyle = child.age < 18 ? state.lifestyle : lifestyleFromResources(0, child.money);
   for (const sibling of state.siblings) if (sibling.alive !== false) sibling.lifestyle = sibling.age < 18 ? householdLifestyle(state) : lifestyleFromResources(0, sibling.money);
 }
@@ -597,6 +600,7 @@ function applyOutcome(state, event, outcome = event, context = {}) {
     for (const [key, amount] of Object.entries(outcome.subjectChanges || {})) addStat(subject, key, amount);
     if (outcome.relationship) subject.relationship = round(clamp(subject.relationship + outcome.relationship, 0, 10));
   }
+  const afterPermanent = effectiveStats(state);
   let temporaryYears = 0;
   if (outcome.years > 0 && (Object.keys(outcome.modifiers || {}).length || outcome.lifestyle || outcome.focusLimits)) {
     const old = state.effects.find(effect => effect.id === key);
@@ -613,14 +617,17 @@ function applyOutcome(state, event, outcome = event, context = {}) {
   clampFocusToLimits(state);
   syncFamilyLifestyles(state);
   const label = key => SKILLS.find(skill => skill.key === key)?.label || ({ health: 'Health', stability: 'Mental stability' }[key]);
-  const after = effectiveStats(state);
-  const keys = new Set([...Object.keys(outcome.statChanges || {}), ...Object.keys(outcome.playerChanges || {}), ...Object.keys(outcome.modifiers || {})]);
-  const changes = [...keys].map(key => `Your ${label(key).toLowerCase()} ${before.stats[key]} → ${after[key]}`);
+  const keys = new Set([...Object.keys(outcome.statChanges || {}), ...Object.keys(outcome.playerChanges || {})]);
+  const changes = [...keys].map(key => `Your ${label(key).toLowerCase()} ${before.stats[key]} → ${afterPermanent[key]}`);
+  const signed = amount => `${amount > 0 ? '+' : '-'}${Math.abs(amount).toFixed(1).replace(/^0\./, '.')}`;
+  if (temporaryYears) for (const [key, amount] of Object.entries(outcome.modifiers || {})) {
+    if (amount) changes.push(`${signed(amount)} ${label(key)}`);
+  }
   if (subject && subject !== state) {
     for (const key of Object.keys(outcome.subjectChanges || {})) changes.push(`${subject.name}: ${label(key)} ${before.subjectStats[key]} → ${subject.stats[key]}`);
     if (outcome.relationship) changes.push(`${subject.name}: Relationship ${before.relationship} → ${subject.relationship}`);
   }
-  if (outcome.lifestyle) changes.push(`Lifestyle ${before.lifestyle} → ${state.lifestyle}`);
+  if (temporaryYears && outcome.lifestyle && state.age >= 18) changes.push(`${signed(outcome.lifestyle)} Lifestyle`);
   const decision = outcome === event ? '' : `${outcome.label}. `;
   const result = changes.length ? `${changes.join('; ')}.` : 'No stat changes.';
   const duration = temporaryYears ? ` Temporary effects: ${temporaryYears} ${temporaryYears === 1 ? 'year' : 'years'}.` : '';
@@ -978,7 +985,7 @@ export function succeed(state, heirId) {
     // standalone profile must not create an artificial support jump next year.
     for (const parent of state.parents) {
       parent.lifestyle = previous.lifestyle;
-      parent.career = { ...(parent.career || initialParentCareer(parent, parent.id === previous.id ? state.focus.work : 1 + personHash(parent) % 5)), progress: previous.lifestyle };
+      parent.career = { ...(parent.career || initialParentCareer(parent, parent.id === previous.id ? state.focus.work : 1 + personHash(parent) % 5)), progress: clamp(previous.lifestyle, 0, 10) };
     }
   } else if (info.route === 'siblings') {
     state.siblings = formerSiblings.filter(person => person.id !== heir.id);
@@ -1017,7 +1024,9 @@ function validSchema(raw, version) {
     const coreKeys = legacy ? [...CORE, 'discipline'] : CORE;
     const statKeys = [...coreKeys, 'health', version === 1 ? 'instability' : 'stability', ...(legacy ? ['relaxation'] : [])];
     const validStats = stats => stats && Object.keys(stats).length === statKeys.length && statKeys.every(key => finite(stats[key], ratingFloor, 10));
-    const validLifestyle = value => finite(value, ratingFloor, 10) && (version >= 13 || Number.isInteger(value));
+    const effectiveFloor = version >= 16 ? -270 : ratingFloor;
+    const effectiveCeiling = version >= 16 ? 280 : 10;
+    const validLifestyle = value => finite(value, effectiveFloor, effectiveCeiling) && (version >= 13 || Number.isInteger(value));
     const aptitudeKeys = version >= 12 ? STAT_KEYS : coreKeys;
     const validAptitudes = aptitude => aptitude && Object.keys(aptitude).length === aptitudeKeys.length && aptitudeKeys.every(key => Number.isInteger(aptitude[key]) && finite(aptitude[key], -3, 3));
     const validGeneration = value => Number.isInteger(value) && finite(value, 1, 100000);
@@ -1039,7 +1048,10 @@ function validSchema(raw, version) {
     if (version >= 7) {
       if (!Number.isInteger(raw.cryLevel) || !finite(raw.cryLevel, 1, 5) || typeof raw.alive !== 'boolean' || !validDeath(raw)) return false;
       if (raw.alive ? raw.death !== null : !raw.death || !raw.needsSuccession || raw.pendingEvents.length || raw.pregnancy) return false;
-      const validDelta = value => value && finite(value.before, ratingFloor, 10) && finite(value.after, ratingFloor, 10) && finite(value.change, ratingFloor - 10, 10 - ratingFloor) && Math.abs(round(value.after - value.before) - value.change) < .001;
+      const validDelta = (value, effective = false) => {
+        const low = effective ? effectiveFloor : ratingFloor, high = effective ? effectiveCeiling : 10;
+        return value && finite(value.before, low, high) && finite(value.after, low, high) && finite(value.change, low - high, high - low) && Math.abs(round(value.after - value.before) - value.change) < .001;
+      };
       const summary = raw.yearSummary;
       if (summary?.decisions !== undefined) {
         const decisions = summary.decisions;
@@ -1054,7 +1066,7 @@ function validSchema(raw, version) {
         }
       }
       if (summary?.height !== undefined && (!finite(summary.height.before, heightBound(40), heightBound(240)) || !finite(summary.height.after, heightBound(40), heightBound(240)) || !finite(summary.height.change, 0, heightBound(200)) || Math.abs(round(summary.height.after - summary.height.before) - summary.height.change) > .001)) return false;
-      if (summary !== null && (!summary || typeof summary.dismissed !== 'boolean' || summary.toAge !== raw.age || summary.fromAge !== raw.age - 1 || !summary.stats || Object.keys(summary.stats).length !== STAT_KEYS.length || !STAT_KEYS.every(key => validDelta(summary.stats[key])) || !validDelta(summary.lifestyle) || !Array.isArray(summary.parents) || summary.parents.length > (version >= 15 ? 3 : 2) || !summary.parents.every(parent => text(parent.id, 100) && text(parent.name, 50) && validDelta(parent.stability) && validDelta(parent.relationship) && (parent.lifestyle === undefined || validDelta(parent.lifestyle))) || !Array.isArray(summary.events) || summary.events.length > 30 || !summary.events.every(event => text(event.title, 200) && text(event.text, 2000) && text(event.kind, 50) && (event.description === undefined || text(event.description, 1000))))) return false;
+      if (summary !== null && (!summary || typeof summary.dismissed !== 'boolean' || summary.toAge !== raw.age || summary.fromAge !== raw.age - 1 || !summary.stats || Object.keys(summary.stats).length !== STAT_KEYS.length || !STAT_KEYS.every(key => validDelta(summary.stats[key], true)) || !validDelta(summary.lifestyle, true) || !Array.isArray(summary.parents) || summary.parents.length > (version >= 15 ? 3 : 2) || !summary.parents.every(parent => text(parent.id, 100) && text(parent.name, 50) && validDelta(parent.stability) && validDelta(parent.relationship) && (parent.lifestyle === undefined || validDelta(parent.lifestyle, true))) || !Array.isArray(summary.events) || summary.events.length > 30 || !summary.events.every(event => text(event.title, 200) && text(event.text, 2000) && text(event.kind, 50) && (event.description === undefined || text(event.description, 1000))))) return false;
     }
     if (!Array.isArray(raw.parents) || raw.parents.length > 2 || !raw.parents.every(person => validPerson(person) && validLivingAge(person) && (!person.alive || person.age > raw.age))) return false;
     if (version >= 7 && !raw.parents.every(person => finite(person.relationship, ratingFloor, 10))) return false;
@@ -1135,7 +1147,7 @@ function validSchema(raw, version) {
   } catch { return false; }
 }
 
-export function validateSave(raw) { return validSchema(raw, 15); }
+export function validateSave(raw) { return validSchema(raw, 16); }
 
 // Version 10 stores every measurement in inches. Source growth tables stay in
 // centimetres; historical prose is rendered separately without rewriting it.
@@ -1154,7 +1166,7 @@ function convertSavedHeights(value) {
 export function migrateSave(raw) {
   try {
     if (validateSave(raw)) return clone(raw);
-    if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].some(version => validSchema(raw, version))) return null;
+    if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].some(version => validSchema(raw, version))) return null;
     const state = clone(raw);
     // Existing lives receive neutral wellbeing aptitudes without rerolling
     // ratings or consuming random numbers, including saved pregnancy copies.
@@ -1167,9 +1179,9 @@ export function migrateSave(raw) {
     if (state.version < 11 && state.age >= 2 && state.age < 5) state.focus.creative = 0;
     if (state.version < 10) convertSavedHeights(state);
     if (state.version >= 9) {
-      // Version 15 allows zero ratings and optional caregiving metadata.
+      // Version 16 allows effective totals outside 0-10; base ratings stay bounded.
       // Existing values and the random state stay unchanged.
-      state.version = 15;
+      state.version = 16;
       return validateSave(state) ? state : null;
     }
     if (state.version === 1) {
@@ -1251,7 +1263,7 @@ export function migrateSave(raw) {
       }
       names.add(parent.name.toLocaleLowerCase());
     });
-    state.version = 15;
+    state.version = 16;
     return validateSave(state) ? state : null;
   } catch { return null; }
 }

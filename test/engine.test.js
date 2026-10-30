@@ -88,7 +88,7 @@ test('all five stats exist at birth with established natural ratings and average
     const baby = createGame({ seed });
     for (const { key } of SKILLS) assert.ok(baby.stats[key] >= 0 && baby.stats[key] <= 10, `${key} at birth`);
     assert.ok(baby.stats.attractiveness >= 0 && baby.stats.attractiveness <= 10);
-    assert.equal(baby.version, 15);
+    assert.equal(baby.version, 16);
     for (const key of ['health', 'stability']) {
       assert.ok(baby.stats[key] >= 0 && baby.stats[key] <= 10);
       wellbeing[key].push(baby.stats[key]);
@@ -233,7 +233,7 @@ test('event chances are absolute, leave quiet years and respond to choices and s
 test('stability effects and self care follow the higher-is-calmer scale', () => {
   assert.ok(EVENTS.find(event => event.id === 'crisis').modifiers.stability < 0);
   assert.ok(EVENTS.find(event => event.id === 'burnout').modifiers.stability < 0);
-  assert.ok(EVENTS.find(event => event.id === 'friendship').modifiers.stability > 0);
+  assert.ok(EVENTS.find(event => event.id === 'friendship').statChanges.stability > 0);
   const resting = adult(88); resting.stats.stability = 5; resting.effects = [];
   const pressured = copy(resting);
   resting.focus = { work: 0, social: 3, family: 4, self: 5 };
@@ -326,7 +326,8 @@ test('every career can be entered, simulated, and restored with a qualified adul
     assert.equal(state.jobId, job.id);
     assert.equal(state.jobYears, 1);
     assert.ok(Number.isFinite(state.income) && state.income > 0);
-    assert.ok(Number.isFinite(state.lifestyle) && state.lifestyle >= 0 && state.lifestyle <= 10);
+    const lifestyleBase = state.lifestyle - currentEffects(state).reduce((sum, effect) => sum + (effect.lifestyle || 0), 0);
+    assert.ok(Number.isFinite(lifestyleBase) && lifestyleBase >= -1e-9 && lifestyleBase <= 10 + 1e-9);
     assert.equal(validateSave(state), true, `${job.name} leaves a valid save`);
     const restored = migrateSave(copy(state));
     assert.equal(restored.jobId, job.id);
@@ -471,7 +472,7 @@ test('v2 upgrades preserve school, current careers, and adults without consuming
       const snapshot = copy(old);
       const upgraded = migrateSave(old);
       assert.equal(validateSave(upgraded), true);
-      assert.equal(upgraded.version, 15);
+      assert.equal(upgraded.version, 16);
       assert.equal(upgraded.education.status, status);
       assert.equal(upgraded.education.years, status === 'graduate' ? 4 : 0);
       assert.equal(upgraded.jobOffers.length, count);
@@ -744,7 +745,7 @@ test('migration uses a safe household fallback for old childhood saves and rejec
   ]) {
     const bad = copy(old); mutation(bad); assert.equal(migrateSave(bad), null);
   }
-  const invalidV2 = copy(converted); invalidV2.parents[0].lifestyle = 11;
+  const invalidV2 = copy(converted); invalidV2.parents[0].lifestyle = 281;
   assert.equal(validateSave(invalidV2), false);
   assert.equal(migrateSave(invalidV2), null);
   assert.equal(migrateSave(null), null);
@@ -798,7 +799,11 @@ test('long simulations retain bounds and mix quiet years with at most five uniqu
       assert.equal(new Set(result.eventIds).size, result.eventIds.length);
       assert.ok(result.eventIds.every(id => EVENTS.some(event => event.id === id || id.startsWith(`${event.id}:`))));
       assert.equal(validateSave(state), true, `invalid seed ${seed}, age ${state.age}`);
-      for (const value of Object.values(effectiveStats(state))) assert.ok(value >= 0 && value <= 10);
+      for (const value of Object.values(state.stats)) assert.ok(value >= 0 && value <= 10);
+      for (const [key, value] of Object.entries(effectiveStats(state))) {
+        const base = value - currentEffects(state).reduce((sum, effect) => sum + (effect.modifiers[key] || 0), 0);
+        assert.ok(base >= -1e-9 && base <= 10 + 1e-9);
+      }
     }
   }
   assert.ok(quiet > 100 && quiet < 60 * 85 / 2, 'quiet years remain possible but events occur in most years');
@@ -1017,7 +1022,7 @@ test('college, employment, physical work, and children gate their own event cont
   state.children[0].alive = false; assert.equal(chance('child_confides'), 0);
 });
 
-test('lifestyle consequences are temporary, bounded, and shared by dependent children', () => {
+test('lifestyle consequences are temporary and shared by dependent children', () => {
   const state = adult(1403); haveChild(state);
   advanceYear(state);
   state.effects = [];
@@ -1033,7 +1038,7 @@ test('lifestyle consequences are temporary, bounded, and shared by dependent chi
   assert.equal(state.effects.find(effect => effect.id === 'investment_pitch').description, outcome.description);
   assert.ok(!state.history[0].text.includes(outcome.description));
   assert.ok(state.history[0].text.startsWith(`${outcome.label}. `));
-  assert.match(state.history[0].text, /Lifestyle [\d.]+ → [\d.]+\. Temporary effects: 2 years\.$/);
+  assert.match(state.history[0].text, /-1\.0 Lifestyle\. Temporary effects: 2 years\.$/);
   assert.equal(validateSave(state), true);
   const saved = migrateSave(state);
   assert.equal(saved.lifestyle, state.lifestyle);
@@ -1440,7 +1445,7 @@ test('old childless endings become valid retirement choices without resetting th
   for (const parent of previous.parents) { parent.age = Math.min(85, parent.age); if (parent.age === 85) parent.alive = false; }
   for(const person of [previous,...previous.parents,...previous.children,...previous.siblings,...previous.lineage,...previous.encounters,previous.partner,previous.pregnancy?.otherParent].filter(Boolean)) { delete person.familyName; person.appearancePeakAge = 30; }
   const migrated=migrateSave(previous);
-  assert.equal(validateSave(migrated),true); assert.equal(migrated.version,15);
+  assert.equal(validateSave(migrated),true); assert.equal(migrated.version,16);
   assert.equal(migrated.ended,false); assert.equal(migrated.needsSuccession,true);
   for(const key of ['id','name','age','rng','nextId','stats','aptitudes','history','money','education','jobOffers','effects','pendingEvents']) assert.deepEqual(migrated[key],neutralWellbeingAptitudes(copy(previous))[key]);
   const info=successionInfo(migrated);
@@ -1487,7 +1492,7 @@ test('v12 upgrades only the schema version and preserves wellbeing aptitudes and
   legacy.version = 12;
   const original = copy(legacy);
   const upgraded = migrateSave(legacy);
-  assert.deepEqual(upgraded, { ...original, version: 15 });
+  assert.deepEqual(upgraded, { ...original, version: 16 });
   assert.deepEqual(legacy, original, 'migration preserves its source');
   assert.equal(validateSave(upgraded), true);
   assert.deepEqual(migrateSave(JSON.parse(JSON.stringify(upgraded))), upgraded);
@@ -1525,7 +1530,7 @@ test('fractional lifestyle survives current-schema round trips across every save
     assert.deepEqual(state, original, 'validation and migration do not alter fractional ratings');
     for (const person of actors) {
       const value = person.lifestyle;
-      for (const invalid of [NaN, Infinity, -.01, 10.01, '4.23']) {
+      for (const invalid of [NaN, Infinity, -270.01, 280.01, '4.23']) {
         person.lifestyle = invalid;
         assert.equal(validateSave(state), false);
         assert.equal(migrateSave(state), null);

@@ -45,7 +45,6 @@ test('ordinary prose, incomplete changes, and custom semicolons are preserved ex
     'Your health 5 → 5.1; this custom story continues.',
     'A custom opening; Your health 5 → 5.1; Daniel Reed: Health 6 → 5.8.',
     'Your health 5; Daniel Reed: Health 6 → 5.8.',
-    'Your health 50 → 51; Daniel Reed: Health 6 → 5.8.',
     'Your health 5 → 5.1; Daniel Reed: Health 6 → 5.8; custom ending.',
     'Your health 5 → 5.1; Your intelligence 4 → 4.2.',
   ]) assert.deepEqual(splitEventOutcome(text), [text]);
@@ -97,10 +96,16 @@ test('journal formatting preserves ordinary semicolons and incomplete or invalid
     'Your health 5 → 5.1; this custom story continues.',
     'A custom opening; Your health 5 → 5.1; Daniel Reed: Health 6 → 5.8.',
     'Your health 5; Daniel Reed: Health 6 → 5.8.',
-    'Your health 50 → 51; Daniel Reed: Health 6 → 5.8.',
-    'Your health 10.01 → 10; Daniel Reed: Health 6 → 5.8.',
-    'Your health 5 → 10.01; Daniel Reed: Health 6 → 5.8.',
-    'Your health -1 → 1; Daniel Reed: Health 6 → 5.8.',
     'Keep your time. No stat changes. Play max 2; Friends max 2. Temporary effects: 1 year.',
   ]) assert.deepEqual(splitJournalEventOutcome(text), [text]);
+});
+
+
+test('temporary amounts and effective transitions retain separate journal lines', () => {
+  const text = 'Try it. Your intelligence 10.2 → 10.4; +.2 Intelligence; -.5 Mental stability. Temporary effects: 2 years.';
+  assert.deepEqual(splitJournalEventOutcome(text), [
+    'Try it. Your intelligence 10.2 → 10.4', '+.2 Intelligence', '-.5 Mental stability. Temporary effects: 2 years.',
+  ]);
+  assert.equal(formatStatNarrative('Your health -1 → 0; Your creativity 10 → 11'), 'Your health -1.0 → 0.0; Your creativity 10.0 → 11.0');
+  assert.equal(splitJournalEventOutcome('Your health 50 → 51; Daniel Reed: Health 6 → 5.8.').length, 2);
 });

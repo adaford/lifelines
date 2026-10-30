@@ -41,7 +41,7 @@ test('each crying contribution is half strength before bounds, including aptitud
       const state = stateAt(0);
       state.cryLevel = level;
       for (const key of statKeys) state.aptitudes[key] = aptitude;
-      const response = value => value * (value >= 0 ? 1 + aptitude * .12 : 1 - aptitude * .1);
+      const response = value => value * (value >= 0 ? 1 + aptitude * .08 : 1 - aptitude * .07);
       const effects = infantChoiceEffects(state);
       close(effects.intelligence, response([-.08, -.04, .04, .08, .12][level - 1]) * .575, 'intelligence');
       close(effects.stability, response([-.24, -.12, .12, .24, .36][level - 1]) * .5, 'mental stability');
@@ -78,7 +78,7 @@ test('all toddler activity effects and unused-point rest use half-strength contr
   close(childhoodWellbeing(lessPlay).stability - childhoodWellbeing(state).stability, .02, 'one unused point gives half the former rest');
   const lowerFamily = { ...state, focus: { ...state.focus, family: 1 } };
   for (const parent of annualForecast(lowerFamily).parents) {
-    assert.equal(parent.relationship.change, -.08);
+    assert.equal(parent.relationship.change, -.04);
     assert.equal(parent.stability.change, -.01);
   }
 });
@@ -144,7 +144,7 @@ test('caregiver, partner, and child routine relationships and wellbeing receive 
       } else {
         const toddler = child.age < 5;
         const skillPractice = toddler
-          ? { intelligence: 0, strength: 0, social: .055 * 2 / 3 * (family - 2), creativity: 0 }
+          ? { intelligence: 0, strength: 0, social: .055 * 2 / 3 * (family - 2) + .055 / 3, creativity: 0 }
           : { intelligence: .035 * (family - 3), strength: .1 * (family - 3), social: .025 * (family - 3), creativity: .08 * (family - 3) };
         for (const key of learned) assert.equal(grown.stats[key], round(5 + skillPractice[key] * .575 + DEVELOPMENT_BALANCE.childhoodBias[key]), `${child.age}-year-old child ${key} care`);
         const healthPractice = (toddler ? .1 : .035) * (family - 3);
@@ -161,7 +161,7 @@ test('caregiver, partner, and child routine relationships and wellbeing receive 
   for (const parent of child.parents) parent.abandonedAt = 2;
   child.focus.family = 0;
   const guardian = annualForecast(child).parents.find(parent => parent.id === 'guardian');
-  assert.equal(guardian.relationship.change, -.12);
+  assert.equal(guardian.relationship.change, -.08);
   assert.equal(guardian.stability.change, -.03);
 });
 
