@@ -121,7 +121,7 @@ npm ci
 npm test
 ```
 
-The toddler social-effects update passes all **249 tests**, including **65 DOM checks**. The regenerated 4,000-life reference is identical, so no refit was needed. Manual checks confirm all five activity popups and preserve saved JSON, RNG, and write count. All 18 local HTTP assets returned 200 and matched disk. Schema 12 and existing saved values remain unchanged. Visual checks are omitted at the user's request. Deployment verification is pending.
+The toddler social-effects update passes all **249 tests**, including **65 DOM checks**. The regenerated 4,000-life reference is identical, so no refit was needed. Manual checks confirm all five activity popups and preserve saved JSON, RNG, and write count. All 18 local HTTP assets returned 200 and matched disk. Schema 12 and existing saved values remain unchanged. Visual checks are omitted at the user's request. GitHub Pages deployed **c195782** successfully (workflow **41065653312**); all **18 live HTTP assets** returned 200 and matched the release.
 
 The previous activity-help and Arts & crafts intelligence release passed 248 tests, including 65 DOM checks, and reproduced the 4,000-life reference unchanged. GitHub Pages deployed **71f3907** successfully (workflow **41062565342**); all 18 live HTTP assets matched the release. Its documentation follow-up **409e06b** also deployed successfully (workflow **41062814843**).
 
