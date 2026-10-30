@@ -13,14 +13,14 @@ export const DEVELOPMENT_BALANCE = {
   "innateScale": 0.8,
   "skillReversion": 0.012,
   "childhoodBias": {
-    "intelligence": -0.038027,
-    "strength": -0.006223,
-    "social": -0.034754,
-    "creativity": -0.033157
+    "intelligence": -0.038872,
+    "strength": -0.008339,
+    "social": -0.032837,
+    "creativity": -0.03333
   },
   "wellbeingTarget": {
-    "health": 5.02253,
-    "stability": 4.652891
+    "health": 5.043729,
+    "stability": 4.6597
   },
   "wellbeingReversion": {
     "health": 0.06,
@@ -48,6 +48,20 @@ function practiceResponse(effort, aptitude) {
   return effort * (effort >= 0 ? 1 + aptitude * .12 : 1 - aptitude * .1);
 }
 
+// Natural resilience changes responses to routine choices, not the background
+// return toward a central wellbeing rating. Missing legacy values are neutral.
+export function wellbeingResponse(person, key, amount) {
+  const aptitude = clamp(number(person.aptitudes?.[key], 0), -3, 3);
+  return practiceResponse(amount, aptitude);
+}
+
+function toddlerWellbeingPractice(focus) {
+  return {
+    health: .1 * (focus.self - 3),
+    stability: .08 * (focus.self - 3) + .035 * (focus.family - 2),
+  };
+}
+
 function infantPractice(person) {
   const level = clamp(number(person.cryLevel, 3), 1, 5);
   return {
@@ -70,8 +84,8 @@ export function infantChoiceEffects(person) {
     effects[skill] = 1.15 * (practiceResponse(practice[skill] + care, aptitude) - practiceResponse(care, aptitude));
   }
   const level = clamp(number(person.cryLevel, 3), 1, 5);
-  effects.health = .06 * ((level - 1) / 4 - .5);
-  effects.stability = [-.24, -.12, .12, .24, .36][level - 1];
+  effects.health = wellbeingResponse(person, 'health', .06 * ((level - 1) / 4 - .5));
+  effects.stability = wellbeingResponse(person, 'stability', [-.24, -.12, .12, .24, .36][level - 1]);
   return effects;
 }
 
@@ -80,10 +94,12 @@ export function infantChoiceEffects(person) {
 export function toddlerActivityEffects(person) {
   const focus = toddlerFocus(person);
   const practice = toddlerPractice(focus);
+  const wellbeing = toddlerWellbeingPractice(focus);
   return Object.fromEntries(Object.entries(toddlerCoefficients).map(([key, coefficients]) => {
     const without = toddlerPractice({ ...focus, [key]: 0 });
+    const withoutWellbeing = toddlerWellbeingPractice({ ...focus, [key]: 0 });
     return [key, Object.fromEntries(Object.entries(coefficients).map(([stat, coefficient]) => {
-      if (!skills.includes(stat)) return [stat, coefficient * focus[key]];
+      if (!skills.includes(stat)) return [stat, wellbeingResponse(person, stat, wellbeing[stat]) - wellbeingResponse(person, stat, withoutWellbeing[stat])];
       const aptitude = clamp(number(person.aptitudes?.[stat], 0), -3, 3);
       return [stat, 1.15 * (practiceResponse(practice[stat], aptitude) - practiceResponse(without[stat], aptitude))];
     }))];
@@ -123,8 +139,8 @@ export function skillChanges(person, career = null) {
   }));
 }
 
-// Wellbeing is not a learned skill. It varies around a middle rating while
-// choices and events can move it in either direction; high scores do not drift
+// Wellbeing varies around a middle rating while natural resilience shapes its
+// response to choices. Events can also move it; high scores do not drift
 // automatically to the ceiling. Call with the age at the start of the year.
 export function childhoodWellbeing(person) {
   if (person.alive === false || person.age >= 18) return { health: 0, stability: 0 };
@@ -143,11 +159,12 @@ export function childhoodWellbeing(person) {
   const focus = person.age < 5 ? toddlerFocus(person) : Object.fromEntries(['work', 'social', 'family', 'self'].map(key => [key, clamp(number(person.focus?.[key], 3), 0, 5)]));
   const spare = Math.max(0, 12 - Object.values(focus).reduce((sum, value) => sum + value, 0));
   if (person.age < 5) {
-    result.health += .1 * (focus.self - 3);
-    result.stability += .08 * (focus.self - 3) + .035 * (focus.family - 2) + spare * .04;
+    const practice = toddlerWellbeingPractice(focus);
+    result.health += wellbeingResponse(person, 'health', practice.health);
+    result.stability += wellbeingResponse(person, 'stability', practice.stability + spare * .04);
     return result;
   }
-  result.health += .035 * (focus.self - 3);
-  result.stability += -.1 * (focus.work - 3) + .07 * (focus.self - 3) + .025 * (focus.family - 3) + .018 * (focus.social - 3) + spare * .04;
+  result.health += wellbeingResponse(person, 'health', .035 * (focus.self - 3));
+  result.stability += wellbeingResponse(person, 'stability', -.1 * (focus.work - 3) + .07 * (focus.self - 3) + .025 * (focus.family - 3) + .018 * (focus.social - 3) + spare * .04);
   return result;
 }

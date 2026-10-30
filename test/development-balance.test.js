@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { naturalSkillRating, skillChanges, childhoodWellbeing, infantChoiceEffects, TODDLER_FOCUS } from '../development.js';
+import { naturalSkillRating, skillChanges, childhoodWellbeing, infantChoiceEffects, wellbeingResponse, TODDLER_FOCUS } from '../development.js';
 import { createGame, advanceYear, resolveEventChoice, EVENTS, effectiveStats } from '../engine.js';
 import { eventChances } from '../events.js';
 
@@ -25,7 +25,7 @@ test('newborn ratings span the scale around five with broad variation and aptitu
     assert.ok(sd > 1.75 && sd < 2.7, `${key} has broad variation: ${sd}`);
     assert.equal(Math.min(...values.all), 1, `${key} can start at the bottom of the scale`);
     assert.equal(Math.max(...values.all), 10, `${key} can start at the top of the scale`);
-    if (learned.includes(key)) {
+    if (learned.includes(key) || ['health', 'stability'].includes(key)) {
       assert.ok(mean(values.high) > mean(values.low) + 2, `${key} aptitude shifts the distribution`);
       assert.ok(values.high.some(value => value < 5), `${key} high aptitude does not fix the starting score`);
       assert.ok(values.low.some(value => value > 5), `${key} low aptitude does not fix the starting score`);
@@ -101,7 +101,7 @@ test('crying choice effects isolate the selected level from background developme
   for (const age of [0, 1]) for (const aptitude of [-3, 0, 3]) for (const careFocus of [1, 3, 5]) {
     const baby = { age, alive: true, careFocus,
       stats: { intelligence: 2, strength: 8, social: 4, creativity: 7, health: 9, stability: 2 },
-      aptitudes: { intelligence: aptitude, strength: aptitude, social: aptitude, creativity: aptitude } };
+      aptitudes: { intelligence: aptitude, strength: aptitude, social: aptitude, creativity: aptitude, health: aptitude, stability: aptitude } };
     const before = structuredClone(baby);
     const levels = Array.from({ length: 5 }, (_, index) => ({ ...baby, cryLevel: index + 1 }));
     const choices = levels.map(infantChoiceEffects);
@@ -117,13 +117,48 @@ test('crying choice effects isolate the selected level from background developme
         assert.ok(Math.abs(annualDifference - (effect[key] - choices[0][key])) < 1e-10,
           `${key} preview isolates exactly the effect used in the annual mean`);
       }
-      const annualDifference = childhoodWellbeing(levels[index]).stability - childhoodWellbeing(levels[0]).stability;
-      assert.ok(Math.abs(annualDifference - (effect.stability - choices[0].stability)) < 1e-10);
+      for (const key of ['health', 'stability']) {
+        const annualDifference = childhoodWellbeing(levels[index])[key] - childhoodWellbeing(levels[0])[key];
+        assert.ok(Math.abs(annualDifference - (effect[key] - choices[0][key])) < 1e-10);
+      }
     }
     assert.deepEqual(baby, before, 'reading choice effects is pure');
     for (const inactive of [{ ...baby, age: 2 }, { ...baby, alive: false }]) {
       assert.ok(Object.values(infantChoiceEffects(inactive)).every(effect => effect === 0));
     }
+  }
+});
+
+test('natural resilience boosts routine wellbeing gains and buffers losses without changing reversion', () => {
+  for (const key of ['health', 'stability']) {
+    assert.equal(wellbeingResponse({}, key, .2), .2, 'missing legacy aptitude is neutral');
+    assert.equal(wellbeingResponse({ aptitudes: { [key]: 0 } }, key, -.2), -.2);
+    assert.equal(wellbeingResponse({ aptitudes: { [key]: 3 } }, key, 0), 0);
+    assert.ok(wellbeingResponse({ aptitudes: { [key]: 3 } }, key, .2) > .2);
+    assert.ok(wellbeingResponse({ aptitudes: { [key]: -3 } }, key, .2) < .2);
+    assert.ok(wellbeingResponse({ aptitudes: { [key]: 3 } }, key, -.2) > -.2);
+    assert.ok(wellbeingResponse({ aptitudes: { [key]: -3 } }, key, -.2) < -.2);
+  }
+  for (const age of [2, 4, 5, 10, 17]) {
+    const toddler = age < 5;
+    const person = { age, alive: true, stats: { health: 2, stability: 9 },
+      focus: toddler ? { ...TODDLER_FOCUS } : { work: 3, social: 3, family: 3, self: 3 } };
+    const before = structuredClone(person);
+    const withAptitude = aptitude => ({ ...person, aptitudes: { health: aptitude, stability: aptitude } });
+    const neutral = childhoodWellbeing(person);
+    for (const aptitude of [-3, 0, 3]) assert.deepEqual(childhoodWellbeing(withAptitude(aptitude)), neutral,
+      'natural resilience does not scale the background return toward wellbeing targets');
+    const positive = toddler ? { work: 1, social: 1, family: 5, self: 5, creative: 0 } : { work: 1, social: 3, family: 3, self: 5 };
+    const negative = toddler ? { work: 5, social: 5, family: 1, self: 1, creative: 0 } : { work: 5, social: 3, family: 3, self: 1 };
+    for (const focus of [positive, negative]) {
+      const values = [-3, 0, 3].map(aptitude => childhoodWellbeing({ ...withAptitude(aptitude), focus }));
+      for (const key of ['health', 'stability']) {
+        assert.ok(values[0][key] < values[1][key] && values[1][key] < values[2][key], `${key} responds to natural resilience at age ${age}`);
+        const change = values[1][key] - neutral[key];
+        assert.ok(focus === positive ? change > 0 : change < 0);
+      }
+    }
+    assert.deepEqual(person, before, 'reading wellbeing responses never mutates the person');
   }
 });
 

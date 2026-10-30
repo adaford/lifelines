@@ -1,3 +1,4 @@
+import { stripWellbeingAptitudes, neutralWellbeingAptitudes } from './helpers/legacy-height.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createGame, advanceYear, setFocus, validateSave, migrateSave, annualForecast } from '../engine.js';
@@ -41,6 +42,7 @@ test('activity contributions grow with points, match practice changes, and do no
 
 test('rest doubles the former toddler health response and crafts spend the shared budget', () => {
   const state = toddler();
+  state.aptitudes.health = 0;
   const higher = { ...state, focus: { ...state.focus, self: 4 } };
   assert.ok(Math.abs(childhoodWellbeing(higher).health - childhoodWellbeing(state).health - .1) < 1e-12);
   assert.equal(setFocus(state, 'creative', 3).ok, false);
@@ -80,6 +82,7 @@ test('v10 toddler saves gain an empty crafts allocation without rewriting progre
   state.age = 3;
   state.focus = { work: 2, social: 4, family: 3, self: 3 };
   advanceYear(state, survives);
+  stripWellbeingAptitudes(state);
   state.version = 10;
   delete state.focus.creative;
   delete state.yearSummary.decisions.focus.creative;
@@ -87,7 +90,8 @@ test('v10 toddler saves gain an empty crafts allocation without rewriting progre
   const migrated = migrateSave(state);
   assert.deepEqual(state, before);
   assert.ok(migrated);
-  const expected = { ...before, version: 11, focus: { ...before.focus, creative: 0 } };
+  const expected = { ...copy(before), version: 12, focus: { ...before.focus, creative: 0 } };
+  neutralWellbeingAptitudes(expected);
   assert.deepEqual(migrated, expected);
   assert.equal(Object.hasOwn(migrated.yearSummary.decisions.focus, 'creative'), false);
   assert.deepEqual(migrateSave(migrated), migrated);

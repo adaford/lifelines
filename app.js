@@ -5,11 +5,11 @@ import {
   offeredJobs, needsEducationChoice, pendingEventSubject,
   relationshipOdds, meetingChances, proposalChance, pregnancyChance, oneNightChance,
   respondToEncounter, proposeMarriage, endRelationship, normalizeSurname, heightPercentile, statPercentiles
-} from './engine.js?v=aptitude-number-1';
-import { annotateNarrative } from './narrative.js?v=aptitude-number-1';
-import { formatRating, formatHeight, heightDescription, formatStatNarrative } from './display.js?v=aptitude-number-1';
+} from './engine.js?v=wellbeing-aptitude-1';
+import { annotateNarrative } from './narrative.js?v=wellbeing-aptitude-1';
+import { formatRating, formatHeight, heightDescription, formatStatNarrative } from './display.js?v=wellbeing-aptitude-1';
 
-import { choiceImpacts } from './choice-impacts.js?v=aptitude-number-1';
+import { choiceImpacts } from './choice-impacts.js?v=wellbeing-aptitude-1';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const app = document.querySelector('#app');
@@ -156,6 +156,10 @@ function ratingBar(label, value) {
   return `<span class="rating-track" role="meter" aria-label="${esc(label)}" aria-valuemin="1" aria-valuemax="10" aria-valuenow="${number(rating)}"><span class="rating-fill" style="width:${rating*10}%;background:hsl(${hue}, 60%, 40%)"></span></span>`;
 }
 
+function profileLifestyleView() {
+  return `<button class="status-pill profile-lifestyle" data-stat="lifestyle" data-action="tab" data-tab="character" aria-label="Lifestyle ${number(state.lifestyle)} out of 10. View your character."><span class="profile-lifestyle-heading"><span class="status-label">Lifestyle${statEmoji('lifestyle')}</span><strong class="status-value">${number(state.lifestyle)}<small>/10</small></strong></span>${ratingBar('Lifestyle',state.lifestyle)}</button>`;
+}
+
 function render() {
   const lifeStage = stage(state);
   const stats = effectiveStats(state);
@@ -166,8 +170,8 @@ function render() {
       <a class="brand" href="#" data-action="tab" data-tab="year" aria-label="Lifelines home"><span class="brand-mark">${icon('sprout')}</span><span class="brand-title">lifelines<span style="color:var(--orange)">.</span></span></a>
       <div class="top-actions"><span class="save-status">${icon(saveAvailable ? 'check' : 'download')}${saveAvailable ? 'Saved' : 'Session only'}</span><button class="icon-button" data-action="menu" aria-label="More options" aria-haspopup="dialog">${icon('menu')}</button></div>
     </header>
-    <section class="profile-bar" aria-label="Your life"><div class="portrait">${avatar(state)}</div><div class="profile-copy"><p class="eyebrow">GENERATION ${state.generation}</p><div class="profile-name-row"><h1 class="person-name">${esc(state.name)}</h1></div><div class="profile-identity">${genderBadge(state)}<button class="profile-height" data-stat="height" data-action="tab" data-tab="character" aria-label="Height ${heightDescription(state.height)}. View your character."><strong class="status-value">${formatHeight(state.height)}${statEmoji('height')}</strong>${percentiles?percentileTag(percentiles,'height'):state.age>=18?'<span class="height-percentile">Adult height</span>':''}</button></div>${state.age<2?'':`<p class="muted">${state.age<5?'Toddler':state.age<18?'Student':state.education.status==='college'?'College student':career()?.name || 'Finding a path'}</p>`}</div><div class="profile-age"><strong>${state.age}</strong><span>YEARS OLD</span></div></section>
-    <div class="status-strip" aria-label="At a glance">${[['health','Health',stats.health],['stability','Mental stability',stats.stability],['lifestyle','Lifestyle',state.lifestyle],...SKILLS.map(skill=>[skill.key,skill.label,stats[skill.key]])].map(([key,label,value])=>`<button class="status-pill" data-stat="${key}" data-action="tab" data-tab="character" aria-label="${label} ${number(value)} out of 10.${Number.isInteger(state.aptitudes[key])?` Natural aptitude ${aptitude(state.aptitudes[key])}.`: ''} View your character."><span class="status-label">${label}${statEmoji(key)}</span><span class="status-reading"><strong class="status-value">${number(value)}<small>/10</small></strong>${aptitudeBadge(state.aptitudes[key])}</span>${ratingBar(label,value)}</button>`).join('')}</div>
+    <section class="profile-bar" aria-label="Your life"><div class="portrait">${avatar(state)}</div><div class="profile-copy"><p class="eyebrow">GENERATION ${state.generation}</p><div class="profile-name-row"><h1 class="person-name">${esc(state.name)}</h1></div><div class="profile-identity">${genderBadge(state)}<button class="profile-height" data-stat="height" data-action="tab" data-tab="character" aria-label="Height ${heightDescription(state.height)}. View your character."><strong class="status-value">${formatHeight(state.height)}${statEmoji('height')}</strong>${percentiles?percentileTag(percentiles,'height'):state.age>=18?'<span class="height-percentile">Adult height</span>':''}</button></div>${profileLifestyleView()}${state.age<2?'':`<p class="muted">${state.age<5?'Toddler':state.age<18?'Student':state.education.status==='college'?'College student':career()?.name || 'Finding a path'}</p>`}</div><div class="profile-age"><strong>${state.age}</strong><span>YEARS OLD</span></div></section>
+    <div class="status-strip" aria-label="At a glance">${[['health','Health',stats.health],['stability','Mental stability',stats.stability],...SKILLS.map(skill=>[skill.key,skill.label,stats[skill.key]])].map(([key,label,value])=>`<button class="status-pill" data-stat="${key}" data-action="tab" data-tab="character" aria-label="${label} ${number(value)} out of 10.${Number.isInteger(state.aptitudes[key])?` Natural aptitude ${aptitude(state.aptitudes[key])}.`: ''} View your character."><span class="status-label">${label}${statEmoji(key)}</span><span class="status-reading"><strong class="status-value">${number(value)}<small>/10</small></strong>${aptitudeBadge(state.aptitudes[key])}</span>${ratingBar(label,value)}</button>`).join('')}</div>
       <main class="main-column" id="main-content">${activeTab==='career'?'':`<div class="chapter-heading"><h2>${isYear ? stageNames[lifeStage] : ({family:'A life, connected',character:'This is you'}[activeTab])}<span style="color:var(--orange)">.</span></h2></div>`}
       ${eventDecisionView()}${state.ended ? endPanel() : ''}${state.needsSuccession ? successionPanel() : ''}
       ${activeTab==='year' ? yearView() : activeTab==='career' ? careerView() : activeTab==='family' ? familyView() : characterView()}</main>
@@ -191,7 +195,7 @@ function statsView() {
     return `<div class="stat-row" data-stat="${skill.key}"><div class="stat-heading"><span class="stat-name">${labelWithHelp(skill.label,skill.key)}</span><span class="stat-reading"><strong class="stat-value">${number(value)}<small>/10</small></strong>${aptitudeBadge(apt)}</span></div>${ratingBar(skill.label,value)}</div>`;
   }).join('')}</div><div class="stat-help-links">${labelWithHelp('Natural aptitude','affinity')}</div><div class="vitals-grid">${[['health','Health'],['stability','Mental stability'],['lifestyle','Lifestyle']].map(([key,label]) => {
     const value = key==='lifestyle' ? state.lifestyle : stats[key];
-    return `<div class="vital" data-stat="${key}"><span class="vital-label">${labelWithHelp(label,key)}</span><span class="vital-value">${number(value)}<small>/10</small></span>${ratingBar(label,value)}</div>`;
+    return `<div class="vital" data-stat="${key}"><span class="vital-label">${labelWithHelp(label,key)}</span><span class="stat-reading"><span class="vital-value">${number(value)}<small>/10</small></span>${aptitudeBadge(state.aptitudes[key])}</span>${ratingBar(label,value)}</div>`;
   }).join('')}<div class="vital height-vital" data-stat="height"><span class="vital-label">${labelWithHelp('Height','height',state.id)}</span><span class="vital-value" aria-label="${heightDescription(state.height)}">${formatHeight(state.height)}</span>${percentiles?percentileTag(percentiles,'height'):state.age>=18?'<span class="height-percentile">Adult height</span>':''}</div></div></section>`;
 }
 
@@ -254,7 +258,7 @@ function parentStatusView() {
   const parents = [...state.parents].sort((a,b) => order[parentLabel(a)] - order[parentLabel(b)]);
   return `<div class="parent-status-list" aria-label="Parents">${parents.map(parent => {
     const role = parentLabel(parent);
-    return `<section class="parent-status" data-parent-id="${esc(parent.id)}" aria-label="${esc(role)}"><div class="parent-status-heading"><h4>${role}:</h4>${helpButton('parents',role)}${parent.alive === false?'<span class="parent-status-state">Deceased</span>':''}</div><div class="parent-status-stats">${[['stability','Mental stability',parent.stats.stability],['relationship','Relationship',parent.relationship]].map(([key,label,value]) => `<div class="parent-status-stat" data-stat="${key}"><div class="parent-stat-heading"><span>${label}${statEmoji(key)}</span><strong>${number(value)}<small>/10</small></strong></div>${ratingBar(`${role}: ${label}`,value)}</div>`).join('')}</div></section>`;
+    return `<section class="parent-status" data-parent-id="${esc(parent.id)}" aria-label="${esc(role)}"><div class="parent-status-heading"><h4>${role}:</h4>${helpButton('parents',role)}${parent.alive === false?'<span class="parent-status-state">Deceased</span>':''}</div><div class="parent-status-stats">${[['stability','Mental stability',parent.stats.stability],['relationship','Relationship',parent.relationship]].map(([key,label,value]) => `<div class="parent-status-stat" data-stat="${key}"><div class="parent-stat-heading"><span>${label}${statEmoji(key)}</span><span class="stat-reading"><strong>${number(value)}<small>/10</small></strong>${aptitudeBadge(parent.aptitudes[key],`${label} natural aptitude`)}</span></div>${ratingBar(`${role}: ${label}`,value)}</div>`).join('')}</div></section>`;
   }).join('')}</div>`;
 }
 
@@ -356,7 +360,7 @@ function relationshipView(person) {
 }
 
 function profileStats(person) {
-  return `<div class="profile-stats">${SKILLS.map(skill=>`<div class="profile-stat" data-skill="${skill.key}"><span>${labelWithHelp(skill.label,skill.key)}</span><span class="stat-reading"><strong>${number(person.stats[skill.key])}<small>/10</small></strong>${aptitudeBadge(person.aptitudes[skill.key],`${skill.label} natural aptitude`)}</span>${ratingBar(skill.label,person.stats[skill.key])}</div>`).join('')}${[['health','Health'],['stability','Mental stability']].map(([key,label])=>`<div class="profile-stat" data-skill="${key}"><span>${labelWithHelp(label,key)}</span><strong>${number(person.stats[key])}<small>/10</small></strong>${ratingBar(label,person.stats[key])}</div>`).join('')}<div class="profile-stat"><span>${labelWithHelp('Lifestyle','lifestyle')}</span><strong>${number(person.lifestyle)}<small>/10</small></strong>${ratingBar('Lifestyle',person.lifestyle)}</div><div class="profile-stat"><span>${labelWithHelp('Height','height',person.id)}</span><strong aria-label="${heightDescription(person.height)}">${formatHeight(person.height)}</strong><span class="height-percentile">${heightLabel(person)}</span></div></div><div class="stat-help-links">${labelWithHelp('Natural aptitude','affinity')}</div>`;
+  return `<div class="profile-stats">${SKILLS.map(skill=>`<div class="profile-stat" data-skill="${skill.key}"><span>${labelWithHelp(skill.label,skill.key)}</span><span class="stat-reading"><strong>${number(person.stats[skill.key])}<small>/10</small></strong>${aptitudeBadge(person.aptitudes[skill.key],`${skill.label} natural aptitude`)}</span>${ratingBar(skill.label,person.stats[skill.key])}</div>`).join('')}${[['health','Health'],['stability','Mental stability']].map(([key,label])=>`<div class="profile-stat" data-skill="${key}"><span>${labelWithHelp(label,key)}</span><span class="stat-reading"><strong>${number(person.stats[key])}<small>/10</small></strong>${aptitudeBadge(person.aptitudes[key],`${label} natural aptitude`)}</span>${ratingBar(label,person.stats[key])}</div>`).join('')}<div class="profile-stat"><span>${labelWithHelp('Lifestyle','lifestyle')}</span><strong>${number(person.lifestyle)}<small>/10</small></strong>${ratingBar('Lifestyle',person.lifestyle)}</div><div class="profile-stat"><span>${labelWithHelp('Height','height',person.id)}</span><strong aria-label="${heightDescription(person.height)}">${formatHeight(person.height)}</strong><span class="height-percentile">${heightLabel(person)}</span></div></div><div class="stat-help-links">${labelWithHelp('Natural aptitude','affinity')}</div>`;
 }
 
 function pregnancyView() {
@@ -488,7 +492,7 @@ function topicHelpModal(topic, id) {
     social: ['Social', ['Ease with people for your age; social practice can improve it.']],
     creativity: ['Creativity', ['Creative potential for your age, shaped by exploration and practice.']],
     attractiveness: ['Attractiveness', ['Starts near its adult value, with tiny random changes each year rather than gains from practice. In this game, aging lowers it after 30 for men and 22 for women.']],
-    affinity: ['Natural aptitude', ['This inherited −3 to +3 trait affects starting ability and responsiveness to focus; higher is stronger. Practice does not increase attractiveness.']],
+    affinity: ['Natural aptitude', ['This inherited −3 to +3 trait affects starting ability and responsiveness to focus; higher is stronger. Health and mental stability aptitude improve routine gains and soften losses. Practice does not increase attractiveness.']],
     forecast: ['Expected changes', ['Signs compare increases and decreases with the other choices for that stat. Zero changes are hidden. Your infant stats show crying effects; later stats show routine changes. Background development, events and yearly variation can alter the result.']],
     health: ['Health', ['Self-care supports health; illness and aging reduce it. Poor health raises disease risk and reduces childhood height gains.']],
     stability: ['Mental stability', ['Higher means calmer; rest and relationships help. Low parental mental stability can lead to difficult childhood events.']],

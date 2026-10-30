@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { toLegacyCentimeters } from './helpers/legacy-height.js';
+import { toLegacyCentimeters, neutralWellbeingAptitudes } from './helpers/legacy-height.js';
 import {
   EVENTS, createGame, advanceYear, annualForecast, dismissYearSummary, setCryLevel,
   effectiveStats, mortalityOdds, haveChild, successionInfo, succeed, validateSave,
@@ -231,12 +231,12 @@ test('v6 saves gain cry level and parent bonds without rerolling progress or que
   const before = clone(legacy);
   const migrated = migrateSave(legacy);
   assert.ok(migrated);
-  assert.equal(migrated.version, 11);
+  assert.equal(migrated.version, 12);
   assert.equal(migrated.cryLevel, 5);
   assert.equal(migrated.alive, true);
   assert.equal(migrated.yearSummary, null);
   assert.ok(migrated.parents.every(parent => parent.relationship === 5));
-  for (const key of ['id', 'rng', 'seed', 'age', 'nextId', 'name', 'stats', 'aptitudes', 'history', 'pendingEvents', 'lastYearEvents', 'education', 'jobOffers']) assert.deepEqual(migrated[key], before[key], key);
+  for (const key of ['id', 'rng', 'seed', 'age', 'nextId', 'name', 'stats', 'aptitudes', 'history', 'pendingEvents', 'lastYearEvents', 'education', 'jobOffers']) assert.deepEqual(migrated[key], neutralWellbeingAptitudes(structuredClone(before))[key], key);
   assert.deepEqual(legacy, before, 'migration must leave the imported object untouched');
   finishChoices(migrated);
   assert.equal(validateSave(migrated), true);

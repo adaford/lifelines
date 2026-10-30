@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createGame, advanceYear, chooseEducation, needsEducationChoice, EVENTS, resolveEventChoice, haveChild, migrateSave, validateSave } from '../engine.js';
-import { toLegacyCentimeters } from './helpers/legacy-height.js';
+import { toLegacyCentimeters, neutralWellbeingAptitudes } from './helpers/legacy-height.js';
 
 const copy = value => structuredClone(value);
 function finishChoices(state) {
@@ -38,9 +38,9 @@ test('v9 centimetre saves convert every family measurement and review while pres
   legacy.version = 9;
   const untouched = copy(legacy);
   const migrated = migrateSave(legacy);
-  assert.deepEqual(migrated, state, 'all actor fields, nested growth metadata and review values round-trip');
+  assert.deepEqual(migrated, neutralWellbeingAptitudes(copy(state)), 'all actor fields, nested growth metadata and review values round-trip');
   assert.deepEqual(legacy, untouched, 'the imported save is never mutated');
-  assert.deepEqual(migrateSave(copy(migrated)), state, 'current saves are not converted again');
+  assert.deepEqual(migrateSave(copy(migrated)), neutralWellbeingAptitudes(copy(state)), 'current saves are not converted again');
 
   state.partner = null;
   state.pregnancy = null;
@@ -48,7 +48,7 @@ test('v9 centimetre saves convert every family measurement and review while pres
   assert.equal(validateSave(state), true);
   const oldEncounters = toLegacyCentimeters(copy(state));
   oldEncounters.version = 9;
-  assert.deepEqual(migrateSave(oldEncounters), state, 'encounter heights convert too');
+  assert.deepEqual(migrateSave(oldEncounters), neutralWellbeingAptitudes(copy(state)), 'encounter heights convert too');
 });
 
 test('v9 migration rounds inches once and recomputes review growth from converted endpoints', () => {

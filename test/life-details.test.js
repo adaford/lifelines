@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { toLegacyCentimeters } from './helpers/legacy-height.js';
+import { toLegacyCentimeters, neutralWellbeingAptitudes } from './helpers/legacy-height.js';
 import {
   createGame, advanceYear, annualForecast, householdLifestyle,
   validateSave, migrateSave, needsEducationChoice, chooseEducation,
@@ -66,7 +66,7 @@ test('v8 migration adds career and growth state without rerolling existing lives
   const before = copy(legacy);
   const migrated = migrateSave(legacy);
   assert.ok(migrated);
-  assert.equal(migrated.version, 11);
+  assert.equal(migrated.version, 12);
   assert.equal(validateSave(migrated), true);
   assert.deepEqual(legacy, before, 'migration does not mutate the imported object');
   for (const key of ['rng', 'seed', 'nextId', 'age', 'maturityAge', 'stats', 'pendingEvents', 'history', 'yearSummary', 'lifestyle']) {

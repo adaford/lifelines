@@ -90,7 +90,7 @@ test('prospect generation is deterministic, bounded, adult-only, and supports fu
     assert.equal(person.adultHeight,person.height);
     assert.deepEqual(Object.keys(person.stats),traits);
     assert.ok(Object.values(person.stats).every(value=>value>=1 && value<=10));
-    assert.deepEqual(Object.keys(person.aptitudes),core);
+    assert.deepEqual(Object.keys(person.aptitudes),traits);
     assert.ok(Object.values(person.aptitudes).every(value=>Number.isInteger(value) && value>=-3 && value<=3));
     assert.equal(person.appearancePeakAge,22);
     assert.equal(person.gender,'female');assert.equal(person.canGestate,true);

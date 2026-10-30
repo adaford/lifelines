@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { toLegacyCentimeters } from './helpers/legacy-height.js';
+import { toLegacyCentimeters, neutralWellbeingAptitudes } from './helpers/legacy-height.js';
 import { SKILLS, JOBS, EVENTS, createGame, stage, advanceYear as advanceYearAction, setBabyChoice, setFocus, effectiveStats, currentEffects, eventOdds, jobFit, canTakeJob, takeJob, quitJob, haveChild, successionInfo, succeed, lifestyleFromResources, householdLifestyle, validateSave, migrateSave, chooseEducation, needsEducationChoice, offeredJobs, resolveEventChoice, respondToEncounter, proposeMarriage, endRelationship, relationshipOdds, oneNightChance, meetingChances, proposalChance, pregnancyChance, pendingEventSubject, normalizeSurname } from '../engine.js';
 
 const copy = value => JSON.parse(JSON.stringify(value));
@@ -84,16 +84,16 @@ test('a new life starts at zero with complete, bounded inherited traits and pare
 
 test('all five stats exist at birth with established natural ratings and average wellbeing', () => {
   const wellbeing = { health: [], stability: [] };
-  for (let seed = 1; seed <= 40; seed++) {
+  for (let seed = 1; seed <= 400; seed++) {
     const baby = createGame({ seed });
     for (const { key } of SKILLS) assert.ok(baby.stats[key] >= 1 && baby.stats[key] <= 10, `${key} at birth`);
     assert.ok(baby.stats.attractiveness >= 1 && baby.stats.attractiveness <= 10);
-    assert.equal(baby.version, 11);
+    assert.equal(baby.version, 12);
     for (const key of ['health', 'stability']) {
       assert.ok(baby.stats[key] >= 1 && baby.stats[key] <= 10);
       wellbeing[key].push(baby.stats[key]);
     }
-    assert.deepEqual(Object.keys(baby.stats).sort(), Object.keys(adult(seed).stats).sort());
+    if (seed <= 40) assert.deepEqual(Object.keys(baby.stats).sort(), Object.keys(adult(seed).stats).sort());
   }
   for (const [key, values] of Object.entries(wellbeing)) {
     const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
@@ -471,14 +471,15 @@ test('v2 upgrades preserve school, current careers, and adults without consuming
       const snapshot = copy(old);
       const upgraded = migrateSave(old);
       assert.equal(validateSave(upgraded), true);
-      assert.equal(upgraded.version, 11);
+      assert.equal(upgraded.version, 12);
       assert.equal(upgraded.education.status, status);
       assert.equal(upgraded.education.years, status === 'graduate' ? 4 : 0);
       assert.equal(upgraded.jobOffers.length, count);
       assert.deepEqual(old, snapshot);
       for (const key of ['age', 'rng', 'seed', 'id', 'nextId', 'jobId', 'jobYears', 'performance', 'schoolProgress', 'money']) assert.equal(upgraded[key], state[key]);
-      for (const key of ['stats', 'aptitudes', 'history', 'effects']) assert.deepEqual(upgraded[key], state[key]);
-      if (old.version === 2) for (const key of ['parents', 'children', 'siblings', 'lineage']) assert.deepEqual(upgraded[key], state[key]);
+      const expected = neutralWellbeingAptitudes(copy(state));
+      for (const key of ['stats', 'aptitudes', 'history', 'effects']) assert.deepEqual(upgraded[key], expected[key]);
+      if (old.version === 2) for (const key of ['parents', 'children', 'siblings', 'lineage']) assert.deepEqual(upgraded[key], expected[key]);
       if (upgraded.jobId) assert.ok(upgraded.jobOffers.includes(upgraded.jobId));
       assert.deepEqual(migrateSave(old), upgraded);
       assert.deepEqual(migrateSave(upgraded), upgraded);
@@ -712,7 +713,7 @@ test('v1 saves migrate every family member and active effects without resetting 
   assert.equal(validateSave(migrated), true);
   assert.deepEqual(old, snapshot, 'migration must not mutate its source');
   for (const key of ['name','age','id','seed','rng','nextId','generation','money','jobId']) assert.equal(migrated[key], state[key]);
-  assert.deepEqual(migrated.aptitudes, state.aptitudes);
+  assert.deepEqual(migrated.aptitudes, neutralWellbeingAptitudes(copy(state)).aptitudes);
   assert.deepEqual(migrated.history, state.history);
   assert.deepEqual(migrated.stats, state.stats);
   assert.deepEqual(migrated.effects, state.effects);
@@ -1086,7 +1087,7 @@ test('adult encounters are yearly, bounded, adult-only, and survive saved reload
   for(const person of state.encounters) {
     assert.ok(person.age>=18&&person.age<85);
     assert.equal(Object.keys(person.stats).length,7);
-    assert.equal(Object.keys(person.aptitudes).length,5);
+    assert.equal(Object.keys(person.aptitudes).length,7);
     assert.equal(person.gender,'female');
   }
   const restored=migrateSave(copy(state));
@@ -1297,7 +1298,7 @@ test('v4 migration keeps unresolved choices and lifestyle-only effects without c
   delete previous.partner; delete previous.encounters; delete previous.encounterYear; delete previous.pregnancy;
   const snapshot=copy(previous),converted=migrateSave(previous);
   assert.ok(converted); assert.equal(validateSave(converted),true);
-  for(const key of ['rng','nextId','age','name','history','education','jobOffers','effects','pendingEvents','lastYearEvents','stats','aptitudes']) assert.deepEqual(converted[key],previous[key]);
+  for(const key of ['rng','nextId','age','name','history','education','jobOffers','effects','pendingEvents','lastYearEvents','stats','aptitudes']) assert.deepEqual(converted[key],neutralWellbeingAptitudes(copy(previous))[key]);
   assert.deepEqual(previous,snapshot);
   assert.equal(converted.partner,null); assert.deepEqual(converted.encounters,[]);
   const event=EVENTS.find(event=>event.id==='investment_pitch');
@@ -1433,9 +1434,9 @@ test('old childless endings become valid retirement choices without resetting th
   for (const parent of previous.parents) { parent.age = Math.min(85, parent.age); if (parent.age === 85) parent.alive = false; }
   for(const person of [previous,...previous.parents,...previous.children,...previous.siblings,...previous.lineage,...previous.encounters,previous.partner,previous.pregnancy?.otherParent].filter(Boolean)) { delete person.familyName; person.appearancePeakAge = 30; }
   const migrated=migrateSave(previous);
-  assert.equal(validateSave(migrated),true); assert.equal(migrated.version,11);
+  assert.equal(validateSave(migrated),true); assert.equal(migrated.version,12);
   assert.equal(migrated.ended,false); assert.equal(migrated.needsSuccession,true);
-  for(const key of ['id','name','age','rng','nextId','stats','aptitudes','history','money','education','jobOffers','effects','pendingEvents']) assert.deepEqual(migrated[key],previous[key]);
+  for(const key of ['id','name','age','rng','nextId','stats','aptitudes','history','money','education','jobOffers','effects','pendingEvents']) assert.deepEqual(migrated[key],neutralWellbeingAptitudes(copy(previous))[key]);
   const info=successionInfo(migrated);
   assert.equal(info.route,'beneficiary'); assert.equal(info.eligible,true);
   assert.equal(succeed(migrated,info.beneficiary.id).ok,true);
@@ -1451,7 +1452,7 @@ test('v5 family migration preserves partnership, pregnancy, offers, and future s
   for(const person of [previous,...previous.parents,...previous.children,...previous.siblings,...previous.lineage,...previous.encounters,previous.partner,previous.pregnancy.otherParent]) { delete person.familyName; person.appearancePeakAge = 30; }
   const migrated=migrateSave(previous);
   assert.equal(validateSave(migrated),true);
-  for(const key of ['rng','nextId','id','name','age','stats','education','jobOffers','history','pendingEvents']) assert.deepEqual(migrated[key],previous[key]);
+  for(const key of ['rng','nextId','id','name','age','stats','education','jobOffers','history','pendingEvents']) assert.deepEqual(migrated[key],neutralWellbeingAptitudes(copy(previous))[key]);
   assert.equal(migrated.partner.id,previous.partner.id); assert.equal(migrated.partner.relationship,previous.partner.relationship);
   assert.equal(migrated.pregnancy.carrierId,previous.pregnancy.carrierId); assert.equal(migrated.pregnancy.dueAge,previous.pregnancy.dueAge);
   const familyName=migrated.familyName;

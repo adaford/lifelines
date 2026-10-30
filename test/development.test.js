@@ -100,7 +100,7 @@ test('crying has neutral parent mental stability at two and distinct increasing 
     for (let level = 1; level <= 5; level++) {
       const state = createGame({ seed: 57 });
       state.age = age;
-      state.parents.forEach(parent => { parent.stats.stability = 7; parent.relationship = 7; });
+      state.parents.forEach(parent => { parent.stats.stability = 7; parent.aptitudes.stability = 0; parent.relationship = 7; });
       setCryLevel(state, level);
       const before = copy(state);
       const forecast = annualForecast(state);
@@ -207,7 +207,7 @@ test('v7 migration preserves existing height, bonds, random state and non-infant
   const before = copy(legacy);
   const migrated = migrateSave(legacy);
   assert.ok(migrated);
-  assert.equal(migrated.version, 11);
+  assert.equal(migrated.version, 12);
   for (const key of ['rng', 'seed', 'nextId', 'age', 'stats', 'pendingEvents', 'history']) assert.deepEqual(migrated[key], before[key], key);
   assert.equal(migrated.height, round(before.height / 2.54));
   assert.equal(migrated.yearSummary.height.before, round(before.yearSummary.height.before / 2.54));

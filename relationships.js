@@ -1,3 +1,4 @@
+import { naturalSkillRating, BIRTH_VARIATION } from './development.js?v=wellbeing-aptitude-1';
 // Fictional relationship balance. These are game rules, not real-world estimates.
 // Actor identity and pregnancy capability are separate so future playable genders
 // can use the same relationship system. The current default is men meeting women.
@@ -89,6 +90,7 @@ export function createProspects(state, helpers, stats = state.stats) {
   const chance = meetingChances(state, stats);
   if (!chance.slots) return [];
   const { random, integer, uid, personName } = helpers;
+  const normal = () => clamp(Math.sqrt(-2 * Math.log(Math.max(1e-12, random()))) * Math.cos(2 * Math.PI * random()), -3, 3);
   const preference = Array.isArray(state.attractedTo) && state.attractedTo.length ? state.attractedTo : ['female'];
   const availableGenders = preference.filter(gender => ['male', 'female', 'nonbinary'].includes(gender));
   if (!availableGenders.length) return [];
@@ -98,11 +100,11 @@ export function createProspects(state, helpers, stats = state.stats) {
     if (random() >= chance.chance) continue;
     const gender = availableGenders[integer(0, availableGenders.length - 1)];
     const actorStats = Object.fromEntries(CORE.map(key => [key, round(clamp(center + (random() - .5) * 4.4, 1, 10))]));
-    actorStats.health = round(clamp(4.5 + center * .45 + (random() - .5) * 2.6, 1, 10));
-    actorStats.stability = round(clamp(3.7 + center * .5 + (random() - .5) * 3.6, 1, 10));
+    const aptitudes = helpers.randomAptitudes ? helpers.randomAptitudes() : Object.fromEntries(TRAITS.map(key => [key, integer(-3, 3)]));
+    actorStats.health = round(clamp(naturalSkillRating(aptitudes.health) + normal() * BIRTH_VARIATION.health, 1, 10));
+    actorStats.stability = round(clamp(naturalSkillRating(aptitudes.stability) + normal() * BIRTH_VARIATION.stability, 1, 10));
     const age = integer(Math.max(18, state.age - 5), Math.min(84, Math.max(18, state.age + 5)));
     const height = round(integer(150, 195) / 2.54);
-    const aptitudes = helpers.randomAptitudes ? helpers.randomAptitudes() : Object.fromEntries(CORE.map(key => [key, integer(-3, 3)]));
     const appearancePeakAge = appearanceDeclineAge({ gender });
     for (let pastAge = appearancePeakAge; pastAge < age; pastAge++) {
       actorStats.attractiveness = clamp(actorStats.attractiveness + attractivenessAgeChange({age:pastAge,gender}),1,10);

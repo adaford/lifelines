@@ -1,5 +1,5 @@
-import { annualForecast, effectiveStats, needsEducationChoice } from './engine.js?v=aptitude-number-1';
-import { infantChoiceEffects } from './development.js?v=aptitude-number-1';
+import { annualForecast, effectiveStats, needsEducationChoice } from './engine.js?v=wellbeing-aptitude-1';
+import { infantChoiceEffects, wellbeingResponse } from './development.js?v=wellbeing-aptitude-1';
 
 const nonzero = value => Math.abs(value) > .000001;
 const keyOf = entry => `${entry.parentId || 'you'}:${entry.stat}`;
@@ -40,7 +40,7 @@ function cryEntries(state, level, clip) {
     if (!entry.parentId) continue;
     const parent = state.parents.find(person => person.id === entry.parentId);
     if (entry.stat === 'stability') {
-      const effect = [.2, 0, -.6, -1.2, -1.8][level - 1];
+      const effect = wellbeingResponse(parent, 'stability', [.2, 0, -.6, -1.2, -1.8][level - 1]);
       entry.change = clip ? bounded(parent.stats.stability, effect) : effect;
     } else if (entry.stat === 'relationship') {
       const effect = .2 * (level - 3);
