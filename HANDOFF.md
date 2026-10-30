@@ -2,7 +2,7 @@
 
 Updated 31 October 2026 for signed temporary modifiers, smaller lasting event changes, reduced aptitude response, and toddler choice refinements. Lifelines is a phone-first, generational life simulator. Preserve saves, lifestyle-only finances, and GitHub Pages deployment.
 
-The todo update is implemented: zero aptitude badges are hidden; signed temporary totals sit beside ratings; parents precede decisions; redundant help/points and the toddler heading are removed; positive year-review changes use stronger green. Temporary ratings and adult lifestyle can exceed the base 0-10 range. Smaller lasting event rewards, reduced aptitude multipliers, and the revised toddler effects are calibrated with a new 4,000-life reference. Schema 16 upgrades valid v15 saves by metadata only. All 352 automated tests pass, including 81 DOM checks; all 18 local HTTP assets match source, and the calibrated reference reproduces byte-for-byte. Deployment verification is pending.
+The todo update is implemented: zero aptitude badges are hidden; signed temporary totals sit beside ratings; parents precede decisions; redundant help/points and the toddler heading are removed; positive year-review changes use stronger green. Temporary ratings and adult lifestyle can exceed the base 0-10 range. Smaller lasting event rewards, reduced aptitude multipliers, and the revised toddler effects are calibrated with a new 4,000-life reference. Schema 16 upgrades valid v15 saves by metadata only. All 352 automated tests pass, including 81 DOM checks; all 18 local HTTP assets match source, and the calibrated reference reproduces byte-for-byte. GitHub Pages deployed gameplay commit **95e7ab5** successfully (workflow **41109757445**); all 18 live HTTP assets match that commit.
 
 The previous journal update put every recorded stat change on its own line, including multiple stats for the same person. Year reviews keep grouped results per person. Selected choices, exact saved values, durations, restrictions, and ordinary prose are preserved without rewriting history. All 325 tests pass, including 77 DOM checks, after `npm ci` on Node 24.14.0. Parser coverage includes personal and family stats, 0-10 bounds, both arrow formats, and trailing restrictions. Simulation rules, saves, RNG, and the calibrated reference are unchanged. Visual checks remain omitted at the user's request.
 
@@ -54,7 +54,7 @@ The earlier gameplay baseline was commit **4da3288**; **6e56897** added portable
 | Cloud environment | lifelines, published privately in the owner's ChatGPT account |
 | Runtime | Node.js 24 for development and tests; static browser files in production |
 | Save schema | Version 16; browser key remains lifelines.save.v1 |
-| Automated checks | All 352 tests pass, including 81 DOM checks. All 18 local HTTP assets match source; the calibrated reference reproduces byte-for-byte. Deployment verification pending. Visual checks remain omitted at the user's request. |
+| Automated checks | All 352 tests pass, including 81 DOM checks. All 18 local HTTP assets match source; the calibrated reference reproduces byte-for-byte. Gameplay deployment verified for **95e7ab5** (workflow **41109757445**), with all 18 live assets matching. Visual checks remain omitted at the user's request. |
 
 Read [AGENTS.md](AGENTS.md) before changing the project and [README.md](README.md) for the detailed current rules. Game progress lives in the player's browser, not in GitHub or the coding environment.
 

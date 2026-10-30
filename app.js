@@ -172,9 +172,10 @@ function statEffectBadge(key) {
 }
 function ratingBar(label, value, statKey) {
   const rating = Math.max(0, Math.min(10, Number(value)));
+  const displayed = Number(number(value));
   const hue = Math.round(rating / 10 * 120);
   const effects = statEffectDescription(statKey);
-  return `<span class="rating-track" role="meter" aria-label="${esc(label)}" aria-valuemin="${Math.min(0,Number(value))}" aria-valuemax="${Math.max(10,Number(value))}" aria-valuenow="${number(value)}" aria-valuetext="${number(value)} out of 10.${effects?` ${esc(effects)}`:''}"><span class="rating-fill" style="width:${rating*10}%;background:hsl(${hue}, 60%, 40%)"></span></span>`;
+  return `<span class="rating-track" role="meter" aria-label="${esc(label)}" aria-valuemin="${Math.min(0,displayed)}" aria-valuemax="${Math.max(10,displayed)}" aria-valuenow="${number(value)}" aria-valuetext="${number(value)} out of 10.${effects?` ${esc(effects)}`:''}"><span class="rating-fill" style="width:${rating*10}%;background:hsl(${hue}, 60%, 40%)"></span></span>`;
 }
 
 function profileLifestyleView() {

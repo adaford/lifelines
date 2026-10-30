@@ -2522,8 +2522,8 @@ test('Year keeps parents above decisions and shows unbounded totals with separat
   const fixture=createGame({seed:121});
   fixture.age=3;
   fixture.focus={work:3,social:2,family:2,self:3,creative:2};
-  fixture.stats.creativity=9.8;
-  fixture.stats.health=.1;
+  fixture.stats.creativity=9.77;
+  fixture.stats.health=.13;
   fixture.aptitudes.creativity=2;
   fixture.aptitudes.health=0;
   fixture.effects=[{id:'mixed',name:'Mixed effects',description:'',years:2,modifiers:{creativity:.5,health:-.4},kind:'neutral'}];
@@ -2547,6 +2547,10 @@ test('Year keeps parents above decisions and shows unbounded totals with separat
   assert.doesNotMatch(ui.query('.effect-meta').textContent,/10\.3|-0\.3/);
   assert.equal(ui.query('.status-strip [data-stat="creativity"] .rating-track').getAttribute('aria-valuenow'),'10.3');
   assert.equal(ui.query('.status-strip [data-stat="health"] .rating-track').getAttribute('aria-valuenow'),'-0.3');
+  for (const track of ui.all('.status-strip .rating-track')) {
+    assert.ok(Number(track.getAttribute('aria-valuemin')) <= Number(track.getAttribute('aria-valuenow')));
+    assert.ok(Number(track.getAttribute('aria-valuenow')) <= Number(track.getAttribute('aria-valuemax')));
+  }
   assert.deepEqual(ui.saved(),before);
   assert.equal(ui.writes(),writes);
 });
