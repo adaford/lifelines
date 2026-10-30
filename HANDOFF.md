@@ -2,6 +2,8 @@
 
 Updated 30 October 2026 for five toddler activities, activity impact labels, Social naming, and compatible schema v11 saves. Lifelines is a phone-first, generational life simulator. Preserve saves, lifestyle-only finances, and GitHub Pages deployment.
 
+Release verification, 30 October 2026: gameplay commit **a0a2b6a** was pushed to `main` and GitHub Pages reported `built` for that exact commit. The live entry point and seven updated assets returned HTTP 200 and matched the released files at https://adaford.github.io/lifelines/. All 231 tests passed, including 57 DOM checks; the accessibility-label follow-up also passed the 57 DOM checks. The phone visual check remains blocked as described below.
+
 The earlier gameplay baseline was commit **4da3288**; **6e56897** added portable cloud instructions. New characters have broad natural ratings across 1–10, with focus and aptitude shaping lifelong gains or losses. Under-18 abilities describe ability relative to peers, not adult knowledge or strength. Only height shows a percentile. Reviews record the choices actually used for the completed year, and stories identify known people's relationships. Blank name fields use defaults. Existing saves, parent bars, stochastic growth, mortality, and before → after reviews remain. Cloud setup observations below remain historical records from 26 October. Record the final tested/deployed commit with the release result.
 
 ## Project access and current status
