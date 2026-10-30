@@ -1,5 +1,5 @@
-import { annualForecast, effectiveStats, needsEducationChoice } from './engine.js?v=toddler-social-1';
-import { infantChoiceEffects, wellbeingResponse, TODDLER_ACTIVITY_EFFECTS, PARENT_FAMILY_RELATIONSHIP_GAIN } from './development.js?v=toddler-social-1';
+import { annualForecast, effectiveStats, needsEducationChoice } from './engine.js?v=parent-help-1';
+import { infantChoiceEffects, wellbeingResponse, TODDLER_ACTIVITY_EFFECTS, PARENT_FAMILY_RELATIONSHIP_GAIN } from './development.js?v=parent-help-1';
 
 const nonzero = value => Math.abs(value) > .000001;
 const keyOf = entry => `${entry.parentId || 'you'}:${entry.stat}`;
@@ -14,7 +14,7 @@ export function toddlerActivityImpacts(activity) {
     return { stat, change, level };
   });
   // Family time is the only toddler activity that improves parent relationships.
-  if (activity === 'family') impacts.push({ stat: 'relationship', change: PARENT_FAMILY_RELATIONSHIP_GAIN, level: 3, target: 'parents' });
+  if (activity === 'family') impacts.push({ stat: 'relationship', change: PARENT_FAMILY_RELATIONSHIP_GAIN, level: 2, target: 'parents' });
   return impacts;
 }
 
