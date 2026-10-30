@@ -87,6 +87,7 @@ button svg { pointer-events: none; }
 .status-label .icon { width: 13px; height: 13px; margin-right: 3px; }
 .status-pill strong { color: var(--ink); font-size: 20px; font-weight: 650; font-variant-numeric: tabular-nums; }
 .status-pill small { font-size: 11px; color: var(--muted); }
+.status-reading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 3px 6px; }
 .rating-track { display: block; width: 100%; height: 9px; margin-top: 7px; border: 1px solid #8b9485; border-radius: 1px; background: #e1e5db; overflow: hidden; }
 .rating-fill { display: block; height: 100%; }
 .profile-stat .rating-track { grid-column: 1 / -1; margin-top: 3px; }
@@ -241,7 +242,10 @@ button svg { pointer-events: none; }
 .vital > .stat-percentile { margin-top: 3px; }
 .stat-value { white-space: nowrap; font-size: 14px; font-weight: 650; font-variant-numeric: tabular-nums; }
 .height-percentile { display: block; color: var(--muted); font-size: 11px; margin-top: 5px; line-height: 1.4; }
-.aptitude { display: inline-flex; align-items: center; justify-content: center; min-width: 27px; height: 23px; padding: 0 6px; border-radius: 5px; background: #eceee3; color: #6e785f; font-size: 11px; font-weight: 650; }
+.aptitude { display: inline-flex; align-items: center; justify-content: center; gap: 3px; min-width: 27px; min-height: 23px; padding: 0 4px; border-radius: 5px; background: #eceee3; color: #6e785f; font-size: 11px; font-weight: 650; white-space: nowrap; }
+.aptitude-emojis { font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif; font-size: 12px; line-height: 1; }
+.aptitude-emojis::before { content: attr(data-emoji); }
+.status-pill .aptitude-compact { padding: 0; min-width: 0; background: transparent; }
 .aptitude.positive { background: #e8f0df; color: #587b47; }
 .aptitude.negative { background: #f5e9df; color: #9f6f4d; }
 .trait-legend { font-size: 12px; color: var(--muted); margin-top: 19px; padding-top: 14px; border-top: 1px solid var(--line); }
