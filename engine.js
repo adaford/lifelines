@@ -1,19 +1,19 @@
 // Lifelines: deterministic, browser-independent simulation rules.
 // All public actions mutate their state and return { ok, reason? }.
-import { JOBS } from './jobs.js?v=wellbeing-aptitude-1';
-import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=wellbeing-aptitude-1';
-import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=wellbeing-aptitude-1';
-import { mortalityRisk, rollMortality } from './mortality.js?v=wellbeing-aptitude-1';
-import { heightReference, advanceGrowth } from './growth.js?v=wellbeing-aptitude-1';
-import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=wellbeing-aptitude-1';
-import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, DEVELOPMENT_BALANCE, BIRTH_VARIATION, TODDLER_FOCUS } from './development.js?v=wellbeing-aptitude-1';
-import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=wellbeing-aptitude-1';
-import { normalPercentile } from './percentiles.js?v=wellbeing-aptitude-1';
+import { JOBS } from './jobs.js?v=baby-height-1';
+import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=baby-height-1';
+import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=baby-height-1';
+import { mortalityRisk, rollMortality } from './mortality.js?v=baby-height-1';
+import { heightReference, advanceGrowth } from './growth.js?v=baby-height-1';
+import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=baby-height-1';
+import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, DEVELOPMENT_BALANCE, BIRTH_VARIATION, TODDLER_FOCUS } from './development.js?v=baby-height-1';
+import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=baby-height-1';
+import { normalPercentile } from './percentiles.js?v=baby-height-1';
 export { DEVELOPMENT_BALANCE };
-export { heightPercentile } from './growth.js?v=wellbeing-aptitude-1';
-export { mortalityRisk } from './mortality.js?v=wellbeing-aptitude-1';
-import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=wellbeing-aptitude-1';
-export { JOBS, JOB_CATEGORIES } from './jobs.js?v=wellbeing-aptitude-1';
+export { heightPercentile } from './growth.js?v=baby-height-1';
+export { mortalityRisk } from './mortality.js?v=baby-height-1';
+import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=baby-height-1';
+export { JOBS, JOB_CATEGORIES } from './jobs.js?v=baby-height-1';
 export const EVENTS = [...PERSONAL_EVENTS, ...FAMILY_EVENTS];
 
 export const SKILLS = [
@@ -713,7 +713,6 @@ export function advanceYear(state, { mortalityRandom, growthRandom, parentCareer
     workLabel: state.age < 5 ? 'Play' : state.age < 18 ? 'School' : state.education.status === 'college' ? 'College' : 'Career',
   };
   const oldMemories = new Set(state.history.map(memory => memory.id));
-  const previousStage = stage(state);
   // Each eligible event has its own independent roll. Shuffle before limiting
   // to five so the catalogue's ordering never gives an event priority.
   const odds = eventOdds(state).filter(event => event.chance > 0);
@@ -743,7 +742,7 @@ export function advanceYear(state, { mortalityRandom, growthRandom, parentCareer
       log(state, roll.name, event.description.replaceAll('{name}', subject.name), 'choice');
     } else applyOutcome(state, event, event, context);
   }
-  if (!selected.length && !deaths.length && !state.history.some(memory => !oldMemories.has(memory.id))) log(state, 'A quiet year', previousStage === 'baby' ? 'Small discoveries fill the year.' : 'Everyday life carries on.', 'quiet');
+  if (!selected.length && !deaths.length && !state.history.some(memory => !oldMemories.has(memory.id))) log(state, 'Events', 'None', 'quiet');
   syncFamilyLifestyles(state);
   if (state.age === 2) log(state, 'A bigger little world', 'Play, little creations and family time fill your days.', 'milestone');
   if (state.age === 5) log(state, 'The first school year', 'You are ready to begin school.', 'milestone');

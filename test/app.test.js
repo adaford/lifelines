@@ -278,9 +278,10 @@ test('gender is visible next to the name and player height percentiles continue 
     assert.equal(ui.all('.profile-copy > .muted').length,0,'infants have no filler subtitle');
     assert.doesNotMatch(ui.query('.profile-copy').textContent,/A whole life ahead/);
     assert.equal(ui.query('.profile-identity .gender-label').textContent,gender==='nonbinary'?'Nonbinary':gender[0].toUpperCase()+gender.slice(1));
-    assert.equal(ui.query('.profile-height .status-value').textContent,"1'5");
-    assert.match(ui.query('.profile-height').getAttribute('aria-label'),/1 foot 5 inches/);
-    assert.match(ui.query('.profile-height').textContent,/1'5.*percentile/);
+    assert.equal(ui.query('.profile-height .status-value').textContent,'17.0"');
+    assert.equal(ui.all('.profile-height .stat-emoji').length,0,'height has no ruler emoji');
+    assert.match(ui.query('.profile-height').getAttribute('aria-label'),/17\.0 inches/);
+    assert.match(ui.query('.profile-height').textContent,/17\.0".*percentile/);
     assert.equal(ui.all('.year-stats .vitals-grid').length,0,'Year keeps vitals in the top strip without a duplicate bottom grid');
     assert.deepEqual(ui.all('.status-pill').map(pill=>pill.dataset.stat).sort(),[...SKILLS.map(skill=>skill.key),'health','stability','lifestyle'].sort());
     for(const key of [...SKILLS.map(skill=>skill.key),'health','stability','lifestyle','height']) {
@@ -291,7 +292,7 @@ test('gender is visible next to the name and player height percentiles continue 
     }
     assert.deepEqual(ui.saved(),baby,'opening top vitals must not alter the life');
     const grown=ageTo(baby,baby.maturityAge);
-    const [storedInches,displayHeight]=({male:[69,"5'9"],female:[71.5,"6'0"],nonbinary:[71.49,"5'11"]})[gender];
+    const [storedInches,displayHeight]=({male:[69,`5'9"`],female:[71.5,`6'0"`],nonbinary:[71.49,`5'11"`]})[gender];
     grown.height=storedInches;
     grown.adultHeight=storedInches;
     ui=await mount(grown);
@@ -324,7 +325,7 @@ test('only height shows a percentile before eighteen without changing current va
     const suffix=rank%100>=11&&rank%100<=13?'th':({1:'st',2:'nd',3:'rd'}[rank%10]||'th');
     return `${rank}${suffix} percentile`;
   };
-  for(const age of [0,17,18]) {
+  for(const age of [0,1,2,17,18]) {
     const fixture=ageTo(createGame({seed:121}),age);
     if(age===18) chooseEducation(fixture,'work');
     const current=effectiveStats(fixture), percentiles=statPercentiles(fixture);
@@ -338,9 +339,12 @@ test('only height shows a percentile before eighteen without changing current va
         const row=ui.query(inHeader&&key==='height'?'.profile-height':inHeader&&key==='lifestyle'?'.profile-lifestyle':`${inHeader?'.status-strip':'.stats-panel'} [data-stat="${key}"]`);
         const value=row.querySelector('.stat-value, .vital-value, strong');
         if(key==='height') {
-          assert.match(value.textContent,/^\d+'(?:[0-9]|1[01])$/);
-          const [feet,inches]=value.textContent.split("'").map(Number);
-          assert.equal(feet*12+inches,Math.round(fixture.height),'height displays the saved inches rounded to one inch');
+          if(age<2) assert.equal(value.textContent,`${(Math.round(fixture.height*10)/10).toFixed(1)}"`);
+          else {
+            assert.match(value.textContent,/^\d+'(?:[0-9]|1[01])"$/);
+            const [feet,inches]=value.textContent.slice(0,-1).split("'").map(Number);
+            assert.equal(feet*12+inches,Math.round(fixture.height),'height displays the saved inches rounded to one inch');
+          }
         } else assert.equal(value.firstChild.textContent,(key==='lifestyle'?fixture.lifestyle:current[key]).toFixed(1),`${key} always displays one decimal`);
         if(age<18 && key==='height') {
           const label=row.querySelector(`[data-percentile-key="${key}"]`);
@@ -401,9 +405,7 @@ test('new-year review shows actual changes, survives reload, and dismisses persi
   assert.equal(ui.query('.year-review-modal [data-stat="height"] > span').textContent,'Height');
   const reviewHeights=ui.query('.year-review-modal [data-stat="height"] strong').textContent.split(' → ');
   for(const [index,measurement] of [height.before,height.after].entries()) {
-    assert.match(reviewHeights[index],/^\d+'(?:[0-9]|1[01])$/);
-    const [feet,inches]=reviewHeights[index].split("'").map(Number);
-    assert.equal(feet*12+inches,Math.round(measurement));
+    assert.equal(reviewHeights[index],`${(Math.round(measurement*10)/10).toFixed(1)}"`);
   }
   assert.doesNotMatch(ui.query('.year-changes').textContent,/[+−-]\d/);
   assert.doesNotMatch(ui.query('.forecast-parents').textContent,/\bbond\b|[+−-]\d/i);
@@ -920,7 +922,7 @@ describe('Dating and family DOM integration', {concurrency:false},()=>{
       for(const skill of [...SKILLS.map(s=>s.key),'health','stability']) assert.ok(card.querySelector(`[data-skill="${skill}"]`));
       for(const label of ['Lifestyle','Height']) assert.match(card.textContent,new RegExp(label));
       assert.equal(card.querySelector('[data-topic="lifestyle"]').closest('.profile-stat').querySelector('strong').firstChild.textContent,person.lifestyle.toFixed(1));
-      assert.match(card.querySelector('[data-topic="height"]').closest('.profile-stat').querySelector('strong').textContent,/^\d+'(?:[0-9]|1[01])$/);
+      assert.match(card.querySelector('[data-topic="height"]').closest('.profile-stat').querySelector('strong').textContent,/^\d+'(?:[0-9]|1[01])"$/);
       assert.doesNotMatch(card.textContent,/\bcm\b/);
       assert.equal(card.querySelectorAll('[data-action="encounter"]').length,3);
       assertNoMoneyDisplay(card,'dating profile');
@@ -1193,6 +1195,7 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     for (let year = 1; year <= 5; year += 1) {
       ui.click('[data-action="advance"]');
       if(year===2) assert.match(ui.query('.year-decisions').textContent,/Cry level5\/5/,'the review still shows the infant year just completed');
+      if(year===2) assert.match(ui.query('.year-review-modal [data-stat="height"] strong').textContent,/^\d+\.\d" \u2192 \d+'(?:[0-9]|1[01])"$/,'the second birthday switches only the after-height into feet and inches');
       if(year===5) assert.match(ui.query('.year-decisions').textContent,/Play4\/5Electronics1\/5Family time2\/5Rest3\/5Arts & crafts2\/5/,'the fifth-birthday review retains toddler activities');
       resolveUIEvents(ui);
       assert.equal(ui.saved().age, year, 'one click advances exactly one year');
@@ -1226,8 +1229,8 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     assert.equal(validateSave(ui.saved()), true);
     assert.doesNotMatch(ui.query('#app').textContent, /undefined|NaN/);
     ui.click('.nav-list [data-tab="character"]');
-    assert.equal(ui.all('.stat-list .stat-row').length, 5);
-    assert.equal(ui.all('.stat-list .aptitude').length, 5);
+    assert.equal(ui.all('.stat-list .stat-row').length, 7);
+    assert.equal(ui.all('.stat-list .aptitude').length, 7);
     assert.equal(ui.saved().age, 5, 'viewing detailed skills must not advance the year');
   });
 
@@ -1361,7 +1364,7 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     assert.match(ui.query('.effect-card.negative').textContent, /Mental stability\s*[\d.]+/);
     assert.doesNotMatch(ui.query('.effect-card.negative').textContent, /[+−-]\d/);
     assert.doesNotMatch(ui.query('.vitals-grid').textContent, /Higher is calmer/);
-    ui.click('.vitals-grid [data-topic="stability"]');
+    ui.click('.stats-panel [data-topic="stability"]');
     assert.match(ui.query('.help-popup').textContent, /Higher means calmer/);
     ui.click('.help-popup [data-action="close"]');
     ui.click('[data-action="menu"]');
@@ -1441,7 +1444,7 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     assert.equal(ui.all('.family-card').length, 2);
     assert.equal(ui.query('[data-action="child"]').disabled, true);
     ui.click('[data-action="tab"][data-tab="character"]');
-    assert.equal(ui.all('.stat-list .stat-row').length, 5);
+    assert.equal(ui.all('.stat-list .stat-row').length, 7);
     ui.click('[data-action="menu"]');
     assert.ok(ui.query('.menu-list [data-action="export"]'));
     ui.click('.menu-list [data-action="help"]');
@@ -1452,7 +1455,7 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     assert.equal(ui.all('[role="dialog"]').length, 0);
     assert.equal(ui.document.body.style.overflow, '');
     ui.click('[data-action="odds"]');
-    assert.match(ui.query('.modal-body').textContent, /Quiet year/);
+    assert.match(ui.query('.modal-body').textContent, /No events/);
     assert.match(ui.query('.modal-body').textContent, /Under the weather/);
   });
 
