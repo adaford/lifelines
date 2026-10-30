@@ -5,11 +5,11 @@ import {
   offeredJobs, needsEducationChoice, pendingEventSubject,
   relationshipOdds, meetingChances, proposalChance, pregnancyChance, oneNightChance,
   respondToEncounter, proposeMarriage, endRelationship, normalizeSurname, heightPercentile, statPercentiles
-} from './engine.js?v=baby-height-1';
-import { annotateNarrative } from './narrative.js?v=baby-height-1';
-import { formatRating, formatHeight, heightDescription, formatStatNarrative } from './display.js?v=baby-height-1';
+} from './engine.js?v=visible-review-1';
+import { annotateNarrative } from './narrative.js?v=visible-review-1';
+import { formatRating, formatHeight, heightDescription, formatStatNarrative } from './display.js?v=visible-review-1';
 
-import { choiceImpacts } from './choice-impacts.js?v=baby-height-1';
+import { choiceImpacts } from './choice-impacts.js?v=visible-review-1';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const app = document.querySelector('#app');
@@ -75,7 +75,6 @@ const journalText = (value, age = state.age) => narrativeText(String(value ?? ''
   .trim(),age);
 const number = formatRating;
 const beforeAfter = ({before,after}) => `${number(before)} → ${number(after)}`;
-const heightBeforeAfter = ({before,after}, fromAge, toAge) => `${formatHeight(before,fromAge)} → ${formatHeight(after,toAge)}`;
 const pct = value => `${Math.round((Number(value) || 0) * 100)}%`;
 const aptitude = value => value > 0 ? `+${value}` : String(value);
 function aptitudeBadge(value, label = 'Natural aptitude') {
@@ -265,7 +264,12 @@ function parentStatusView() {
 
 function changesView(changes, lifestyle, height, fromAge, toAge) {
   const entries = [...Object.entries(changes || {}).sort(([a],[b]) => DISPLAY_STATS.findIndex(stat => stat.key === a) - DISPLAY_STATS.findIndex(stat => stat.key === b)), ...(lifestyle?[['lifestyle',lifestyle]]:[]), ...(height?[['height',height]]:[])];
-  return `<div class="year-changes">${entries.map(([key,value])=>`<div class="year-change" data-stat="${esc(key)}"><span>${esc(skillLabel(key))}${statEmoji(key)}</span><strong class="${value.change>0?'gain':value.change<0?'loss':'unchanged'}">${key==='height'?heightBeforeAfter(value,fromAge,toAge):beforeAfter(value)}</strong></div>`).join('')}</div>`;
+  return `<div class="year-changes">${entries.map(([key,value]) => {
+    const before = key === 'height' ? formatHeight(value.before,fromAge) : number(value.before);
+    const after = key === 'height' ? formatHeight(value.after,toAge) : number(value.after);
+    const change = before === after ? 0 : value.after - value.before;
+    return `<div class="year-change" data-stat="${esc(key)}"><span>${esc(skillLabel(key))}${statEmoji(key)}</span><strong class="${change>0?'gain':change<0?'loss':'unchanged'}">${before} → ${after}</strong></div>`;
+  }).join('')}</div>`;
 }
 
 function yearDecisionsView(decisions) {
