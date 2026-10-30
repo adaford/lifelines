@@ -411,6 +411,7 @@ test('new-year review shows actual changes, survives reload, and dismisses persi
   assert.doesNotMatch(ui.query('.forecast-parents').textContent,/\bbond\b|[+−-]\d/i);
   assert.match(ui.query('.forecast-parents').textContent,/Mental stability [\d.]+ → [\d.]+.*Relationship [\d.]+ → [\d.]+/);
   assertNoMoneyDisplay(ui.query('.year-review-modal'),'year in review');
+  assert.ok(ui.query('.forecast-parents').hasAttribute('open'),'parent changes start expanded');
   assert.ok(ui.query('#app').hasAttribute('inert'));
   ui=await mount(advanced);
   assert.equal(ui.all('.year-review-modal').length,1,'unread reviews reopen after reload');
@@ -1359,7 +1360,8 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     for (const tab of ['year', 'career', 'family', 'character']) {
       ui.click(`.nav-list [data-tab="${tab}"]`);
       assert.doesNotMatch(ui.query('#app').textContent, /instability/i, `${tab} must use the positive stability scale`);
-      assert.match(ui.query('.status-strip').textContent, /Mental stability\s*[\d.]+\s*\/\s*10/);
+      if (tab==='year' || tab==='character') assert.match(ui.query('.status-strip').textContent, /Mental stability\s*[\d.]+\s*\/\s*10/);
+      else assert.equal(ui.all('.status-strip').length,0);
     }
     assert.match(ui.query('.effect-card.negative').textContent, /Mental stability\s*[\d.]+/);
     assert.doesNotMatch(ui.query('.effect-card.negative').textContent, /[+−-]\d/);
@@ -1699,8 +1701,10 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     for (const tab of ['year', 'career', 'family', 'character']) {
       ui.click(`[data-action="tab"][data-tab="${tab}"]`);
       assertNoMoneyDisplay(ui.query('#app'), `${tab} view`);
-      assert.equal(parseFloat(ui.query('.profile-lifestyle .status-value').textContent),5,`${tab} view should show the saved lifestyle`);
-      assert.equal(ui.query('.profile-lifestyle .status-value small').textContent,'/10');
+      if (tab==='year' || tab==='character') {
+        assert.equal(parseFloat(ui.query('.profile-lifestyle .status-value').textContent),5,`${tab} view should show the saved lifestyle`);
+        assert.equal(ui.query('.profile-lifestyle .status-value small').textContent,'/10');
+      } else assert.equal(ui.all('.profile-lifestyle').length,0);
     }
 
     ui.click('[data-action="tab"][data-tab="family"]');
@@ -1770,26 +1774,30 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
   });
 });
 
-test('all eight ratings keep current-value bars across every section and height stays beside gender', async () => {
+test('player ratings appear on Year and You while Career and Family keep their own content', async () => {
   for(const fixture of [createGame({seed:121}),ageTo(createGame({seed:19}),3),partnerFixture()]) {
     const ui=await mount(fixture), original=ui.saved(), writes=ui.writes();
     for(const tab of ['year','character','family','career']) {
       ui.click(`.nav-list [data-tab="${tab}"]`);
-      const stats=effectiveStats(original);
-      assert.equal(ui.all('.status-strip .status-pill').length,7,'lifestyle moves below gender and height');
-      assert.equal(ui.all('.profile-identity .profile-height').length,1);
-      assert.equal(ui.all('.profile-identity .gender-label').length,1);
-      assert.equal(ui.query('.profile-identity').nextElementSibling,ui.query('.profile-lifestyle'),'lifestyle has its own row immediately after gender and height');
-      assert.equal(ui.all('.status-strip [data-stat="lifestyle"], .profile-lifestyle .aptitude').length,0);
-      for(const key of ['health','stability']) {
-        const badge=ui.query(`.status-strip [data-stat="${key}"] .aptitude`);
-        const aptitude=original.aptitudes[key];
-        assert.equal(badge.textContent,`${aptitude>0?'+':''}${aptitude}`);
-        assert.equal(badge.parentElement.querySelector('.status-value').textContent,`${stats[key].toFixed(1)}/10`);
-      }
-      for(const key of [...SKILLS.map(skill=>skill.key),'health','stability','lifestyle']) {
-        const value=ui.query(key==='lifestyle'?'.profile-lifestyle .status-value':`.status-strip [data-stat="${key}"] .status-value`);
-        assert.equal(value.textContent,`${(key==='lifestyle'?original.lifestyle:stats[key]).toFixed(1)}/10`);
+      if (tab==='year' || tab==='character') {
+        const stats=effectiveStats(original);
+        assert.equal(ui.all('.status-strip .status-pill').length,7,'lifestyle moves below gender and height');
+        assert.equal(ui.all('.profile-identity .profile-height').length,1);
+        assert.equal(ui.all('.profile-identity .gender-label').length,1);
+        assert.equal(ui.query('.profile-identity').nextElementSibling,ui.query('.profile-lifestyle'),'lifestyle has its own row immediately after gender and height');
+        assert.equal(ui.all('.status-strip [data-stat="lifestyle"], .profile-lifestyle .aptitude').length,0);
+        for(const key of ['health','stability']) {
+          const badge=ui.query(`.status-strip [data-stat="${key}"] .aptitude`);
+          const aptitude=original.aptitudes[key];
+          assert.equal(badge.textContent,`${aptitude>0?'+':''}${aptitude}`);
+          assert.equal(badge.parentElement.querySelector('.status-value').textContent,`${stats[key].toFixed(1)}/10`);
+        }
+        for(const key of [...SKILLS.map(skill=>skill.key),'health','stability','lifestyle']) {
+          const value=ui.query(key==='lifestyle'?'.profile-lifestyle .status-value':`.status-strip [data-stat="${key}"] .status-value`);
+          assert.equal(value.textContent,`${(key==='lifestyle'?original.lifestyle:stats[key]).toFixed(1)}/10`);
+        }
+      } else {
+        assert.equal(ui.all('.profile-bar, .status-strip, .stats-panel').length,0,`${tab} omits the player summary`);
       }
       assert.equal(ui.all('.stat-projection').length,0,'rating bars show the current value, not future segments');
       assertCurrentRatingBars(ui);
@@ -1897,7 +1905,8 @@ function assertChoiceImpacts(ui) {
 
 function assertCurrentRatingBars(ui) {
   const header=ui.all('.status-strip .rating-track, .profile-lifestyle .rating-track');
-  assert.equal(header.length,8,'every top rating has a bar underneath it');
+  const tab=ui.query('.nav-button[aria-current="page"]').dataset.tab;
+  assert.equal(header.length,tab==='year'||tab==='character'?8:0,'top rating bars appear only on Year and You');
   for(const track of ui.all('.rating-track')) {
     const value=Number(track.getAttribute('aria-valuenow'));
     assert.equal(track.getAttribute('role'),'meter');

@@ -1,5 +1,5 @@
-import { annualForecast, effectiveStats, needsEducationChoice } from './engine.js?v=parent-help-1';
-import { infantChoiceEffects, wellbeingResponse, TODDLER_ACTIVITY_EFFECTS, PARENT_FAMILY_RELATIONSHIP_GAIN } from './development.js?v=parent-help-1';
+import { annualForecast, effectiveStats, needsEducationChoice } from './engine.js?v=focused-tabs-1';
+import { infantChoiceEffects, wellbeingResponse, TODDLER_ACTIVITY_EFFECTS, PARENT_FAMILY_RELATIONSHIP_GAIN } from './development.js?v=focused-tabs-1';
 
 const nonzero = value => Math.abs(value) > .000001;
 const keyOf = entry => `${entry.parentId || 'you'}:${entry.stat}`;

@@ -5,11 +5,11 @@ import {
   offeredJobs, needsEducationChoice, pendingEventSubject,
   relationshipOdds, meetingChances, proposalChance, pregnancyChance, oneNightChance,
   respondToEncounter, proposeMarriage, endRelationship, normalizeSurname, heightPercentile, statPercentiles
-} from './engine.js?v=parent-help-1';
-import { annotateNarrative } from './narrative.js?v=parent-help-1';
-import { formatRating, formatHeight, heightDescription, formatStatNarrative } from './display.js?v=parent-help-1';
+} from './engine.js?v=focused-tabs-1';
+import { annotateNarrative } from './narrative.js?v=focused-tabs-1';
+import { formatRating, formatHeight, heightDescription, formatStatNarrative } from './display.js?v=focused-tabs-1';
 
-import { choiceImpacts, toddlerActivityImpacts } from './choice-impacts.js?v=parent-help-1';
+import { choiceImpacts, toddlerActivityImpacts } from './choice-impacts.js?v=focused-tabs-1';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const app = document.querySelector('#app');
@@ -170,8 +170,10 @@ function render() {
       <a class="brand" href="#" data-action="tab" data-tab="year" aria-label="Lifelines home"><span class="brand-mark">${icon('sprout')}</span><span class="brand-title">lifelines<span style="color:var(--orange)">.</span></span></a>
       <div class="top-actions"><span class="save-status">${icon(saveAvailable ? 'check' : 'download')}${saveAvailable ? 'Saved' : 'Session only'}</span><button class="icon-button" data-action="menu" aria-label="More options" aria-haspopup="dialog">${icon('menu')}</button></div>
     </header>
+    ${isYear || activeTab==='character' ? `
     <section class="profile-bar" aria-label="Your life"><div class="portrait">${avatar(state)}</div><div class="profile-copy"><p class="eyebrow">GENERATION ${state.generation}</p><div class="profile-name-row"><h1 class="person-name">${esc(state.name)}</h1></div><div class="profile-identity">${genderBadge(state)}<button class="profile-height" data-stat="height" data-action="tab" data-tab="character" aria-label="Height ${heightDescription(state.height,state.age)}. View your character."><strong class="status-value">${formatHeight(state.height,state.age)}</strong>${percentiles?percentileTag(percentiles,'height'):state.age>=18?'<span class="height-percentile">Adult height</span>':''}</button></div>${profileLifestyleView()}${state.age<2?'':`<p class="muted">${state.age<5?'Toddler':state.age<18?'Student':state.education.status==='college'?'College student':career()?.name || 'Finding a path'}</p>`}</div><div class="profile-age"><strong>${state.age}</strong><span>YEARS OLD</span></div></section>
     <div class="status-strip" aria-label="At a glance">${DISPLAY_STATS.map(skill=>[skill.key,skill.label,stats[skill.key]]).map(([key,label,value])=>`<button class="status-pill" data-stat="${key}" data-action="tab" data-tab="character" aria-label="${label} ${number(value)} out of 10.${Number.isInteger(state.aptitudes[key])?` Natural aptitude ${aptitude(state.aptitudes[key])}.`: ''} View your character."><span class="status-label">${label}${statEmoji(key)}</span><span class="status-reading"><strong class="status-value">${number(value)}<small>/10</small></strong>${aptitudeBadge(state.aptitudes[key])}</span>${ratingBar(label,value)}</button>`).join('')}</div>
+    ` : ''}
       <main class="main-column" id="main-content">${activeTab==='career'?'':`<div class="chapter-heading"><h2>${isYear ? stageNames[lifeStage] : ({family:'A life, connected',character:'This is you'}[activeTab])}<span style="color:var(--orange)">.</span></h2></div>`}
       ${eventDecisionView()}${state.ended ? endPanel() : ''}${state.needsSuccession ? successionPanel() : ''}
       ${activeTab==='year' ? yearView() : activeTab==='career' ? careerView() : activeTab==='family' ? familyView() : characterView()}</main>
@@ -291,7 +293,7 @@ function yearEventsView(summary) {
 function yearSummaryModal() {
   const summary=state.yearSummary;
   if (!summary || summary.dismissed) return;
-  openModal(`Age ${summary.fromAge} → ${summary.toAge}`, `${yearDecisionsView(summary.decisions)}${changesView(summary.stats,summary.lifestyle,summary.height,summary.fromAge,summary.toAge)}${summary.parents?.length?`<details class="forecast-parents"><summary>Parents</summary>${summary.parents.map(parent=>`<p><strong>${narrativeText(parent.name)}</strong><span>Mental stability${statEmoji('stability')} ${beforeAfter(parent.stability)}<br>Relationship${statEmoji('relationship')} ${beforeAfter(parent.relationship)}${parent.lifestyle?`<span class="parent-review-lifestyle">Lifestyle${statEmoji('lifestyle')} ${beforeAfter(parent.lifestyle)}</span>`:''}</span></p>`).join('')}</details>`:''}${yearEventsView(summary)}${state.pendingEvents.length?'<p class="form-note">Decisions waiting.</p>':''}`, '<button class="button primary" data-action="close">Continue '+icon('arrow')+'</button>');
+  openModal(`Age ${summary.fromAge} → ${summary.toAge}`, `${yearDecisionsView(summary.decisions)}${changesView(summary.stats,summary.lifestyle,summary.height,summary.fromAge,summary.toAge)}${summary.parents?.length?`<details class="forecast-parents" open><summary>Parents</summary>${summary.parents.map(parent=>`<p><strong>${narrativeText(parent.name)}</strong><span>Mental stability${statEmoji('stability')} ${beforeAfter(parent.stability)}<br>Relationship${statEmoji('relationship')} ${beforeAfter(parent.relationship)}${parent.lifestyle?`<span class="parent-review-lifestyle">Lifestyle${statEmoji('lifestyle')} ${beforeAfter(parent.lifestyle)}</span>`:''}</span></p>`).join('')}</details>`:''}${yearEventsView(summary)}${state.pendingEvents.length?'<p class="form-note">Decisions waiting.</p>':''}`, '<button class="button primary" data-action="close">Continue '+icon('arrow')+'</button>');
   showingYearSummary=true;
   modalRoot.querySelector('.modal').classList.add('year-review-modal');
   modalRoot.querySelector('.modal-backdrop').classList.add('year-review-backdrop');
