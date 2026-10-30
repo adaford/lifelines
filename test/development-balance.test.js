@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { naturalSkillRating, skillChanges, childhoodWellbeing } from '../development.js';
+import { naturalSkillRating, skillChanges, childhoodWellbeing, TODDLER_FOCUS } from '../development.js';
 import { createGame, advanceYear, resolveEventChoice, EVENTS, effectiveStats } from '../engine.js';
 import { eventChances } from '../events.js';
 
@@ -97,7 +97,7 @@ test('childhood wellbeing recovers toward its usual range while choices still ma
   assert.deepEqual(child.stats, { health: 5, stability: 5 });
 });
 
-test('toddler play and exploration teach skills while rest supports wellbeing', () => {
+test('toddler play, electronics and crafts have distinct development effects', () => {
   const toddler = { age: 2, alive: true, cryLevel: 3,
     stats: { intelligence: 5, strength: 5, social: 5, creativity: 5, health: 5, stability: 5 },
     aptitudes: { intelligence: 0, strength: 0, social: 0, creativity: 0 },
@@ -106,8 +106,8 @@ test('toddler play and exploration teach skills while rest supports wellbeing', 
   for (const age of [2, 3, 4]) {
     toddler.age = age;
     const base = skillChanges(toddler), play = skillChanges(option('work')), explore = skillChanges(option('social'));
-    assert.ok(play.strength > base.strength && play.social > base.social && play.creativity > base.creativity);
-    assert.ok(explore.intelligence > base.intelligence && explore.creativity > base.creativity);
+    assert.ok(play.strength > base.strength && play.social > base.social && play.creativity === base.creativity);
+    assert.ok(explore.intelligence > base.intelligence && explore.social < base.social && explore.creativity === base.creativity);
     assert.deepEqual(skillChanges(option('self')), base, 'rest does not teach skills');
     const rested = childhoodWellbeing(option('self')), usual = childhoodWellbeing(toddler);
     assert.ok(rested.health > usual.health && rested.stability > usual.stability);
@@ -122,7 +122,7 @@ test('toddler play and exploration teach skills while rest supports wellbeing', 
   assert.ok(skillChanges({ ...baby, cryLevel: 5 }).social > skillChanges({ ...baby, cryLevel: 1 }).social);
 });
 
-test('toddler events follow play and explore focus and school events begin at five', () => {
+test('toddler events follow play, electronics and crafts while school events begin at five', () => {
   const stats = Object.fromEntries(['intelligence', 'strength', 'social', 'creativity', 'attractiveness', 'health', 'stability'].map(key => [key, 5]));
   const state = { age: 2, focus: { work: 2, social: 2, family: 2, self: 2 }, lifestyle: 5, education: { status: 'school' } };
   const odds = person => Object.fromEntries(eventChances(person, stats).map(event => [event.id, event.chance]));
@@ -135,7 +135,9 @@ test('toddler events follow play and explore focus and school events begin at fi
   const play = odds({ ...state, focus: { ...state.focus, work: 5 } });
   const explore = odds({ ...state, focus: { ...state.focus, social: 5 } });
   const rest = odds({ ...state, focus: { ...state.focus, self: 5 } });
-  assert.ok(play.treehouse > rest.treehouse && play.stamina_gain > rest.stamina_gain);
+  const crafts = odds({ ...state, focus: { ...state.focus, creative: 5 } });
+  assert.ok(crafts.treehouse > play.treehouse && crafts.child_art > play.child_art);
+  assert.ok(play.stamina_gain > rest.stamina_gain);
   assert.ok(explore.child_library > rest.child_library);
   assert.ok(odds({ ...state, age: 5 }).good_grades > 0);
 });
@@ -150,6 +152,7 @@ test('independent game lives reach age 18 with average ratings near five and ret
     state.cryLevel = 3;
     let choiceSeed = (seed ^ 0xA5A5A5A5) >>> 0;
     while (state.age < 18 && state.alive) {
+      state.focus = state.age >= 2 && state.age < 5 ? { ...TODDLER_FOCUS } : { work: 3, social: 3, family: 3, self: 3 };
       assert.equal(advanceYear(state).ok, true);
       while (state.pendingEvents.length) {
         const pending = state.pendingEvents[0];

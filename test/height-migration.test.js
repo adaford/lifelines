@@ -71,6 +71,7 @@ test('v9 migration rounds inches once and recomputes review growth from converte
 test('old age-two cry reviews and queued childhood choices survive the new age boundaries', () => {
   const legacy = toLegacyCentimeters(lifeAt(3));
   legacy.version = 9;
+  delete legacy.focus.creative;
   legacy.yearSummary.decisions = { cryLevel: 4 };
   const migrated = migrateSave(legacy);
   assert.ok(migrated);
@@ -78,6 +79,8 @@ test('old age-two cry reviews and queued childhood choices survive the new age b
 
   const pending = toLegacyCentimeters(lifeAt(4));
   pending.version = 9;
+  delete pending.focus.creative;
+  delete pending.yearSummary.decisions.focus.creative;
   pending.yearSummary.decisions.workLabel = 'School';
   pending.pendingEvents = [{ eventId: 'school_play', age: 4 }];
   pending.lastYearEvents = ['school_play'];

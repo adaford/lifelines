@@ -24,18 +24,18 @@ export const EVENTS = [
     { id: 'copycat_game', name: 'The copying game', description: 'You discover that making a funny face can make someone smile back.', ...change({ social: .3, creativity: .2 }) },
   ]),
   ...group('Growing up', { minAge: 2, maxAge: 12, baseChance: .011, kind: 'positive' }, [
-    { id: 'treehouse', name: 'A backyard invention', description: 'Cardboard and spare cushions become a tiny world of your own.', focusFactors: ['self'], toddlerFocusFactors: ['work'], statFactors: [high('creativity')], ...temporary({ creativity: .7 }, 2) },
+    { id: 'treehouse', name: 'A backyard invention', description: 'Cardboard and spare cushions become a tiny world of your own.', focusFactors: ['self'], toddlerFocusFactors: ['creative'], statFactors: [high('creativity')], ...temporary({ creativity: .7 }, 2) },
     { id: 'learning_bike', name: 'Finding your balance', description: 'Practice finally turns a shaky ride into a confident one.', minAge: 5, focusFactors: ['self'], statFactors: [high('strength')], ...change({ strength: .4, stability: .15 }) },
     { id: 'playground_fall', name: 'A playground fall', description: 'A misstep interrupts a lively afternoon.', kind: 'negative', statFactors: [low('strength')], focusFactors: ['social'], toddlerFocusFactors: ['work'], ...temporary({ strength: -.7, health: -.4 }) },
     { id: 'lost_toy', name: 'Your favorite toy is missing', description: 'Losing something familiar makes this year feel less settled.', kind: 'negative', statFactors: [low('stability')], ...temporary({ stability: -.5 }) },
     { id: 'child_library', name: 'A library discovery', description: 'You find a shelf of books you cannot wait to explore.', focusFactors: ['self'], toddlerFocusFactors: ['social'], statFactors: [high('intelligence')], ...change({ intelligence: .4 }) },
     { id: 'school_play', name: 'A part in the play', description: 'You are offered a small part in a community performance.', minAge: 3, conditions: ['schoolAge'], focusFactors: ['social'], choices: [choice('perform', 'Take the part', 'The stage stretches your confidence, but rehearsals feel stressful.', { ...change({ social: .4, creativity: .3 }), ...temporary({ stability: -.3 }) }), choice('backstage', 'Help backstage', 'You find a quieter way to contribute.', change({ creativity: .3, intelligence: .2 }))] },
     { id: 'child_pet', name: 'A neighbor needs a pet sitter', description: 'A neighbor asks whether you would like to help care for their pet.', minAge: 3, conditions: ['schoolAge'], focusFactors: ['family'], choices: [choice('help', 'Help with the pet', 'The routine teaches patience and brings a new connection.', change({ social: .25, stability: .25 })), choice('decline', 'Keep your own time', 'You put the spare time into an imaginative hobby.', change({ creativity: .25 }))] },
-    { id: 'birthday_left_out', name: 'An invitation never comes', description: 'Being left out of a birthday gathering stings.', kind: 'negative', focusFactors: ['social'], statFactors: [low('social')], ...temporary({ social: -.5, stability: -.4 }) },
-    { id: 'child_kindness', name: 'A small act of kindness', description: 'Helping someone who feels left out becomes the start of a friendship.', focusFactors: ['social'], ...temporary({ social: .5, stability: .3 }, 2) },
+    { id: 'birthday_left_out', name: 'An invitation never comes', description: 'Being left out of a birthday gathering stings.', kind: 'negative', focusFactors: ['social'], toddlerFocusFactors: ['work'], statFactors: [low('social')], ...temporary({ social: -.5, stability: -.4 }) },
+    { id: 'child_kindness', name: 'A small act of kindness', description: 'Helping someone who feels left out becomes the start of a friendship.', focusFactors: ['social'], toddlerFocusFactors: ['work'], ...temporary({ social: .5, stability: .3 }, 2) },
     { id: 'child_argument', name: 'A game turns into an argument', description: 'Everyone has a different idea of what is fair.', minAge: 3, conditions: ['schoolAge'], kind: 'negative', focusFactors: ['social'], statFactors: [low('stability')], choices: [choice('listen', 'Hear everyone out', 'It takes effort to settle down and find common ground.', change({ social: .3, stability: .2 })), choice('leave', 'Leave the game', 'Space helps you calm down, but the others feel distant.', { ...change({ stability: .25 }), ...temporary({ social: -.25 }) })] },
     { id: 'family_outing', name: 'A day to remember', description: 'A simple outing with family becomes a treasured memory.', focusFactors: ['family'], ...temporary({ stability: .6 }, 2) },
-    { id: 'child_art', name: 'Your picture goes on the wall', description: 'Someone proudly displays your artwork, making you want to create more.', statFactors: [high('creativity')], focusFactors: ['self'], toddlerFocusFactors: ['work'], ...change({ creativity: .35 }) },
+    { id: 'child_art', name: 'Your picture goes on the wall', description: 'Someone proudly displays your artwork, making you want to create more.', statFactors: [high('creativity')], focusFactors: ['self'], toddlerFocusFactors: ['creative'], ...change({ creativity: .35 }) },
   ]),
   ...group('School', { minAge: 5, maxAge: 17, conditions: ['school'], baseChance: .009, kind: 'positive' }, [
     { id: 'good_grades', name: 'An excellent report card', description: 'Your understanding and study time turn into a set of strong grades.', statFactors: [high('intelligence')], focusFactors: ['work'], ...temporary({ intelligence: .8, stability: .4 }, 2) },
@@ -199,7 +199,7 @@ export function eventChances(state, stats, job) {
   return EVENTS.map(event => {
     let chance = inactive || !eligible(event, state, job) ? 0 : event.baseChance;
     const focusFactors = state.age < 5 && event.toddlerFocusFactors || event.focusFactors || [];
-    for (const key of focusFactors) chance *= .4 + focus[key] * .25;
+    for (const key of focusFactors) chance *= .4 + (focus[key] ?? 0) * .25;
     for (const key of event.neglectFactors || []) chance *= .25 + (5 - focus[key]) * .35;
     for (const [key, direction] of event.statFactors || []) {
       const value = Math.max(1, Math.min(10, key === 'lifestyle' ? state.lifestyle : stats[key]));

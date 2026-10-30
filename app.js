@@ -5,9 +5,10 @@ import {
   offeredJobs, needsEducationChoice, pendingEventSubject,
   relationshipOdds, meetingChances, proposalChance, pregnancyChance, oneNightChance,
   respondToEncounter, proposeMarriage, endRelationship, normalizeSurname, heightPercentile, statPercentiles
-} from './engine.js?v=childhood-inches-1';
-import { annotateNarrative } from './narrative.js?v=childhood-inches-1';
-import { formatRating, formatHeight, heightDescription, formatStatNarrative } from './display.js?v=childhood-inches-1';
+} from './engine.js?v=toddler-activities-2';
+import { annotateNarrative } from './narrative.js?v=toddler-activities-2';
+import { formatRating, formatHeight, heightDescription, formatStatNarrative } from './display.js?v=toddler-activities-2';
+import { toddlerActivityEffects } from './development.js?v=toddler-activities-2';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const app = document.querySelector('#app');
@@ -32,6 +33,7 @@ const icons = {
   arrow: '<path d="M4 12h16m-6-6 6 6-6 6"/>',
   sprout: '<path d="M12 22V10M12 16C2 16 2 7 2 7s10-1 10 9ZM12 11C12 2 22 3 22 3s1 9-10 8Z"/>',
   self: '<path d="M12 3c-7 6-9 11-5 16 3 3 7 3 10 0 4-5 2-10-5-16Z"/><path d="M12 10v12M8 15l4 4 4-4"/>',
+  electronics: '<rect x="5" y="2" width="14" height="20" rx="2"/><path d="M10 18h4"/>',
   social: '<path d="M21 11a8 8 0 0 1-8 8H5l-4 3 2-7a8 8 0 1 1 18-4Z"/><path d="M7 10h10M7 14h6"/>',
   school: '<path d="m2 8 10-5 10 5-10 5-10-5Zm4 3v7q6 5 12 0v-7M22 8v9"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
@@ -55,7 +57,7 @@ const journalText = value => narrativeText(String(value ?? '')
   .replace(/\bbonds\b/gi, 'relationships').replace(/\bbond\b/gi, 'relationship')
   // Older journal entries have deltas but no historical starting value. Keep
   // their direction without inventing a before/after pair or rewriting saves.
-  .replace(/\b(Intelligence|Strength|Attractiveness|Social ability|Creativity|Health|Mental stability|Lifestyle|Relationships?)\s+([+−-])(\d+(?:\.\d+)?|\.\d+)/gi, (_,label,sign,value) => `${label} ${Number(value)===0?'stayed steady':sign==='+'?'increased':'decreased'}`)
+  .replace(/\b(Intelligence|Strength|Attractiveness|Social(?: ability)?|Creativity|Health|Mental stability|Lifestyle|Relationships?)\s+([+−-])(\d+(?:\.\d+)?|\.\d+)/gi, (_,label,sign,value) => `${label} ${Number(value)===0?'stayed steady':sign==='+'?'increased':'decreased'}`)
   // Tutorial suffixes in existing saves belong in contextual help, not the
   // journal. Event narratives and recorded outcomes remain visible.
   .replace(/\s*For now, a cry or a quiet moment is enough to shape the day\./g, '')
@@ -77,7 +79,8 @@ const pct = value => `${Math.round((Number(value) || 0) * 100)}%`;
 const aptitude = value => value > 0 ? `+${value}` : String(value);
 const skillLabel = key => SKILLS.find(s => s.key === key)?.label || ({health:'Health',stability:'Mental stability',lifestyle:'Lifestyle',height:'Height'}[key]) || key;
 const stageNames = {baby:'The beginning',toddler:'Small discoveries',child:'Growing roots',teen:'Finding your way',adult:'A life of your own',elder:'What you leave behind'};
-const toddlerFocusRows = [['work','Play','sprout'],['social','Explore','social'],['family','Family time','family'],['self','Rest','self']];
+const toddlerFocusRows = [['work','Play','sprout'],['social','Electronics','electronics'],['family','Family time','family'],['self','Rest','self'],['creative','Arts & crafts','spark']];
+const legacyToddlerFocusRows = [['work','Play'],['social','Explore'],['family','Family time'],['self','Rest']];
 const career = () => JOBS.find(j => j.id === state.jobId);
 const focusUsed = () => Object.values(state.focus).reduce((a,b) => a+b, 0);
 const genderLabel = person => ({ male: 'Male', female: 'Female', nonbinary: 'Nonbinary' }[person.gender] || 'Unspecified');
@@ -257,7 +260,7 @@ function yearDecisionsView(decisions) {
   if (!decisions) return '';
   const entries=decisions.cryLevel!==undefined
     ? [['Cry level',`${decisions.cryLevel}/5`]]
-    : (decisions.workLabel==='Play'?toddlerFocusRows.map(([key,label])=>[label,key]):[[decisions.workLabel || 'School/career','work'],['Friends','social'],['Family','family'],['Yourself','self']]).map(([label,key])=>[label,`${decisions.focus[key]}/5`]);
+    : (decisions.workLabel==='Play'?(Object.hasOwn(decisions.focus,'creative')?toddlerFocusRows:legacyToddlerFocusRows).map(([key,label])=>[label,key]):[[decisions.workLabel || 'School/career','work'],['Friends','social'],['Family','family'],['Yourself','self']]).map(([label,key])=>[label,`${decisions.focus[key]}/5`]);
   const rest=decisions.focus?12-Object.values(decisions.focus).reduce((sum,value)=>sum+value,0):0;
   if(rest) entries.push([decisions.workLabel==='Play'?'Unused':'Rest',`${rest} point${rest===1?'':'s'}`]);
   return `<section class="year-decisions" aria-label="Choices used this year"><h3>Your choices</h3><dl>${entries.map(([label,value])=>`<div><dt>${label}</dt><dd>${value}</dd></div>`).join('')}</dl></section>`;
@@ -277,12 +280,25 @@ function lifestyleView() {
   return `<section class="lifestyle-summary" aria-label="Lifestyle"><div><span class="eyebrow">EVERYDAY COMFORT</span><h3>${labelWithHelp('Lifestyle','lifestyle')} <strong>${number(state.lifestyle)}<small> / 10</small></strong></h3><p>${descriptions[state.lifestyle-1]}</p></div><div class="lifestyle-scale" role="meter" aria-label="Lifestyle" aria-valuemin="1" aria-valuemax="10" aria-valuenow="${number(state.lifestyle)}">${Array.from({length:10},(_,i)=>`<span class="${i<state.lifestyle?'filled':''}" style="--level:${i+1}"></span>`).join('')}</div></section>`;
 }
 
+function activityEffectsView(effects) {
+  const entries = Object.entries(effects || {}).filter(([,change]) => Math.abs(change) > .000001);
+  if (!entries.length) return '';
+  return `<div class="activity-effects">${entries.map(([stat,change]) => {
+    const level = Math.abs(change) >= .3 ? 3 : Math.abs(change) >= .15 ? 2 : 1;
+    const positive = change > 0;
+    const signs = (positive?'+':'-').repeat(level);
+    const magnitude = ['small','medium','large'][level-1];
+    return `<span role="img" class="activity-effect ${positive?'positive':'negative'}" data-stat="${stat}" data-level="${level}" aria-label="${skillLabel(stat)}: ${magnitude} ${positive?'benefit':'cost'}"><b aria-hidden="true">${signs}</b> ${esc(skillLabel(stat))}</span>`;
+  }).join('')}</div>`;
+}
+
 function focusView(disabled) {
   const toddler = state.age < 5;
   const studying = state.age<18 || state.education.status==='college';
   const rows = toddler?toddlerFocusRows:[['work',state.age<18?'School':studying?'College':'Career',studying?'school':'career'],['social','Friends','social'],['family','Family','family'],['self','Yourself','self']];
   const mode = toddler?'activity':'focus';
-  return `<div class="focus-list">${rows.map(([key,label,ico]) => `<div class="focus-row"><span class="focus-icon">${icon(ico)}</span><div class="focus-copy"><h4>${labelWithHelp(label,`${toddler?'toddler':'focus'}-${key}`)}</h4><div class="focus-scale" aria-hidden="true">${Array.from({length:5},(_,i)=>`<span class="${i<state.focus[key]?'filled':''}"></span>`).join('')}</div></div><div class="stepper" role="group" aria-label="${label} ${mode}"><button data-action="focus" data-key="${key}" data-delta="-1" aria-label="Decrease ${label.toLowerCase()} ${mode}" ${state.focus[key]<=0||disabled?'disabled':''}>${icon('minus')}</button><output aria-label="${label} ${mode} level">${state.focus[key]}</output><button data-action="focus" data-key="${key}" data-delta="1" aria-label="Increase ${label.toLowerCase()} ${mode}" ${state.focus[key]>=5||focusUsed()>=12||disabled?'disabled':''}>${icon('plus')}</button></div></div>`).join('')}</div><div class="budget-bar"><div class="budget-summary"><span>${12-focusUsed()} ${mode} point${12-focusUsed()===1?'':'s'} available</span><strong>${focusUsed()} / 12</strong></div><div class="budget-track"><span style="width:${focusUsed()/12*100}%"></span></div></div>`;
+  const effects = toddler ? toddlerActivityEffects(state) : {};
+  return `<div class="focus-list">${rows.map(([key,label,ico]) => `<div class="focus-row" data-focus-key="${key}"><span class="focus-icon">${icon(ico)}</span><div class="focus-copy"><h4>${labelWithHelp(label,`${toddler?'toddler':'focus'}-${key}`)}</h4><div class="focus-scale" aria-hidden="true">${Array.from({length:5},(_,i)=>`<span class="${i<(state.focus[key] ?? 0)?'filled':''}"></span>`).join('')}</div></div><div class="stepper" role="group" aria-label="${esc(label)} ${mode}"><button data-action="focus" data-key="${key}" data-delta="-1" aria-label="Decrease ${esc(label.toLowerCase())} ${mode}" ${(state.focus[key] ?? 0)<=0||disabled?'disabled':''}>${icon('minus')}</button><output aria-label="${esc(label)} ${mode} level">${state.focus[key] ?? 0}</output><button data-action="focus" data-key="${key}" data-delta="1" aria-label="Increase ${esc(label.toLowerCase())} ${mode}" ${(state.focus[key] ?? 0)>=5||focusUsed()>=12||disabled?'disabled':''}>${icon('plus')}</button></div>${toddler?activityEffectsView(effects[key]):''}</div>`).join('')}</div><div class="budget-bar"><div class="budget-summary"><span>${12-focusUsed()} ${mode} point${12-focusUsed()===1?'':'s'} available</span><strong>${focusUsed()} / 12</strong></div><div class="budget-track"><span style="width:${focusUsed()/12*100}%"></span></div></div>`;
 }
 
 function journalView() {
@@ -453,7 +469,7 @@ function topicHelpModal(topic, id) {
     stats: ['Your stats', ['Before 18, ability ratings compare you with others your age: high infant intelligence means strong natural potential. Focus can raise skills; neglect can lower them.']],
     intelligence: ['Intelligence', ['Reasoning ability for your age; school and mental practice can strengthen it.']],
     strength: ['Strength', ['A 7.0/10 baby is strong for a baby. Exercise can maintain or raise this rating; inactivity can lower it.']],
-    social: ['Social ability', ['Ease with people for your age; social practice can improve it.']],
+    social: ['Social', ['Ease with people for your age; social practice can improve it.']],
     creativity: ['Creativity', ['Creative potential for your age, shaped by exploration and practice.']],
     attractiveness: ['Attractiveness', ['Starts near its adult value, with tiny random changes each year rather than gains from practice. In this game, aging lowers it after 30 for men and 22 for women.']],
     affinity: ['Natural aptitude', ['This inherited −3 to +3 trait affects starting ability and responsiveness to focus; higher is stronger. Practice does not increase attractiveness.']],
@@ -464,22 +480,23 @@ function topicHelpModal(topic, id) {
     height: ['Height', ['Final height emerges from yearly growth shaped by age, inheritance, health and chance, ending at 14–18. Poor health reduces new growth, never existing height.']],
     cry: ['Cry level', ['Parent relationships tend to fall at levels 1–2, stay steady at 3, and rise at 4–5, with yearly variation. Harder crying strains their mental stability more.']],
     focus: ['Your focus', ['Allocate 12 points, at most 5 per area; unused points allow rest. Focused skills can rise, neglected ones can fall, and results vary yearly.']],
-    'toddler-focus': ['Toddler activities', ['Share 12 points among play, exploration, family time and rest, up to 5 each. Activities shape development with yearly variation.']],
-    'toddler-work': ['Play', ['Play supports strength, social ability and creativity.']],
-    'toddler-social': ['Explore', ['Exploration supports reasoning and creativity.']],
+    'toddler-focus': ['Toddler activities', ['Share 12 points among five activities, up to 5 each. More + or - signs mean a stronger benefit or cost from that activity; zero points show no effect. Stat bars combine these effects with routine development. Unused points support mental stability, and results vary each year.']],
+    'toddler-work': ['Play', ['Play develops strength and social.']],
+    'toddler-social': ['Electronics', ['Electronics develops intelligence but reduces social.']],
     'toddler-family': ['Family time', ['Time with family supports relationships and development.']],
-    'toddler-self': ['Rest', ['Rest supports health and mental stability.']],
+    'toddler-self': ['Rest', ['Rest strongly supports health and also supports mental stability.']],
+    'toddler-creative': ['Arts & crafts', ['Drawing, making and pretend creations develop creativity.']],
     'focus-work': ['School & career focus', ['Study and work exercise relevant abilities; career focus also supports performance and lifestyle.']],
-    'focus-social': ['Friends focus', ['Can improve social ability, support mental stability and create chances to meet people.']],
+    'focus-social': ['Friends focus', ['Can improve social, support mental stability and create chances to meet people.']],
     'focus-family': ['Family focus', ['Strengthens relationships, helps children develop and supports parents’ mental stability.']],
     'focus-self': ['Yourself focus', ['Exercise, learning and self-care support strength, creativity, health and mental stability.']],
     parents: ['Your parents', ['Their wellbeing and careers affect your childhood. Starting relationships vary around 8.0/10; age and health influence their chance of death.']],
     'parent-career': ['Parents’ careers', ['Higher career focus and experience tend to improve lifestyle; job loss can set it back.']],
-    relationship: ['Relationship', ['Higher means closer; family time and shared events change this rating. Partners support social ability and mental stability, but lower lifestyle.']],
+    relationship: ['Relationship', ['Higher means closer; family time and shared events change this rating. Partners support social and mental stability, but lower lifestyle.']],
     career: ['Careers', ['Your skills determine job fit; career focus and experience improve performance and lifestyle. Start working at 18 or after college.']],
     college: ['College or career', ['Four years of college open 15 offers and time to develop skills; starting work at 18 gives 10.']],
     children: ['Children', ['Adults can have up to six children, with one adoption per year. Family time helps them develop; dependent children lower lifestyle.']],
-    dating: ['People you meet', ['Attractiveness, social ability and lifestyle affect encounters. Invitations expire next year or when a relationship starts, and either approach can be declined.']],
+    dating: ['People you meet', ['Attractiveness, social and lifestyle affect encounters. Invitations expire next year or when a relationship starts, and either approach can be declined.']],
     marriage: ['Marriage', ['Propose once per year; a closer relationship and more years together improve acceptance.']],
     pregnancy: ['Pregnancy', ['Age, health and pregnancy capability affect the odds; marriage makes it more likely. A baby arrives the next year.']],
     inheritance: ['Retirement & inheritance', ['Succession opens at 65 or on death and is required at 85; choose a child, sibling or unrelated child, in that order. Eligible children share inheritance equally; otherwise the chosen heir receives it.']]
@@ -544,7 +561,7 @@ document.addEventListener('click', event => {
   }
   if (action==='focus') {
     const {key,delta} = button.dataset;
-    update(()=>setFocus(state,key,state.focus[key]+Number(delta)));
+    update(()=>setFocus(state,key,(state.focus[key] ?? 0)+Number(delta)));
     app.querySelector(`[data-action="focus"][data-key="${key}"][data-delta="${delta}"]`)?.focus({preventScroll:true});
   }
   if (action==='advance') {

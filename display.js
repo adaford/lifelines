@@ -24,7 +24,7 @@ export function heightDescription(inches) {
 
 const amount = '\\d+(?:\\.\\d+)?';
 const arrow = '\\s*(?:→|->)\\s*';
-const label = '\\b(?:Intelligence|Strength|Attractiveness|Social ability|Creativity|Health|(?:Mental\\s+)?stability|Lifestyle|Relationships?)(?:\\s*:\\s*|\\s+)';
+const label = '\\b(?:Intelligence|Strength|Attractiveness|Social(?: ability)?|Creativity|Health|(?:Mental\\s+)?stability|Lifestyle|Relationships?)(?:\\s*:\\s*|\\s+)';
 const valueEnd = '(?![\\p{L}\\p{M}\\p{N}_]|\\.\\d)(?!\\s*(?:→|->|%|percent\\b|per cent\\b|focus\\b|points?\\b|years?\\b|months?\\b|chance\\b|probability\\b))';
 const ratingPattern = new RegExp(`(${label})(${amount})(?:(${arrow})(${amount}))?${valueEnd}`, 'giu');
 const heightUnit = '(cm|inches|inch)';
@@ -34,6 +34,7 @@ const heightInches = (value, unit) => Number(value) / (unit.toLowerCase() === 'c
 
 function formatValues(text) {
   return text
+    .replace(/\bsocial ability\b/gi, match => match[0] === 'S' ? 'Social' : 'social')
     .replace(heightPair, (_, prefix, before, beforeUnit, separator, after, afterUnit) => `${prefix}${formatHeight(heightInches(before, beforeUnit || afterUnit))}${separator}${formatHeight(heightInches(after, afterUnit))}`)
     .replace(heightSingle, (_, prefix, value, unit) => `${prefix}${formatHeight(heightInches(value, unit))}`)
     .replace(ratingPattern, (match, prefix, before, separator, after) => {

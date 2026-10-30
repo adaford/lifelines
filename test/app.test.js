@@ -161,7 +161,7 @@ test('legacy journal and review text hides signed changes and tutorial suffixes 
   fixture.effects=[{id:'legacy-effect',name:'A stronger bond',description:'Bond +0.3; Stability -0.2.',years:2,modifiers:{stability:-.2},kind:'negative'}];
   const ui=await mount(fixture);
   const review=ui.query('.year-review-events').textContent;
-  assert.match(review,/A closer relationship.*relationship increased.*Social ability increased.*Mental stability decreased.*Health decreased.*Mental stability decreased.*Lifestyle 6\.0 → 5\.0/);
+  assert.match(review,/A closer relationship.*relationship increased.*Social increased.*Mental stability decreased.*Health decreased.*Mental stability decreased.*Lifestyle 6\.0 → 5\.0/);
   assert.doesNotMatch(review,/\bbonds?\b|instability|[+−-](?:\d|\.)|Family focus will help/i);
   assert.ok(review.includes(`${fixture.parents[0].name} (Mom)`));
   assert.ok(review.includes(`${fixture.parents[1].name} (Dad)`));
@@ -1186,14 +1186,14 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     for (let year = 1; year <= 5; year += 1) {
       ui.click('[data-action="advance"]');
       if(year===2) assert.match(ui.query('.year-decisions').textContent,/Cry level5\/5/,'the review still shows the infant year just completed');
-      if(year===5) assert.match(ui.query('.year-decisions').textContent,/Play4\/5Explore2\/5Family time3\/5Rest3\/5/,'the fifth-birthday review retains toddler activities');
+      if(year===5) assert.match(ui.query('.year-decisions').textContent,/Play4\/5Electronics1\/5Family time2\/5Rest3\/5Arts & crafts2\/5/,'the fifth-birthday review retains toddler activities');
       resolveUIEvents(ui);
       assert.equal(ui.saved().age, year, 'one click advances exactly one year');
       if(year===1) assert.equal(ui.all('.cry-level').length,5);
       if(year>=2 && year<=4) {
         assert.equal(ui.all('.cry-level').length,0);
         assert.match(ui.query('.focus-panel .panel-heading').textContent,/Toddler activities/);
-        assert.deepEqual(ui.all('.focus-copy h4').map(heading=>heading.firstChild.firstChild.textContent),['Play','Explore','Family time','Rest']);
+        assert.deepEqual(ui.all('.focus-copy h4').map(heading=>[...heading.firstChild.childNodes].filter(node=>node.nodeType===3).map(node=>node.textContent).join('')),['Play','Electronics','Family time','Rest','Arts & crafts']);
         assert.match(ui.query('.profile-copy > .muted').textContent,/Toddler/);
         assert.doesNotMatch(ui.query('.focus-panel').textContent,/School|Career/);
       }
@@ -1201,7 +1201,8 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
         ui.click('[data-action="focus"][data-key="social"][data-delta="-1"]');
         ui.click('[data-action="focus"][data-key="work"][data-delta="1"]');
         ui.click('[data-topic="toddler-focus"]');
-        assert.match(ui.query('.help-popup').textContent,/12 points.*play, exploration, family time and rest.*5 each/);
+        assert.match(ui.query('.help-popup').textContent,/12 points.*5 each/);
+        assert.match(ui.query('.help-popup').textContent,/signs|impact/i);
         ui.click('.help-popup [data-action="close"]');
         const persisted=ui.saved();
         ui=await mount(persisted);
@@ -1213,7 +1214,7 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     assert.equal(ui.all('[data-action="focus"]').length, 8);
     assert.equal(ui.query('.year-stats [data-stat="intelligence"] .stat-value').textContent,ui.saved().stats.intelligence.toFixed(1),'the changing age-relative rating remains synchronized with the save');
     assert.ok(ui.saved().parents[0].stats.stability < initial.parents[0].stats.stability);
-    assert.deepEqual(ui.all('.focus-copy h4').map(heading=>heading.firstChild.firstChild.textContent),['School','Friends','Family','Yourself']);
+    assert.deepEqual(ui.all('.focus-copy h4').map(heading=>[...heading.firstChild.childNodes].filter(node=>node.nodeType===3).map(node=>node.textContent).join('')),['School','Friends','Family','Yourself']);
     assert.equal(ui.query('.profile-copy > .muted').textContent,'Student');
     assert.equal(validateSave(ui.saved()), true);
     assert.doesNotMatch(ui.query('#app').textContent, /undefined|NaN/);
@@ -1232,12 +1233,100 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     assert.equal(ui.saved().focus.work, 3, 'disabled controls must not change the state');
     ui.click(minus);
     assert.equal(ui.query(plus).disabled, false);
-    assert.equal(ui.saved().focus.social, 2);
+    assert.equal(ui.saved().focus.social, 1);
     ui.click(plus);
     assert.equal(ui.saved().focus.work, 4);
     assert.equal(Object.values(ui.saved().focus).reduce((a, b) => a + b, 0), 12);
     assert.equal(ui.query(plus).disabled, true);
     assert.match(ui.query('.budget-summary').textContent, /12\s*\/\s*12/);
+  });
+
+  test('toddler activity impacts update with points, show signed strength, and preserve simulation state', async () => {
+    const fixture=ageTo(createGame({seed:19}),3);
+    fixture.focus={work:0,social:0,family:0,self:0,creative:0};
+    for(const key of ['intelligence','strength','social','creativity']) fixture.aptitudes[key]=0;
+    const ui=await mount(fixture);
+    const row=key=>`.focus-row[data-focus-key="${key}"]`;
+    const increase=key=>ui.click(`[data-action="focus"][data-key="${key}"][data-delta="1"]`);
+    const decrease=key=>ui.click(`[data-action="focus"][data-key="${key}"][data-delta="-1"]`);
+    assert.equal(ui.all('.activity-effect').length,0,'unselected activities must not claim an active effect');
+    const strengthLevels=new Set();
+    for(let points=1;points<=5;points++) {
+      increase('work');
+      const strength=ui.query(`${row('work')} .activity-effect[data-stat="strength"]`);
+      assert.ok(strength.classList.contains('positive'));
+      assert.match(strength.textContent,/\+{1,3}\s*Strength/);
+      strengthLevels.add(Number(strength.dataset.level));
+      assert.ok(ui.query(`${row('work')} .activity-effect[data-stat="social"]`).classList.contains('positive'));
+      assert.equal(ui.all(`${row('work')} .activity-effect[data-stat="creativity"]`).length,0,'Play no longer teaches creativity');
+    }
+    assert.deepEqual([...strengthLevels].sort(),[1,2,3],'the impact scale reaches one, two, and three signs');
+    assert.equal(ui.query('[data-action="focus"][data-key="work"][data-delta="1"]').disabled,true);
+    for(let points=5;points>0;points--) decrease('work');
+    assert.equal(ui.all(`${row('work')} .activity-effect`).length,0);
+    let previousSocialImpact=0;
+    for(let points=1;points<=5;points++) {
+      increase('social');
+      const intelligence=ui.query(`${row('social')} .activity-effect[data-stat="intelligence"]`);
+      const social=ui.query(`${row('social')} .activity-effect[data-stat="social"]`);
+      assert.ok(intelligence.classList.contains('positive'));
+      assert.ok(social.classList.contains('negative'),'Electronics reduces Social even at low point settings');
+      assert.match(social.textContent,/[-−]{1,3}\s*Social/);
+      assert.ok(Number(social.dataset.level)>=previousSocialImpact);
+      previousSocialImpact=Number(social.dataset.level);
+    }
+    increase('creative');
+    assert.ok(ui.query(`${row('creative')} .activity-effect[data-stat="creativity"]`).classList.contains('positive'));
+    increase('self');
+    assert.ok(ui.query(`${row('self')} .activity-effect[data-stat="health"]`).classList.contains('positive'));
+    for(const effect of ui.all('.activity-effect')) {
+      assert.equal(effect.getAttribute('role'),'img','each effect exposes its direction and magnitude as one accessible label');
+      assert.ok([1,2,3].includes(Number(effect.dataset.level)));
+      assert.doesNotMatch(effect.textContent,/[+−-]\d|\+{4}|[-−]{4}/,'effects use bounded qualitative signs, not numerical deltas');
+      assert.ok(effect.getAttribute('aria-label'),'screen readers need a spoken effect description');
+    }
+    const saved=ui.saved();
+    assert.deepEqual(saved.stats,fixture.stats,'editing activities changes no current ratings');
+    assert.equal(saved.rng,fixture.rng,'effect previews consume no RNG');
+    assert.equal(saved.age,fixture.age);
+    assert.equal(validateSave(saved),true);
+    const reloaded=await mount(saved);
+    assert.deepEqual(reloaded.saved(),saved);
+    assert.match(reloaded.query(`${row('social')} .activity-effects`).textContent,/Social/);
+  });
+
+  test('legacy toddler reviews retain Explore while migrated controls use Electronics and Arts & crafts', async () => {
+    const legacy=ageTo(createGame({seed:123}),3);
+    legacy.version=10;
+    legacy.focus={work:4,social:2,family:3,self:3};
+    legacy.yearSummary.dismissed=false;
+    legacy.yearSummary.decisions={workLabel:'Play',focus:{work:2,social:4,family:3,self:3}};
+    const ui=await mount(legacy);
+    assert.match(ui.query('.year-decisions').textContent,/Play2\/5Explore4\/5Family time3\/5Rest3\/5/);
+    assert.doesNotMatch(ui.query('.year-decisions').textContent,/Electronics|Arts & crafts/,'historical choices must not be relabeled or invented');
+    assert.deepEqual(ui.saved().yearSummary,legacy.yearSummary);
+    assert.deepEqual(ui.saved().stats,legacy.stats);
+    assert.equal(ui.saved().rng,legacy.rng);
+    assert.deepEqual(ui.saved().focus,{...legacy.focus,creative:0});
+    assert.equal(validateSave(ui.saved()),true);
+    ui.click('.year-review-modal [data-action="close"]');
+    assert.deepEqual(ui.all('.focus-copy h4').map(heading=>[...heading.firstChild.childNodes].filter(node=>node.nodeType===3).map(node=>node.textContent).join('')),['Play','Electronics','Family time','Rest','Arts & crafts']);
+  });
+
+  test('Social is the stat label throughout Year, You, Family, careers, and contextual help', async () => {
+    for(const fixture of [ageTo(createGame({seed:19}),3),partnerFixture()]) {
+      const ui=await mount(fixture);
+      for(const tab of ['year','character','family','career']) {
+        ui.click(`.nav-list [data-tab="${tab}"]`);
+        assert.doesNotMatch(ui.query('#app').textContent,/social ability/i,`${tab} uses the shorter stat label`);
+      }
+      ui.click('.nav-list [data-tab="character"]');
+      ui.click('[data-topic="social"]');
+      assert.equal(ui.query('.help-popup #modal-title').textContent,'Social');
+      assert.doesNotMatch(ui.query('.help-popup').textContent,/social ability/i);
+      ui.click('.help-popup [data-action="close"]');
+      assert.deepEqual(ui.saved(),fixture,'label changes must preserve saved data');
+    }
   });
 
   test('a child shares the displayed parental lifestyle until adulthood', async () => {

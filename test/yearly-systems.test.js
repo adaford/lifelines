@@ -175,7 +175,7 @@ test('year reviews retain the completed year decisions across age and education 
   assert.equal(baby.age, 2);
   assert.deepEqual(baby.yearSummary.decisions, { cryLevel: 4 });
   finishChoices(baby);
-  const focus = { work: 2, social: 4, family: 5, self: 1 };
+  const focus = { work: 2, social: 4, family: 4, self: 1, creative: 1 };
   baby.focus = clone(focus);
   advanceYear(baby, survives);
   baby.focus.self = 0;
@@ -231,7 +231,7 @@ test('v6 saves gain cry level and parent bonds without rerolling progress or que
   const before = clone(legacy);
   const migrated = migrateSave(legacy);
   assert.ok(migrated);
-  assert.equal(migrated.version, 10);
+  assert.equal(migrated.version, 11);
   assert.equal(migrated.cryLevel, 5);
   assert.equal(migrated.alive, true);
   assert.equal(migrated.yearSummary, null);
@@ -270,6 +270,7 @@ test('parents, children, siblings and partners each have risks and die only once
   for (const role of ['parent', 'child', 'sibling', 'partner']) {
     const state = household();
     const target = role === 'parent' ? state.parents[0] : role === 'child' ? state.children[0] : role === 'sibling' ? state.siblings[0] : state.partner;
+    target.stats.health = 5;
     const odds = mortalityOdds(state);
     assert.ok(odds.find(row => row.id === target.id)?.total > 0, role);
     const oldHealth = target.stats.health;

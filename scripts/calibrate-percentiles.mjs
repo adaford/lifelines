@@ -2,7 +2,7 @@
 // Reproduce: node scripts/calibrate-percentiles.mjs --samples 2000 --seed 200001
 // Refit development after changing the simulation: add --fit.
 import { readFile, writeFile } from 'node:fs/promises';
-import { BIRTH_VARIATION } from '../development.js';
+import { BIRTH_VARIATION, TODDLER_FOCUS } from '../development.js';
 import {
   createGame, advanceYear, resolveEventChoice, EVENTS, effectiveStats,
   DEVELOPMENT_BALANCE,
@@ -47,6 +47,7 @@ function cohort(measureAges) {
       state.focus = { ...focus };
       const choose = choiceRng(seed);
       while (state.age < 18 && state.alive) {
+        state.focus = { ...(state.age >= 2 && state.age < 5 ? TODDLER_FOCUS : focus) };
         // Same-age peers include everyone currently alive, irrespective of
         // whether they survive later years. No future projection is involved.
         if (measureAges) {
@@ -107,7 +108,7 @@ const result = cohort(true);
 const reference = {
   calibration: {
     samplesPerSex: samples, seedStart, survivors: result.survivors,
-    cryLevel: 3, cryThroughAge: 1, focus, choices: 'uniform, independent seeded draws',
+    cryLevel: 3, cryThroughAge: 1, focus, toddlerFocus: TODDLER_FOCUS, choices: 'uniform, independent seeded draws',
     heightUnit: 'inches',
     conditionedOn: 'alive at the observed age',
     observationsByAge: [...result.ageStats.map(stats => stats.health.count), result.stats.health.count],

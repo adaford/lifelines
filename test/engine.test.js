@@ -88,7 +88,7 @@ test('all five stats exist at birth with established natural ratings and average
     const baby = createGame({ seed });
     for (const { key } of SKILLS) assert.ok(baby.stats[key] >= 1 && baby.stats[key] <= 10, `${key} at birth`);
     assert.ok(baby.stats.attractiveness >= 1 && baby.stats.attractiveness <= 10);
-    assert.equal(baby.version, 10);
+    assert.equal(baby.version, 11);
     for (const key of ['health', 'stability']) {
       assert.ok(baby.stats[key] >= 1 && baby.stats[key] <= 10);
       wellbeing[key].push(baby.stats[key]);
@@ -209,6 +209,7 @@ test('aptitude changes development speed without leaving the stat scale', () => 
 
 test('focus has four independent 0–5 values and a hard 12-point budget', () => {
   const state = adult();
+  state.focus = { work: 3, social: 3, family: 3, self: 3 };
   assert.equal(setFocus(state, 'work', 5).ok, false);
   assert.equal(setFocus(state, 'social', 1).ok, true);
   assert.equal(setFocus(state, 'work', 5).ok, true);
@@ -469,7 +470,7 @@ test('v2 upgrades preserve school, current careers, and adults without consuming
       const snapshot = copy(old);
       const upgraded = migrateSave(old);
       assert.equal(validateSave(upgraded), true);
-      assert.equal(upgraded.version, 10);
+      assert.equal(upgraded.version, 11);
       assert.equal(upgraded.education.status, status);
       assert.equal(upgraded.education.years, status === 'graduate' ? 4 : 0);
       assert.equal(upgraded.jobOffers.length, count);
@@ -981,7 +982,7 @@ test('both peer-pressure choices have different visible stat consequences and pe
   assert.equal(state.stats.social, 7);
   assert.equal(state.stats.intelligence, 5);
   assert.equal(state.stats.health, 5.7);
-  assert.match(state.history[0].text, /social ability 6 → 7; Your intelligence 6 → 5/);
+  assert.match(state.history[0].text, /social 6 → 7; Your intelligence 6 → 5/);
   assert.equal(resolveEventChoice(declined, 'decline', 'peer_drinking').ok, true);
   assert.equal(declined.stats.stability, 6.5);
   assert.equal(declined.stats.social, 5.8);
@@ -1431,7 +1432,7 @@ test('old childless endings become valid retirement choices without resetting th
   for (const parent of previous.parents) { parent.age = Math.min(85, parent.age); if (parent.age === 85) parent.alive = false; }
   for(const person of [previous,...previous.parents,...previous.children,...previous.siblings,...previous.lineage,...previous.encounters,previous.partner,previous.pregnancy?.otherParent].filter(Boolean)) { delete person.familyName; person.appearancePeakAge = 30; }
   const migrated=migrateSave(previous);
-  assert.equal(validateSave(migrated),true); assert.equal(migrated.version,10);
+  assert.equal(validateSave(migrated),true); assert.equal(migrated.version,11);
   assert.equal(migrated.ended,false); assert.equal(migrated.needsSuccession,true);
   for(const key of ['id','name','age','rng','nextId','stats','aptitudes','history','money','education','jobOffers','effects','pendingEvents']) assert.deepEqual(migrated[key],previous[key]);
   const info=successionInfo(migrated);
