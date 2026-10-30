@@ -107,7 +107,7 @@ test('mean attractiveness stays at its initial level and declines only after the
 });
 
 test('crying has neutral parent mental stability at two and distinct increasing costs after it', () => {
-  const expected = [.2, 0, -.6, -1.2, -1.8];
+  const expected = [.1, 0, -.3, -.6, -.9];
   for (const age of [0, 1]) {
     for (let level = 1; level <= 5; level++) {
       const state = createGame({ seed: 57 });
@@ -119,7 +119,7 @@ test('crying has neutral parent mental stability at two and distinct increasing 
       assert.deepEqual(state, before, 'reading every cry forecast preserves ratings, history, and RNG');
       assert.deepEqual(annualForecast(state), forecast);
       assert.ok(forecast.parents.every(parent => parent.stability.change === expected[level - 1]));
-      assert.ok(forecast.parents.every(parent => parent.relationship.change === round(.2 * (level - 3))));
+      assert.ok(forecast.parents.every(parent => parent.relationship.change === round(.1 * (level - 3))));
       advanceQuietMean(state);
       assert.deepEqual(state.lastYearEvents, [], 'quiet fixture isolates routine development');
       for (const parent of state.parents) {
@@ -132,7 +132,7 @@ test('crying has neutral parent mental stability at two and distinct increasing 
 });
 
 test('crying previews respect parent rating bounds and remembered parents', () => {
-  for (const [starting, level, ending] of [[9.9, 1, 10], [1.1, 5, 0], [0, 5, 0], [10, 1, 10], [5, 2, 5]]) {
+  for (const [starting, level, ending] of [[9.99, 1, 10], [.1, 5, 0], [0, 5, 0], [10, 1, 10], [5, 2, 5]]) {
     const state = createGame({ seed: 57 });
     const [living, remembered] = state.parents;
     living.stats.stability = starting;
@@ -210,7 +210,8 @@ test('annual development varies around the pure mean forecast and is reproducibl
   const spread = standardDeviation(gains);
   assert.ok(spread > .035 && spread < .12, 'small annual variation remains even when the mean change is near zero');
   assert.ok(gains.some(gain => gain < 0) && gains.some(gain => gain > 0), 'ordinary yearly variation can move ratings in either direction');
-  assert.ok(standardDeviation(stressChanges) > .1);
+  const expectedStressSpread = Math.abs(forecast.parents[0].stability.change) * .25 + .02;
+  assert.ok(Math.abs(standardDeviation(stressChanges) - expectedStressSpread) < .025, 'parent variation follows the reduced mean strain');
 });
 
 test('v7 migration preserves existing height, bonds, random state and non-infant appearance', () => {

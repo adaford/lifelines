@@ -108,7 +108,7 @@ test('crying respects stat and relationship limits and never changes deceased pa
   state.stats.intelligence = 9.99;
   state.aptitudes.intelligence = 3;
   state.parents[0].relationship = 9.99;
-  state.parents[0].stats.stability = 1;
+  state.parents[0].stats.stability = .1;
   state.parents[1].alive = false;
   const deceased = clone(state.parents[1]);
   setCryLevel(state, 5);

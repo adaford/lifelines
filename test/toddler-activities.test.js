@@ -40,11 +40,11 @@ test('activity contributions grow with points, match practice changes, and do no
   }
 });
 
-test('rest doubles the former toddler health response and crafts spend the shared budget', () => {
+test('rest uses the halved toddler health response and crafts spend the shared budget', () => {
   const state = toddler();
   state.aptitudes.health = 0;
   const higher = { ...state, focus: { ...state.focus, self: 4 } };
-  assert.ok(Math.abs(childhoodWellbeing(higher).health - childhoodWellbeing(state).health - .1) < 1e-12);
+  assert.ok(Math.abs(childhoodWellbeing(higher).health - childhoodWellbeing(state).health - .05) < 1e-12);
   assert.equal(setFocus(state, 'creative', 3).ok, false);
   assert.equal(setFocus(state, 'work', 2).ok, true);
   assert.equal(setFocus(state, 'creative', 3).ok, true);
@@ -105,7 +105,7 @@ test('toddler social practice has three, minus one, and two relative units while
     const closer = annualForecast(more('family'));
     for (const parent of neutral.parents) {
       const next = closer.parents.find(person => person.id === parent.id);
-      assert.equal(parent.relationship.change, -.08);
+      assert.equal(parent.relationship.change, -.04);
       assert.equal(next.relationship.change, 0);
     }
     assert.deepEqual(state, before, 'practice and forecast reads preserve the save and RNG');

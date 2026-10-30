@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createGame, migrateSave } from '../engine.js';
+import { createGame, migrateSave, annualForecast } from '../engine.js';
 import { TODDLER_FOCUS, TODDLER_ACTIVITY_EFFECTS } from '../development.js';
-import { toddlerChoiceImpacts, toddlerActivityImpacts } from '../choice-impacts.js';
+import { toddlerChoiceImpacts, toddlerActivityImpacts, choiceImpacts } from '../choice-impacts.js';
 
 function toddler() {
   const state = createGame({ seed: 71321 });
@@ -32,6 +32,72 @@ function selected(state, activity, points) {
   }
   return candidate;
 }
+
+test('activity previews show half-strength gains and losses without changing relative signs', () => {
+  const cases = [
+    ['work', 5, 'strength', .12, 3],
+    ['work', 0, 'strength', -.17, 3],
+    ['social', 0, 'social', .02, 2],
+    ['social', 5, 'intelligence', .16, 3],
+    ['creative', 0, 'intelligence', -.03, 2],
+    ['creative', 5, 'creativity', .19, 3],
+    ['self', 5, 'health', .1, 3],
+    ['self', 0, 'stability', -.12, 3],
+    ['family', 5, 'stability', .05, 3],
+  ];
+  for (const [activity, points, stat, expected, level] of cases) {
+    const entries = toddlerChoiceImpacts(selected(toddler(), activity, points), activity);
+    const entry = entries.find(entry => entry.stat === stat && !entry.parentId);
+    assert.ok(Math.abs(entry.change - expected) < 1e-10, `${activity} ${points}: ${stat} has the halved contribution rounded to stat precision`);
+    assert.equal(entry.level, level, `${activity} ${points}: signs retain their relative strength`);
+    assert.ok(entries.every(entry => entry.stat !== 'lifestyle'));
+  }
+  for (const points of [0, 1, 2, 4, 5]) {
+    const state = selected(toddler(), 'family', points);
+    const entries = toddlerChoiceImpacts(state, 'family');
+    for (const parent of state.parents) {
+      const relationship = entries.find(entry => entry.parentId === parent.id && entry.stat === 'relationship');
+      const stability = entries.find(entry => entry.parentId === parent.id && entry.stat === 'stability');
+      assert.ok(Math.abs(relationship.change - (points - 3) * .04) < 1e-10);
+      if (points === 2) assert.equal(stability, undefined);
+      else assert.ok(Math.abs(stability.change - (points - 2) * .0125) < 1e-10);
+    }
+  }
+});
+
+test('crying previews halve personal and caregiver effects once and match the annual forecast', () => {
+  const state = toddler();
+  state.age = 1;
+  state.focus = { work: 3, social: 3, family: 3, self: 3 };
+  const expected = {
+    intelligence: [-.05, -.02, .02, .05, .07],
+    stability: [-.12, -.06, .06, .12, .18],
+    health: [-.01, -.01, 0, .01, .01],
+  };
+  const parentStability = [.1, 0, -.3, -.6, -.9];
+  for (let cryLevel = 1; cryLevel <= 5; cryLevel++) {
+    state.cryLevel = cryLevel;
+    const before = structuredClone(state);
+    const entries = choiceImpacts(state);
+    for (const [stat, amounts] of Object.entries(expected)) {
+      const entry = entries.find(entry => entry.stat === stat && !entry.parentId);
+      if (!amounts[cryLevel - 1]) assert.equal(entry, undefined);
+      else assert.ok(Math.abs(entry.change - amounts[cryLevel - 1]) < 1e-10, `${stat} at cry level ${cryLevel}`);
+    }
+    const forecast = annualForecast(state);
+    for (const parent of state.parents) {
+      const predicted = forecast.parents.find(person => person.id === parent.id);
+      for (const [stat, amount] of [['stability', parentStability[cryLevel - 1]], ['relationship', .1 * (cryLevel - 3)]]) {
+        const entry = entries.find(entry => entry.parentId === parent.id && entry.stat === stat);
+        if (!amount) assert.equal(entry, undefined);
+        else assert.ok(Math.abs(entry.change - amount) < 1e-10, `${stat} for ${parent.id} at cry level ${cryLevel}`);
+        assert.ok(Math.abs(predicted[stat].change - amount) < 1e-10, 'preview and annual parent changes use the same scale');
+      }
+    }
+    assert.ok(!entries.some(entry => entry.stat === 'lifestyle' || entry.stat === 'strength' && !entry.parentId));
+    assert.deepEqual(state, before, 'previewing the scaled changes preserves saves and RNG');
+  }
+});
 
 test('Play shows only its own skill contribution below and above the balanced allocation', () => {
   const state = toddler();

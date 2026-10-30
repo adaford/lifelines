@@ -506,7 +506,6 @@ details p { font-size: 13px; color: var(--muted); line-height: 1.65; padding-bot
 .choice-impact b { font-weight: 750; letter-spacing: .5px; white-space: nowrap; }
 .choice-impact-summary > p { font-size: 12px; line-height: 1.5; }
 .activity-effects { grid-column: 2 / -1; min-width: 0; }
-.activity-effects .choice-impact-group:first-child { margin-top: 0; }
 .activity-effects .choice-impact-list { margin-top: 0; }
 @media (max-width: 370px) {
   .activity-effects { grid-column: 1 / -1; }

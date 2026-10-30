@@ -1,5 +1,5 @@
-import { annualForecast, effectiveStats, needsEducationChoice, focusLimits, caregivers } from './engine.js?v=journal-stat-lines-1';
-import { infantChoiceEffects, wellbeingResponse, toddlerActivityEffects, TODDLER_FOCUS, TODDLER_ACTIVITY_EFFECTS, PARENT_FAMILY_RELATIONSHIP_GAIN } from './development.js?v=journal-stat-lines-1';
+import { annualForecast, effectiveStats, needsEducationChoice, focusLimits, caregivers } from './engine.js?v=decision-choice-rows-1';
+import { infantChoiceEffects, wellbeingResponse, toddlerActivityEffects, schoolFocusEffects, TODDLER_FOCUS, TODDLER_ACTIVITY_EFFECTS, PARENT_FAMILY_RELATIONSHIP_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=decision-choice-rows-1';
 
 const nonzero = value => Math.abs(value) > .000001;
 const keyOf = entry => `${entry.parentId || 'you'}:${entry.stat}`;
@@ -18,12 +18,7 @@ export function toddlerActivityImpacts(activity) {
   return impacts;
 }
 
-function toddlerChoiceEntries(state, activity, points, clip) {
-  const candidate = { ...state, focus: { ...state.focus, [activity]: points } };
-  const balanced = { ...candidate, focus: { ...candidate.focus, [activity]: TODDLER_FOCUS[activity] } };
-  const contributions = toddlerActivityEffects(candidate)[activity];
-  const reference = toddlerActivityEffects(balanced)[activity];
-  const effects = Object.fromEntries(Object.entries(contributions).map(([stat, change]) => [stat, change - reference[stat]]));
+function personalChoiceEntries(state, effects, clip) {
   // Retained modifiers can hide an otherwise possible change at the displayed
   // bounds. Expiring modifiers are background changes, not activity effects.
   const next = { ...state, effects: state.effects.filter(effect => effect.years > 1) };
@@ -31,7 +26,16 @@ function toddlerChoiceEntries(state, activity, points, clip) {
   const after = clip ? effectiveStats({ ...next, stats: { ...state.stats,
     ...Object.fromEntries(Object.entries(effects).map(([stat, change]) => [stat, state.stats[stat] + bounded(state.stats[stat], change)])),
   } }) : null;
-  const entries = Object.entries(effects).map(([stat, change]) => ({ stat, change: clip ? after[stat] - before[stat] : change, group: 'you' }));
+  return Object.entries(effects).map(([stat, change]) => ({ stat, change: clip ? after[stat] - before[stat] : change, group: 'you' }));
+}
+
+function toddlerChoiceEntries(state, activity, points, clip) {
+  const candidate = { ...state, focus: { ...state.focus, [activity]: points } };
+  const balanced = { ...candidate, focus: { ...candidate.focus, [activity]: TODDLER_FOCUS[activity] } };
+  const contributions = toddlerActivityEffects(candidate)[activity];
+  const reference = toddlerActivityEffects(balanced)[activity];
+  const effects = Object.fromEntries(Object.entries(contributions).map(([stat, change]) => [stat, change - reference[stat]]));
+  const entries = personalChoiceEntries(state, effects, clip);
   if (activity === 'family') {
     for (const parent of caregivers(state)) {
       const stability = wellbeingResponse(parent, 'stability', .025 * (points - 2));
@@ -52,6 +56,11 @@ export function toddlerChoiceImpacts(state, activity) {
   const entries = toddlerChoiceEntries(state, activity, points, true);
   const raw = toddlerChoiceEntries(state, activity, points, false);
   const comparisons = Array.from({ length: 6 }, (_, level) => toddlerChoiceEntries(state, activity, level, false));
+  return rankedChoiceEntries(entries, raw, comparisons, points,
+    entry => entry.parentId ? (entry.stat === 'relationship' ? 3 : 2) : TODDLER_FOCUS[activity]);
+}
+
+function rankedChoiceEntries(entries, raw, comparisons, points, neutralFor) {
   return entries.filter(entry => nonzero(entry.change)).map(entry => {
     const key = keyOf(entry);
     const change = raw.find(candidate => keyOf(candidate) === key).change;
@@ -64,11 +73,39 @@ export function toddlerChoiceImpacts(state, activity) {
     // such as Electronics on social. Static help must not cap these ranks.
     const ordered = [...new Set(magnitudes)].sort((a, b) => a - b);
     const rank = Math.max(0, ordered.indexOf(Math.round(Math.abs(change) * 1e8)));
-    const neutral = entry.parentId ? (entry.stat === 'relationship' ? 3 : 2) : TODDLER_FOCUS[activity];
+    const neutral = neutralFor(entry);
     const level = points < neutral ? Math.min(3, rank + 1)
       : ordered.length < 2 ? 1 : 1 + Math.round(2 * rank / (ordered.length - 1));
     return { ...entry, level };
   });
+}
+
+function schoolChoiceEntries(state, area, points, clip) {
+  const candidate = { ...state, focus: { ...state.focus, [area]: points } };
+  const entries = personalChoiceEntries(state, schoolFocusEffects(candidate, area), clip);
+  if (area === 'family') {
+    for (const parent of caregivers(state)) {
+      const stability = wellbeingResponse(parent, 'stability', .025 * (points - 3));
+      const relationship = PARENT_FAMILY_RELATIONSHIP_GAIN * (points - 2);
+      entries.push({ stat: 'stability', parentId: parent.id, group: 'others', change: clip ? bounded(parent.stats.stability, stability) : stability });
+      entries.push({ stat: 'relationship', parentId: parent.id, group: 'relationships', change: clip ? bounded(parent.relationship, relationship) : relationship });
+    }
+  }
+  return entries;
+}
+
+// School and college show only each choice's own decision contribution. Keep
+// the same complete 0–5 reference as toddler rows when an event limits a choice.
+export function schoolChoiceImpacts(state, area) {
+  if (state.age < 5 || state.age >= 18 && state.education.status !== 'college'
+      || !['work', 'social', 'family', 'self'].includes(area) || state.ended
+      || state.alive === false || state.needsSuccession || state.pendingEvents.length || needsEducationChoice(state)) return [];
+  const points = Math.max(0, Math.min(focusLimits(state)[area], state.focus[area] ?? 0));
+  const entries = schoolChoiceEntries(state, area, points, true);
+  const raw = schoolChoiceEntries(state, area, points, false);
+  const comparisons = Array.from({ length: 6 }, (_, level) => schoolChoiceEntries(state, area, level, false));
+  return rankedChoiceEntries(entries, raw, comparisons, points,
+    entry => entry.parentId && entry.stat === 'relationship' ? 2 : 3);
 }
 
 function forecastEntries(state, forecast) {
@@ -110,7 +147,7 @@ function cryEntries(state, level, clip) {
       const effect = wellbeingResponse(parent, 'stability', [.2, 0, -.6, -1.2, -1.8][level - 1]);
       entry.change = clip ? bounded(parent.stats.stability, effect) : effect;
     } else if (entry.stat === 'relationship') {
-      const effect = .2 * (level - 3);
+      const effect = YEARLY_DECISION_SCALE * .2 * (level - 3);
       entry.change = clip ? bounded(parent.relationship, effect) : effect;
     }
   }

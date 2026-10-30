@@ -5,11 +5,11 @@ import {
   offeredJobs, needsEducationChoice, pendingEventSubject, focusLimits, focusLimitDetails, caregivers,
   relationshipOdds, meetingChances, proposalChance, pregnancyChance, oneNightChance,
   respondToEncounter, proposeMarriage, endRelationship, normalizeSurname, heightPercentile, statPercentiles
-} from './engine.js?v=journal-stat-lines-1';
-import { annotateNarrative } from './narrative.js?v=journal-stat-lines-1';
-import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome, splitJournalEventOutcome } from './display.js?v=journal-stat-lines-1';
+} from './engine.js?v=decision-choice-rows-1';
+import { annotateNarrative } from './narrative.js?v=decision-choice-rows-1';
+import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome, splitJournalEventOutcome } from './display.js?v=decision-choice-rows-1';
 
-import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts } from './choice-impacts.js?v=journal-stat-lines-1';
+import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=decision-choice-rows-1';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const app = document.querySelector('#app');
@@ -267,7 +267,7 @@ function yearView() {
   const disabled = state.ended || state.needsSuccession || state.pendingEvents.length>0;
   return `${state.education.status==='college'?collegeProgressView():''}<section class="panel focus-panel"><div class="panel-heading"><h3>${labelWithHelp(baby?'Cry level':toddler?'Toddler activities':'Focus',baby?'cry':toddler?'toddler-focus':'focus')}</h3><span class="tag">${baby ? 'AGES 0–1' : `${focusUsed()} / 12 POINTS`}</span></div>
     ${baby ? `<div class="cry-control" role="group" aria-label="Cry level"><div class="cry-levels">${[1,2,3,4,5].map(level=>`<button class="cry-level ${state.cryLevel===level?'selected':''}" data-action="baby" data-level="${level}" aria-label="Cry level ${level} of 5" aria-pressed="${state.cryLevel===level}" ${disabled?'disabled':''}>${level}</button>`).join('')}</div><div class="cry-scale-labels"><span>Low</span><span>High</span></div></div>` : focusView(disabled)}
-    ${toddler?'':choiceImpactSummary()}
+    ${!baby&&(state.age<18||state.education.status==='college')?'':choiceImpactSummary()}
     ${parentStatusView()}
     </section>
     ${effectsView()}
@@ -367,13 +367,12 @@ function lifestyleView() {
   return `<section class="lifestyle-summary" aria-label="Lifestyle"><div><span class="eyebrow">EVERYDAY COMFORT</span><h3>${labelWithHelp('Lifestyle','lifestyle')} <strong>${number(state.lifestyle)}<small>/10</small></strong></h3><p>${descriptions[Math.round(state.lifestyle)]}</p>${ratingBar('Lifestyle',state.lifestyle)}</div></section>`;
 }
 
-function choiceImpactGroups(changes, compact = false) {
+function choiceImpactGroups(changes) {
   const groups = [['you','You'],['others','Other people'],['relationships','Relationships']];
-  const headings = !compact || changes.some(entry=>entry.group!=='you');
   return groups.map(([group,title]) => {
     const entries = changes.filter(entry => entry.group === group);
     if (!entries.length) return '';
-    return `<section class="choice-impact-group" data-impact-group="${group}" aria-label="${title}">${headings?`<h5>${title}</h5>`:''}<ul class="choice-impact-list">${entries.map(({stat,change,level,parentId}) => {
+    return `<section class="choice-impact-group" data-impact-group="${group}" aria-label="${title}"><h5>${title}</h5><ul class="choice-impact-list">${entries.map(({stat,change,level,parentId}) => {
       let label = skillLabel(stat);
       if (parentId) {
         const parent = familyCareProfiles().find(person => person.id === parentId);
@@ -396,8 +395,23 @@ function choiceImpactSummary() {
 }
 
 function activityEffectsView(activity, label) {
-  const changes = toddlerChoiceImpacts(state,activity);
-  return changes.length?`<div class="activity-effects" aria-label="${esc(label)} expected changes">${choiceImpactGroups(changes,true)}</div>`:'';
+  const changes = state.age<5?toddlerChoiceImpacts(state,activity):schoolChoiceImpacts(state,activity);
+  const entries = [];
+  for (const change of changes) {
+    const existing = change.parentId && entries.find(entry => entry.parentIds && entry.stat===change.stat && entry.level===change.level && Math.sign(entry.change)===Math.sign(change.change));
+    if (existing) existing.parentIds.push(change.parentId);
+    else entries.push({ ...change, ...(change.parentId?{parentIds:[change.parentId]}:{}) });
+  }
+  if (!entries.length) return '';
+  return `<div class="activity-effects" aria-label="${esc(label)} expected changes"><ul class="choice-impact-list">${entries.map(({stat,change,level,parentIds}) => {
+    const family = !!parentIds;
+    const name = family?`${stat==='relationship'?'Relationships':skillLabel(stat)} (family)`:skillLabel(stat);
+    const direction = change>0?'increase':'decrease';
+    const signs = (change>0?'+':'-').repeat(level);
+    const magnitude = ['small','medium','large'][level-1];
+    const people = family?parentIds.map(id=>parentLabel(familyCareProfiles().find(person=>person.id===id))).join(', '):'';
+    return `<li class="choice-impact" data-stat="${stat}" data-level="${level}" data-direction="${direction}" data-target="${family?'family':'you'}" ${family?`data-parent-ids="${esc(parentIds.join(' '))}"`:''}><span role="img" aria-label="${esc(name)}: ${magnitude} expected ${direction}${people?`; ${esc(people)}`:''}"><b aria-hidden="true">${signs}</b> ${esc(name)}${statEmoji(stat)}</span></li>`;
+  }).join('')}</ul></div>`;
 }
 
 function focusView(disabled) {
@@ -409,7 +423,7 @@ function focusView(disabled) {
   return `<div class="focus-list">${rows.map(([key,label,ico]) => {
     const restrictions = details.filter(limit=>limit.key===key);
     const limitText = restrictions.length?'Max '+limits[key]+' · '+restrictions.map(limit=>limit.name+' ('+(limit.years===1?'this year':limit.years+' years left')+')').join('; '):'';
-    return `<div class="focus-row" data-focus-key="${key}"><span class="focus-icon">${icon(ico)}</span><div class="focus-copy"><h4>${labelWithHelp(label,`${toddler?'toddler':'focus'}-${key}`)}</h4><div class="focus-scale" aria-hidden="true">${Array.from({length:5},(_,i)=>`<span class="${i<(state.focus[key] ?? 0)?'filled':i>=limits[key]?'limited':''}"></span>`).join('')}</div>${limitText?`<div class="focus-limit" id="focus-limit-${key}">${esc(limitText)}</div>`:''}</div><div class="stepper" role="group" aria-label="${esc(label)} ${mode}" ${limitText?`aria-describedby="focus-limit-${key}"`:''}><button data-action="focus" data-key="${key}" data-delta="-1" aria-label="Decrease ${esc(label.toLowerCase())} ${mode}" ${(state.focus[key] ?? 0)<=0||disabled?'disabled':''}>${icon('minus')}</button><output aria-label="${esc(label)} ${mode} level">${state.focus[key] ?? 0}</output><button data-action="focus" data-key="${key}" data-delta="1" aria-label="Increase ${esc(label.toLowerCase())} ${mode}" ${(state.focus[key] ?? 0)>=limits[key]||focusUsed()>=12||disabled?'disabled':''}>${icon('plus')}</button></div>${toddler&&!disabled?activityEffectsView(key,label):''}</div>`;
+    return `<div class="focus-row" data-focus-key="${key}"><span class="focus-icon">${icon(ico)}</span><div class="focus-copy"><h4>${labelWithHelp(label,`${toddler?'toddler':'focus'}-${key}`)}</h4><div class="focus-scale" aria-hidden="true">${Array.from({length:5},(_,i)=>`<span class="${i<(state.focus[key] ?? 0)?'filled':i>=limits[key]?'limited':''}"></span>`).join('')}</div>${limitText?`<div class="focus-limit" id="focus-limit-${key}">${esc(limitText)}</div>`:''}</div><div class="stepper" role="group" aria-label="${esc(label)} ${mode}" ${limitText?`aria-describedby="focus-limit-${key}"`:''}><button data-action="focus" data-key="${key}" data-delta="-1" aria-label="Decrease ${esc(label.toLowerCase())} ${mode}" ${(state.focus[key] ?? 0)<=0||disabled?'disabled':''}>${icon('minus')}</button><output aria-label="${esc(label)} ${mode} level">${state.focus[key] ?? 0}</output><button data-action="focus" data-key="${key}" data-delta="1" aria-label="Increase ${esc(label.toLowerCase())} ${mode}" ${(state.focus[key] ?? 0)>=limits[key]||focusUsed()>=12||disabled?'disabled':''}>${icon('plus')}</button></div>${(toddler||studying)&&!disabled?activityEffectsView(key,label):''}</div>`;
   }).join('')}</div><div class="budget-bar"><div class="budget-summary"><span>${12-focusUsed()} ${mode} point${12-focusUsed()===1?'':'s'} available</span><strong>${focusUsed()} / 12</strong></div><div class="budget-track"><span style="width:${focusUsed()/12*100}%"></span></div></div>`;
 }
 
@@ -581,13 +595,13 @@ function topicHelpModal(topic, id) {
     creativity: ['Creativity', ['Creative potential for your age, shaped by exploration and practice.']],
     attractiveness: ['Attractiveness', ['Starts near its adult value, with tiny random changes each year rather than gains from practice. In this game, aging lowers it after 30 for men and 22 for women.']],
     affinity: ['Natural aptitude', ['This inherited −3 to +3 trait affects starting ability and responsiveness to focus; higher is stronger. Health and mental stability aptitude improve routine gains and soften losses. Practice does not increase attractiveness.']],
-    forecast: ['Expected changes', ['Signs compare increases and decreases with the other choices for that stat. Zero changes are hidden. Your infant stats show crying effects; later stats show routine changes. Background development, events and yearly variation can alter the result.']],
+    forecast: ['Expected changes', ['Signs compare increases and decreases with the other choices for that stat. Zero changes are hidden. Infant stats show crying effects; adult stats show routine changes. Background development, events and yearly variation can alter the result.']],
     health: ['Health', ['Self-care supports health; illness and aging reduce it. Poor health raises disease risk and reduces childhood height gains.']],
     stability: ['Mental stability', ['Higher means calmer; rest and relationships help. Low parental mental stability can lead to difficult childhood events.']],
     lifestyle: ['Lifestyle', ['Until 18, you share your parents’ or guardian’s changing household lifestyle. As an adult, work, family, events and inheritance shape it.']],
     height: ['Height', ['Final height emerges from yearly growth shaped by age, inheritance, health and chance, ending at 14–18. Poor health reduces new growth, never existing height.']],
     cry: ['Cry level', ['Less crying lowers your intelligence and mental stability; more crying raises them. Strength is unaffected. Parent relationships tend to fall at levels 1–2, stay steady at 3, and rise at 4–5, with yearly variation. Harder crying strains their mental stability more.']],
-    focus: ['Your focus', ['Allocate 12 points, at most 5 per area; unused points allow rest. Events can temporarily lower these limits. Focused skills can rise, neglected ones can fall, and results vary yearly.']],
+    focus: ['Your focus', ['Allocate 12 points, at most 5 per area; unused points allow rest. Events can temporarily lower these limits. Focused skills can rise, neglected ones can fall, and results vary yearly.', ...(state.age<18||state.education.status==='college'?['Each row shows that choice compared with 3 points; family relationships are neutral at 2. Signs run from one for the weakest effect to three for the strongest. Zero effects are hidden, and shared family effects appear once.']:[])]],
     'toddler-focus': ['Toddler activities', ['Share 12 points among five activities, up to 5 each. Events can temporarily lower these limits. Unused points support mental stability, and results vary each year.', 'Your activity effects are measured from Play 3, Electronics 2, Family time 2, Rest 3, and Arts & crafts 2. Parent relationships are neutral at Family time 3; parent mental stability at 2. Below neutral, each missing point adds one sign. Above neutral, signs run from one for the weakest option to three for the strongest. Zero effects are hidden.']],
     ...Object.fromEntries(toddlerFocusRows.map(([key,label]) => [`toddler-${key}`, [label,
       toddlerActivityImpacts(key).map(({stat,change,level,target}) => `${(change>0?'+':'-').repeat(level)}${target==='parents'?(caregivers(state).some(person=>person.guardianRole)?'Guardian relationship':'Parent relationships'):skillLabel(stat)}`)

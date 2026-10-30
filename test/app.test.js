@@ -5,7 +5,7 @@ import { readFile } from 'node:fs/promises';
 import { afterEach, describe, test } from 'node:test';
 import { parseHTML } from 'linkedom';
 import { toLegacyCentimeters, stripWellbeingAptitudes, legacyRatingFloor } from './helpers/legacy-height.js';
-import { choiceImpacts, toddlerChoiceImpacts } from '../choice-impacts.js';
+import { choiceImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from '../choice-impacts.js';
 import { SKILLS, JOBS, EVENTS, resolveEventChoice, eventOdds, canTakeJob, chooseEducation, offeredJobs, needsEducationChoice, createGame, advanceYear, annualForecast, haveChild, takeJob, successionInfo, succeed, validateSave, respondToEncounter, proposeMarriage, effectiveStats, relationshipOdds, proposalChance, statPercentiles } from '../engine.js';
 
 const SAVE_KEY = 'lifelines.save.v1';
@@ -2097,8 +2097,8 @@ test('parent ratings stay numeric while crying updates their separate choice imp
   assert.equal(saved.cryLevel,5);
 });
 
-test('parent effects do not cancel each other and remembered parents have no forecast', async () => {
-  const fixture=ageTo(createGame({seed:121}),8);
+test('adult combined parent effects do not cancel each other and remembered parents have no forecast', async () => {
+  const fixture=ageTo(createGame({seed:121}),30);
   fixture.parents.forEach(parent=>{parent.alive=true;delete parent.death;delete parent.abandonedAt;});
   fixture.guardian=null;
   for (const effect of fixture.effects) delete effect.focusLimits;
@@ -2134,20 +2134,26 @@ test('parent effects do not cancel each other and remembered parents have no for
 function assertChoiceImpacts(ui) {
   assert.equal(ui.all('.choice-impact[data-stat="lifestyle"]').length,0,'Lifestyle is never an expected activity change');
   const state=ui.saved();
-  if (state.age>=2 && state.age<5) {
+  if (state.age>=2 && (state.age<18 || state.education.status==='college')) {
+    const toddler=state.age<5;
     assert.equal(ui.all('.choice-impact-summary').length,0);
-    for(const activity of ['work','social','family','self','creative']) {
+    assert.equal(ui.all('.activity-effects .choice-impact-group, .activity-effects h5').length,0,'inline effects have no sections or headings');
+    for(const activity of toddler?['work','social','family','self','creative']:['work','social','family','self']) {
       const row=ui.query(`.focus-row[data-focus-key="${activity}"]`);
-      const expected=toddlerChoiceImpacts(state,activity);
-      assert.equal(row.querySelectorAll('.choice-impact').length,expected.length);
+      const expected=(toddler?toddlerChoiceImpacts:schoolChoiceImpacts)(state,activity);
+      const distinct=new Set(expected.map(entry=>`${entry.parentId?'family':'you'}:${entry.stat}:${entry.level}:${Math.sign(entry.change)}`));
+      assert.equal(row.querySelectorAll('.choice-impact').length,distinct.size);
       assert.equal(row.querySelectorAll('.activity-effects').length,expected.length?1:0);
-      for(const {stat,parentId,change,level,group} of expected) {
-        const selector=`.choice-impact[data-stat="${stat}"]${parentId?`[data-parent-id="${parentId}"]`:':not([data-parent-id])'}`;
+      for(const {stat,parentId,change,level} of expected) {
+        const selector=`.choice-impact[data-stat="${stat}"][data-target="${parentId?'family':'you'}"][data-level="${level}"][data-direction="${change>0?'increase':'decrease'}"]`;
         const entry=row.querySelector(selector);
         assert.ok(entry,`${activity} shows its ${stat} effect`);
         assert.equal(entry.querySelector('b').textContent,(change>0?'+':'-').repeat(level));
-        assert.equal(entry.closest('.choice-impact-group').dataset.impactGroup,group);
         assert.ok(entry.querySelector('[role="img"]').getAttribute('aria-label'));
+        if(parentId) {
+          assert.ok(entry.dataset.parentIds.split(' ').includes(parentId));
+          assert.match(entry.textContent,/\(family\)/);
+        }
       }
     }
     assert.equal(ui.all('.activity-effects [data-stat="lifestyle"], .activity-effects [data-stat="height"]').length,0);
@@ -2262,8 +2268,9 @@ test('departed parents remain identified and the guardian receives care previews
     assert.equal(ui.query(`.parent-status[data-parent-id="${parent.id}"] .parent-status-state`).textContent,'Left the family');
     assert.equal(ui.all(`.choice-impact[data-parent-id="${parent.id}"]`).length,0);
   }
-  assert.ok(ui.all('.choice-impact[data-parent-id="relative-guardian"]').length>0);
-  assert.match(ui.query('.choice-impact[data-parent-id="relative-guardian"]').textContent,/Aunt/);
+  assert.ok(ui.all('.choice-impact[data-parent-ids="relative-guardian"]').length>0);
+  assert.match(ui.query('.choice-impact[data-parent-ids="relative-guardian"]').textContent,/\(family\)/);
+  assert.match(ui.query('.choice-impact[data-parent-ids="relative-guardian"] [role="img"]').getAttribute('aria-label'),/Aunt/);
   ui.click('[data-topic="toddler-family"]');
   assert.match(ui.query('.help-popup').textContent,/Guardian relationship/);
   ui.click('.help-popup [data-action="close"]');
@@ -2374,7 +2381,61 @@ test('activity signs compare possible allocations rather than fixed numerical ga
     assert.deepEqual(ui.saved().stats,before.stats);
     assert.equal(ui.saved().rng,before.rng);
   }
-  assert.ok(maximumGains[0]<.15 && maximumGains[1]>=.3,'the same signs span the former small and large absolute thresholds');
+  assert.ok(maximumGains[0]>0 && maximumGains[1]>maximumGains[0]*2,'the same signs apply despite more than double the absolute gain');
+});
+
+test('school and college decisions show signed effects inside each choice and update without changing stats', async () => {
+  for(const age of [5,17,18]) {
+    const fixture=ageTo(createGame({seed:121}),age);
+    if(age===18) assert.equal(chooseEducation(fixture,'college').ok,true);
+    fixture.effects=[];
+    fixture.focus={work:4,social:2,family:2,self:4};
+    for(const key of Object.keys(fixture.stats)) fixture.stats[key]=5;
+    for(const key of Object.keys(fixture.aptitudes)) fixture.aptitudes[key]=0;
+    fixture.parents.forEach(parent=>{parent.stats.stability=5;parent.relationship=5;});
+    const ui=await mount(fixture),before=ui.saved();
+    assertChoiceImpacts(ui);
+    const work=ui.query('.focus-row[data-focus-key="work"]');
+    assert.match(work.querySelector('h4').textContent,age<18?/School/:/College/);
+    assert.equal(work.querySelector('[data-stat="intelligence"] b').textContent,'+');
+    assert.equal(work.querySelector('[data-stat="stability"] b').textContent,'-');
+    ui.click('[data-action="focus"][data-key="social"][data-delta="-1"]');
+    ui.click('[data-action="focus"][data-key="work"][data-delta="1"]');
+    assertChoiceImpacts(ui);
+    assert.equal(ui.query('.focus-row[data-focus-key="work"] [data-stat="intelligence"] b').textContent,'+++');
+    assert.equal(ui.query('.focus-row[data-focus-key="work"] [data-stat="stability"] b').textContent,'---');
+    assert.deepEqual(ui.saved().stats,before.stats);
+    assert.deepEqual(ui.saved().parents,before.parents);
+    assert.equal(ui.saved().rng,before.rng);
+  }
+});
+
+test('toddler family effects combine parents without sections and omit neutral or blocked changes', async () => {
+  const fixture=ageTo(createGame({seed:121}),3);
+  fixture.effects=[];
+  fixture.focus={work:1,social:1,family:4,self:3,creative:2};
+  fixture.parents.forEach(parent=>{parent.stats.stability=5;parent.relationship=5;});
+  const ui=await mount(fixture),before=ui.saved();
+  const family=()=>ui.query('.focus-row[data-focus-key="family"]');
+  assertChoiceImpacts(ui);
+  assert.equal(family().querySelectorAll('[data-target="family"]').length,2,'each shared family effect appears once');
+  assert.match(family().querySelector('[data-target="family"][data-stat="stability"]').textContent,/\+.*Mental stability \(family\)/);
+  assert.match(family().querySelector('[data-target="family"][data-stat="relationship"]').textContent,/\+.*Relationships \(family\)/);
+  assert.doesNotMatch(family().querySelector('.activity-effects').textContent,/Dad|Mom|Other people|You/);
+  ui.click('[data-action="focus"][data-key="family"][data-delta="-1"]');
+  assert.equal(family().querySelectorAll('[data-target="family"][data-stat="relationship"]').length,0);
+  ui.click('[data-action="focus"][data-key="family"][data-delta="-1"]');
+  assert.equal(family().querySelectorAll('[data-target="family"][data-stat="stability"]').length,0);
+  assertChoiceImpacts(ui);
+  assert.deepEqual(ui.saved().parents,before.parents);
+  assert.equal(ui.saved().rng,before.rng);
+
+  fixture.parents[0].stats.stability=10;
+  fixture.parents[0].relationship=10;
+  const bounded=await mount(fixture);
+  for(const item of bounded.all('.activity-effects [data-target="family"]')) {
+    assert.equal(item.dataset.parentIds,fixture.parents[1].id,'bounded parent contributes no misleading family gain');
+  }
 });
 
 test('lifestyle never appears in expected changes even when household or adult lifestyle will change', async () => {

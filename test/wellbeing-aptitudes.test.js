@@ -68,7 +68,7 @@ test('wellbeing aptitude strengthens routine adult recovery and buffers routine 
   for (const key of wellbeing) template.stats[key] = 5;
   for (const focus of [
     { work: 0, social: 3, family: 4, self: 5 },
-    { work: 5, social: 0, family: 0, self: 0 },
+    { work: 5, social: 2, family: 0, self: 0 },
   ]) {
     const low = { ...copy(template), focus }, high = copy(low);
     for (const key of wellbeing) { low.aptitudes[key] = -3; high.aptitudes[key] = 3; }

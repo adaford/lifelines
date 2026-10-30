@@ -53,11 +53,11 @@ test('lifetime focus produces substantial gains, losses, and reversals without f
   };
   const trained = advance(structuredClone(person), practice, 10);
   const neglected = advance(structuredClone(person), neglect, 10);
-  assert.ok(trained.stats.intelligence > 6.8);
-  assert.ok(neglected.stats.intelligence < 3.2);
+  assert.ok(trained.stats.intelligence > 5.9);
+  assert.ok(neglected.stats.intelligence < 4.1);
   const previous = trained.stats.intelligence;
   advance(trained, neglect, 10);
-  assert.ok(trained.stats.intelligence < previous - 1.8);
+  assert.ok(trained.stats.intelligence < previous - .9);
   assert.ok(trained.stats.intelligence < 5);
   assert.deepEqual(person.stats, { intelligence: 5, strength: 5, social: 5, creativity: 5 });
 });
@@ -73,7 +73,7 @@ test('aptitude helps learning and retention while care and older-age focus still
   assert.ok(skillChanges(neglected(3)).intelligence > skillChanges(neglected(0)).intelligence);
   assert.ok(skillChanges(neglected(3)).intelligence < 0);
   const older = skillChanges({ ...person(0), age: 75 });
-  assert.ok(older.intelligence > .1 && older.intelligence < skillChanges(person(0)).intelligence);
+  assert.ok(older.intelligence > .05 && older.intelligence < skillChanges(person(0)).intelligence);
   const baby = { ...person(0), age: 0, cryLevel: 3 };
   assert.ok(skillChanges({ ...baby, careFocus: 5 }).intelligence > skillChanges({ ...baby, careFocus: 1 }).intelligence);
   assert.ok(skillChanges({ ...baby, cryLevel: 5 }).social > skillChanges({ ...baby, cryLevel: 1 }).social);
@@ -131,13 +131,13 @@ test('crying choice effects isolate the selected level from background developme
 
 test('natural resilience boosts routine wellbeing gains and buffers losses without changing reversion', () => {
   for (const key of ['health', 'stability']) {
-    assert.equal(wellbeingResponse({}, key, .2), .2, 'missing legacy aptitude is neutral');
-    assert.equal(wellbeingResponse({ aptitudes: { [key]: 0 } }, key, -.2), -.2);
+    assert.equal(wellbeingResponse({}, key, .2), .1, 'missing legacy aptitude is neutral with half-strength decisions');
+    assert.equal(wellbeingResponse({ aptitudes: { [key]: 0 } }, key, -.2), -.1);
     assert.equal(wellbeingResponse({ aptitudes: { [key]: 3 } }, key, 0), 0);
-    assert.ok(wellbeingResponse({ aptitudes: { [key]: 3 } }, key, .2) > .2);
-    assert.ok(wellbeingResponse({ aptitudes: { [key]: -3 } }, key, .2) < .2);
-    assert.ok(wellbeingResponse({ aptitudes: { [key]: 3 } }, key, -.2) > -.2);
-    assert.ok(wellbeingResponse({ aptitudes: { [key]: -3 } }, key, -.2) < -.2);
+    assert.ok(wellbeingResponse({ aptitudes: { [key]: 3 } }, key, .2) > .1);
+    assert.ok(wellbeingResponse({ aptitudes: { [key]: -3 } }, key, .2) < .1);
+    assert.ok(wellbeingResponse({ aptitudes: { [key]: 3 } }, key, -.2) > -.1);
+    assert.ok(wellbeingResponse({ aptitudes: { [key]: -3 } }, key, -.2) < -.1);
   }
   for (const age of [2, 4, 5, 10, 17]) {
     const toddler = age < 5;

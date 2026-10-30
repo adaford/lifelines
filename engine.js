@@ -1,19 +1,19 @@
 // Lifelines: deterministic, browser-independent simulation rules.
 // All public actions mutate their state and return { ok, reason? }.
-import { JOBS } from './jobs.js?v=journal-stat-lines-1';
-import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=journal-stat-lines-1';
-import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=journal-stat-lines-1';
-import { mortalityRisk, rollMortality } from './mortality.js?v=journal-stat-lines-1';
-import { heightReference, advanceGrowth } from './growth.js?v=journal-stat-lines-1';
-import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=journal-stat-lines-1';
-import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, DEVELOPMENT_BALANCE, BIRTH_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN } from './development.js?v=journal-stat-lines-1';
-import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=journal-stat-lines-1';
-import { normalPercentile } from './percentiles.js?v=journal-stat-lines-1';
+import { JOBS } from './jobs.js?v=decision-choice-rows-1';
+import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=decision-choice-rows-1';
+import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=decision-choice-rows-1';
+import { mortalityRisk, rollMortality } from './mortality.js?v=decision-choice-rows-1';
+import { heightReference, advanceGrowth } from './growth.js?v=decision-choice-rows-1';
+import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=decision-choice-rows-1';
+import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, DEVELOPMENT_BALANCE, BIRTH_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=decision-choice-rows-1';
+import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=decision-choice-rows-1';
+import { normalPercentile } from './percentiles.js?v=decision-choice-rows-1';
 export { DEVELOPMENT_BALANCE };
-export { heightPercentile } from './growth.js?v=journal-stat-lines-1';
-export { mortalityRisk } from './mortality.js?v=journal-stat-lines-1';
-import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=journal-stat-lines-1';
-export { JOBS, JOB_CATEGORIES } from './jobs.js?v=journal-stat-lines-1';
+export { heightPercentile } from './growth.js?v=decision-choice-rows-1';
+export { mortalityRisk } from './mortality.js?v=decision-choice-rows-1';
+import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=decision-choice-rows-1';
+export { JOBS, JOB_CATEGORIES } from './jobs.js?v=decision-choice-rows-1';
 export const EVENTS = [...PERSONAL_EVENTS, ...FAMILY_EVENTS];
 
 export const SKILLS = [
@@ -89,8 +89,8 @@ function log(state, title, text, kind = 'neutral', description) {
   state.history = state.history.slice(0, 500);
 }
 function addStat(person, key, amount) { person.stats[key] = round(clamp(person.stats[key] + amount, 0, 10)); }
-function developSkills(person, context = person, career = null) {
-  for (const [key, amount] of Object.entries(skillChanges(context, career))) addStat(person, key, amount);
+function developSkills(person, context = person, career = null, practiceScale = YEARLY_DECISION_SCALE) {
+  for (const [key, amount] of Object.entries(skillChanges(context, career, practiceScale))) addStat(person, key, amount);
 }
 function randomStats(state, aptitudes) {
   const result = Object.fromEntries(CORE.filter(key => key !== 'attractiveness').map(key => [key, round(clamp(naturalSkillRating(aptitudes[key]) + normal(state) * BIRTH_VARIATION.skill, 0, 10))]));
@@ -455,7 +455,7 @@ function growYear(state) {
     for (const [key, amount] of Object.entries(childhoodWellbeing(state))) addStat(state, key, amount);
     for (const parent of caregivers(state)) {
       addStat(parent, 'stability', wellbeingResponse(parent, 'stability', parentStabilityChange));
-      parent.relationship = round(clamp(parent.relationship + .2 * (state.cryLevel - 3), 0, 10));
+      parent.relationship = round(clamp(parent.relationship + YEARLY_DECISION_SCALE * .2 * (state.cryLevel - 3), 0, 10));
     }
     return;
   }
@@ -540,12 +540,12 @@ function annualFinances(state) {
   state.expenses = Math.round(9000 + state.income * (.32 + state.lifestyle * .025) + dependents * 2500 + reserveUpkeep);
   state.money = Math.max(0, Math.round(state.money + state.income - state.expenses));
   state.lifestyle = lifestyleFromResources(state.income, state.money);
-  if (!job && state.education.status !== 'college' && state.focus.work >= 3) addStat(state, 'stability', -.15);
+  if (!job && state.education.status !== 'college' && state.focus.work >= 3) addStat(state, 'stability', YEARLY_DECISION_SCALE * -.15);
 }
 function ageFamily(state) {
   for (const parent of [...state.parents, state.guardian].filter(Boolean)) {
     if (parent.alive === false) continue;
-    developSkills(parent, { ...parent, focus: { work: parent.career?.focus ?? 3, social: 3, family: 3, self: 3 } });
+    developSkills(parent, { ...parent, focus: { work: parent.career?.focus ?? 3, social: 3, family: 3, self: 3 } }, null, 1);
     addStat(parent, 'attractiveness', attractivenessAgeChange(parent));
     if (parent.age >= 65) addStat(parent, 'health', -.07);
     parent.age += 1;
@@ -563,11 +563,11 @@ function ageFamily(state) {
       addStat(child, 'stability', wellbeingResponse(child, 'stability', -.08 + state.focus.family * .045));
       addStat(child, 'health', wellbeingResponse(child, 'health', (state.focus.family - 2) * .02));
     }
-    child.relationship = round(clamp(child.relationship + (state.focus.family - 2) * .13, 0, 10));
+    child.relationship = round(clamp(child.relationship + YEARLY_DECISION_SCALE * (state.focus.family - 2) * .13, 0, 10));
     if (child.age >= 18) child.money += Math.round(1500 + child.stats.intelligence * 250);
     if (child.age >= 65) addStat(child, 'health', -.07);
   }
-  for (const sibling of state.siblings) if (sibling.alive !== false) { developSkills(sibling); addStat(sibling, 'attractiveness', attractivenessAgeChange(sibling)); if (sibling.age >= 65) addStat(sibling, 'health', -.07); sibling.age += 1; }
+  for (const sibling of state.siblings) if (sibling.alive !== false) { developSkills(sibling, sibling, null, 1); addStat(sibling, 'attractiveness', attractivenessAgeChange(sibling)); if (sibling.age >= 65) addStat(sibling, 'health', -.07); sibling.age += 1; }
   const partner = livingPartner(state);
   if (partner) {
     const appearanceChange = attractivenessAgeChange(partner);
@@ -575,7 +575,7 @@ function ageFamily(state) {
     if (appearanceChange) addStat(partner, 'attractiveness', appearanceChange);
     addStat(partner, 'stability', wellbeingResponse(partner, 'stability', (state.focus.family - 2) * .035));
     if (partner.age >= 65) addStat(partner, 'health', -.07);
-    partner.relationship = round(clamp(partner.relationship + (state.focus.family - 2) * .11, 0, 10));
+    partner.relationship = round(clamp(partner.relationship + YEARLY_DECISION_SCALE * (state.focus.family - 2) * .11, 0, 10));
     partner.yearsTogether += 1; partner.age += 1;
   }
 }
@@ -931,7 +931,7 @@ function legacyBeneficiary(state) {
   newbornGrowth(draft, person);
   while (person.age < age) {
     Object.assign(person, advanceGrowth(person, normal(draft)));
-    developSkills(person);
+    developSkills(person, person, null, 1);
     for (const key of CORE) if (key !== 'attractiveness') addStat(person, key, normal(draft) * .06);
     person.age++;
   }

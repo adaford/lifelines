@@ -13,14 +13,14 @@ export const DEVELOPMENT_BALANCE = {
   "innateScale": 0.8,
   "skillReversion": 0.012,
   "childhoodBias": {
-    "intelligence": -0.095658,
-    "strength": -0.018549,
-    "social": -0.085243,
-    "creativity": -0.096566
+    "intelligence": -0.095118,
+    "strength": -0.018873,
+    "social": -0.087305,
+    "creativity": -0.097331
   },
   "wellbeingTarget": {
-    "health": 5.150338,
-    "stability": 4.224217
+    "health": 5.144981,
+    "stability": 4.321297
   },
   "wellbeingReversion": {
     "health": 0.06,
@@ -33,7 +33,10 @@ const number = (value, fallback) => Number.isFinite(value) ? value : fallback;
 const skills = ['intelligence', 'strength', 'social', 'creativity'];
 
 export const TODDLER_FOCUS = { work: 3, social: 2, family: 2, self: 3, creative: 2 };
-export const PARENT_FAMILY_RELATIONSHIP_GAIN = .08;
+// Scale only yearly decision contributions, leaving natural development,
+// aging, and event outcomes independent of the player's allocation.
+export const YEARLY_DECISION_SCALE = .5;
+export const PARENT_FAMILY_RELATIONSHIP_GAIN = .08 * YEARLY_DECISION_SCALE;
 export const TODDLER_ACTIVITY_EFFECTS = {
   work: { strength: .1, social: .055 },
   social: { intelligence: .09, social: -.055 / 3 },
@@ -53,7 +56,7 @@ function practiceResponse(effort, aptitude) {
 // return toward a central wellbeing rating. Missing legacy values are neutral.
 export function wellbeingResponse(person, key, amount) {
   const aptitude = clamp(number(person.aptitudes?.[key], 0), -3, 3);
-  return practiceResponse(amount, aptitude);
+  return YEARLY_DECISION_SCALE * practiceResponse(amount, aptitude);
 }
 
 function toddlerWellbeingPractice(focus) {
@@ -82,7 +85,7 @@ export function infantChoiceEffects(person) {
   const care = .02 * (clamp(number(person.careFocus, 3), 0, 5) - 3);
   for (const skill of skills) {
     const aptitude = clamp(number(person.aptitudes?.[skill], 0), -3, 3);
-    effects[skill] = 1.15 * (practiceResponse(practice[skill] + care, aptitude) - practiceResponse(care, aptitude));
+    effects[skill] = YEARLY_DECISION_SCALE * 1.15 * (practiceResponse(practice[skill] + care, aptitude) - practiceResponse(care, aptitude));
   }
   const level = clamp(number(person.cryLevel, 3), 1, 5);
   effects.health = wellbeingResponse(person, 'health', .06 * ((level - 1) / 4 - .5));
@@ -102,7 +105,7 @@ export function toddlerActivityEffects(person) {
     return [key, Object.fromEntries(Object.entries(coefficients).map(([stat, coefficient]) => {
       if (!skills.includes(stat)) return [stat, wellbeingResponse(person, stat, wellbeing[stat]) - wellbeingResponse(person, stat, withoutWellbeing[stat])];
       const aptitude = clamp(number(person.aptitudes?.[stat], 0), -3, 3);
-      return [stat, 1.15 * (practiceResponse(practice[stat], aptitude) - practiceResponse(without[stat], aptitude))];
+      return [stat, YEARLY_DECISION_SCALE * 1.15 * (practiceResponse(practice[stat], aptitude) - practiceResponse(without[stat], aptitude))];
     }))];
   }));
 }
@@ -113,7 +116,7 @@ export function naturalSkillRating(aptitude = 0) {
 }
 
 // Pure annual means; the engine adds seeded individual variation afterwards.
-export function skillChanges(person, career = null) {
+export function skillChanges(person, career = null, practiceScale = YEARLY_DECISION_SCALE) {
   if (person.alive === false) return Object.fromEntries(skills.map(key => [key, 0]));
   const age = number(person.age, 18);
   const flexibility = age < 18 ? 1.15 : age < 40 ? 1 : age < 60 ? .85 : .65;
@@ -132,12 +135,34 @@ export function skillChanges(person, career = null) {
     const careerPractice = age >= 18 ? .035 * clamp(number(career?.weights?.[key], 0), 0, 1) * focus.work : 0;
     const effort = practice[key] + careerPractice;
     // Aptitude helps improvement and buffers loss without eliminating either.
-    const response = practiceResponse(effort, aptitude);
+    const response = practiceScale * practiceResponse(effort, aptitude);
     const current = number(person.stats?.[key], naturalSkillRating(aptitude));
     const tendency = DEVELOPMENT_BALANCE.skillReversion * (naturalSkillRating(aptitude) - current);
     const eventBias = age < 18 ? number(DEVELOPMENT_BALANCE.childhoodBias[key], 0) : 0;
     return [key, (response + tendency) * flexibility + eventBias];
   }));
+}
+
+// School and college rows isolate one allocation from the other choices.
+// Background development and the rest earned by unused points are excluded.
+export function schoolFocusEffects(person, area) {
+  if (person.alive === false || person.age < 5 || !['work', 'social', 'family', 'self'].includes(area)) return {};
+  const focus = Object.fromEntries(['work', 'social', 'family', 'self'].map(key => [key, clamp(number(person.focus?.[key], 3), 0, 5)]));
+  const baseline = { ...focus, [area]: 3 };
+  const chosenSkills = skillChanges({ ...person, focus });
+  const baselineSkills = skillChanges({ ...person, focus: baseline });
+  const wellbeing = f => person.age < 18 ? {
+    health: .035 * (f.self - 3),
+    stability: -.1 * (f.work - 3) + .07 * (f.self - 3) + .025 * (f.family - 3) + .018 * (f.social - 3),
+  } : {
+    health: .035 * (f.self - 2),
+    stability: -.1 * (f.work - 2) + f.self * .07 + f.family * .025 + f.social * .018,
+  };
+  const chosenWellbeing = wellbeing(focus), baselineWellbeing = wellbeing(baseline);
+  return {
+    ...Object.fromEntries(skills.map(key => [key, chosenSkills[key] - baselineSkills[key]])),
+    ...Object.fromEntries(['health', 'stability'].map(key => [key, wellbeingResponse(person, key, chosenWellbeing[key]) - wellbeingResponse(person, key, baselineWellbeing[key])])),
+  };
 }
 
 // Wellbeing varies around a middle rating while natural resilience shapes its
