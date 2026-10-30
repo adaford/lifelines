@@ -191,14 +191,15 @@ test('legacy journal and review text hides signed changes and tutorial suffixes 
 });
 
 test('event outcomes put each person on a separate line in the review and journal', async () => {
-  const fixture = ageTo(createGame({ seed: 78123 }), 1);
+  const fixture = ageTo(createGame({ surname: 'St. Clair', seed: 78123 }), 1);
   const dad = fixture.parents.find(parent=>parent.role==='Dad') || fixture.parents[1];
   const entry = { title: `${dad.name}: Tired days after broken nights`, text: `Your mental stability 5.2 → 5; ${dad.name}: Mental stability 6.3 → 6; ${dad.name}: Health 7.1 → 7.`, kind: 'negative' };
   fixture.history[0] = { ...fixture.history[0], ...entry };
   fixture.yearSummary.events = [entry];
   fixture.yearSummary.dismissed = false;
   const ui = await mount(fixture);
-  const paragraphs = [ui.query('.year-review-events li p'), ui.query('.journal-entry p')];
+  assert.equal(ui.query('.year-event-description').textContent, `${dad.name} (Dad) struggles to rest, leaving you both unsettled.`, 'a period in a family name does not truncate its explanation');
+  const paragraphs = [ui.query('.year-review-events .year-event-results'), ui.query('.journal-entry p')];
   for (const paragraph of paragraphs) {
     const lines = paragraph.innerHTML.split('<br>');
     assert.equal(lines.length, 2, 'one line per person, not one line per stat');
@@ -207,6 +208,44 @@ test('event outcomes put each person on a separate line in the review and journa
     assert.match(lines[1], /Mental stability 6\.3 → 6\.0; .*Health 7\.1 → 7\.0/);
   }
   assert.deepEqual(ui.saved(), fixture, 'line breaks do not rewrite event history or ratings');
+});
+
+test('year reviews show one saved explanation while journals retain only titles and results', async () => {
+  const fixture = ageTo(createGame({ seed: 78123 }), 1);
+  const dad = fixture.parents[1];
+  const entry = { title: 'A difficult night', description: `${dad.name} could not sleep after a <loud> storm. The morning was difficult.`, text: `Your mental stability 5.2 → 5; ${dad.name}: Mental stability 6.3 → 6.`, kind: 'negative' };
+  fixture.history = [{ ...fixture.history[0], ...entry }];
+  fixture.yearSummary.events = [entry];
+  fixture.yearSummary.dismissed = false;
+  const ui = await mount(fixture);
+  assert.equal(ui.query('.year-event-description').textContent, `${dad.name} (Dad) could not sleep after a <loud> storm.`);
+  assert.equal(ui.all('.year-event-description loud').length, 0, 'saved prose is escaped');
+  assert.doesNotMatch(ui.query('.year-review-events').textContent, /The morning was difficult/);
+  assert.match(ui.query('.year-event-results').textContent, /5\.2 → 5\.0/);
+  assert.doesNotMatch(ui.query('.journal-list').textContent, /storm|morning was difficult/);
+  assert.match(ui.query('.journal-list').textContent, /A difficult night.*5\.2 → 5\.0/);
+  assert.deepEqual(ui.saved(), fixture, 'adding review context changes neither saved history nor RNG');
+  const reloaded = await mount(ui.saved());
+  assert.equal(reloaded.query('.year-event-description').textContent, `${dad.name} (Dad) could not sleep after a <loud> storm.`);
+});
+
+test('older catalog events gain review context without restoring journal flavor or duplicating choices', async () => {
+  for (const choice of [false, true]) {
+    const fixture = ageTo(createGame({ seed: 78123 }), 1);
+    const event = EVENTS.find(event => event.id === (choice ? 'broken_tablet' : 'broken_bone'));
+    const text = choice ? event.description : `${event.description} Your health 5 → 4.4. Temporary effects: 1 year.`;
+    const entry = { title: event.name, text, kind: choice ? 'choice' : 'negative' };
+    fixture.history = [{ ...fixture.history[0], ...entry }];
+    fixture.yearSummary.events = [entry];
+    fixture.yearSummary.dismissed = false;
+    const ui = await mount(fixture);
+    assert.equal(ui.query('.year-event-description').textContent, event.description);
+    assert.equal(ui.all('.year-event-description').length, 1);
+    assert.doesNotMatch(ui.query('.journal-list').textContent, choice ? /tablet stops working/ : /means less active play/);
+    if (choice) assert.equal(ui.query('.year-event-results').textContent, 'Choice offered.');
+    else assert.match(ui.query('.year-event-results').textContent, /Your health 5\.0 → 4\.4.*1 year/);
+    assert.deepEqual(ui.saved(), fixture);
+  }
 });
 
 test('first launch accepts a blank surname and preserves supplied multiword names', async () => {

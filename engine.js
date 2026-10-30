@@ -1,19 +1,19 @@
 // Lifelines: deterministic, browser-independent simulation rules.
 // All public actions mutate their state and return { ok, reason? }.
-import { JOBS } from './jobs.js?v=zero-care-1';
-import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=zero-care-1';
-import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=zero-care-1';
-import { mortalityRisk, rollMortality } from './mortality.js?v=zero-care-1';
-import { heightReference, advanceGrowth } from './growth.js?v=zero-care-1';
-import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=zero-care-1';
-import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, DEVELOPMENT_BALANCE, BIRTH_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN } from './development.js?v=zero-care-1';
-import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=zero-care-1';
-import { normalPercentile } from './percentiles.js?v=zero-care-1';
+import { JOBS } from './jobs.js?v=review-context-1';
+import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=review-context-1';
+import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=review-context-1';
+import { mortalityRisk, rollMortality } from './mortality.js?v=review-context-1';
+import { heightReference, advanceGrowth } from './growth.js?v=review-context-1';
+import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=review-context-1';
+import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, DEVELOPMENT_BALANCE, BIRTH_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN } from './development.js?v=review-context-1';
+import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=review-context-1';
+import { normalPercentile } from './percentiles.js?v=review-context-1';
 export { DEVELOPMENT_BALANCE };
-export { heightPercentile } from './growth.js?v=zero-care-1';
-export { mortalityRisk } from './mortality.js?v=zero-care-1';
-import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=zero-care-1';
-export { JOBS, JOB_CATEGORIES } from './jobs.js?v=zero-care-1';
+export { heightPercentile } from './growth.js?v=review-context-1';
+export { mortalityRisk } from './mortality.js?v=review-context-1';
+import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=review-context-1';
+export { JOBS, JOB_CATEGORIES } from './jobs.js?v=review-context-1';
 export const EVENTS = [...PERSONAL_EVENTS, ...FAMILY_EVENTS];
 
 export const SKILLS = [
@@ -84,8 +84,8 @@ function useFamilyName(person, familyName) {
   person.name = `${firstName.slice(0, 49 - familyName.length)} ${familyName}`;
   return person;
 }
-function log(state, title, text, kind = 'neutral') {
-  state.history.unshift({ id: uid(state, 'memory'), age: state.age, generation: state.generation, title, text, kind });
+function log(state, title, text, kind = 'neutral', description) {
+  state.history.unshift({ id: uid(state, 'memory'), age: state.age, generation: state.generation, title, text, kind, ...(description === undefined ? {} : { description }) });
   state.history = state.history.slice(0, 500);
 }
 function addStat(person, key, amount) { person.stats[key] = round(clamp(person.stats[key] + amount, 0, 10)); }
@@ -628,7 +628,10 @@ function applyOutcome(state, event, outcome = event, context = {}) {
     .filter(([, max]) => max < 5)
     .map(([key, max]) => `${focusLabel(state, key)} max ${max}`);
   const restrictions = limits.length ? ` ${limits.join('; ')}.` : '';
-  log(state, `${context.subjectId ? `${subject.name}: ` : ''}${event.name}`, `${decision}${result}${restrictions}${duration}`, event.kind);
+  // Keep the event context separate from the concise journal outcome. The year
+  // review can explain what happened without restoring flavor to saved results.
+  const eventDescription = event.description.replaceAll('{name}', subject?.name || 'Your family member');
+  log(state, `${context.subjectId ? `${subject.name}: ` : ''}${event.name}`, `${decision}${result}${restrictions}${duration}`, event.kind, eventDescription);
 }
 
 function ensureCare(state, finalChildhoodTurn = false) {
@@ -844,7 +847,8 @@ export function advanceYear(state, { mortalityRandom, growthRandom, parentCareer
     if (event.choices?.length) {
       state.pendingEvents.push({ eventId: event.id, age: state.age, ...context });
       const subject = pendingEventSubject(state, context);
-      log(state, roll.name, event.description.replaceAll('{name}', subject.name), 'choice');
+      const description = event.description.replaceAll('{name}', subject.name);
+      log(state, roll.name, description, 'choice', description);
     } else applyOutcome(state, event, event, context);
   }
   selected = completed;
@@ -881,7 +885,7 @@ export function advanceYear(state, { mortalityRandom, growthRandom, parentCareer
     state.ended = false;
     if (state.alive) log(state, 'Time for the next chapter', 'You retire at 85.', 'milestone');
   }
-  state.yearSummary = { ...yearChanges(before, state), decisions, events: state.history.filter(memory => !oldMemories.has(memory.id)).map(({ title, text, kind }) => ({ title, text, kind })), dismissed: false };
+  state.yearSummary = { ...yearChanges(before, state), decisions, events: state.history.filter(memory => !oldMemories.has(memory.id)).map(({ title, text, kind, description }) => ({ title, text, kind, ...(description === undefined ? {} : { description }) })), dismissed: false };
   return { ok: true, eventId: selected[0]?.eventId || selected[0]?.id || null, eventIds: [...state.lastYearEvents] };
 }
 
@@ -1050,7 +1054,7 @@ function validSchema(raw, version) {
         }
       }
       if (summary?.height !== undefined && (!finite(summary.height.before, heightBound(40), heightBound(240)) || !finite(summary.height.after, heightBound(40), heightBound(240)) || !finite(summary.height.change, 0, heightBound(200)) || Math.abs(round(summary.height.after - summary.height.before) - summary.height.change) > .001)) return false;
-      if (summary !== null && (!summary || typeof summary.dismissed !== 'boolean' || summary.toAge !== raw.age || summary.fromAge !== raw.age - 1 || !summary.stats || Object.keys(summary.stats).length !== STAT_KEYS.length || !STAT_KEYS.every(key => validDelta(summary.stats[key])) || !validDelta(summary.lifestyle) || !Array.isArray(summary.parents) || summary.parents.length > (version >= 15 ? 3 : 2) || !summary.parents.every(parent => text(parent.id, 100) && text(parent.name, 50) && validDelta(parent.stability) && validDelta(parent.relationship) && (parent.lifestyle === undefined || validDelta(parent.lifestyle))) || !Array.isArray(summary.events) || summary.events.length > 30 || !summary.events.every(event => text(event.title, 200) && text(event.text, 2000) && text(event.kind, 50)))) return false;
+      if (summary !== null && (!summary || typeof summary.dismissed !== 'boolean' || summary.toAge !== raw.age || summary.fromAge !== raw.age - 1 || !summary.stats || Object.keys(summary.stats).length !== STAT_KEYS.length || !STAT_KEYS.every(key => validDelta(summary.stats[key])) || !validDelta(summary.lifestyle) || !Array.isArray(summary.parents) || summary.parents.length > (version >= 15 ? 3 : 2) || !summary.parents.every(parent => text(parent.id, 100) && text(parent.name, 50) && validDelta(parent.stability) && validDelta(parent.relationship) && (parent.lifestyle === undefined || validDelta(parent.lifestyle))) || !Array.isArray(summary.events) || summary.events.length > 30 || !summary.events.every(event => text(event.title, 200) && text(event.text, 2000) && text(event.kind, 50) && (event.description === undefined || text(event.description, 1000))))) return false;
     }
     if (!Array.isArray(raw.parents) || raw.parents.length > 2 || !raw.parents.every(person => validPerson(person) && validLivingAge(person) && (!person.alive || person.age > raw.age))) return false;
     if (version >= 7 && !raw.parents.every(person => finite(person.relationship, ratingFloor, 10))) return false;
@@ -1121,7 +1125,7 @@ function validSchema(raw, version) {
         return !pending.subjectType && !pending.subjectId && raw.age - 1 >= event.minAge && raw.age - 1 <= (event.maxAge ?? 85);
       })) return false;
     }
-    if (!Array.isArray(raw.history) || raw.history.length > 500 || !raw.history.every(memory => text(memory.id, 100) && finite(memory.age, 0, 85) && finite(memory.generation, 1, 100000) && text(memory.title, 200) && text(memory.text, 2000) && text(memory.kind, 50))) return false;
+    if (!Array.isArray(raw.history) || raw.history.length > 500 || !raw.history.every(memory => text(memory.id, 100) && finite(memory.age, 0, 85) && finite(memory.generation, 1, 100000) && text(memory.title, 200) && text(memory.text, 2000) && text(memory.kind, 50) && (memory.description === undefined || text(memory.description, 1000)))) return false;
     if (!Array.isArray(raw.lineage) || !raw.lineage.every(person => validPerson(person) && validGeneration(person.generation) && typeof person.alive === 'boolean' && validLifestyle(person.lifestyle) && finite(person.money, 0, 1e15) && finite(person.estate, 0, 1e15) && finite(person.share, 0, 1e15) && Array.isArray(person.children) && person.children.length <= 6 && person.children.every(child => child && text(child.id, 100) && text(child.name, 50) && finite(child.inheritance, 0, 1e15)))) return false;
     if (raw.needsSuccession && ((raw.age < 85 && (version < 7 || raw.alive)) || raw.ended || version < 6 && !raw.children.some(child => child.alive !== false && child.age < 85))) return false;
     if (version >= 6 && raw.ended) return false;

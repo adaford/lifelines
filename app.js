@@ -5,11 +5,11 @@ import {
   offeredJobs, needsEducationChoice, pendingEventSubject, focusLimits, focusLimitDetails, caregivers,
   relationshipOdds, meetingChances, proposalChance, pregnancyChance, oneNightChance,
   respondToEncounter, proposeMarriage, endRelationship, normalizeSurname, heightPercentile, statPercentiles
-} from './engine.js?v=zero-care-1';
-import { annotateNarrative } from './narrative.js?v=zero-care-1';
-import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome } from './display.js?v=zero-care-1';
+} from './engine.js?v=review-context-1';
+import { annotateNarrative } from './narrative.js?v=review-context-1';
+import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome } from './display.js?v=review-context-1';
 
-import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts } from './choice-impacts.js?v=zero-care-1';
+import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts } from './choice-impacts.js?v=review-context-1';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const app = document.querySelector('#app');
@@ -330,7 +330,23 @@ function completedEventCopy(entry) {
 }
 function yearEventsView(summary) {
   const events = (summary.events || []).filter(event => !isNoEventEntry(event));
-  return `<details class="year-review-events" open><summary>Events</summary>${events.length?`<ul>${events.map(event=>`<li><strong>${journalText(completedEventCopy(event).title,summary.toAge)}</strong><p>${eventOutcomeText(completedEventCopy(event).text,summary.toAge)}</p></li>`).join('')}</ul>`:'<p>None</p>'}</details>`;
+  return `<details class="year-review-events" open><summary>Events</summary>${events.length?`<ul>${events.map(event=>{
+    const copy = completedEventCopy(event);
+    const description = reviewEventDescription(event);
+    const result = event.kind==='choice' && description ? 'Choice offered.' : copy.text;
+    return `<li><strong>${journalText(copy.title,summary.toAge)}</strong>${description?`<p class="year-event-description">${narrativeText(description,summary.toAge)}</p>`:''}<p class="year-event-results">${eventOutcomeText(result,summary.toAge)}</p></li>`;
+  }).join('')}</ul>`:'<p>None</p>'}</details>`;
+}
+
+function reviewEventDescription(entry) {
+  const event = EVENTS.find(event=>entry.title===event.name || entry.title.endsWith(`: ${event.name}`));
+  const subject = event && entry.title!==event.name ? entry.title.slice(0,-event.name.length-2) : 'Your family member';
+  const source = entry.description || event?.description?.replaceAll('{name}',subject) || '';
+  // Saved context also covers events created during play, such as adoption.
+  // Catalog lookup lets existing reviews gain context without rewriting saves.
+  const template = event ? source.replaceAll(subject,'{name}') : source;
+  const sentence = template.match(/^.*?[.!?](?=\s|$)/s)?.[0] || template;
+  return sentence.replaceAll('{name}',subject).trim();
 }
 
 function eventOutcomeText(text, age) {
