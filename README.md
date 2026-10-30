@@ -111,7 +111,7 @@ npm ci
 npm test
 ```
 
-The grouped relative-effects and stat-emoji update passes all **242 tests**, including **65 DOM checks**, after `npm ci` on Node **24.14.0**. All **18 local HTTP assets** returned 200 and matched disk. The 4,000-life reference was regenerated and development balance refitted after the infant changes. Schema 11 and existing saved ratings remain unchanged. A real-browser phone-layout check could not be completed because the browser access host is unavailable; DOM checks do not establish visual verification. Deployment verification is pending. The prior readability release (`5541cb8`) was successfully deployed to GitHub Pages.
+The grouped relative-effects and stat-emoji update passes all **242 tests**, including **65 DOM checks**, after `npm ci` on Node **24.14.0**. All **18 local HTTP assets** returned 200 and matched disk. The 4,000-life reference was regenerated and development balance refitted after the infant changes. Schema 11 and existing saved ratings remain unchanged. A real-browser phone-layout check could not be completed because the browser access host is unavailable; DOM checks do not establish visual verification. GitHub Pages build and deploy jobs succeeded for gameplay commit **80285d1** (workflow run **41049209978**); all **18 live HTTP assets** returned 200 and matched the committed files. The prior readability release (`5541cb8`) was successfully deployed to GitHub Pages.
 
 ## Source and deployment
 
