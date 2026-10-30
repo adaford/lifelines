@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises';
 import { afterEach, describe, test } from 'node:test';
 import { parseHTML } from 'linkedom';
 import { toLegacyCentimeters } from './helpers/legacy-height.js';
+import { choiceImpacts } from '../choice-impacts.js';
 import { SKILLS, JOBS, EVENTS, resolveEventChoice, eventOdds, canTakeJob, chooseEducation, offeredJobs, needsEducationChoice, createGame, advanceYear, annualForecast, haveChild, takeJob, successionInfo, succeed, validateSave, respondToEncounter, proposeMarriage, effectiveStats, relationshipOdds, proposalChance, statPercentiles } from '../engine.js';
 
 const SAVE_KEY = 'lifelines.save.v1';
@@ -376,6 +377,7 @@ test('aging losses show in the choices list and parents keep their explicit fami
   const impact=ui.query('.choice-impact[data-stat="attractiveness"]:not([data-parent-id])');
   assert.equal(ui.query('.status-strip [data-stat="attractiveness"] .status-value').firstChild.textContent,'8.0');
   assert.equal(impact.dataset.direction,'decrease');
+  assert.equal(impact.dataset.level,'1','a background loss identical for every focus option has no stronger relative rank');
   assert.match(impact.textContent,/-{1,3}\s*Attractiveness/);
   ui.click('.nav-list [data-tab="family"]');
   assert.equal(ui.query(`.roots-panel [data-person-id="${fixture.parents[0].id}"] .eyebrow`).textContent,'Mom');
@@ -1800,8 +1802,9 @@ test('parent ratings stay numeric while crying updates their separate choice imp
     ui.click(`[data-action="baby"][data-level="${level}"]`);
     assertChoiceImpacts(ui);
     for(const parent of fixture.parents) {
-      const stability=ui.query(`.choice-impact[data-parent-id="${parent.id}"][data-stat="stability"]`);
-      assert.equal(stability.querySelector('b').textContent,['+','0','-','--','---'][level-1]);
+      const stability=ui.document.querySelector(`.choice-impact[data-parent-id="${parent.id}"][data-stat="stability"]`);
+      if(level===2) assert.equal(stability,null,'zero parent stability effects are omitted');
+      else assert.equal(stability.querySelector('b').textContent,['+',null,'-','--','---'][level-1]);
       const effects=ui.all(`.choice-impact[data-parent-id="${parent.id}"][data-stat="relationship"]`);
       assert.equal(effects.length,level===3?0:1,'zero routine relationship changes are omitted');
       if(effects.length) assert.equal(effects[0].dataset.direction,level<3?'decrease':'increase');
@@ -1847,32 +1850,28 @@ test('parent effects do not cancel each other and remembered parents have no for
 });
 
 function assertChoiceImpacts(ui) {
-  const state=ui.saved(), forecast=annualForecast(state);
-  const expected=[...Object.entries(forecast.stats),['lifestyle',forecast.lifestyle]]
-    .filter(([,value])=>value.change!==0).map(([key,value])=>({key,change:value.change}));
-  for(const parent of forecast.parents) {
-    if(state.parents.find(person=>person.id===parent.id)?.alive===false) continue;
-    for(const key of ['stability','relationship','lifestyle']) {
-      if(parent[key]?.change || state.age<2&&key==='stability') expected.push({key,change:parent[key].change,parentId:parent.id});
-    }
-  }
+  const state=ui.saved(), expected=choiceImpacts(state);
   assert.equal(ui.all('.focus-panel .choice-impact-summary').length,1);
   assert.equal(ui.query('.choice-impact-summary').getAttribute('aria-label'),'Expected changes');
-  assert.equal(ui.all('.choice-impact-list .choice-impact').length,expected.length,'net routine changes and neutral infant parent stability appear once');
-  for(const {key,change,parentId} of expected) {
+  assert.equal(ui.all('.choice-impact-list .choice-impact').length,expected.length,'each nonzero expected effect appears once');
+  const groups=[['you','You'],['others','Other people'],['relationships','Relationships']]
+    .filter(([group])=>expected.some(entry=>entry.group===group));
+  assert.deepEqual(ui.all('.choice-impact-group').map(group=>group.dataset.impactGroup),groups.map(([key])=>key),'only nonempty groups appear in the requested order');
+  assert.deepEqual(ui.all('.choice-impact-group h5').map(heading=>heading.textContent),groups.map(([,label])=>label));
+  for(const {stat:key,change,parentId,level,group} of expected) {
     const selector=`.choice-impact[data-stat="${key}"]${parentId?`[data-parent-id="${parentId}"]`:':not([data-parent-id])'}`;
     const entries=ui.all(selector);
     assert.equal(entries.length,1,`${key} has one net impact for ${parentId||'player'}`);
     const entry=entries[0];
-    const direction=change===0?'steady':change>0?'increase':'decrease';
+    assert.equal(entry.closest('.choice-impact-group').dataset.impactGroup,group);
+    assert.notEqual(change,0,'zero effects are not shown');
+    const direction=change>0?'increase':'decrease';
     assert.equal(entry.dataset.direction,direction);
-    const magnitude=Math.abs(change);
-    const level=change===0?0:state.age<2&&parentId&&key==='stability'?(magnitude>=1.5?3:magnitude>=.9?2:1):(magnitude>=.3?3:magnitude>=.15?2:1);
     assert.equal(Number(entry.dataset.level),level);
-    assert.equal(entry.querySelector('b').textContent,change===0?'0':(change>0?'+':'-').repeat(level));
+    assert.equal(entry.querySelector('b').textContent,(change>0?'+':'-').repeat(level));
     const spoken=entry.querySelector('[role="img"]');
     assert.ok(spoken,'the signed impact has an accessible description');
-    assert.match(spoken.getAttribute('aria-label'),change===0?/steady/:new RegExp(`(?:small|medium|large).*${direction}`));
+    assert.match(spoken.getAttribute('aria-label'),new RegExp(`(?:small|medium|large).*${direction}`));
     assert.doesNotMatch(entry.textContent,/[+\u2212-]\d|\+{4}|-{4}|\u2192/,'forecasts use qualitative signs without numerical deltas');
     if(parentId) assert.match(entry.textContent,/Dad|Mom|Parent/);
   }
@@ -1922,17 +1921,112 @@ test('rating bars distinguish low and high values and preserve displayed ratings
   assert.deepEqual(ui.saved(),before);
 });
 
-test('crying parent stability signs respect capped ratings and retain neutral effects', async () => {
+test('crying parent stability signs hide effects blocked by rating bounds', async () => {
   const fixture=createGame({seed:121});
   fixture.parents[0].stats.stability=10;
   fixture.parents[1].stats.stability=1;
   const ui=await mount(fixture),before=ui.saved();
   ui.click('[data-action="baby"][data-level="1"]');
   assertChoiceImpacts(ui);
-  assert.equal(ui.query(`.choice-impact[data-parent-id="${fixture.parents[0].id}"][data-stat="stability"] b`).textContent,'0','a parent at the ceiling cannot gain more stability');
+  assert.equal(ui.all(`.choice-impact[data-parent-id="${fixture.parents[0].id}"][data-stat="stability"]`).length,0,'a parent at the ceiling cannot gain more stability');
   ui.click('[data-action="baby"][data-level="5"]');
   assertChoiceImpacts(ui);
-  assert.equal(ui.query(`.choice-impact[data-parent-id="${fixture.parents[1].id}"][data-stat="stability"] b`).textContent,'0','a parent at the floor cannot lose more stability');
+  assert.equal(ui.all(`.choice-impact[data-parent-id="${fixture.parents[1].id}"][data-stat="stability"]`).length,0,'a parent at the floor cannot lose more stability');
   assert.deepEqual(ui.saved().parents,before.parents);
+  assert.equal(ui.saved().rng,before.rng);
+});
+
+test('crying ranks intelligence and mental stability by the available levels, without strength effects', async () => {
+  for(const age of [0,1]) for(const [rating,aptitude] of [[2.2,-3],[8.8,3]]) {
+    const fixture=ageTo(createGame({seed:121}),age);
+    fixture.stats.intelligence=rating;
+    fixture.stats.stability=rating;
+    fixture.aptitudes.intelligence=aptitude;
+    const ui=await mount(fixture),before=ui.saved();
+    for(const level of [1,2,3,4,5]) {
+      ui.click(`[data-action="baby"][data-level="${level}"]`);
+      assertChoiceImpacts(ui);
+      for(const stat of ['intelligence','stability']) {
+        const impact=ui.query(`.choice-impact[data-stat="${stat}"]:not([data-parent-id])`);
+        assert.equal(impact.querySelector('b').textContent,['--','-','+','++','+++'][level-1],`${stat} compares cry choices regardless of starting rating or absolute gain`);
+        assert.equal(impact.closest('.choice-impact-group').dataset.impactGroup,'you');
+      }
+      assert.equal(ui.all('.choice-impact[data-stat="strength"]:not([data-parent-id])').length,0,'crying does not change strength');
+      assert.equal(ui.all('.choice-impact[data-level="0"], .choice-impact[data-direction="steady"]').length,0);
+    }
+    assert.deepEqual(ui.saved().stats,before.stats);
+    assert.deepEqual(ui.saved().parents,before.parents);
+    assert.equal(ui.saved().rng,before.rng);
+    assert.equal(ui.saved().age,age);
+  }
+});
+
+test('expected changes separate personal stats, other people and relationships, omitting empty groups', async () => {
+  const fixture=createGame({seed:121});
+  fixture.parents.forEach(parent=>{parent.stats.stability=7;parent.relationship=7;});
+  const ui=await mount(fixture),before=ui.saved();
+  ui.click('[data-action="baby"][data-level="5"]');
+  assert.deepEqual(ui.all('.choice-impact-group h5').map(heading=>heading.textContent),['You','Other people','Relationships']);
+  for(const entry of ui.all('.choice-impact-group[data-impact-group="you"] .choice-impact')) assert.equal(entry.hasAttribute('data-parent-id'),false);
+  for(const entry of ui.all('.choice-impact-group[data-impact-group="others"] .choice-impact')) {
+    assert.ok(entry.hasAttribute('data-parent-id'));
+    assert.notEqual(entry.dataset.stat,'relationship');
+  }
+  for(const entry of ui.all('.choice-impact-group[data-impact-group="relationships"] .choice-impact')) {
+    assert.ok(entry.hasAttribute('data-parent-id'));
+    assert.equal(entry.dataset.stat,'relationship');
+  }
+  ui.click('[data-action="baby"][data-level="3"]');
+  assert.equal(ui.all('.choice-impact-group[data-impact-group="relationships"]').length,0,'neutral relationships leave no empty heading or list');
+  assert.deepEqual(ui.saved().stats,before.stats);
+  assert.deepEqual(ui.saved().parents,before.parents);
+  assert.equal(ui.saved().rng,before.rng);
+});
+
+test('zero personal effects at rating limits are omitted without changing remaining relative signs', async () => {
+  const fixture=createGame({seed:121});
+  fixture.stats.intelligence=10;
+  fixture.stats.stability=1;
+  const ui=await mount(fixture);
+  ui.click('[data-action="baby"][data-level="5"]');
+  assert.equal(ui.all('.choice-impact[data-stat="intelligence"]:not([data-parent-id])').length,0);
+  assert.equal(ui.query('.choice-impact[data-stat="stability"]:not([data-parent-id]) b').textContent,'+++');
+  ui.click('[data-action="baby"][data-level="1"]');
+  assert.equal(ui.all('.choice-impact[data-stat="stability"]:not([data-parent-id])').length,0);
+  assert.equal(ui.query('.choice-impact[data-stat="intelligence"]:not([data-parent-id]) b').textContent,'--');
+  assert.equal(ui.saved().rng,fixture.rng);
+  assert.deepEqual(ui.saved().stats,fixture.stats);
+});
+
+test('activity signs compare possible allocations rather than fixed numerical gains', async () => {
+  const maximumGains=[];
+  for(const aptitude of [-3,3]) {
+    const fixture=ageTo(createGame({seed:121}),3);
+    fixture.aptitudes.strength=aptitude;
+    fixture.stats.strength=5+.8*aptitude;
+    fixture.focus={work:5,social:0,family:0,self:0,creative:0};
+    const ui=await mount(fixture),before=ui.saved();
+    maximumGains.push(annualForecast(before).stats.strength.change);
+    assert.equal(ui.query('.choice-impact[data-stat="strength"]:not([data-parent-id]) b').textContent,'+++','maximum Play has the strongest relative strength effect for either aptitude');
+    ui.click('[data-action="focus"][data-key="work"][data-delta="-1"]');
+    assert.equal(ui.query('.choice-impact[data-stat="strength"]:not([data-parent-id]) b').textContent,'++','one fewer Play point has a smaller relative effect');
+    assert.deepEqual(ui.saved().stats,before.stats);
+    assert.equal(ui.saved().rng,before.rng);
+  }
+  assert.ok(maximumGains[0]<.15 && maximumGains[1]>.3,'the same signs span the former small and large absolute thresholds');
+});
+
+test('infant changes respect displayed limits from retained temporary modifiers', async () => {
+  const fixture=createGame({seed:121});
+  fixture.stats.intelligence=9;
+  fixture.stats.stability=2;
+  fixture.effects=[{id:'temporary',name:'Temporary effects',description:'Test effects.',years:2,modifiers:{intelligence:2,stability:-2},kind:'neutral'}];
+  const ui=await mount(fixture),before=ui.saved();
+  ui.click('[data-action="baby"][data-level="5"]');
+  assert.equal(ui.all('.choice-impact[data-stat="intelligence"]:not([data-parent-id])').length,0,'a retained boost blocks gains beyond displayed 10');
+  ui.click('[data-action="baby"][data-level="1"]');
+  assert.equal(ui.all('.choice-impact[data-stat="stability"]:not([data-parent-id])').length,0,'a retained penalty blocks losses below displayed 1');
+  assert.deepEqual(ui.saved().effects,before.effects);
+  assert.deepEqual(ui.saved().stats,before.stats);
   assert.equal(ui.saved().rng,before.rng);
 });

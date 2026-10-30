@@ -135,12 +135,43 @@ test('crying previews respect parent rating bounds and remembered parents', () =
   }
 });
 
+test('infant crying supports intelligence and mental stability without training strength', () => {
+  for (const age of [0, 1]) {
+    const changes = [];
+    for (let level = 1; level <= 5; level++) {
+      const state = createGame({ seed: 57 });
+      state.age = age;
+      for (const key of Object.keys(state.stats)) state.stats[key] = 5;
+      for (const key of Object.keys(state.aptitudes)) state.aptitudes[key] = 0;
+      setCryLevel(state, level);
+      const before = copy(state);
+      const forecast = annualForecast(state);
+      assert.deepEqual(state, before, 'the complete mean forecast is pure');
+      changes.push(forecast.stats);
+      for (const key of ['intelligence', 'stability']) {
+        assert.ok(level <= 2 ? forecast.stats[key].change < 0 : forecast.stats[key].change > 0,
+          `age ${age}, cry ${level}: ${key} follows the low/high crying choice`);
+      }
+      assert.equal(advanceYear(state, { ...meanYear, parentCareerRandom: () => 1 }).ok, true);
+      assert.deepEqual(state.lastYearEvents, [], 'the fixture isolates routine means');
+      for (const key of ['intelligence', 'stability', 'strength']) {
+        assert.equal(state.stats[key], forecast.stats[key].after, `${key} actual mean agrees with preview`);
+      }
+    }
+    for (let index = 1; index < changes.length; index++) {
+      assert.ok(changes[index].intelligence.change > changes[index - 1].intelligence.change);
+      assert.ok(changes[index].stability.change > changes[index - 1].stability.change);
+      assert.equal(changes[index].strength.change, changes[0].strength.change, 'crying never changes strength development');
+    }
+  }
+});
+
 test('annual development varies around the pure mean forecast and is reproducible from a saved seed', () => {
   const template = createGame({ seed: 76 });
   template.aptitudes.intelligence = 0;
   template.stats.intelligence = 5;
   template.parents.forEach(parent => { parent.stats.stability = 7; parent.relationship = 7; });
-  setCryLevel(template, 5);
+  setCryLevel(template, 3);
   const beforePreview = copy(template);
   const forecast = annualForecast(template);
   assert.deepEqual(annualForecast(template), forecast);

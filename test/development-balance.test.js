@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { naturalSkillRating, skillChanges, childhoodWellbeing, TODDLER_FOCUS } from '../development.js';
+import { naturalSkillRating, skillChanges, childhoodWellbeing, infantChoiceEffects, TODDLER_FOCUS } from '../development.js';
 import { createGame, advanceYear, resolveEventChoice, EVENTS, effectiveStats } from '../engine.js';
 import { eventChances } from '../events.js';
 
@@ -95,6 +95,36 @@ test('childhood wellbeing recovers toward its usual range while choices still ma
   assert.deepEqual(childhoodWellbeing({ ...child, age: 18 }), { health: 0, stability: 0 });
   assert.deepEqual(childhoodWellbeing({ ...child, alive: false }), { health: 0, stability: 0 });
   assert.deepEqual(child.stats, { health: 5, stability: 5 });
+});
+
+test('crying choice effects isolate the selected level from background development and care', () => {
+  for (const age of [0, 1]) for (const aptitude of [-3, 0, 3]) for (const careFocus of [1, 3, 5]) {
+    const baby = { age, alive: true, careFocus,
+      stats: { intelligence: 2, strength: 8, social: 4, creativity: 7, health: 9, stability: 2 },
+      aptitudes: { intelligence: aptitude, strength: aptitude, social: aptitude, creativity: aptitude } };
+    const before = structuredClone(baby);
+    const levels = Array.from({ length: 5 }, (_, index) => ({ ...baby, cryLevel: index + 1 }));
+    const choices = levels.map(infantChoiceEffects);
+    for (let index = 0; index < choices.length; index++) {
+      const effect = choices[index];
+      assert.equal(effect.strength, 0);
+      for (const key of ['intelligence', 'stability']) assert.ok(index < 2 ? effect[key] < 0 : effect[key] > 0);
+      if (index === 0) continue;
+      assert.ok(effect.intelligence > choices[index - 1].intelligence);
+      assert.ok(effect.stability > choices[index - 1].stability);
+      for (const key of ['intelligence', 'strength', 'social', 'creativity']) {
+        const annualDifference = skillChanges(levels[index])[key] - skillChanges(levels[0])[key];
+        assert.ok(Math.abs(annualDifference - (effect[key] - choices[0][key])) < 1e-10,
+          `${key} preview isolates exactly the effect used in the annual mean`);
+      }
+      const annualDifference = childhoodWellbeing(levels[index]).stability - childhoodWellbeing(levels[0]).stability;
+      assert.ok(Math.abs(annualDifference - (effect.stability - choices[0].stability)) < 1e-10);
+    }
+    assert.deepEqual(baby, before, 'reading choice effects is pure');
+    for (const inactive of [{ ...baby, age: 2 }, { ...baby, alive: false }]) {
+      assert.ok(Object.values(infantChoiceEffects(inactive)).every(effect => effect === 0));
+    }
+  }
 });
 
 test('toddler play, electronics and crafts have distinct development effects', () => {

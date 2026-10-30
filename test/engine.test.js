@@ -190,11 +190,12 @@ test('one click advances one year, toddler activities start at two, school at fi
   assert.equal(setBabyChoice(state, 'cry').ok, false);
 });
 
-test('crying improves development more but stresses both parents', () => {
+test('crying improves non-physical development more but stresses both parents', () => {
   const cry = createGame({ seed: 3 }), quiet = copy(cry);
   setBabyChoice(cry, 'cry'); setBabyChoice(quiet, 'quiet');
   advanceYear(cry); advanceYear(quiet);
-  for (const skill of SKILLS.filter(skill => skill.key !== 'attractiveness')) assert.ok(cry.stats[skill.key] > quiet.stats[skill.key]);
+  for (const key of ['intelligence', 'social', 'creativity', 'stability']) assert.ok(cry.stats[key] > quiet.stats[key]);
+  assert.equal(cry.stats.strength, quiet.stats.strength, 'crying does not train strength');
   assert.equal(cry.stats.attractiveness, quiet.stats.attractiveness);
   for (let i = 0; i < 2; i++) assert.ok(cry.parents[i].stats.stability < quiet.parents[i].stats.stability);
 });

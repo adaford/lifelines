@@ -13,14 +13,14 @@ export const DEVELOPMENT_BALANCE = {
   "innateScale": 0.8,
   "skillReversion": 0.012,
   "childhoodBias": {
-    "intelligence": -0.034749,
-    "strength": -0.006114,
-    "social": -0.034802,
-    "creativity": -0.033537
+    "intelligence": -0.038027,
+    "strength": -0.006223,
+    "social": -0.034754,
+    "creativity": -0.033157
   },
   "wellbeingTarget": {
-    "health": 5.022861,
-    "stability": 4.723184
+    "health": 5.02253,
+    "stability": 4.652891
   },
   "wellbeingReversion": {
     "health": 0.06,
@@ -46,6 +46,33 @@ function toddlerPractice(focus) {
 }
 function practiceResponse(effort, aptitude) {
   return effort * (effort >= 0 ? 1 + aptitude * .12 : 1 - aptitude * .1);
+}
+
+function infantPractice(person) {
+  const level = clamp(number(person.cryLevel, 3), 1, 5);
+  return {
+    intelligence: [-.08, -.04, .04, .08, .12][level - 1],
+    strength: 0,
+    social: .02 * (level - 3),
+    creativity: .02 * (level - 3),
+  };
+}
+
+// Isolate the chosen crying level from care, natural development and event
+// balancing. The engine uses the same effects in its complete annual mean.
+export function infantChoiceEffects(person) {
+  const effects = { intelligence: 0, strength: 0, social: 0, creativity: 0, health: 0, stability: 0 };
+  if (person.alive === false || person.age >= 2) return effects;
+  const practice = infantPractice(person);
+  const care = .02 * (clamp(number(person.careFocus, 3), 0, 5) - 3);
+  for (const skill of skills) {
+    const aptitude = clamp(number(person.aptitudes?.[skill], 0), -3, 3);
+    effects[skill] = 1.15 * (practiceResponse(practice[skill] + care, aptitude) - practiceResponse(care, aptitude));
+  }
+  const level = clamp(number(person.cryLevel, 3), 1, 5);
+  effects.health = .06 * ((level - 1) / 4 - .5);
+  effects.stability = [-.24, -.12, .12, .24, .36][level - 1];
+  return effects;
 }
 
 // Contribution from the selected points, separate from background development
@@ -76,7 +103,7 @@ export function skillChanges(person, career = null) {
   const focus = Object.fromEntries(['work', 'social', 'family', 'self'].map(key => [key, clamp(number(person.focus?.[key], 3), 0, 5) - 3]));
   const babyCare = .02 * (clamp(number(person.careFocus, 3), 0, 5) - 3);
   const practice = age < 2
-    ? Object.fromEntries(skills.map(key => [key, .02 * (clamp(number(person.cryLevel, 3), 1, 5) - 3) + babyCare]))
+    ? Object.fromEntries(Object.entries(infantPractice(person)).map(([key, effect]) => [key, effect + babyCare]))
     : age < 5 ? toddlerPractice(toddlerFocus(person)) : {
       intelligence: .075 * focus.work + .035 * focus.self,
       strength: .1 * focus.self,
@@ -108,8 +135,9 @@ export function childhoodWellbeing(person) {
     stability: DEVELOPMENT_BALANCE.wellbeingReversion.stability * (DEVELOPMENT_BALANCE.wellbeingTarget.stability - stability),
   };
   if (person.age < 2) {
-    const intensity = (clamp(number(person.cryLevel, 3), 1, 5) - 1) / 4;
-    result.health += .06 * (intensity - .5);
+    const effects = infantChoiceEffects(person);
+    result.health += effects.health;
+    result.stability += effects.stability;
     return result;
   }
   const focus = person.age < 5 ? toddlerFocus(person) : Object.fromEntries(['work', 'social', 'family', 'self'].map(key => [key, clamp(number(person.focus?.[key], 3), 0, 5)]));
