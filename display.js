@@ -72,6 +72,32 @@ export function splitEventOutcome(text) {
   return lines;
 }
 
+// Journal results give every recorded stat its own line. Only a consecutive
+// list of valid rating changes is split; remaining prose, limits and durations
+// stay intact on the final line, including any semicolons they contain.
+export function splitJournalEventOutcome(text) {
+  const source = String(text ?? '');
+  const parts = source.split(';');
+  if (parts.length < 2) return [source];
+  const lines = [];
+  for (let index = 0; index < parts.length; index++) {
+    const match = outcomePart.exec(parts[index].trim());
+    const valid = match && [match.groups.before, match.groups.after].every(value => Number(value) >= 0 && Number(value) <= 10)
+      && (index === 0 || !match.groups.prefix && !match.groups.lifestylePrefix);
+    if (!valid) {
+      if (lines.length < 2) return [source];
+      lines[lines.length - 1] += `;${parts.slice(index).join(';')}`;
+      return lines;
+    }
+    lines.push(index === 0 ? parts[index] : parts[index].trimStart());
+    if (match.groups.suffix && index < parts.length - 1) {
+      lines[lines.length - 1] += `;${parts.slice(index + 1).join(';')}`;
+      return lines;
+    }
+  }
+  return lines;
+}
+
 function formatValues(text, age) {
   return text
     .replace(/\bsocial ability\b/gi, match => match[0] === 'S' ? 'Social' : 'social')

@@ -190,7 +190,7 @@ test('legacy journal and review text hides signed changes and tutorial suffixes 
   assert.deepEqual(ui.saved().effects,fixture.effects);
 });
 
-test('event outcomes put each person on a separate line in the review and journal', async () => {
+test('journal outcomes put every stat on its own line while reviews group each person', async () => {
   const fixture = ageTo(createGame({ surname: 'St. Clair', seed: 78123 }), 1);
   const dad = fixture.parents.find(parent=>parent.role==='Dad') || fixture.parents[1];
   const entry = { title: `${dad.name}: Tired days after broken nights`, text: `Your mental stability 5.2 → 5; ${dad.name}: Mental stability 6.3 → 6; ${dad.name}: Health 7.1 → 7.`, kind: 'negative' };
@@ -199,14 +199,16 @@ test('event outcomes put each person on a separate line in the review and journa
   fixture.yearSummary.dismissed = false;
   const ui = await mount(fixture);
   assert.equal(ui.query('.year-event-description').textContent, `${dad.name} (Dad) struggles to rest, leaving you both unsettled.`, 'a period in a family name does not truncate its explanation');
-  const paragraphs = [ui.query('.year-review-events .year-event-results'), ui.query('.journal-entry p')];
-  for (const paragraph of paragraphs) {
-    const lines = paragraph.innerHTML.split('<br>');
-    assert.equal(lines.length, 2, 'one line per person, not one line per stat');
-    assert.match(lines[0], /Your Mental stability 5\.2 → 5\.0/);
-    assert.ok(lines[1].includes(`${dad.name} (Dad)`));
-    assert.match(lines[1], /Mental stability 6\.3 → 6\.0; .*Health 7\.1 → 7\.0/);
-  }
+  const reviewLines = ui.query('.year-review-events .year-event-results').innerHTML.split('<br>');
+  assert.equal(reviewLines.length, 2, 'reviews retain their separate explanation and grouped-person results');
+  assert.match(reviewLines[1], /Mental stability 6\.3 → 6\.0; .*Health 7\.1 → 7\.0/);
+  const journalLines = ui.query('.journal-entry p').innerHTML.split('<br>');
+  assert.equal(journalLines.length, 3, 'every stat gets its own line in the journal');
+  assert.match(journalLines[0], /Your Mental stability 5\.2 → 5\.0/);
+  assert.ok(journalLines[1].includes(`${dad.name} (Dad)`));
+  assert.ok(journalLines[2].includes(`${dad.name} (Dad)`));
+  assert.match(journalLines[1], /Mental stability 6\.3 → 6\.0/);
+  assert.match(journalLines[2], /Health 7\.1 → 7\.0/);
   assert.deepEqual(ui.saved(), fixture, 'line breaks do not rewrite event history or ratings');
 });
 

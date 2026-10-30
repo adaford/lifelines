@@ -1,5 +1,5 @@
-import { annualForecast, effectiveStats, needsEducationChoice, focusLimits, caregivers } from './engine.js?v=no-lifestyle-preview-1';
-import { infantChoiceEffects, wellbeingResponse, toddlerActivityEffects, TODDLER_FOCUS, TODDLER_ACTIVITY_EFFECTS, PARENT_FAMILY_RELATIONSHIP_GAIN } from './development.js?v=no-lifestyle-preview-1';
+import { annualForecast, effectiveStats, needsEducationChoice, focusLimits, caregivers } from './engine.js?v=journal-stat-lines-1';
+import { infantChoiceEffects, wellbeingResponse, toddlerActivityEffects, TODDLER_FOCUS, TODDLER_ACTIVITY_EFFECTS, PARENT_FAMILY_RELATIONSHIP_GAIN } from './development.js?v=journal-stat-lines-1';
 
 const nonzero = value => Math.abs(value) > .000001;
 const keyOf = entry => `${entry.parentId || 'you'}:${entry.stat}`;

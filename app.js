@@ -5,11 +5,11 @@ import {
   offeredJobs, needsEducationChoice, pendingEventSubject, focusLimits, focusLimitDetails, caregivers,
   relationshipOdds, meetingChances, proposalChance, pregnancyChance, oneNightChance,
   respondToEncounter, proposeMarriage, endRelationship, normalizeSurname, heightPercentile, statPercentiles
-} from './engine.js?v=no-lifestyle-preview-1';
-import { annotateNarrative } from './narrative.js?v=no-lifestyle-preview-1';
-import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome } from './display.js?v=no-lifestyle-preview-1';
+} from './engine.js?v=journal-stat-lines-1';
+import { annotateNarrative } from './narrative.js?v=journal-stat-lines-1';
+import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome, splitJournalEventOutcome } from './display.js?v=journal-stat-lines-1';
 
-import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts } from './choice-impacts.js?v=no-lifestyle-preview-1';
+import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts } from './choice-impacts.js?v=journal-stat-lines-1';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const app = document.querySelector('#app');
@@ -349,8 +349,8 @@ function reviewEventDescription(entry) {
   return sentence.replaceAll('{name}',subject).trim();
 }
 
-function eventOutcomeText(text, age) {
-  return splitEventOutcome(text).map(line=>journalText(line,age)).join('<br>');
+function eventOutcomeText(text, age, split = splitEventOutcome) {
+  return split(text).map(line=>journalText(line,age)).join('<br>');
 }
 
 function yearSummaryModal() {
@@ -415,7 +415,7 @@ function focusView(disabled) {
 
 function journalView() {
   const entries = showAllHistory ? state.history : state.history.slice(0,8);
-  return `<section class="panel journal-panel"><div class="panel-heading"><h3>Journal</h3></div><div class="journal-list">${entries.map(entry => `<article class="journal-entry ${esc(entry.kind || 'neutral')}"><div class="journal-age"><strong>${entry.age}</strong><span>${entry.generation===state.generation?'AGE':`GEN ${entry.generation}`}</span></div><span class="journal-marker"></span><div class="journal-content"><h4>${journalText(completedEventCopy(entry).title,entry.age)}</h4><p>${eventOutcomeText(completedEventCopy(entry).text,entry.age)}</p></div></article>`).join('')}</div>${state.history.length>8?`<button class="button ghost small" data-action="history">${showAllHistory?'Recent years':'Show all'} ${icon('arrow')}</button>`:''}</section>`;
+  return `<section class="panel journal-panel"><div class="panel-heading"><h3>Journal</h3></div><div class="journal-list">${entries.map(entry => `<article class="journal-entry ${esc(entry.kind || 'neutral')}"><div class="journal-age"><strong>${entry.age}</strong><span>${entry.generation===state.generation?'AGE':`GEN ${entry.generation}`}</span></div><span class="journal-marker"></span><div class="journal-content"><h4>${journalText(completedEventCopy(entry).title,entry.age)}</h4><p>${eventOutcomeText(completedEventCopy(entry).text,entry.age,splitJournalEventOutcome)}</p></div></article>`).join('')}</div>${state.history.length>8?`<button class="button ghost small" data-action="history">${showAllHistory?'Recent years':'Show all'} ${icon('arrow')}</button>`:''}</section>`;
 }
 
 function collegeProgressView() {
