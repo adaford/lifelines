@@ -109,7 +109,7 @@ npm ci
 npm test
 ```
 
-The readability and crying update passes all 235 tests on Node 24.14.0, including 60 DOM checks. The infant parent mental-stability curve changes, and the 4,000-life reference has been regenerated; schema 11 and existing saved ratings remain unchanged. A real-browser phone-layout check could not be completed because the browser access host is unavailable; DOM checks do not establish visual verification. All 17 local HTTP assets returned 200 and matched disk. Deployment verification is pending.
+The readability and crying update passes all 235 tests on Node 24.14.0, including 60 DOM checks. The infant parent mental-stability curve changes, and the 4,000-life reference has been regenerated; schema 11 and existing saved ratings remain unchanged. A real-browser phone-layout check could not be completed because the browser access host is unavailable; DOM checks do not establish visual verification. All 17 local HTTP assets returned 200 and matched disk. GitHub Pages deployment of commit `5541cb8` was verified successfully, with the updated live files matching the release.
 
 ## Source and deployment
 
