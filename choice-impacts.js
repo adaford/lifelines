@@ -1,5 +1,5 @@
-import { annualForecast, effectiveStats, needsEducationChoice, focusLimits } from './engine.js?v=event-limits-1';
-import { infantChoiceEffects, wellbeingResponse, toddlerActivityEffects, TODDLER_FOCUS, TODDLER_ACTIVITY_EFFECTS, PARENT_FAMILY_RELATIONSHIP_GAIN } from './development.js?v=event-limits-1';
+import { annualForecast, effectiveStats, needsEducationChoice, focusLimits } from './engine.js?v=event-variety-1';
+import { infantChoiceEffects, wellbeingResponse, toddlerActivityEffects, TODDLER_FOCUS, TODDLER_ACTIVITY_EFFECTS, PARENT_FAMILY_RELATIONSHIP_GAIN } from './development.js?v=event-variety-1';
 
 const nonzero = value => Math.abs(value) > .000001;
 const keyOf = entry => `${entry.parentId || 'you'}:${entry.stat}`;

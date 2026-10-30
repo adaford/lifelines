@@ -200,6 +200,90 @@ export const EVENTS = [
   ...group('Good fortune', { minAge: 18, baseChance: .006, kind: 'positive' }, [
     { id: 'windfall', name: 'A little good fortune', description: 'An unexpected benefit gives your everyday lifestyle a welcome boost.', ...temporary({}, 2, 1) },
   ]),
+  ...group('Early years', { minAge: 0, maxAge: 1, baseChance: .01, kind: 'positive' }, [
+    { id: 'baby_hand_coordination', name: 'Reaching and grasping', description: 'You start picking up small toys accurately.', ...change({ strength: .2, intelligence: .15 }) },
+    { id: 'baby_separation_anxiety', name: 'Separation anxiety', description: 'Unfamiliar caregivers leave you unsettled.', kind: 'negative', statFactors: [low('stability')], ...temporary({ stability: -.4, social: -.2 }) },
+  ]),
+  ...group('Growing up', { minAge: 2, maxAge: 3, baseChance: .008, kind: 'neutral' }, [
+    { id: 'toddler_swim_class', name: 'Swimming lessons', description: 'Swimming lessons overlap with screen time.', toddlerFocusFactors: ['work'], choices: [
+      choice('swim', 'Take the lessons', 'Practice swimming instead of using electronics.', { ...change({ strength: .4, health: .15 }), ...temporary({}), focusLimits: { toddler: { social: 1 } } }),
+      choice('watch', 'Watch and meet others', 'Meet other children without joining the lessons.', change({ social: .2 })),
+    ] },
+    { id: 'toddler_messy_paint', name: 'A messy paint project', description: 'Choose how to make a picture.', toddlerFocusFactors: ['creative'], choices: [
+      choice('experiment', 'Experiment with finger paints', 'Try new textures despite the frustration of spills.', change({ creativity: .4, stability: -.15 })),
+      choice('patterns', 'Copy shapes and patterns', 'Practice matching shapes and colors.', change({ intelligence: .25, creativity: .15 })),
+    ] },
+    { id: 'toddler_new_playmate', name: 'A new playmate', description: 'Another child wants to use your favorite toys.', toddlerFocusFactors: ['work'], choices: [
+      choice('share', 'Take turns', 'Practice sharing even when waiting is frustrating.', change({ social: .4, stability: -.15 })),
+      choice('separate', 'Play separately', 'Keep your own toys but miss time together.', change({ stability: .25, social: -.15 })),
+    ] },
+    { id: 'toddler_nursery_days', name: 'Longer nursery days', description: 'More nursery time would mean less time at home.', choices: [
+      choice('full_days', 'Try full days', 'Spend more time playing with other children.', { ...change({ social: .4, strength: .2 }), ...temporary({}), focusLimits: { toddler: { family: 1 } } }),
+      choice('short_days', 'Keep shorter days', 'Meet other children while keeping time at home.', change({ social: .15, stability: .1 })),
+    ] },
+    { id: 'toddler_sore_fingers', name: 'Sore fingers', description: 'Sore fingers interrupt drawing and crafts.', kind: 'negative', toddlerFocusFactors: ['creative'], ...temporary({ health: -.2 }), focusLimits: { toddler: { creative: 1 } } },
+    { id: 'toddler_puzzle_box', name: 'A tricky puzzle box', description: 'The last pieces will not fit.', toddlerFocusFactors: ['social'], choices: [
+      choice('persist', 'Keep trying alone', 'Solve more of the puzzle through frustrating trial and error.', change({ intelligence: .35, stability: -.15 })),
+      choice('ask', 'Ask someone to help', 'Solve the puzzle together.', change({ intelligence: .2, social: .15 })),
+    ] },
+  ]),
+  ...group('School', { minAge: 5, maxAge: 12, conditions: ['school'], baseChance: .006, kind: 'neutral' }, [
+    { id: 'school_garden', name: 'School garden', description: 'The school garden needs a planting crew and a design.', choices: [
+      choice('plant', 'Join the planting crew', 'Work outdoors during your usual free time.', { ...change({ strength: .3, health: .2 }), ...temporary({}), focusLimits: { standard: { self: 2 } } }),
+      choice('design', 'Design the planting plan', 'Plan where the plants should grow.', change({ intelligence: .25, creativity: .2 })),
+    ] },
+    { id: 'school_friend_moves', name: 'A friend moves away', description: 'A close friend leaves your school.', kind: 'negative', focusFactors: ['social'], ...temporary({ social: -.4, stability: -.3 }, 2) },
+    { id: 'school_lost_project', name: 'A lost school project', description: 'Your finished project disappears before the deadline.', kind: 'negative', focusFactors: ['work'], choices: [
+      choice('rebuild', 'Rebuild it quickly', 'Repeat the work under pressure.', { ...change({ intelligence: .35 }), ...temporary({ stability: -.3 }) }),
+      choice('explain', 'Explain what happened', 'Ask for help and accept an incomplete result.', change({ social: .2, intelligence: -.15, stability: .1 })),
+    ] },
+    { id: 'school_class_representative', name: 'Class representative', description: 'Your class needs someone to speak at school meetings.', focusFactors: ['social'], choices: [
+      choice('stand', 'Stand for the role', 'Practice speaking while meetings reduce family time.', { ...change({ social: .45 }), ...temporary({ stability: -.2 }), focusLimits: { standard: { family: 2 } } }),
+      choice('poster', 'Design a campaign poster', 'Help a classmate communicate their ideas.', change({ creativity: .3, social: .1 })),
+    ] },
+  ]),
+  ...group('Teen years', { minAge: 13, maxAge: 16, baseChance: .006, kind: 'neutral' }, [
+    { id: 'teen_answer_leak', name: 'Leaked test answers', description: 'A classmate offers you the answers before a test.', focusFactors: ['social'], choices: [
+      choice('refuse', 'Refuse the answers', 'Keep your own work, despite pressure from classmates.', change({ stability: .35, social: -.2 })),
+      choice('copy', 'Use the answers', 'Fit in with the group while skipping the learning.', change({ social: .25, intelligence: -.4 })),
+    ] },
+    { id: 'teen_band_disagreement', name: 'Band disagreement', description: 'Your band disagrees about what to perform.', focusFactors: ['self'], statFactors: [high('creativity')], choices: [
+      choice('compromise', 'Work on a compromise', 'Combine ideas through stressful rehearsals.', { ...change({ creativity: .35, social: .2 }), ...temporary({ stability: -.3 }) }),
+      choice('solo', 'Make music alone', 'Keep creative control with less time around friends.', change({ creativity: .3, stability: .2, social: -.2 })),
+    ] },
+    { id: 'teen_group_chat', name: 'An overwhelming group chat', description: 'Constant messages interrupt your downtime.', focusFactors: ['social'], kind: 'negative', choices: [
+      choice('mute', 'Mute the chat', 'Protect your downtime and step back from the group.', { ...change({ stability: .35 }), ...temporary({}), focusLimits: { standard: { social: 1 } } }),
+      choice('reply', 'Keep replying', 'Stay involved while the interruptions continue.', { ...change({ social: .3 }), ...temporary({ stability: -.35 }) }),
+    ] },
+    { id: 'teen_first_aid', name: 'First-aid course', description: 'A first-aid course would use your free afternoons.', focusFactors: ['self'], choices: [
+      choice('train', 'Take the course', 'Learn practical skills during your usual personal time.', { ...change({ intelligence: .35, health: .25 }), ...temporary({}), focusLimits: { standard: { self: 2 } } }),
+      choice('decline', 'Keep the afternoons free', 'Protect time to rest.', change({ stability: .2 })),
+    ] },
+  ]),
+  ...group('Everyday life', { minAge: 18, maxAge: 59, baseChance: .007, kind: 'neutral' }, [
+    { id: 'college_noisy_housing', name: 'Noisy student housing', description: 'Noise in your building interrupts study and sleep.', conditions: ['college'], kind: 'negative', ...temporary({ intelligence: -.25, stability: -.35 }) },
+    { id: 'college_field_study', name: 'Field study offer', description: 'A field study placement would take you away from home.', conditions: ['college'], focusFactors: ['work'], choices: [
+      choice('travel', 'Take the placement', 'Learn through fieldwork while spending less time with family.', { ...change({ intelligence: .45, strength: .2 }), ...temporary({}), focusLimits: { standard: { family: 1 } } }),
+      choice('local', 'Research locally', 'Study the same topic close to home.', change({ intelligence: .25, creativity: .1 })),
+    ] },
+    { id: 'work_commute_disrupted', name: 'Commute disruption', description: 'Transport disruption cuts into your working time.', conditions: ['employed'], kind: 'negative', ...temporary({ stability: -.3 }), focusLimits: { standard: { work: 3 } } },
+    { id: 'community_kitchen', name: 'Community kitchen', description: 'A community kitchen needs organizers and cooks.', focusFactors: ['social'], choices: [
+      choice('organize', 'Organize the shifts', 'Coordinate volunteers while giving up some family time.', { ...change({ social: .4, strength: .2 }), ...temporary({}), focusLimits: { standard: { family: 2 } } }),
+      choice('cook', 'Learn to cook there', 'Practice cooking without a regular commitment.', change({ health: .25, intelligence: .15 })),
+    ] },
+  ]),
+  ...group('Later years', { minAge: 60, maxAge: 83, baseChance: .008, kind: 'neutral' }, [
+    { id: 'elder_safer_home', name: 'Safer home layout', description: 'Better lighting and clear walkways make moving around easier.', kind: 'positive', ...temporary({ health: .3, strength: .15 }, 2) },
+    { id: 'elder_walking_group', name: 'Walking group', description: 'A regular walking group meets during family visiting time.', focusFactors: ['self'], choices: [
+      choice('regular', 'Join the regular walks', 'Build a routine with the group.', { ...change({ strength: .3, health: .2 }), ...temporary({}), focusLimits: { standard: { family: 2 } } }),
+      choice('occasional', 'Walk when you can', 'Stay active without a fixed schedule.', change({ health: .15, social: .1 })),
+    ] },
+    { id: 'elder_photo_archive', name: 'Old photo collection', description: 'Old photographs need sorting and identifying.', focusFactors: ['family'], choices: [
+      choice('digitize', 'Create a digital archive', 'Learn new tools while spending less time out with friends.', { ...change({ intelligence: .3, creativity: .35 }), ...temporary({}), focusLimits: { standard: { social: 2 } } }),
+      choice('gather', 'Invite people to identify them', 'Share the work and the memories.', change({ social: .3, stability: .2 })),
+    ] },
+    { id: 'elder_heatwave', name: 'A difficult heatwave', description: 'Persistent heat limits outings and disrupts sleep.', kind: 'negative', statFactors: [low('health')], ...temporary({ health: -.4, stability: -.2 }), focusLimits: { standard: { social: 3 } } },
+  ]),
 ];
 
 const SPORTS_JOBS = new Set(['athlete', 'personal_trainer', 'sports_coach', 'yoga_instructor', 'lifeguard', 'dance_instructor', 'outdoor_guide']);

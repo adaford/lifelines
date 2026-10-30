@@ -29,8 +29,19 @@ test('ordinary events occur in most balanced years without approaching the five-
     const rates = [...chances(state), ...familyEventChances(state)].map(event => event.chance);
     const any = 1 - rates.reduce((none, chance) => none * (1 - chance), 1);
     const expected = rates.reduce((sum, chance) => sum + chance, 0);
-    assert.ok(any >= .6 && any < .9, `age ${age}: ${any}`);
-    assert.ok(expected < 2.2, `age ${age}: ${expected} expected rolls`);
+    // Exact Poisson-binomial mass for zero through four independent rolls.
+    // The remainder is the chance of reaching the shared five-event cap.
+    const countMass = [1, 0, 0, 0, 0];
+    for (const rate of rates) {
+      for (let count = 4; count >= 0; count--) {
+        countMass[count] = countMass[count] * (1-rate) + (count > 0 ? countMass[count-1] * rate : 0);
+      }
+    }
+    const capped = 1-countMass.reduce((sum,mass)=>sum+mass,0);
+    assert.ok(any >= .6 && any < .92, `age ${age}: ${any}`);
+    assert.ok(countMass[0] > .05, `age ${age}: quiet years remain possible (${countMass[0]})`);
+    assert.ok(expected < 2.5, `age ${age}: ${expected} expected rolls`);
+    assert.ok(capped < .1, `age ${age}: five-event cap probability ${capped}`);
     assert.deepEqual(state, before, 'reading odds preserves saves and RNG');
   }
 });

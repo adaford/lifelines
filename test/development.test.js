@@ -15,6 +15,16 @@ const round = value => Math.round(value * 100) / 100;
 const median = values => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
 const average = values => values.reduce((a, b) => a + b, 0) / values.length;
 const standardDeviation = values => Math.sqrt(average(values.map(value => (value - average(values)) ** 2)));
+function advanceQuietMean(state) {
+  for (let rng = 1; rng <= 300; rng++) {
+    const candidate = { ...copy(state), rng };
+    assert.equal(advanceYear(candidate, { ...meanYear, parentCareerRandom: () => 1 }).ok, true);
+    if (candidate.lastYearEvents.length) continue;
+    Object.assign(state, candidate);
+    return;
+  }
+  assert.fail('Could not find a quiet mean-development fixture');
+}
 function finishChoices(state) {
   while (state.pendingEvents.length) {
     const pending = state.pendingEvents[0];
@@ -36,6 +46,7 @@ function aged(age, seed = 43, gender = 'male') {
 function legacyV7(state) {
   const legacy = toLegacyCentimeters(copy(state));
   legacy.version = 7;
+  for (const effect of legacy.effects) delete effect.focusLimits;
   for (const person of [legacy, ...legacy.parents, ...legacy.children, ...legacy.siblings, ...legacy.lineage, legacy.partner, ...legacy.encounters, legacy.pregnancy?.otherParent].filter(Boolean)) {
     if (person.adultHeight === null) person.adultHeight = 170;
     for (const key of ['growthSex', 'growthFactor', 'maturityAge', 'birthHeight', 'growthAnchor', 'parentRole', 'career']) delete person[key];
@@ -100,7 +111,6 @@ test('crying has neutral parent mental stability at two and distinct increasing 
   for (const age of [0, 1]) {
     for (let level = 1; level <= 5; level++) {
       const state = createGame({ seed: 57 });
-      state.rng = 5; // Isolate routine development from ordinary events.
       state.age = age;
       state.parents.forEach(parent => { parent.stats.stability = 7; parent.aptitudes.stability = 0; parent.relationship = 7; });
       setCryLevel(state, level);
@@ -110,7 +120,7 @@ test('crying has neutral parent mental stability at two and distinct increasing 
       assert.deepEqual(annualForecast(state), forecast);
       assert.ok(forecast.parents.every(parent => parent.stability.change === expected[level - 1]));
       assert.ok(forecast.parents.every(parent => parent.relationship.change === round(.2 * (level - 3))));
-      assert.equal(advanceYear(state, { ...meanYear, parentCareerRandom: () => 1 }).ok, true);
+      advanceQuietMean(state);
       assert.deepEqual(state.lastYearEvents, [], 'quiet fixture isolates routine development');
       for (const parent of state.parents) {
         const predicted = forecast.parents.find(person => person.id === parent.id);
@@ -142,7 +152,6 @@ test('infant crying supports intelligence and mental stability without training 
     const changes = [];
     for (let level = 1; level <= 5; level++) {
       const state = createGame({ seed: 57 });
-      state.rng = 5; // Isolate routine development from ordinary events.
       state.age = age;
       for (const key of Object.keys(state.stats)) state.stats[key] = 5;
       for (const key of Object.keys(state.aptitudes)) state.aptitudes[key] = 0;
@@ -156,7 +165,7 @@ test('infant crying supports intelligence and mental stability without training 
         assert.ok(level <= 2 ? contribution[key] < 0 : contribution[key] > 0,
           `age ${age}, cry ${level}: ${key} choice contribution follows low/high crying independently of background development`);
       }
-      assert.equal(advanceYear(state, { ...meanYear, parentCareerRandom: () => 1 }).ok, true);
+      advanceQuietMean(state);
       assert.deepEqual(state.lastYearEvents, [], 'the fixture isolates routine means');
       for (const key of ['intelligence', 'stability', 'strength']) {
         assert.equal(state.stats[key], forecast.stats[key].after, `${key} actual mean agrees with preview`);

@@ -13,14 +13,14 @@ export const DEVELOPMENT_BALANCE = {
   "innateScale": 0.8,
   "skillReversion": 0.012,
   "childhoodBias": {
-    "intelligence": -0.091691,
-    "strength": -0.017822,
-    "social": -0.084572,
-    "creativity": -0.092658
+    "intelligence": -0.095997,
+    "strength": -0.020439,
+    "social": -0.088969,
+    "creativity": -0.097668
   },
   "wellbeingTarget": {
-    "health": 5.181532,
-    "stability": 4.097116
+    "health": 5.14703,
+    "stability": 4.220116
   },
   "wellbeingReversion": {
     "health": 0.06,

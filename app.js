@@ -5,11 +5,11 @@ import {
   offeredJobs, needsEducationChoice, pendingEventSubject, focusLimits, focusLimitDetails,
   relationshipOdds, meetingChances, proposalChance, pregnancyChance, oneNightChance,
   respondToEncounter, proposeMarriage, endRelationship, normalizeSurname, heightPercentile, statPercentiles
-} from './engine.js?v=event-limits-1';
-import { annotateNarrative } from './narrative.js?v=event-limits-1';
-import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome } from './display.js?v=event-limits-1';
+} from './engine.js?v=event-variety-1';
+import { annotateNarrative } from './narrative.js?v=event-variety-1';
+import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome } from './display.js?v=event-variety-1';
 
-import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts } from './choice-impacts.js?v=event-limits-1';
+import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts } from './choice-impacts.js?v=event-variety-1';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const app = document.querySelector('#app');
@@ -150,14 +150,32 @@ function avatar(person, small = false) {
   </svg>`;
 }
 
-function ratingBar(label, value) {
+function statEffectGroups(key) {
+  if (!key || key==='height' || key==='lifestyle' && state.age<18) return [];
+  const affected = state.effects.filter(effect=>effect.years>0).map(effect=>({
+    effect, amount:key==='lifestyle'?effect.lifestyle:effect.modifiers?.[key],
+  })).filter(({amount})=>Number.isFinite(amount) && amount!==0);
+  return [['buff','⬆️',1],['debuff','⬇️',-1]].flatMap(([direction,emoji,sign])=>{
+    const effects = affected.filter(({amount})=>Math.sign(amount)===sign).map(({effect})=>effect);
+    if (!effects.length) return [];
+    const description = `Active ${direction}: ${effects.map(effect=>`${effect.name} (${effect.years} year${effect.years===1?'':'s'} remaining)`).join('; ')}`;
+    return [{direction,emoji,description}];
+  });
+}
+
+function statEffectDescription(key) {
+  return statEffectGroups(key).map(({description})=>description).join('. ');
+}
+
+function ratingBar(label, value, statKey) {
   const rating = Math.max(1, Math.min(10, Number(value)));
   const hue = Math.round((rating - 1) / 9 * 120);
-  return `<span class="rating-track" role="meter" aria-label="${esc(label)}" aria-valuemin="1" aria-valuemax="10" aria-valuenow="${number(rating)}"><span class="rating-fill" style="width:${rating*10}%;background:hsl(${hue}, 60%, 40%)"></span></span>`;
+  const effects = statEffectGroups(statKey);
+  return `<span class="rating-track${effects.length?' has-active-effects':''}" role="meter" aria-label="${esc(label)}" aria-valuemin="1" aria-valuemax="10" aria-valuenow="${number(rating)}" ${effects.length?`aria-valuetext="${number(rating)} out of 10. ${esc(statEffectDescription(statKey))}"`:''}><span class="rating-fill" style="width:${rating*10}%;background:hsl(${hue}, 60%, 40%)"></span>${effects.length?`<span class="stat-effect-indicators" aria-hidden="true">${effects.map(({direction,emoji,description})=>`<span class="stat-effect-indicator" data-direction="${direction}" title="${esc(description)}">${emoji}</span>`).join('')}</span>`:''}</span>`;
 }
 
 function profileLifestyleView() {
-  return `<button class="status-pill profile-lifestyle" data-stat="lifestyle" data-action="tab" data-tab="character" aria-label="Lifestyle ${number(state.lifestyle)} out of 10. View your character."><span class="profile-lifestyle-heading"><span class="status-label">Lifestyle${statEmoji('lifestyle')}</span><strong class="status-value">${number(state.lifestyle)}<small>/10</small></strong></span>${ratingBar('Lifestyle',state.lifestyle)}</button>`;
+  return `<button class="status-pill profile-lifestyle" data-stat="lifestyle" data-action="topic-help" data-topic="lifestyle" data-id="${esc(state.id)}" aria-haspopup="dialog" aria-label="Lifestyle ${number(state.lifestyle)} out of 10. ${esc(statEffectDescription('lifestyle'))} Open help."><span class="profile-lifestyle-heading"><span class="status-label">Lifestyle${statEmoji('lifestyle')}</span><strong class="status-value">${number(state.lifestyle)}<small>/10</small></strong></span>${ratingBar('Lifestyle',state.lifestyle,'lifestyle')}</button>`;
 }
 
 function render() {
@@ -170,14 +188,15 @@ function render() {
       <a class="brand" href="#" data-action="tab" data-tab="year" aria-label="Lifelines home"><span class="brand-mark">${icon('sprout')}</span><span class="brand-title">lifelines<span style="color:var(--orange)">.</span></span></a>
       <div class="top-actions"><span class="save-status">${icon(saveAvailable ? 'check' : 'download')}${saveAvailable ? 'Saved' : 'Session only'}</span><button class="icon-button" data-action="menu" aria-label="More options" aria-haspopup="dialog">${icon('menu')}</button></div>
     </header>
-    ${isYear || activeTab==='character' ? `
-    <section class="profile-bar" aria-label="Your life"><div class="portrait">${avatar(state)}</div><div class="profile-copy"><p class="eyebrow">GENERATION ${state.generation}</p><div class="profile-name-row"><h1 class="person-name">${esc(state.name)}</h1></div><div class="profile-identity">${genderBadge(state)}<button class="profile-height" data-stat="height" data-action="tab" data-tab="character" aria-label="Height ${heightDescription(state.height,state.age)}. View your character."><strong class="status-value">${formatHeight(state.height,state.age)}</strong>${percentiles?percentileTag(percentiles,'height'):state.age>=18?'<span class="height-percentile">Adult height</span>':''}</button></div>${profileLifestyleView()}</div><div class="profile-age"><strong>${state.age}</strong>${state.age<2?'':`<p class="profile-stage">${state.age<5?'Toddler':state.age<18?'Student':state.education.status==='college'?'College student':career()?.name || 'Finding a path'}</p>`}<span>YEARS OLD</span></div></section>
-    <div class="status-strip" aria-label="At a glance">${DISPLAY_STATS.map(skill=>[skill.key,skill.label,stats[skill.key]]).map(([key,label,value])=>`<button class="status-pill" data-stat="${key}" data-action="tab" data-tab="character" aria-label="${label} ${number(value)} out of 10.${Number.isInteger(state.aptitudes[key])?` Natural aptitude ${aptitude(state.aptitudes[key])}.`: ''} View your character."><span class="status-label">${label}${statEmoji(key)}</span><span class="status-reading"><strong class="status-value">${number(value)}<small>/10</small></strong>${aptitudeBadge(state.aptitudes[key])}</span>${ratingBar(label,value)}</button>`).join('')}</div>
+    ${isYear ? `
+    <section class="profile-bar" aria-label="Your life"><div class="portrait">${avatar(state)}</div><div class="profile-copy"><p class="eyebrow">GENERATION ${state.generation}</p><div class="profile-name-row"><h1 class="person-name">${esc(state.name)}</h1></div><div class="profile-identity">${genderBadge(state)}<button class="profile-height" data-stat="height" data-action="topic-help" data-topic="height" data-id="${esc(state.id)}" aria-haspopup="dialog" aria-label="Height ${heightDescription(state.height,state.age)}. Open help."><strong class="status-value">${formatHeight(state.height,state.age)}</strong>${percentiles?percentileTag(percentiles,'height'):state.age>=18?'<span class="height-percentile">Adult height</span>':''}</button></div>${profileLifestyleView()}</div><div class="profile-age"><strong>${state.age}</strong>${state.age<2?'':`<p class="profile-stage">${state.age<5?'Toddler':state.age<18?'Student':state.education.status==='college'?'College student':career()?.name || 'Finding a path'}</p>`}<span>YEARS OLD</span></div></section>
+    <div class="status-strip" aria-label="At a glance">${DISPLAY_STATS.map(skill=>[skill.key,skill.label,stats[skill.key]]).map(([key,label,value])=>`<button class="status-pill" data-stat="${key}" data-action="topic-help" data-topic="${key}" data-id="${esc(state.id)}" aria-haspopup="dialog" aria-label="${label} ${number(value)} out of 10.${Number.isInteger(state.aptitudes[key])?` Natural aptitude ${aptitude(state.aptitudes[key])}.`: ''} ${esc(statEffectDescription(key))} Open help."><span class="status-label">${label}${statEmoji(key)}</span><span class="status-reading"><strong class="status-value">${number(value)}<small>/10</small></strong>${aptitudeBadge(state.aptitudes[key])}</span>${ratingBar(label,value,key)}</button>`).join('')}</div>
+    <div class="stat-help-links year-stat-help">${labelWithHelp('Stats','stats')}${labelWithHelp('Natural aptitude','affinity')}</div>
     ` : ''}
-      <main class="main-column" id="main-content">${activeTab==='career'?'':`<div class="chapter-heading"><h2>${isYear ? stageNames[lifeStage] : ({family:'A life, connected',character:'This is you'}[activeTab])}<span style="color:var(--orange)">.</span></h2></div>`}
+      <main class="main-column" id="main-content">${activeTab==='career'?'':`<div class="chapter-heading"><h2>${isYear ? stageNames[lifeStage] : ({family:'A life, connected'}[activeTab])}<span style="color:var(--orange)">.</span></h2></div>`}
       ${eventDecisionView()}${state.ended ? endPanel() : ''}${state.needsSuccession ? successionPanel() : ''}
-      ${activeTab==='year' ? yearView() : activeTab==='career' ? careerView() : activeTab==='family' ? familyView() : characterView()}</main>
-    <footer class="bottom-dock" aria-label="Game controls">${isYear?advanceControls():''}<nav class="nav-list" aria-label="Game sections">${[['year','Year'],['career','Career'],['family','Family'],['character','You']].map(([id,label])=>`<button class="nav-button ${activeTab===id?'active':''}" data-action="tab" data-tab="${id}" ${activeTab===id?'aria-current="page"':''}><span class="nav-icon">${icon(id)}</span><span class="nav-label">${label}</span>${id==='family'&&state.children.length?`<span class="nav-count">${state.children.length}</span>`:''}</button>`).join('')}</nav></footer>
+      ${activeTab==='year' ? yearView() : activeTab==='career' ? careerView() : familyView()}</main>
+    <footer class="bottom-dock" aria-label="Game controls">${isYear?advanceControls():''}<nav class="nav-list" aria-label="Game sections">${[['year','Year'],['career','Career'],['family','Family']].map(([id,label])=>`<button class="nav-button ${activeTab===id?'active':''}" data-action="tab" data-tab="${id}" ${activeTab===id?'aria-current="page"':''}><span class="nav-icon">${icon(id)}</span><span class="nav-label">${label}</span>${id==='family'&&state.children.length?`<span class="nav-count">${state.children.length}</span>`:''}</button>`).join('')}</nav></footer>
   </div>`;
 }
 
@@ -187,18 +206,6 @@ function advanceControls() {
   if (state.needsSuccession) return `<div class="advance-row"><button class="button primary advance-button" data-action="tab" data-tab="family">Choose your heir ${icon('arrow')}</button></div>`;
   if (needsEducationChoice(state)) return `<div class="advance-row"><button class="button primary advance-button" data-action="tab" data-tab="career">Choose your path ${icon('arrow')}</button></div>`;
   return `<div class="advance-row"><div class="advance-copy"><strong>Age ${state.age} → ${state.age+1}</strong><span>${state.age<2?`Cry level ${state.cryLevel}/5`:`${focusUsed()}/12 ${state.age<5?'activity points':'focus'} used`}</span></div><button class="button primary advance-button" data-action="advance">Next year ${icon('arrow')}</button></div>`;
-}
-
-function statsView() {
-  const stats = effectiveStats(state);
-  const percentiles = statPercentiles(state);
-  return `<section class="panel stats-panel" aria-label="Your character stats"><div class="panel-heading"><h3>${labelWithHelp('Your character','stats')}</h3></div><div class="stat-list">${DISPLAY_STATS.map(skill => {
-    const value = stats[skill.key]; const apt = state.aptitudes[skill.key];
-    return `<div class="stat-row" data-stat="${skill.key}"><div class="stat-heading"><span class="stat-name">${labelWithHelp(skill.label,skill.key)}</span><span class="stat-reading"><strong class="stat-value">${number(value)}<small>/10</small></strong>${aptitudeBadge(apt)}</span></div>${ratingBar(skill.label,value)}</div>`;
-  }).join('')}</div><div class="stat-help-links">${labelWithHelp('Natural aptitude','affinity')}</div><div class="vitals-grid">${[['lifestyle','Lifestyle']].map(([key,label]) => {
-    const value = key==='lifestyle' ? state.lifestyle : stats[key];
-    return `<div class="vital" data-stat="${key}"><span class="vital-label">${labelWithHelp(label,key)}</span><span class="stat-reading"><span class="vital-value">${number(value)}<small>/10</small></span>${aptitudeBadge(state.aptitudes[key])}</span>${ratingBar(label,value)}</div>`;
-  }).join('')}<div class="vital height-vital" data-stat="height"><span class="vital-label">${labelWithHelp('Height','height',state.id)}</span><span class="vital-value" aria-label="${heightDescription(state.height,state.age)}">${formatHeight(state.height,state.age)}</span>${percentiles?percentileTag(percentiles,'height'):state.age>=18?'<span class="height-percentile">Adult height</span>':''}</div></div></section>`;
 }
 
 function focusLabel(key) {
@@ -248,11 +255,12 @@ function focusEventDecision() {
 }
 
 function effectsView() {
-  return `<section class="panel"><div class="panel-heading"><h3>Active effects</h3><span class="tag">${state.effects.length} active</span></div>${state.effects.length ? `<div class="effect-list">${state.effects.map(effect => `<div class="effect-card ${Object.values(effect.modifiers || {}).some(value => value<0)||effect.lifestyle<0||outcomeLimits(effect).length?'negative':'positive'}"><div class="effect-title">${icon('spark')} ${journalText(effect.name)}</div><div class="effect-meta">${esc(outcomeSummary(effect))}<br>${effect.years} year${effect.years===1?'':'s'} remaining</div></div>`).join('')}</div>` : `<div class="empty-state">${icon('spark')}<p>None</p></div>`}<button class="button ghost small" data-action="odds">View this year’s odds ${icon('arrow')}</button></section>`;
+  if (!state.effects.length) return '';
+  return `<details class="panel active-effects"><summary>Active effects <span class="tag">${state.effects.length}</span></summary><div class="effect-list">${state.effects.map(effect => `<div class="effect-card ${Object.values(effect.modifiers || {}).some(value => value<0)||effect.lifestyle<0||outcomeLimits(effect).length?'negative':'positive'}"><div class="effect-title">${icon('spark')} ${journalText(effect.name)}</div><div class="effect-meta">${esc(outcomeSummary(effect))}<br>${effect.years} year${effect.years===1?'':'s'} remaining</div></div>`).join('')}</div><button class="button ghost small" data-action="odds">View this year’s odds ${icon('arrow')}</button></details>`;
 }
 
 function yearView() {
-  if (needsEducationChoice(state)) return `<section class="panel education-prompt"><div class="panel-heading"><h3>${labelWithHelp('Your next chapter','college')}</h3><span class="tag">A NEW CHOICE</span></div><p class="decision-required">Choose college or a career before your next year.</p><button class="button primary" data-action="tab" data-tab="career">College or career? ${icon('arrow')}</button></section>${retirementNotice()}${connectionNotice()}${journalView()}`;
+  if (needsEducationChoice(state)) return `<section class="panel education-prompt"><div class="panel-heading"><h3>${labelWithHelp('Your next chapter','college')}</h3><span class="tag">A NEW CHOICE</span></div><p class="decision-required">Choose college or a career before your next year.</p><button class="button primary" data-action="tab" data-tab="career">College or career? ${icon('arrow')}</button></section>${effectsView()}${retirementNotice()}${connectionNotice()}${journalView()}`;
   const baby = state.age < 2;
   const toddler = !baby && state.age < 5;
   const disabled = state.ended || state.needsSuccession || state.pendingEvents.length>0;
@@ -261,7 +269,7 @@ function yearView() {
     ${toddler?'':choiceImpactSummary()}
     ${parentStatusView()}
     </section>
-    ${state.effects.length?`<button class="effect-summary button secondary" data-action="tab" data-tab="character">${icon('spark')} ${state.effects.length} active life effect${state.effects.length===1?'':'s'} · View ${icon('arrow')}</button>`:''}
+    ${effectsView()}
     ${retirementNotice()}${connectionNotice()}${journalView()}`;
 }
 
@@ -493,10 +501,6 @@ function familyView() {
     ${state.lineage.length?`<section class="panel"><div class="panel-heading"><h3>Those who came before</h3><span class="tag">${state.lineage.length} CHAPTERS</span></div><div class="legacy-list">${state.lineage.map(p=>`<div class="legacy-card"><strong>${esc(p.name)}</strong><span>Generation ${esc(p.generation ?? '—')} · Age ${esc(p.age ?? '—')}</span></div>`).join('')}</div></section>`:''}`;
 }
 
-function characterView() {
-  return `${statsView()}${effectsView()}`;
-}
-
 function endPanel() {
   return `<section class="panel"><div class="panel-heading"><h3>A life, fully lived.</h3><span class="tag">AGE ${state.age}</span></div><p class="section-description">${narrativeText(state.name)}’s story has come to a close. </p><button class="button primary" data-action="new">Begin another story ${icon('arrow')}</button></section>`;
 }
@@ -543,7 +547,7 @@ function newLifeModal(initial = false) {
 }
 
 function navigate(tab) {
-  if (!['year','career','family','character'].includes(tab)) return;
+  if (!['year','career','family'].includes(tab)) return;
   if (modalRoot.firstElementChild) closeModal();
   activeTab = tab;
   render();
@@ -593,6 +597,7 @@ function topicHelpModal(topic, id) {
     if (job) entry = [job.name,[job.description,'+3 marks a core skill; skill fit reflects your current match.']];
   }
   if (!entry) return;
+  if (id===state.id) entry=[entry[0],[...entry[1],...statEffectGroups(topic).map(({description})=>description)]];
   openModal(esc(entry[0]),`${entry[1].map(paragraph=>`<p>${esc(paragraph)}</p>`).join('')}`);
   modalRoot.querySelector('.modal').classList.add('help-popup');
   modalRoot.querySelector('.modal').setAttribute('aria-describedby','topic-help-content');

@@ -99,6 +99,42 @@ export const FAMILY_EVENTS = [
     ] },
     { id: 'household_child_milestone', name: 'An independent achievement', description: '{name} works through a difficult personal goal and shares the good news.', minAge: 18, statFactors: [high('intelligence')], subjectChanges: { intelligence: .2, social: .2 }, playerChanges: { stability: .25 }, relationship: .2 },
   ]),
+  ...group('parent', { minAge: 0, maxAge: 120, minPlayerAge: 0, maxPlayerAge: 17, baseChance: .006 }, [
+    { id: 'household_parent_park_walks', name: 'Regular park walks', description: '{name} takes you on regular walks outside.', maxPlayerAge: 4, subjectChanges: { health: .15 }, playerChanges: { health: .2, strength: .15 }, relationship: .15 },
+    { id: 'household_parent_cooking', name: 'Cooking together', description: '{name} teaches you to prepare a simple meal.', minPlayerAge: 3, focusFactors: ['family'], subjectChanges: { stability: .1 }, playerChanges: { intelligence: .15, creativity: .2 }, relationship: .2 },
+    { id: 'household_parent_shift_change', name: 'Changed household schedule', description: 'A schedule change leaves {name} with less time at home.', minPlayerAge: 2, kind: 'negative', subjectChanges: { stability: -.15 }, playerChanges: { stability: -.2 }, relationship: -.2 },
+    { id: 'household_parent_missed_pickup', name: 'A missed school pickup', description: '{name} arrives late to collect you from school.', minPlayerAge: 5, kind: 'negative', statFactors: [low('stability')], subjectChanges: { stability: -.2 }, playerChanges: { stability: -.15 }, relationship: -.2 },
+  ]),
+  ...group('partner', { minAge: 18, maxAge: 84, minPlayerAge: 18, baseChance: .006 }, [
+    { id: 'household_partner_language_course', name: 'A language course', description: '{name} invites you to evening language classes.', focusFactors: ['family'], choices: [
+      option('join', 'Attend together', 'Classes replace some evenings with friends.', { subjectChanges: { intelligence: .35 }, playerChanges: { intelligence: .35 }, relationship: .3, years: 1, focusLimits: { standard: { social: 2 } } }),
+      option('separate', 'Keep separate schedules', '{name} takes the course while you keep your plans.', { subjectChanges: { intelligence: .35 }, playerChanges: { social: .15 }, relationship: .1 }),
+    ] },
+    { id: 'household_partner_roof_leak', name: 'A leaking roof', description: 'A roof leak disrupts your home with {name}.', kind: 'negative', baseChance: .005, choices: [
+      option('repair', 'Handle the repairs together', 'Repair work uses your spare evenings.', { subjectChanges: { strength: .2, stability: -.15 }, playerChanges: { strength: .25, health: -.15 }, relationship: .25, years: 1, focusLimits: { standard: { social: 1 } } }),
+      option('hire', 'Hire repair help', 'Outside help protects your time but lowers lifestyle.', { subjectChanges: { stability: .15 }, playerChanges: { stability: .15 }, lifestyle: -1, years: 1 }),
+    ] },
+    { id: 'household_partner_travel_plans', name: 'Separate travel plans', description: 'You and {name} want different trips.', kind: 'neutral', choices: [
+      option('together', 'Plan a shared trip', 'A longer trip leaves less time for work.', { subjectChanges: { stability: .2 }, playerChanges: { creativity: .25 }, relationship: .4, years: 1, focusLimits: { standard: { work: 3 } } }),
+      option('apart', 'Travel separately', 'You pursue different interests and spend less time together.', { subjectChanges: { creativity: .3 }, playerChanges: { intelligence: .3 }, relationship: -.2 }),
+    ] },
+    { id: 'household_partner_lost_keys', name: 'Lost house keys', description: '{name} loses the house keys during a busy day.', kind: 'negative', subjectChanges: { stability: -.2 }, playerChanges: { stability: -.15 }, relationship: -.1 },
+  ]),
+  ...group('child', { minAge: 0, maxAge: 17, minPlayerAge: 18, baseChance: .007 }, [
+    { id: 'household_child_care_closure', name: 'Childcare closes', description: "{name}'s childcare provider closes unexpectedly.", maxAge: 4, kind: 'negative', choices: [
+      option('home', 'Provide care yourself', 'Caregiving leaves less time for work.', { subjectChanges: { stability: .2 }, playerChanges: { stability: -.15 }, relationship: .3, years: 1, focusLimits: { standard: { work: 2 } } }),
+      option('replace', 'Arrange replacement care', 'New care protects your schedule but lowers lifestyle.', { subjectChanges: { social: .2 }, relationship: .1, lifestyle: -1, years: 1 }),
+    ] },
+    { id: 'household_child_science_fair', name: 'A science fair', description: '{name} asks for help building a science exhibit.', minAge: 6, maxAge: 16, choices: [
+      option('build', 'Build it together', 'The project takes time from your own activities.', { subjectChanges: { intelligence: .35, creativity: .25 }, playerChanges: { intelligence: .15 }, relationship: .3, years: 1, focusLimits: { standard: { self: 2 } } }),
+      option('advise', 'Offer occasional advice', '{name} builds independently with a little guidance.', { subjectChanges: { intelligence: .2, stability: .15 }, relationship: .15 }),
+    ] },
+    { id: 'household_child_driving', name: 'Driving practice', description: '{name} wants help learning to drive.', minAge: 16, maxAge: 17, kind: 'neutral', choices: [
+      option('teach', 'Practice together', 'Driving sessions replace some time with friends.', { subjectChanges: { intelligence: .3, stability: .2 }, playerChanges: { stability: -.1 }, relationship: .35, years: 1, focusLimits: { standard: { social: 2 } } }),
+      option('instructor', 'Arrange driving lessons', 'Lessons protect your time but lower lifestyle.', { subjectChanges: { intelligence: .35, stability: .15 }, playerChanges: { stability: .15 }, relationship: .1, lifestyle: -1, years: 1 }),
+    ] },
+    { id: 'household_child_rescued_stray', name: 'A rescued stray', description: '{name} helps a lost animal reach its owner.', minAge: 6, subjectChanges: { social: .25, stability: .15 }, playerChanges: { stability: .1 }, relationship: .15 },
+  ]),
 ];
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
