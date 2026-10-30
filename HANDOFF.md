@@ -2,7 +2,7 @@
 
 Updated 30 October 2026 for visible skill aptitudes using ice and fire emojis. Lifelines is a phone-first, generational life simulator. Preserve saves, lifestyle-only finances, and GitHub Pages deployment.
 
-The current update restores visible natural aptitude beside the five top skill ratings and in You and full personal profiles: one 🧊 for each negative point, one 🔥 for each positive point, and no emoji at zero. The top summary uses symbols only; You and full profiles also retain the signed numeric value, including 0. Accessible labels retain the signed -3 to +3 value. This is a presentation-only change; simulation rules, schema 11 saves, and the calibrated reference remain unchanged. All 242 tests, including 65 DOM checks, and 18 local HTTP asset checks pass. Phone visual checking remains unavailable because the browser access host is unavailable. Deployment verification is pending.
+The current update restores visible natural aptitude beside the five top skill ratings and in You and full personal profiles: one 🧊 for each negative point, one 🔥 for each positive point, and no emoji at zero. The top summary uses symbols only; You and full profiles also retain the signed numeric value, including 0. Accessible labels retain the signed -3 to +3 value. This is a presentation-only change; simulation rules, schema 11 saves, and the calibrated reference remain unchanged. All 242 tests, including 65 DOM checks, and 18 local HTTP asset checks pass. Phone visual checking remains unavailable because the browser access host is unavailable. GitHub Pages build and deploy succeeded for commit **28cc67a** (workflow run **41050572952**); all **18 live HTTP assets** returned 200 and matched the release.
 
 Release verification, 30 October 2026: GitHub Pages build and deploy jobs succeeded for gameplay commit **80285d1** (workflow run **41049209978**); all **18 live HTTP assets** returned 200 and matched the committed files. Live game: https://adaford.github.io/lifelines/. The legacy Pages builds endpoint still reported the previous commit, so the exact-commit Actions deployment and live file comparison establish this release.
 
@@ -26,7 +26,7 @@ The earlier gameplay baseline was commit **4da3288**; **6e56897** added portable
 | Cloud environment | lifelines, published privately in the owner's ChatGPT account |
 | Runtime | Node.js 24 for development and tests; static browser files in production |
 | Save schema | Version 11; browser key remains lifelines.save.v1 |
-| Automated checks | Current aptitude display: `npm ci` on Node 24.14.0; all 242 tests pass, including 65 DOM checks. All 18 local HTTP assets returned 200 and matched disk. Browser visual verification unavailable; deployment pending. |
+| Automated checks | Current aptitude display: `npm ci` on Node 24.14.0; all 242 tests pass, including 65 DOM checks. All 18 local HTTP assets returned 200 and matched disk. Browser visual verification unavailable; deployment verified for 28cc67a. |
 
 Read [AGENTS.md](AGENTS.md) before changing the project and [README.md](README.md) for the detailed current rules. Game progress lives in the player's browser, not in GitHub or the coding environment.
 
@@ -229,7 +229,7 @@ npm start
 
 The preview runs at http://127.0.0.1:4173. There is no production build command, database, or runtime dependency. ES modules require HTTP rather than opening index.html through file URLs. LinkeDOM is a development dependency for UI tests.
 
-The aptitude-emoji display update passes all **242 tests**, including **65 DOM checks**, after `npm ci` on Node **24.14.0**. All **18 local HTTP assets** returned 200 and matched disk. Simulation, saves, and calibration are unchanged. Phone visual verification could not be completed because the browser access host is unavailable. Deployment verification is pending.
+The aptitude-emoji display update passes all **242 tests**, including **65 DOM checks**, after `npm ci` on Node **24.14.0**. All **18 local HTTP assets** returned 200 and matched disk. Simulation, saves, and calibration are unchanged. Phone visual verification could not be completed because the browser access host is unavailable. GitHub Pages build and deploy succeeded for commit **28cc67a** (workflow run **41050572952**); all **18 live HTTP assets** returned 200 and matched the release.
 
 The previous grouped relative-effects and emoji release passed all **242 tests** on Node **24.14.0**, including **65 LinkeDOM checks**, after `npm ci`. All **18 local HTTP assets** returned 200 and matched disk. Coverage includes separated effect groups, hidden zero changes and empty groups, relative crying signs independent of stat magnitude, unchanged crying strength, later-age routine previews, rating limits, and preserved saves/RNG. Schema 11 and existing saved ratings remain unchanged. The 4,000-life reference was regenerated with `--fit`; the second fit iteration reached age-18 means within 0.025 of 5. A real-browser phone-layout check could not be completed because the browser access host is unavailable. GitHub Pages build and deploy jobs succeeded for gameplay commit **80285d1** (workflow run **41049209978**); all **18 live HTTP assets** returned 200 and matched the committed files.
 
