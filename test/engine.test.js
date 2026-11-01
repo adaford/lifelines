@@ -1208,7 +1208,7 @@ test('marriage raises pregnancy chances and a saved pregnancy produces an inheri
   advanceYear(pregnant);
   const child=pregnant.children[0];
   assert.equal(pregnant.pregnancy,null);
-  assert.equal(child.age,0); assert.equal(child.adopted,false); assert.ok(child.relationship >= 5 && child.relationship <= 10);
+  assert.equal(child.age,0); assert.equal(child.adopted,false); assert.ok(child.relationship >= 4 && child.relationship <= 10);
   assert.equal(child.lifestyle,pregnant.lifestyle);
   for(const {key} of SKILLS) {
     assert.ok(child.stats[key]>=0&&child.stats[key]<=10);

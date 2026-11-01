@@ -1,4 +1,4 @@
-import { MAX_FOCUS, DEFAULT_FOCUS, focusEffect, defaultFocus } from './focus-rules.js?v=childhood-deduction-1';
+import { MAX_FOCUS, DEFAULT_FOCUS, focusEffect, defaultFocus } from './focus-rules.js?v=parent-relationships-7';
 // Ratings use the same scale throughout life. Balanced toddler activities use
 // TODDLER_FOCUS; every stage uses 2 per area. Keep the historical calibration
 // offsets, with childhood deductions reduced to the requested tenth strength.

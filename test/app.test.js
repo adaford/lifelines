@@ -254,7 +254,7 @@ test('Mom helping with the load keeps each actual stat change on a separate revi
       assert.match(lines[0], /Your Mental stability 6\.5 \u2192 6\.7/);
       assert.match(lines[1], /Mental stability 3\.1 \u2192 3\.7/);
       assert.match(lines[2], /Health 6\.8 \u2192 6\.9/);
-      assert.match(lines[3], /Relationship 8\.6 \u2192 8\.8/);
+      assert.match(lines[3], /Relationship 7\.6 \u2192 7\.8/);
       assert.ok(lines.slice(1).every(line => line.includes(`${mom.name} (Mom)`)), 'each Mom change keeps its subject label');
       assert.doesNotMatch(results.textContent, /;/, "Mom's multiple outcomes are never joined by semicolons");
       assert.deepEqual(ui.saved(), before, 'rendering and reloading never rewrite saved history, ratings, or RNG');

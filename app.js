@@ -5,13 +5,13 @@ import {
   offeredJobs, needsEducationChoice, pendingEventSubject, focusLimits, focusLimitDetails, caregivers,
   relationshipOdds, meetingChances, proposalChance, pregnancyChance, oneNightChance,
   respondToEncounter, proposeMarriage, endRelationship, normalizeSurname, heightPercentile, statPercentiles
-} from './engine.js?v=childhood-deduction-1';
-import { annotateNarrative } from './narrative.js?v=childhood-deduction-1';
-import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome } from './display.js?v=childhood-deduction-1';
+} from './engine.js?v=parent-relationships-7';
+import { annotateNarrative } from './narrative.js?v=parent-relationships-7';
+import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome } from './display.js?v=parent-relationships-7';
 
-import { MAX_FOCUS, focusBudget } from './focus-rules.js?v=childhood-deduction-1';
-import { getBirthConditions } from './birth-conditions.js?v=childhood-deduction-1';
-import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=childhood-deduction-1';
+import { MAX_FOCUS, focusBudget } from './focus-rules.js?v=parent-relationships-7';
+import { getBirthConditions } from './birth-conditions.js?v=parent-relationships-7';
+import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=parent-relationships-7';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const app = document.querySelector('#app');

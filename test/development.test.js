@@ -56,8 +56,9 @@ function legacyV7(state) {
   return legacy;
 }
 
-test('new families have a mom and dad with varied bonds centered near eight', () => {
-  const bonds = [];
+test('new families have mom and dad relationships with mean seven and standard deviation one', () => {
+  const relationships = [];
+  const relationshipsByRole = { mom: [], dad: [] };
   const appearances = [];
   const heights = new Set();
   for (let seed = 1; seed <= 1000; seed++) {
@@ -65,16 +66,20 @@ test('new families have a mom and dad with varied bonds centered near eight', ()
     assert.equal(state.gender, 'male');
     assert.equal(state.parents.find(parent => parent.parentRole === 'mom')?.gender, 'female');
     assert.equal(state.parents.find(parent => parent.parentRole === 'dad')?.gender, 'male');
-    bonds.push(...state.parents.map(parent => parent.relationship));
+    relationships.push(...state.parents.map(parent => parent.relationship));
+    for (const parent of state.parents) relationshipsByRole[parent.parentRole].push(parent.relationship);
     appearances.push(state.stats.attractiveness);
     heights.add(state.height);
     assert.equal(validateSave(state), true, `seed ${seed}`);
   }
-  assert.ok(bonds.every(bond => bond >= 5 && bond <= 10));
-  assert.ok(Math.abs(average(bonds) - 8) < .2, `mean ${average(bonds)}`);
-  assert.ok(Math.abs(median(bonds) - 8) < .2, `median ${median(bonds)}`);
-  assert.ok(standardDeviation(bonds) > .7 && standardDeviation(bonds) < 1.2);
-  assert.ok(new Set(bonds).size > 100, 'bonds vary across families');
+  assert.ok(relationships.every(value => value >= 4 && value <= 10));
+  assert.ok(relationships.some(value => value < 5), 'relationships are not floored at five');
+  for (const [group, values] of Object.entries({ all: relationships, ...relationshipsByRole })) {
+    assert.ok(Math.abs(average(values) - 7) < .1, `${group} mean ${average(values)}`);
+    assert.ok(Math.abs(median(values) - 7) < .1, `${group} median ${median(values)}`);
+    assert.ok(Math.abs(standardDeviation(values) - 1) < .1, `${group} standard deviation ${standardDeviation(values)}`);
+  }
+  assert.ok(new Set(relationships).size > 100, 'relationships vary across families');
   assert.ok(appearances.every(value => value >= 0 && value <= 10));
   assert.ok(median(appearances) >= 4 && median(appearances) <= 8);
   assert.ok(standardDeviation(appearances) > 1.7 && standardDeviation(appearances) < 2.4, 'appearance starts with a broad spread');
