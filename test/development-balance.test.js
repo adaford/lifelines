@@ -1,3 +1,4 @@
+import { fitFocusBudget } from '../focus-rules.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { naturalSkillRating, skillChanges, childhoodWellbeing, infantChoiceEffects, wellbeingResponse, TODDLER_FOCUS } from '../development.js';
@@ -38,11 +39,11 @@ test('lifetime focus produces substantial gains, losses, and reversals without f
     age: 20, alive: true,
     stats: { intelligence: 5, strength: 5, social: 5, creativity: 5 },
     aptitudes: { intelligence: 0, strength: 0, social: 0, creativity: 0 },
-    focus: { work: 3, social: 3, family: 3, self: 3 },
+    focus: { work: 2, social: 2, family: 2, self: 2 },
   };
   assert.deepEqual(skillChanges(person), { intelligence: 0, strength: 0, social: 0, creativity: 0 });
-  const practice = { work: 5, social: 1, family: 1, self: 5 };
-  const neglect = { work: 1, social: 5, family: 5, self: 1 };
+  const practice = { work: 4, social: 0, family: 0, self: 4 };
+  const neglect = { work: 0, social: 4, family: 4, self: 0 };
   const advance = (state, focus, years) => {
     state.focus = focus;
     for (let year = 0; year < years; year++) {
@@ -66,10 +67,10 @@ test('aptitude helps learning and retention while care and older-age focus still
   const person = aptitude => ({
     age: 25, alive: true,
     stats: { intelligence: naturalSkillRating(aptitude) }, aptitudes: { intelligence: aptitude },
-    focus: { work: 5, social: 1, family: 1, self: 5 },
+    focus: { work: 4, social: 0, family: 0, self: 4 },
   });
   assert.ok(skillChanges(person(3)).intelligence > skillChanges(person(0)).intelligence);
-  const neglected = aptitude => ({ ...person(aptitude), focus: { work: 1, social: 5, family: 5, self: 1 } });
+  const neglected = aptitude => ({ ...person(aptitude), focus: { work: 0, social: 4, family: 4, self: 0 } });
   assert.ok(skillChanges(neglected(3)).intelligence > skillChanges(neglected(0)).intelligence);
   assert.ok(skillChanges(neglected(3)).intelligence < 0);
   const older = skillChanges({ ...person(0), age: 75 });
@@ -85,23 +86,23 @@ test('aptitude has a gentler influence on starting ratings, practice and routine
   assert.equal(naturalSkillRating(0), 5);
   assert.equal(naturalSkillRating(3), 6.8);
   for (const aptitude of [-3, 0, 3]) {
-    const person = { age: 25, stats: { strength: naturalSkillRating(aptitude) }, aptitudes: { strength: aptitude, health: aptitude }, focus: { self: 5 } };
-    assert.ok(Math.abs(skillChanges(person).strength - .1 * (1 + aptitude * .08)) < 1e-12);
+    const person = { age: 25, stats: { strength: naturalSkillRating(aptitude) }, aptitudes: { strength: aptitude, health: aptitude }, focus: { self: 4 } };
+    assert.ok(Math.abs(skillChanges(person).strength - .15 * (1 + aptitude * .08)) < 1e-12);
     person.focus.self = 1;
-    assert.ok(Math.abs(skillChanges(person).strength + .1 * (1 - aptitude * .07)) < 1e-12);
+    assert.ok(Math.abs(skillChanges(person).strength + .05 * (1 - aptitude * .07)) < 1e-12);
     assert.ok(Math.abs(wellbeingResponse(person, 'health', .2) - .1 * (1 + aptitude * .08)) < 1e-12);
     assert.ok(Math.abs(wellbeingResponse(person, 'health', -.2) + .1 * (1 - aptitude * .07)) < 1e-12);
   }
 });
 
 test('childhood wellbeing recovers toward its usual range while choices still matter', () => {
-  const child = { age: 10, alive: true, stats: { health: 5, stability: 5 }, focus: { work: 3, social: 3, family: 3, self: 3 } };
+  const child = { age: 10, alive: true, stats: { health: 5, stability: 5 }, focus: { work: 2, social: 2, family: 2, self: 2 } };
   const low = childhoodWellbeing({ ...child, stats: { health: 2, stability: 2 } });
   const high = childhoodWellbeing({ ...child, stats: { health: 9, stability: 9 } });
   assert.ok(low.health > 0 && low.stability > 0);
   assert.ok(high.health < 0 && high.stability < 0);
   const rested = childhoodWellbeing({ ...child, focus: { work: 1, social: 2, family: 4, self: 5 } });
-  const strained = childhoodWellbeing({ ...child, focus: { work: 5, social: 3, family: 3, self: 1 } });
+  const strained = childhoodWellbeing({ ...child, focus: { work: 4, social: 2, family: 2, self: 0 } });
   assert.ok(rested.health > strained.health);
   assert.ok(rested.stability > strained.stability);
   const baby = { ...child, age: 0 };
@@ -156,14 +157,14 @@ test('natural resilience boosts routine wellbeing gains and buffers losses witho
   for (const age of [2, 4, 5, 10, 17]) {
     const toddler = age < 5;
     const person = { age, alive: true, stats: { health: 2, stability: 9 },
-      focus: toddler ? { ...TODDLER_FOCUS } : { work: 3, social: 3, family: 3, self: 3 } };
+      focus: toddler ? { ...TODDLER_FOCUS } : { work: 2, social: 2, family: 2, self: 2 } };
     const before = structuredClone(person);
     const withAptitude = aptitude => ({ ...person, aptitudes: { health: aptitude, stability: aptitude } });
     const neutral = childhoodWellbeing(person);
     for (const aptitude of [-3, 0, 3]) assert.deepEqual(childhoodWellbeing(withAptitude(aptitude)), neutral,
       'natural resilience does not scale the background return toward wellbeing targets');
-    const positive = toddler ? { work: 1, social: 1, family: 5, self: 5, creative: 0 } : { work: 1, social: 3, family: 3, self: 5 };
-    const negative = toddler ? { work: 5, social: 5, family: 1, self: 1, creative: 0 } : { work: 5, social: 3, family: 3, self: 1 };
+    const positive = toddler ? { work: 0, social: 0, family: 4, self: 4, creative: 0 } : { work: 0, social: 2, family: 2, self: 4 };
+    const negative = toddler ? { work: 4, social: 4, family: 0, self: 0, creative: 0 } : { work: 4, social: 2, family: 2, self: 0 };
     for (const focus of [positive, negative]) {
       const values = [-3, 0, 3].map(aptitude => childhoodWellbeing({ ...withAptitude(aptitude), focus }));
       for (const key of ['health', 'stability']) {
@@ -234,9 +235,9 @@ test('independent game lives reach age 18 with average ratings near five and ret
     state.cryLevel = 3;
     let choiceSeed = (seed ^ 0xA5A5A5A5) >>> 0;
     while (state.age < 18 && state.alive) {
-      const target = state.age >= 2 && state.age < 5 ? TODDLER_FOCUS : { work: 3, social: 3, family: 3, self: 3 };
+      const target = state.age >= 2 && state.age < 5 ? TODDLER_FOCUS : { work: 2, social: 2, family: 2, self: 2 };
       const limits = focusLimits(state);
-      state.focus = Object.fromEntries(Object.entries(target).map(([key, points]) => [key, Math.min(points, limits[key] ?? 5)]));
+      state.focus = fitFocusBudget(state, Object.fromEntries(Object.entries(target).map(([key, points]) => [key, Math.min(points, limits[key] ?? 4)])));
       assert.equal(advanceYear(state).ok, true);
       while (state.pendingEvents.length) {
         const pending = state.pendingEvents[0];

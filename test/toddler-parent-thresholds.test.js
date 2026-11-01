@@ -1,3 +1,4 @@
+import { focusEffect } from '../focus-rules.js';
 import { changedRating } from '../rating-changes.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -18,26 +19,26 @@ function familyTime(age, points) {
 }
 
 test('toddler Family time has neutral parent relationships and mental stability at two points', () => {
-  for (const age of [2, 3, 4]) for (let points = 0; points <= 5; points++) {
+  for (const age of [2, 3, 4]) for (let points = 0; points <= 4; points++) {
     const state = familyTime(age, points);
     const before = structuredClone(state);
     const forecast = annualForecast(state);
     for (const parent of forecast.parents) {
-      assert.equal(parent.relationship.after, round(5 + (points - 2) * .04), `age ${age}, Family ${points}, relationship`);
-      assert.equal(parent.relationship.change, round((points - 2) * .04));
-      assert.equal(parent.stability.after, round(5 + (points - 2) * .0125), `age ${age}, Family ${points}, mental stability`);
-      assert.equal(parent.stability.change, round(round(5 + (points - 2) * .0125) - 5));
+      assert.equal(parent.relationship.after, round(5 + focusEffect(points) * .04), `age ${age}, Family ${points}, relationship`);
+      assert.equal(parent.relationship.change, round(focusEffect(points) * .04));
+      assert.equal(parent.stability.after, round(5 + focusEffect(points) * .0125), `age ${age}, Family ${points}, mental stability`);
+      assert.equal(parent.stability.change, round(round(5 + focusEffect(points) * .0125) - 5));
     }
     assert.deepEqual(state, before, 'the mean forecast never mutates a saved life or RNG');
   }
 });
 
-test('school-age Family keeps its existing parent thresholds', () => {
-  for (const age of [5, 17]) for (let points = 0; points <= 5; points++) {
+test('school-age Family uses the same two-point neutral and triple endpoints', () => {
+  for (const age of [5, 17]) for (let points = 0; points <= 4; points++) {
     const forecast = annualForecast(familyTime(age, points));
     for (const parent of forecast.parents) {
-      assert.equal(parent.relationship.after, round(5 + (points - 2) * .04));
-      assert.equal(parent.stability.after, round(5 + (points - 3) * .0125));
+      assert.equal(parent.relationship.after, round(5 + focusEffect(points) * .04));
+      assert.equal(parent.stability.after, round(5 + focusEffect(points) * .0125));
     }
   }
 });
@@ -51,7 +52,7 @@ test('toddler parent mental stability preserves aptitude response and background
     });
     const forecast = annualForecast(state);
     for (const parent of state.parents) {
-      const change = .08 * (5 - parent.stats.stability) + wellbeingResponse(parent, 'stability', (points - 2) * .025);
+      const change = .08 * (5 - parent.stats.stability) + wellbeingResponse(parent, 'stability', focusEffect(points) * .025);
       assert.equal(forecast.parents.find(row => row.id === parent.id).stability.after, changedRating(parent.stats.stability, change));
     }
   }

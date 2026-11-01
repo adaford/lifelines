@@ -1,7 +1,8 @@
 // Fictional life-sim probabilities and consequences, not real-world risk estimates.
 // Each eligible event gets an independent yearly roll. The engine caps a year at five.
 // Low/high factors are curved so extreme traits matter much more than small changes.
-import { APTITUDE_EVENTS } from './cross-aptitude-events.js?v=permanent-cross-stat-1';
+import { legacyFocusValue } from './focus-rules.js?v=birth-focus-1';
+import { APTITUDE_EVENTS } from './cross-aptitude-events.js?v=birth-focus-1';
 
 const low = key => [key, 'low'];
 const high = key => [key, 'high'];
@@ -326,7 +327,7 @@ function eligible(event, state, job) {
 
 export function eventChances(state, stats, job) {
   const inactive = state.ended || state.needsSuccession;
-  const focus = state.age < 2 ? { work: 0, social: 0, family: 0, self: 0 } : state.focus;
+  const focus = state.age < 2 ? { work: 0, social: 0, family: 0, self: 0 } : Object.fromEntries(Object.entries(state.focus || {}).map(([key, value]) => [key, legacyFocusValue(value, state.age < 5 && !['work', 'self'].includes(key) ? 2 : 3)]));
   return EVENTS.map(event => {
     let chance = inactive || !eligible(event, state, job) ? 0 : event.baseChance * (event.rare ? 1 : PERSONAL_EVENT_RATE_MULTIPLIER);
     const focusFactors = state.age < 5 && event.toddlerFocusFactors || event.focusFactors || [];

@@ -1,6 +1,7 @@
-import { annualForecast, effectiveStats, needsEducationChoice, focusLimits, caregivers } from './engine.js?v=permanent-cross-stat-1';
-import { infantChoiceEffects, wellbeingResponse, toddlerActivityEffects, toddlerActivityNeutral, toddlerActivitySteps, schoolFocusEffects, TODDLER_FOCUS, TODDLER_ACTIVITY_EFFECTS, PARENT_FAMILY_RELATIONSHIP_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=permanent-cross-stat-1';
-import { changedRating } from './rating-changes.js?v=permanent-cross-stat-1';
+import { annualForecast, effectiveStats, needsEducationChoice, focusLimits, caregivers, JOBS } from './engine.js?v=birth-focus-1';
+import { infantChoiceEffects, wellbeingResponse, toddlerActivityEffects, toddlerActivityNeutral, toddlerActivitySteps, schoolFocusEffects, focusChoiceEffects, focusEffectStrength, standardFocusCoefficients, STANDARD_FOCUS_EFFECTS, TODDLER_FOCUS, TODDLER_ACTIVITY_EFFECTS, PARENT_FAMILY_RELATIONSHIP_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=birth-focus-1';
+import { DEFAULT_FOCUS, focusEffect } from './focus-rules.js?v=birth-focus-1';
+import { changedRating } from './rating-changes.js?v=birth-focus-1';
 
 const nonzero = value => Math.abs(value) > .000001;
 const keyOf = entry => `${entry.parentId || 'you'}:${entry.stat}`;
@@ -10,8 +11,7 @@ const bounded = (before, change) => Math.max(0, Math.min(10, before + change)) -
 // activities. The activity rows separately account for selected points.
 export function toddlerActivityImpacts(activity) {
   const impacts = Object.entries(TODDLER_ACTIVITY_EFFECTS[activity] || {}).filter(([,change]) => nonzero(change)).map(([stat,change]) => {
-    const maximum = Math.max(...Object.values(TODDLER_ACTIVITY_EFFECTS).map(effects => Math.abs(effects[stat] || 0)));
-    const level = Math.min(3, Math.max(1, Math.ceil(3 * Math.abs(change) / maximum - 1e-8)));
+    const level = focusEffectStrength(TODDLER_ACTIVITY_EFFECTS, activity, stat);
     return { stat, change, level };
   });
   // Family time is the only toddler activity that improves parent relationships.
@@ -40,8 +40,8 @@ function toddlerChoiceEntries(state, activity, points, clip) {
   const entries = personalChoiceEntries(state, effects, clip);
   if (activity === 'family') {
     for (const parent of caregivers(state)) {
-      const stability = wellbeingResponse(parent, 'stability', .025 * (points - 2));
-      const relationship = PARENT_FAMILY_RELATIONSHIP_GAIN * (points - 2);
+      const stability = wellbeingResponse(parent, 'stability', .025 * focusEffect(points));
+      const relationship = PARENT_FAMILY_RELATIONSHIP_GAIN * focusEffect(points);
       entries.push({ stat: 'stability', parentId: parent.id, group: 'others', change: clip ? changedRating(parent.stats.stability, stability) - parent.stats.stability : stability });
       entries.push({ stat: 'relationship', parentId: parent.id, group: 'relationships', change: clip ? bounded(parent.relationship, relationship) : relationship });
     }
@@ -50,21 +50,20 @@ function toddlerChoiceEntries(state, activity, points, clip) {
 }
 
 // Each row shows its own contribution relative to the balanced activity points.
-// Comparing all 0–5 choices keeps the signs stable while reallocating a budget;
+// Comparing all 0–4 choices keeps the signs stable while reallocating a budget;
 // unrelated household changes and unused-point rest do not belong to any row.
 export function toddlerChoiceImpacts(state, activity) {
   if (state.age < 2 || state.age >= 5 || !Object.hasOwn(TODDLER_FOCUS, activity) || state.ended || state.alive === false || state.needsSuccession || state.pendingEvents.length || needsEducationChoice(state)) return [];
-  const points = Math.max(0, Math.min(5, state.focus[activity] ?? 0));
+  const points = Math.max(0, Math.min(focusLimits(state)[activity], state.focus[activity] ?? DEFAULT_FOCUS));
   const entries = toddlerChoiceEntries(state, activity, points, true);
-  return proportionalChoiceEntries(entries, entry => entry.parentId
-    ? points - 2 : toddlerActivitySteps(activity, entry.stat, points));
+  return proportionalChoiceEntries(entries, points, entry => entry.parentId ? 2 : focusEffectStrength(TODDLER_ACTIVITY_EFFECTS, activity, entry.stat));
 }
 
 // Each sign represents an equal raw contribution for this activity/person/stat.
 // Aptitude and current-rating response affect the outcome, never this scale.
-function proportionalChoiceEntries(entries, stepsFor) {
+function proportionalChoiceEntries(entries, points, strengthFor) {
   return entries.filter(entry => nonzero(entry.change)).map(entry => ({
-    ...entry, level: Math.min(3, Math.abs(stepsFor(entry))),
+    ...entry, level: Math.min(6, Math.abs(focusEffect(points)) * strengthFor(entry)),
   }));
 }
 
@@ -73,8 +72,8 @@ function schoolChoiceEntries(state, area, points, clip) {
   const entries = personalChoiceEntries(state, schoolFocusEffects(candidate, area), clip);
   if (area === 'family') {
     for (const parent of caregivers(state)) {
-      const stability = wellbeingResponse(parent, 'stability', .025 * (points - 3));
-      const relationship = PARENT_FAMILY_RELATIONSHIP_GAIN * (points - 2);
+      const stability = wellbeingResponse(parent, 'stability', .025 * focusEffect(points));
+      const relationship = PARENT_FAMILY_RELATIONSHIP_GAIN * focusEffect(points);
       entries.push({ stat: 'stability', parentId: parent.id, group: 'others', change: clip ? changedRating(parent.stats.stability, stability) - parent.stats.stability : stability });
       entries.push({ stat: 'relationship', parentId: parent.id, group: 'relationships', change: clip ? bounded(parent.relationship, relationship) : relationship });
     }
@@ -83,14 +82,14 @@ function schoolChoiceEntries(state, area, points, clip) {
 }
 
 // School and college show only each choice's own decision contribution. Keep
-// the same complete 0–5 reference as toddler rows when an event limits a choice.
+// the same complete 0–4 reference as toddler rows when an event limits a choice.
 export function schoolChoiceImpacts(state, area) {
   if (state.age < 5 || state.age >= 18 && state.education.status !== 'college'
       || !['work', 'social', 'family', 'self'].includes(area) || state.ended
       || state.alive === false || state.needsSuccession || state.pendingEvents.length || needsEducationChoice(state)) return [];
   const points = Math.max(0, Math.min(focusLimits(state)[area], state.focus[area] ?? 0));
   const entries = schoolChoiceEntries(state, area, points, true);
-  return proportionalChoiceEntries(entries, entry => points - (entry.parentId && entry.stat === 'relationship' ? 2 : 3));
+  return proportionalChoiceEntries(entries, points, entry => entry.parentId ? 2 : focusEffectStrength(STANDARD_FOCUS_EFFECTS, area, entry.stat));
 }
 
 function forecastEntries(state, forecast) {
@@ -138,42 +137,33 @@ function cryEntries(state, level, clip) {
   return entries;
 }
 
-// Vertices of the legal 12-point allocation space, including temporary caps. Routine focus
-// effects reach their positive/negative extremes at these allocations; including
-// the current allocation also covers discontinuities such as career thresholds.
-function focusExtremes(keys, limits) {
-  const result = new Map();
-  const add = values => result.set(values.join(','), Object.fromEntries(keys.map((key, i) => [key, values[i]])));
-  for (let mask = 0; mask < 2 ** keys.length; mask++) {
-    const values = keys.map((key, i) => mask & (1 << i) ? limits[key] : 0);
-    const used = values.reduce((sum, value) => sum + value, 0);
-    if (used > 12) continue;
-    add(values);
-    const remaining = 12 - used;
-    if (remaining > 0) {
-      values.forEach((value, i) => {
-        if (!value && remaining < limits[keys[i]]) add(values.map((v, j) => j === i ? remaining : v));
-      });
-    }
+function adultFocusEntries(state, clip) {
+  const career = JOBS.find(job => job.id === state.jobId);
+  const effects = focusChoiceEffects(state, career);
+  const unemployedStrain = !career && state.education.status !== 'college'
+    ? wellbeingResponse(state, 'stability', -.15 * Math.max(0, focusEffect(state.focus.work))) : 0;
+  const entries = personalChoiceEntries(state, effects, clip);
+  const stability = entries.find(entry => entry.stat === 'stability');
+  if (unemployedStrain) stability.change = clip
+    ? changedRating(changedRating(state.stats.stability, effects.stability), unemployedStrain) - state.stats.stability
+    : stability.change + unemployedStrain;
+  const effort = focusEffect(state.focus.family);
+  for (const parent of caregivers(state)) {
+    const stability = wellbeingResponse(parent, 'stability', .025 * effort);
+    const relationship = PARENT_FAMILY_RELATIONSHIP_GAIN * effort;
+    entries.push({ stat: 'stability', parentId: parent.id, group: 'others', change: clip ? changedRating(parent.stats.stability, stability) - parent.stats.stability : stability });
+    entries.push({ stat: 'relationship', parentId: parent.id, group: 'relationships', change: clip ? bounded(parent.relationship, relationship) : relationship });
   }
-  return [...result.values()];
+  return entries;
 }
 
-let cachedFocusKey;
-let cachedFocusEntries;
-function focusComparisons(state) {
-  // Reuse alternatives while the user changes only the allocation. No saved
-  // state or RNG is written, and any other state change invalidates the cache.
-  const cacheKey = JSON.stringify({ ...state, focus: null });
-  if (cacheKey !== cachedFocusKey) {
-    const keys = state.age < 5 ? ['work', 'social', 'family', 'self', 'creative'] : ['work', 'social', 'family', 'self'];
-    cachedFocusEntries = focusExtremes(keys, focusLimits(state)).map(focus => {
-      const candidate = { ...state, focus };
-      return forecastEntries(candidate, annualForecast(candidate));
-    });
-    cachedFocusKey = cacheKey;
-  }
-  return cachedFocusEntries;
+function adultFocusLevel(state, entry) {
+  if (entry.parentId) return 2 * Math.abs(focusEffect(state.focus.family));
+  const career = JOBS.find(job => job.id === state.jobId);
+  const coefficients = standardFocusCoefficients(state, career);
+  if (!career && state.education.status !== 'college' && focusEffect(state.focus.work) > 0) coefficients.work.stability -= .15;
+  const units = Object.entries(coefficients).reduce((sum, [area, effects]) => sum + Math.sign(effects[entry.stat] || 0) * focusEffectStrength(coefficients, area, entry.stat) * focusEffect(state.focus[area]), 0);
+  return Math.min(6, Math.max(1, Math.abs(units)));
 }
 
 // Qualitative signs compare options for the same person and stat, never a fixed
@@ -182,11 +172,15 @@ function focusComparisons(state) {
 export function choiceImpacts(state) {
   if (state.ended || state.alive === false || state.needsSuccession || state.pendingEvents.length || needsEducationChoice(state)) return [];
   const infant = state.age < 2;
-  const entries = infant ? cryEntries(state, state.cryLevel, true) : forecastEntries(state, annualForecast(state));
+  if (!infant) {
+    const limits = focusLimits(state);
+    state = { ...state, focus: Object.fromEntries(Object.entries(limits).map(([area, cap]) => [area, Math.max(0, Math.min(cap, state.focus[area] ?? DEFAULT_FOCUS))])) };
+  }
+  const entries = infant ? cryEntries(state, state.cryLevel, true) : adultFocusEntries(state, true);
   const comparisons = infant
     ? [1, 2, 3, 4, 5].map(level => cryEntries(state, level, false))
-    : [...focusComparisons(state), entries];
-  const raw = infant ? cryEntries(state, state.cryLevel, false) : entries;
+    : [];
+  const raw = infant ? cryEntries(state, state.cryLevel, false) : adultFocusEntries(state, false);
   return entries.filter(entry => nonzero(entry.change)).map(entry => {
     const key = keyOf(entry);
     const change = raw.find(candidate => keyOf(candidate) === key).change;
@@ -197,9 +191,7 @@ export function choiceImpacts(state) {
       const ordered = [...new Set(magnitudes.map(value => Math.round(value * 1e8)))].sort((a, b) => a - b);
       level = Math.min(3, ordered.indexOf(Math.round(Math.abs(change) * 1e8)) + 1);
     } else {
-      const maximum = Math.max(Math.abs(change), ...magnitudes);
-      level = Math.max(...possible) - Math.min(...possible) < .000001 ? 1
-        : Math.min(3, Math.max(1, Math.ceil(3 * Math.abs(change) / maximum - 1e-8)));
+      level = adultFocusLevel(state, entry);
     }
     return { ...entry, level };
   });

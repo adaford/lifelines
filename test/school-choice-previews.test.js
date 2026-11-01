@@ -1,14 +1,15 @@
+import { focusEffect, focusBudget } from '../focus-rules.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createGame, migrateSave } from '../engine.js';
-import { schoolFocusEffects } from '../development.js';
+import { schoolFocusEffects, STANDARD_FOCUS_EFFECTS } from '../development.js';
 import { schoolChoiceImpacts } from '../choice-impacts.js';
 
 function student(age = 12) {
   const state = createGame({ seed: 71321 });
   state.age = age;
   state.education = { status: age < 18 ? 'school' : 'college', years: 0 };
-  state.focus = { work: 3, social: 3, family: 3, self: 3 };
+  state.focus = { work: 2, social: 2, family: 2, self: 2 };
   for (const key of Object.keys(state.stats)) {
     state.stats[key] = 5;
     state.aptitudes[key] = 0;
@@ -24,7 +25,7 @@ function student(age = 12) {
 function selected(state, area, points) {
   const candidate = structuredClone(state);
   candidate.focus[area] = points;
-  let excess = Object.values(candidate.focus).reduce((sum, value) => sum + value, 0) - 12;
+  let excess = Object.values(candidate.focus).reduce((sum, value) => sum + value, 0) - focusBudget(candidate.age);
   for (const key of ['work', 'social', 'family', 'self']) {
     if (key === area || excess <= 0) continue;
     const taken = Math.min(candidate.focus[key], excess);
@@ -45,13 +46,15 @@ test('school and college show each choice contribution with toddler-style relati
   for (const age of [5, 12, 17, 19]) for (const aptitude of [-3, 0, 3]) {
     const state = student(age);
     for (const stat of Object.keys(state.aptitudes)) state.aptitudes[stat] = aptitude;
-    for (const [area, affected] of Object.entries(ownStats)) for (let points = 0; points <= 5; points++) {
+    for (const [area, affected] of Object.entries(ownStats)) for (let points = 0; points <= 4; points++) {
       const candidate = selected(state, area, points), before = structuredClone(candidate);
       const entries = schoolChoiceImpacts(candidate, area).filter(entry => !entry.parentId);
-      assert.deepEqual(entries.map(entry => entry.stat).sort(), points === 3 ? [] : Object.keys(affected).sort(), `${age} ${area} ${points} includes only the choice's stats`);
+      assert.deepEqual(entries.map(entry => entry.stat).sort(), points === 2 ? [] : Object.keys(affected).sort(), `${age} ${area} ${points} includes only the choice's stats`);
       for (const entry of entries) {
-        assert.equal(Math.sign(entry.change), Math.sign(points - 3) * affected[entry.stat]);
-        assert.equal(entry.level, [3, 2, 1, 0, 1, 2][points], `${age} ${area} ${points} ${entry.stat}`);
+        assert.equal(Math.sign(entry.change), Math.sign(focusEffect(points)) * affected[entry.stat]);
+        const maximum = Math.max(...Object.values(STANDARD_FOCUS_EFFECTS).map(effects => Math.abs(effects[entry.stat] || 0)));
+        const strength = Math.ceil(2 * Math.abs(STANDARD_FOCUS_EFFECTS[area][entry.stat]) / maximum - 1e-8);
+        assert.equal(entry.level, Math.abs(focusEffect(points)) * strength, `${age} ${area} ${points} ${entry.stat}`);
       }
       assert.deepEqual(candidate, before, 'comparison does not mutate choices, saves, or RNG');
     }
@@ -65,9 +68,9 @@ test('school contribution magnitudes include halved practice and stress without 
   assert.ok(Math.abs(effects.intelligence + .129375) < 1e-10);
   assert.ok(Math.abs(effects.stability - .15) < 1e-10, 'less School relieves only its own stress');
   assert.equal(effects.health, 0);
-  const high = selected(state, 'self', 5);
+  const high = selected(state, 'self', 4);
   effects = schoolFocusEffects(high, 'self');
-  for (const [stat, amount] of Object.entries({ intelligence: .04025, strength: .115, creativity: .092, health: .035, stability: .07 })) {
+  for (const [stat, amount] of Object.entries({ intelligence: .0646875, strength: .1725, creativity: .138, health: .0525, stability: .15 })) {
     assert.ok(Math.abs(effects[stat] - amount) < 1e-10, `${stat} uses half-strength self-focus`);
   }
   const initial = schoolChoiceImpacts(low, 'work');
@@ -79,28 +82,28 @@ test('school contribution magnitudes include halved practice and stress without 
   low.focus.self = 0;
   assert.deepEqual(schoolChoiceImpacts(low, 'work').map(({ stat, change, level }) => ({ stat, change: Math.round(change * 100), level })),
     initial.map(({ stat, change, level }) => ({ stat, change: Math.round(change * 100), level })), 'household decline, reversion, and spare points stay out of the School row');
-  const college = selected(student(19), 'work', 5);
+  const college = selected(student(19), 'work', 4);
   const collegeEffects = schoolFocusEffects(college, 'work');
-  assert.ok(Math.abs(collegeEffects.intelligence - .075) < 1e-10);
-  assert.ok(Math.abs(collegeEffects.stability + .1) < 1e-10);
+  assert.ok(Math.abs(collegeEffects.intelligence - .1125) < 1e-10);
+  assert.ok(Math.abs(collegeEffects.stability + .15) < 1e-10);
 });
 
 test('Family previews retain school caregiver neutral points and follow guardians', () => {
   const state = student();
-  for (let points = 0; points <= 5; points++) {
+  for (let points = 0; points <= 4; points++) {
     const entries = schoolChoiceImpacts(selected(state, 'family', points), 'family');
     for (const parent of state.parents) {
       const stability = entries.find(entry => entry.parentId === parent.id && entry.stat === 'stability');
       const relationship = entries.find(entry => entry.parentId === parent.id && entry.stat === 'relationship');
-      if (points === 3) assert.equal(stability, undefined);
+      if (points === 2) assert.equal(stability, undefined);
       else {
-        assert.ok(Math.abs(stability.change - (Math.round((5 + (points - 3) * .0125) * 100) / 100 - 5)) < 1e-10);
-        assert.equal(stability.level, [3, 2, 1, 0, 1, 2][points]);
+        assert.ok(Math.abs(stability.change - (Math.round((5 + (focusEffect(points)) * .0125) * 100) / 100 - 5)) < 1e-10);
+        assert.equal(stability.level, [6, 2, 0, 2, 6][points]);
       }
       if (points === 2) assert.equal(relationship, undefined);
       else {
-        assert.ok(Math.abs(relationship.change - (points - 2) * .04) < 1e-10);
-        assert.equal(relationship.level, [2, 1, 0, 1, 2, 3][points]);
+        assert.ok(Math.abs(relationship.change - (focusEffect(points)) * .04) < 1e-10);
+        assert.equal(relationship.level, [6, 2, 0, 2, 6][points]);
       }
     }
     assert.ok(entries.every(entry => entry.stat !== 'lifestyle'));
@@ -108,23 +111,23 @@ test('Family previews retain school caregiver neutral points and follow guardian
   state.parents.forEach(parent => { parent.abandonedAt = 11; });
   state.guardian = { ...structuredClone(state.parents[0]), id: 'guardian-school', guardianRole: 'aunt', adoptedAt: 11 };
   delete state.guardian.abandonedAt;
-  const entries = schoolChoiceImpacts(selected(state, 'family', 5), 'family').filter(entry => entry.parentId);
+  const entries = schoolChoiceImpacts(selected(state, 'family', 4), 'family').filter(entry => entry.parentId);
   assert.deepEqual(entries.map(entry => [entry.parentId, entry.stat]), [['guardian-school', 'stability'], ['guardian-school', 'relationship']]);
 });
 
 test('school rows respect active caps and rating limits without reranking signs', () => {
-  const state = selected(student(), 'work', 5);
-  state.effects = [{ id: 'limited-school', name: 'Recovery', years: 1, modifiers: {}, focusLimits: { standard: { work: 2 } } }];
+  const state = selected(student(), 'work', 4);
+  state.effects = [{ id: 'limited-school', name: 'Recovery', years: 1, modifiers: {}, focusLimits: { standard: { work: 1 } } }];
   const before = structuredClone(state);
   const capped = schoolChoiceImpacts(state, 'work');
-  assert.equal(capped.find(entry => entry.stat === 'intelligence').level, 1);
+  assert.equal(capped.find(entry => entry.stat === 'intelligence').level, 2);
   assert.ok(capped.find(entry => entry.stat === 'intelligence').change < 0);
   assert.deepEqual(state, before, 'reading the cap never reallocates saved points');
   state.effects = [];
   state.stats.intelligence = 9.99;
   let entry = schoolChoiceImpacts(state, 'work').find(entry => entry.stat === 'intelligence');
   assert.ok(entry.change > 0 && entry.change < .02);
-  assert.equal(entry.level, 2);
+  assert.equal(entry.level, 6);
   state.stats.intelligence = 10;
   assert.ok(!schoolChoiceImpacts(state, 'work').some(entry => entry.stat === 'intelligence'));
   state.stats.intelligence = 9;
@@ -135,13 +138,13 @@ test('school rows respect active caps and rating limits without reranking signs'
   const low = selected(student(), 'work', 0);
   low.stats.intelligence = 0;
   assert.ok(!schoolChoiceImpacts(low, 'work').some(entry => entry.stat === 'intelligence'));
-  const family = selected(student(), 'family', 5);
+  const family = selected(student(), 'family', 4);
   family.parents.forEach(parent => { parent.stats.stability = 10; parent.relationship = 10; });
   assert.ok(schoolChoiceImpacts(family, 'family').every(entry => !entry.parentId));
 });
 
 test('school rows survive reloads and hide outside school or when progression is blocked', () => {
-  const state = selected(student(), 'family', 5);
+  const state = selected(student(), 'family', 4);
   const before = structuredClone(state), entries = schoolChoiceImpacts(state, 'family');
   const reloaded = migrateSave(JSON.parse(JSON.stringify(state)));
   assert.ok(reloaded);

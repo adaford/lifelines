@@ -10,7 +10,7 @@ test('new lives inherit bounded wellbeing aptitudes and all generation routes re
   const observed = { health: new Set(), stability: new Set() };
   for (let seed = 1; seed <= 120; seed++) {
     const state = createGame({ seed });
-    assert.equal(state.version, 16);
+    assert.equal(state.version, 17);
     for (const key of wellbeing) {
       const average = (state.parents[0].aptitudes[key] + state.parents[1].aptitudes[key]) / 2;
       const inherited = Math.sign(average) * Math.round(Math.abs(average));
@@ -39,12 +39,13 @@ test('v11 migration adds neutral wellbeing aptitude without changing any saved p
   legacy.focus = { work: 2, social: 3, family: 2, self: 2, creative: 3 };
   legacy.pendingEvents = [{ eventId: 'school_play', age: 4 }];
   legacy.lastYearEvents = ['school_play'];
-  stripWellbeingAptitudes(legacy);
   legacy.version = 11;
+  stripWellbeingAptitudes(legacy);
   const before = copy(legacy);
   const migrated = migrateSave(legacy);
   const expected = neutralWellbeingAptitudes(copy(before));
-  expected.version = 16;
+  expected.version = 17;
+  expected.focus = { work: 1, social: 3, family: 2, self: 1, creative: 3 };
   assert.deepEqual(migrated, expected);
   assert.deepEqual(legacy, before);
   assert.equal(migrated.focus.creative, 3, 'v11 crafts choices are not reset');
@@ -67,8 +68,8 @@ test('wellbeing aptitude strengthens routine adult recovery and buffers routine 
   template.age = 30;
   for (const key of wellbeing) template.stats[key] = 5;
   for (const focus of [
-    { work: 0, social: 3, family: 4, self: 5 },
-    { work: 5, social: 5, family: 0, self: 0 },
+    { work: 0, social: 2, family: 2, self: 4 },
+    { work: 4, social: 4, family: 0, self: 0 },
   ]) {
     const low = { ...copy(template), focus }, high = copy(low);
     for (const key of wellbeing) { low.aptitudes[key] = -3; high.aptitudes[key] = 3; }
@@ -77,7 +78,7 @@ test('wellbeing aptitude strengthens routine adult recovery and buffers routine 
     for (const key of wellbeing) assert.ok(faster.stats[key].change > slower.stats[key].change, key);
     assert.deepEqual(high, original, 'reading aptitude-sensitive forecasts is pure');
   }
-  const low = { ...copy(template), age: 65, focus: { work: 3, social: 3, family: 3, self: 2 } }, high = copy(low);
+  const low = { ...copy(template), age: 65, focus: { work: 2, social: 2, family: 2, self: 2 } }, high = copy(low);
   low.aptitudes.health = -3; high.aptitudes.health = 3;
   assert.equal(annualForecast(low).stats.health.change, annualForecast(high).stats.health.change, 'aging loss itself is not a practice effect');
 });

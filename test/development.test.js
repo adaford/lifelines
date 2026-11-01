@@ -96,7 +96,7 @@ test('mean attractiveness stays at its initial level and declines only after the
     const adult = aged(threshold - 1, 345, gender);
     adult.stats.attractiveness = 7;
     adult.effects = [];
-    adult.focus = { work: 5, social: 1, family: 1, self: 5 };
+    adult.focus = { work: 4, social: 0, family: 0, self: 4 };
     assert.equal(annualForecast(adult).stats.attractiveness.change, 0);
     advanceYear(adult, meanYear);
     finishChoices(adult);
@@ -222,7 +222,7 @@ test('v7 migration preserves existing height, bonds, random state and non-infant
   const before = copy(legacy);
   const migrated = migrateSave(legacy);
   assert.ok(migrated);
-  assert.equal(migrated.version, 16);
+  assert.equal(migrated.version, 17);
   for (const key of ['rng', 'seed', 'nextId', 'age', 'stats', 'pendingEvents', 'history']) assert.deepEqual(migrated[key], before[key], key);
   assert.equal(migrated.height, round(before.height / 2.54));
   assert.equal(migrated.yearSummary.height.before, round(before.yearSummary.height.before / 2.54));

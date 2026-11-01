@@ -36,7 +36,7 @@ test('new wellbeing and material events are permanent while injuries retain acti
 test('a backyard invention records permanent two-tenths gains without creating a temporary effect', () => {
   const original = createGame({ seed: 33021 });
   original.age = 3;
-  original.focus = { work: 3, social: 2, family: 2, self: 3, creative: 2 };
+  original.focus = { work: 2, social: 2, family: 2, self: 2, creative: 2 };
   for (const key of Object.keys(original.stats)) original.stats[key] = 5;
   let found;
   for (let attempt = 1; attempt <= 600; attempt++) {

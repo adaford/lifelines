@@ -25,7 +25,7 @@ test('v15 upgrades without changing pending choices, saved buffs, base ratings o
   state.pendingEvents = [{ eventId: 'school_play', age: state.age }];
   state.lastYearEvents = ['school_play'];
   const before = structuredClone(state);
-  assert.deepEqual(migrateSave(state), { ...before, version: 16 });
+  assert.deepEqual(migrateSave(state), { ...before, version: 17, focus: { work: 1, social: 1, family: 1, self: 1 } });
   assert.deepEqual(state, before);
 });
 

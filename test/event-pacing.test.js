@@ -9,7 +9,7 @@ function balancedLife(age) {
   const stats = Object.fromEntries(keys.map(key => [key, 5]));
   return {
     age, stats, lifestyle: 5,
-    focus: age >= 2 && age < 5 ? { work: 3, social: 2, family: 2, self: 3, creative: 2 } : { work: 3, social: 3, family: 3, self: 3 },
+    focus: age >= 2 && age < 5 ? { work: 2, social: 2, family: 2, self: 2, creative: 2 } : { work: 2, social: 2, family: 2, self: 2 },
     education: { status: age < 18 ? 'school' : 'workforce' },
     parents: [
       { id: 'mom', age: age + 30, stats: { ...stats }, relationship: 8 },

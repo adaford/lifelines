@@ -60,7 +60,7 @@ test('aptitude events change only the target, respect both bounds and survive sa
 test('new modifier-shaped outcomes are permanent, while only activity limits are temporary', () => {
   const state = createGame({ seed: 51 });
   state.age = 2;
-  state.focus = { work: 3, social: 2, family: 2, self: 3, creative: 2 };
+  state.focus = { work: 2, social: 2, family: 2, self: 2, creative: 2 };
   state.stats.social = state.stats.health = 5;
   resolve(state, 'legacy_shape');
   assert.equal(state.stats.social, 5.5, 'permanent and formerly temporary contributions merge before scaling');
@@ -88,7 +88,7 @@ test('legacy timed effects remain unchanged and forecast reads are pure', () => 
 test('a new restriction cannot overwrite a legacy stat effect from the same event', () => {
   const state = createGame({ seed: 51 });
   state.age = 2;
-  state.focus = { work: 3, social: 2, family: 2, self: 3, creative: 2 };
+  state.focus = { work: 2, social: 2, family: 2, self: 2, creative: 2 };
   const legacy = { id: event.id, name: event.name, description: 'Saved outcome', years: 4, modifiers: { health: .7 }, lifestyle: 1, kind: 'positive' };
   state.effects = [structuredClone(legacy)];
   resolve(state, 'legacy_shape');
@@ -107,7 +107,7 @@ test('a new restriction cannot overwrite a legacy stat effect from the same even
 test('a full legacy effect history can coexist with new restrictions and still reload', () => {
   const state = createGame({ seed: 51 });
   state.age = 2;
-  state.focus = { work: 3, social: 2, family: 2, self: 3, creative: 2 };
+  state.focus = { work: 2, social: 2, family: 2, self: 2, creative: 2 };
   state.effects = Array.from({ length: 27 }, (_, index) => ({ id: `legacy-${index}`, name: 'Saved bonus', description: '', years: 5, modifiers: { social: .1 }, kind: 'positive' }));
   const legacy = structuredClone(state.effects);
   resolve(state, 'legacy_shape');

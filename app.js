@@ -5,11 +5,13 @@ import {
   offeredJobs, needsEducationChoice, pendingEventSubject, focusLimits, focusLimitDetails, caregivers,
   relationshipOdds, meetingChances, proposalChance, pregnancyChance, oneNightChance,
   respondToEncounter, proposeMarriage, endRelationship, normalizeSurname, heightPercentile, statPercentiles
-} from './engine.js?v=permanent-cross-stat-1';
-import { annotateNarrative } from './narrative.js?v=permanent-cross-stat-1';
-import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome } from './display.js?v=event-stat-lines-1';
+} from './engine.js?v=birth-focus-1';
+import { annotateNarrative } from './narrative.js?v=birth-focus-1';
+import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome } from './display.js?v=birth-focus-1';
 
-import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=permanent-cross-stat-1';
+import { MAX_FOCUS, focusBudget } from './focus-rules.js?v=birth-focus-1';
+import { getBirthConditions } from './birth-conditions.js?v=birth-focus-1';
+import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=birth-focus-1';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const app = document.querySelector('#app');
@@ -115,6 +117,24 @@ const percentileTag = (percentiles, key) => percentiles ? `<span class="stat-per
 const helpButton = (topic, label, id = '') => `<button type="button" class="help-button" data-action="topic-help" data-topic="${esc(topic)}" ${id?`data-id="${esc(id)}"`:''} aria-label="About ${esc(label)}" aria-haspopup="dialog"><span aria-hidden="true">?</span></button>`;
 const labelWithHelp = (label, topic, id = '') => `<span class="label-with-help">${esc(label)}${statEmoji(topic)}${helpButton(topic,label,id)}</span>`;
 
+function birthConditionEffects(condition) {
+  const effects = Object.entries(condition.statChanges || {}).filter(([,amount])=>amount).map(([key,amount])=>`${signedModifier(amount)} ${skillLabel(key)} at birth`);
+  if (condition.focusPoints) effects.push(`${condition.focusPoints>0?'+':''}${condition.focusPoints} focus point${Math.abs(condition.focusPoints)===1?'':'s'} each year from age 2, lifelong`);
+  for (const [stage,limits] of Object.entries(condition.focusLimits || {})) {
+    for (const [key,max] of Object.entries(limits)) {
+      const label = stage==='toddler'?toddlerFocusRows.find(([area])=>area===key)?.[1]:({work:'School / College / Career',social:'Friends',family:'Family',self:'Yourself'})[key];
+      effects.push(`${label || key} max ${max} ${stage==='toddler'?'at ages 2–4':'from age 5'}, lifelong`);
+    }
+  }
+  return effects;
+}
+
+function birthConditionsView(person) {
+  const conditions = getBirthConditions(person);
+  if (!conditions.length) return '';
+  return `<div class="birth-conditions" aria-label="${esc(person.name)}: birth conditions">${conditions.map(condition=>`<span class="birth-condition" data-condition-id="${esc(condition.id)}"><span>${esc(condition.name)}</span><button type="button" class="help-button" data-action="topic-help" data-topic="condition-${esc(condition.id)}" data-id="${esc(person.id)}" aria-label="About ${esc(person.name)}: ${esc(condition.name)}. ${esc(birthConditionEffects(condition).join('. '))}." aria-haspopup="dialog"><span aria-hidden="true">?</span></button></span>`).join('')}</div>`;
+}
+
 function loadGame() {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
@@ -193,7 +213,7 @@ function render() {
       <div class="top-actions"><span class="save-status">${icon(saveAvailable ? 'check' : 'download')}${saveAvailable ? 'Saved' : 'Session only'}</span><button class="icon-button" data-action="menu" aria-label="More options" aria-haspopup="dialog">${icon('menu')}</button></div>
     </header>
     ${isYear ? `
-    <section class="profile-bar" aria-label="Your life"><div class="portrait">${avatar(state)}</div><div class="profile-copy"><p class="eyebrow">GENERATION ${state.generation}</p><div class="profile-name-row"><h1 class="person-name">${esc(state.name)}</h1></div><div class="profile-identity">${genderBadge(state)}<button class="profile-height" data-stat="height" data-action="topic-help" data-topic="height" data-id="${esc(state.id)}" aria-haspopup="dialog" aria-label="Height ${heightDescription(state.height,state.age)}. Open help."><strong class="status-value">${formatHeight(state.height,state.age)}</strong>${percentiles?percentileTag(percentiles,'height'):state.age>=18?'<span class="height-percentile">Adult height</span>':''}</button></div>${profileLifestyleView()}</div><div class="profile-age"><strong>${state.age}</strong>${state.age<2?'':`<p class="profile-stage">${state.age<5?'Toddler':state.age<18?'Student':state.education.status==='college'?'College student':career()?.name || 'Finding a path'}</p>`}<span>YEARS OLD</span></div></section>
+    <section class="profile-bar" aria-label="Your life"><div class="portrait">${avatar(state)}</div><div class="profile-copy"><p class="eyebrow">GENERATION ${state.generation}</p><div class="profile-name-row"><h1 class="person-name">${esc(state.name)}</h1></div><div class="profile-identity">${genderBadge(state)}<button class="profile-height" data-stat="height" data-action="topic-help" data-topic="height" data-id="${esc(state.id)}" aria-haspopup="dialog" aria-label="Height ${heightDescription(state.height,state.age)}. Open help."><strong class="status-value">${formatHeight(state.height,state.age)}</strong>${percentiles?percentileTag(percentiles,'height'):state.age>=18?'<span class="height-percentile">Adult height</span>':''}</button></div>${profileLifestyleView()}${birthConditionsView(state)}</div><div class="profile-age"><strong>${state.age}</strong>${state.age<2?'':`<p class="profile-stage">${state.age<5?'Toddler':state.age<18?'Student':state.education.status==='college'?'College student':career()?.name || 'Finding a path'}</p>`}<span>YEARS OLD</span></div></section>
     <div class="status-strip" aria-label="At a glance">${DISPLAY_STATS.map(skill=>[skill.key,skill.label,stats[skill.key]]).map(([key,label,value])=>`<button class="status-pill" data-stat="${key}" data-action="topic-help" data-topic="${key}" data-id="${esc(state.id)}" aria-haspopup="dialog" aria-label="${label} ${number(value)} out of 10.${Number.isInteger(state.aptitudes[key]) && state.aptitudes[key]!==0?` Natural aptitude ${aptitude(state.aptitudes[key])}.`: ''} ${esc(statEffectDescription(key))} Open help."><span class="status-label">${label}${statEmoji(key)}</span><span class="status-reading"><strong class="status-value">${number(value)}<small>/10</small></strong>${aptitudeBadge(state.aptitudes[key])}${statEffectBadge(key)}</span>${ratingBar(label,value,key)}</button>`).join('')}</div>
     ` : ''}
       <main class="main-column" id="main-content">${activeTab==='career'||isYear&&!stageNames[lifeStage]?'':`<div class="chapter-heading"><h2>${isYear ? stageNames[lifeStage] : ({family:'A life, connected'}[activeTab])}<span style="color:var(--orange)">.</span></h2></div>`}
@@ -218,7 +238,7 @@ function focusLabel(key) {
 
 function outcomeLimits(outcome) {
   const limits = state.age<2?{}:outcome.focusLimits?.[state.age<5?'toddler':'standard'] || {};
-  return Object.entries(limits).filter(([,max])=>max<5).map(([key,max])=>`${focusLabel(key)} max ${max}`);
+  return Object.entries(limits).filter(([,max])=>max<MAX_FOCUS).map(([key,max])=>`${focusLabel(key)} max ${max}`);
 }
 
 function outcomeSummary(outcome, subject, pending) {
@@ -270,7 +290,7 @@ function yearView() {
   const baby = state.age < 2;
   const toddler = !baby && state.age < 5;
   const disabled = state.ended || state.needsSuccession || state.pendingEvents.length>0;
-  return `${state.education.status==='college'?collegeProgressView():''}<section class="panel focus-panel"><div class="panel-heading"><h3>${labelWithHelp(baby?'Cry level':toddler?'Toddler activities':'Focus',baby?'cry':toddler?'toddler-focus':'focus')}</h3><span class="tag">${baby ? 'AGES 0–1' : `${focusUsed()} / 12 POINTS`}</span></div>
+  return `${state.education.status==='college'?collegeProgressView():''}<section class="panel focus-panel"><div class="panel-heading"><h3>${labelWithHelp(baby?'Cry level':toddler?'Toddler activities':'Focus',baby?'cry':toddler?'toddler-focus':'focus')}</h3><span class="tag">${baby ? 'AGES 0–1' : `${focusUsed()} / ${focusBudget(state)} POINTS`}</span></div>
     ${baby ? `<div class="cry-control" role="group" aria-label="Cry level"><div class="cry-levels">${[1,2,3,4,5].map(level=>`<button class="cry-level ${state.cryLevel===level?'selected':''}" data-action="baby" data-level="${level}" aria-label="Cry level ${level} of 5" aria-pressed="${state.cryLevel===level}" ${disabled?'disabled':''}>${level}</button>`).join('')}</div><div class="cry-scale-labels"><span>Low</span><span>High</span></div></div>` : focusView(disabled)}
     ${!baby&&(state.age<18||state.education.status==='college')?'':choiceImpactSummary()}
     </section>
@@ -302,9 +322,9 @@ function yearDecisionsView(decisions) {
   if (!decisions) return '';
   const entries=decisions.cryLevel!==undefined
     ? [['Cry level',`${decisions.cryLevel}/5`]]
-    : (decisions.workLabel==='Play'?(Object.hasOwn(decisions.focus,'creative')?toddlerFocusRows:legacyToddlerFocusRows).map(([key,label])=>[label,key]):[[decisions.workLabel || 'School/career','work'],['Friends','social'],['Family','family'],['Yourself','self']]).map(([label,key])=>[label,`${decisions.focus[key]}/5`]);
-  const rest=decisions.focus?12-Object.values(decisions.focus).reduce((sum,value)=>sum+value,0):0;
-  if(rest) entries.push([decisions.workLabel==='Play'?'Unused':'Rest',`${rest} point${rest===1?'':'s'}`]);
+    : (decisions.workLabel==='Play'?(Object.hasOwn(decisions.focus,'creative')?toddlerFocusRows:legacyToddlerFocusRows).map(([key,label])=>[label,key]):[[decisions.workLabel || 'School/career','work'],['Friends','social'],['Family','family'],['Yourself','self']]).map(([label,key])=>[label,`${decisions.focus[key]}/${decisions.focusMax ?? 5}`]);
+  const rest=decisions.focus?(decisions.focusBudget ?? 12)-Object.values(decisions.focus).reduce((sum,value)=>sum+value,0):0;
+  if(rest) entries.push([decisions.focusMax===MAX_FOCUS||decisions.workLabel==='Play'?'Unused':'Rest',`${rest} point${rest===1?'':'s'}`]);
   return `<section class="year-decisions" aria-label="Choices used this year"><h3>Your choices</h3><dl>${entries.map(([label,value])=>`<div><dt>${label}</dt><dd>${value}</dd></div>`).join('')}</dl></section>`;
 }
 
@@ -386,7 +406,7 @@ function choiceImpactGroups(changes) {
       }
       const direction = change > 0 ? 'increase' : 'decrease';
       const signs = (change > 0 ? '+' : '-').repeat(level);
-      const magnitude = ['small','medium','large'][level-1];
+      const magnitude = ['small','medium','large'][Math.min(level,3)-1];
       return `<li class="choice-impact" data-stat="${stat}" data-level="${level}" data-direction="${direction}" ${parentId?`data-parent-id="${esc(parentId)}"`:''}><span role="img" aria-label="${esc(label)}: ${magnitude} expected ${direction}"><b aria-hidden="true">${signs}</b> ${esc(label)}${statEmoji(stat)}</span></li>`;
     }).join('')}</ul></section>`;
   }).join('');
@@ -395,7 +415,7 @@ function choiceImpactGroups(changes) {
 function choiceImpactSummary() {
   if (state.ended || state.needsSuccession || state.pendingEvents.length || needsEducationChoice(state)) return '';
   const changes = choiceImpacts(state);
-  return `<section class="choice-impact-summary" aria-label="Expected changes"><h4>${labelWithHelp('Expected changes','forecast')}</h4>${changes.length?choiceImpactGroups(changes):'<p class="muted">No routine changes expected.</p>'}</section>`;
+  return `<section class="choice-impact-summary" aria-label="Expected changes"><h4>${labelWithHelp('Expected changes','forecast')}</h4>${changes.length?choiceImpactGroups(changes):'<p class="muted">No focus-driven changes expected.</p>'}</section>`;
 }
 
 function activityEffectsView(activity, label) {
@@ -412,7 +432,7 @@ function activityEffectsView(activity, label) {
     const name = family?`${stat==='relationship'?'Relationships':skillLabel(stat)} (family)`:skillLabel(stat);
     const direction = change>0?'increase':'decrease';
     const signs = (change>0?'+':'-').repeat(level);
-    const magnitude = ['small','medium','large'][level-1];
+    const magnitude = ['small','medium','large'][Math.min(level,3)-1];
     const people = family?parentIds.map(id=>parentLabel(familyCareProfiles().find(person=>person.id===id))).join(', '):'';
     return `<li class="choice-impact" data-stat="${stat}" data-level="${level}" data-direction="${direction}" data-target="${family?'family':'you'}" ${family?`data-parent-ids="${esc(parentIds.join(' '))}"`:''}><span role="img" aria-label="${esc(name)}: ${magnitude} expected ${direction}${people?`; ${esc(people)}`:''}"><b aria-hidden="true">${signs}</b> ${esc(name)}${statEmoji(stat)}</span></li>`;
   }).join('')}</ul></div>`;
@@ -426,8 +446,8 @@ function focusView(disabled) {
   const limits = focusLimits(state), details = focusLimitDetails(state);
   return `<div class="focus-list">${rows.map(([key,label,ico]) => {
     const restrictions = details.filter(limit=>limit.key===key);
-    const limitText = restrictions.length?'Max '+limits[key]+' · '+restrictions.map(limit=>limit.name+' ('+(limit.years===1?'this year':limit.years+' years left')+')').join('; '):'';
-    return `<div class="focus-row" data-focus-key="${key}"><span class="focus-icon">${icon(ico)}</span><div class="focus-copy"><h4>${labelWithHelp(label,`${toddler?'toddler':'focus'}-${key}`)}</h4><div class="focus-scale" aria-hidden="true">${Array.from({length:5},(_,i)=>`<span class="${i<(state.focus[key] ?? 0)?'filled':i>=limits[key]?'limited':''}"></span>`).join('')}</div>${limitText?`<div class="focus-limit" id="focus-limit-${key}">${esc(limitText)}</div>`:''}</div><div class="stepper" role="group" aria-label="${esc(label)} ${mode}" ${limitText?`aria-describedby="focus-limit-${key}"`:''}><button data-action="focus" data-key="${key}" data-delta="-1" aria-label="Decrease ${esc(label.toLowerCase())} ${mode}" ${(state.focus[key] ?? 0)<=0||disabled?'disabled':''}>${icon('minus')}</button><output aria-label="${esc(label)} ${mode} level">${state.focus[key] ?? 0}</output><button data-action="focus" data-key="${key}" data-delta="1" aria-label="Increase ${esc(label.toLowerCase())} ${mode}" ${(state.focus[key] ?? 0)>=limits[key]||focusUsed()>=12||disabled?'disabled':''}>${icon('plus')}</button></div>${(toddler||studying)&&!disabled?activityEffectsView(key,label):''}</div>`;
+    const limitText = restrictions.length?'Max '+limits[key]+' · '+restrictions.map(limit=>limit.name+' ('+(limit.years===null?'lifelong':limit.years===1?'this year':limit.years+' years left')+')').join('; '):'';
+    return `<div class="focus-row" data-focus-key="${key}"><span class="focus-icon">${icon(ico)}</span><div class="focus-copy"><h4>${labelWithHelp(label,`${toddler?'toddler':'focus'}-${key}`)}</h4><div class="focus-scale" aria-hidden="true">${Array.from({length:MAX_FOCUS},(_,i)=>`<span class="${i<(state.focus[key] ?? 0)?'filled':i>=limits[key]?'limited':''}"></span>`).join('')}</div>${limitText?`<div class="focus-limit" id="focus-limit-${key}">${esc(limitText)}</div>`:''}</div><div class="stepper" role="group" aria-label="${esc(label)} ${mode}" ${limitText?`aria-describedby="focus-limit-${key}"`:''}><button data-action="focus" data-key="${key}" data-delta="-1" aria-label="Decrease ${esc(label.toLowerCase())} ${mode}" ${(state.focus[key] ?? 0)<=0||disabled?'disabled':''}>${icon('minus')}</button><output aria-label="${esc(label)} ${mode} level">${state.focus[key] ?? 0}</output><button data-action="focus" data-key="${key}" data-delta="1" aria-label="Increase ${esc(label.toLowerCase())} ${mode}" ${(state.focus[key] ?? 0)>=limits[key]||focusUsed()>=focusBudget(state)||disabled?'disabled':''}>${icon('plus')}</button></div>${(toddler||studying)&&!disabled?activityEffectsView(key,label):''}</div>`;
   }).join('')}</div>`;
 }
 
@@ -487,15 +507,15 @@ function loveView() {
     const proposal = proposalChance(state);
     const pregnancy = pregnancyChance(state);
     const living = person.alive!==false;
-    return `<section class="panel partner-panel" data-person-id="${esc(person.id)}"><div class="panel-heading"><h3>${icon('heart')} Your life together</h3><span class="tag">${living?partnerLabel(person).toUpperCase():'REMEMBERED'}</span></div><div class="family-header"><div class="family-avatar">${avatar(person,true)}</div><div class="family-meta"><h3>${esc(person.name)}</h3>${genderBadge(person)}<p>${person.age} years old · ${person.yearsTogether} year${person.yearsTogether===1?'':'s'} together</p></div></div>${relationshipView(person)}${profileStats(person)}${living?`<div class="relationship-actions">${!person.married?`<button class="button primary" data-action="propose" ${blocked||!proposal?'disabled':''}>Propose marriage <span>${pct(proposal)} chance</span></button>${labelWithHelp(person.lastProposalAge===state.age?'Already proposed this year':'Marriage','marriage')}`:'<p class="married-note">Married · A shared chapter</p>'}<div class="game-status">${labelWithHelp(state.pregnancy?'Your family is expecting.':`Pregnancy chance this year: ${pct(pregnancy)}`,'pregnancy')}</div><button class="button ghost small" data-action="breakup" ${blocked?'disabled':''}>${person.married?'End marriage':'End relationship'}</button></div>`:''}</section>${pregnancyView()}`;
+    return `<section class="panel partner-panel" data-person-id="${esc(person.id)}"><div class="panel-heading"><h3>${icon('heart')} Your life together</h3><span class="tag">${living?partnerLabel(person).toUpperCase():'REMEMBERED'}</span></div><div class="family-header"><div class="family-avatar">${avatar(person,true)}</div><div class="family-meta"><h3>${esc(person.name)}</h3>${genderBadge(person)}<p>${person.age} years old · ${person.yearsTogether} year${person.yearsTogether===1?'':'s'} together</p></div></div>${birthConditionsView(person)}${relationshipView(person)}${profileStats(person)}${living?`<div class="relationship-actions">${!person.married?`<button class="button primary" data-action="propose" ${blocked||!proposal?'disabled':''}>Propose marriage <span>${pct(proposal)} chance</span></button>${labelWithHelp(person.lastProposalAge===state.age?'Already proposed this year':'Marriage','marriage')}`:'<p class="married-note">Married · A shared chapter</p>'}<div class="game-status">${labelWithHelp(state.pregnancy?'Your family is expecting.':`Pregnancy chance this year: ${pct(pregnancy)}`,'pregnancy')}</div><button class="button ghost small" data-action="breakup" ${blocked?'disabled':''}>${person.married?'End marriage':'End relationship'}</button></div>`:''}</section>${pregnancyView()}`;
   }
-  const remembered=state.partner?.alive===false ? `<section class="panel remembered-partner"><div class="panel-heading"><h3>Remembering your partner</h3><span class="tag">REMEMBERED</span></div><div class="family-header"><div class="family-avatar">${avatar(state.partner,true)}</div><div class="family-meta"><h3>${esc(state.partner.name)}</h3>${genderBadge(state.partner)}<p>Died at age ${state.partner.age}</p></div></div>${relationshipView(state.partner)}<details class="family-details"><summary>Your shared chapter</summary>${profileStats(state.partner)}</details></section>` : '';
+  const remembered=state.partner?.alive===false ? `<section class="panel remembered-partner"><div class="panel-heading"><h3>Remembering your partner</h3><span class="tag">REMEMBERED</span></div><div class="family-header"><div class="family-avatar">${avatar(state.partner,true)}</div><div class="family-meta"><h3>${esc(state.partner.name)}</h3>${genderBadge(state.partner)}<p>Died at age ${state.partner.age}</p></div></div>${birthConditionsView(state.partner)}${relationshipView(state.partner)}<details class="family-details"><summary>Your shared chapter</summary>${profileStats(state.partner)}</details></section>` : '';
   const chance = meetingChances(state);
   const anyChance = 1-Math.pow(1-chance.chance,chance.slots);
   const people = state.encounters;
   encounterIndex = Math.max(0,Math.min(encounterIndex,people.length-1));
   const person = people[encounterIndex];
-  return `${remembered}${pregnancyView()}<section class="panel dating-panel"><div class="panel-heading"><h3>${labelWithHelp('People you meet','dating')}</h3><span class="tag">${people.length} AVAILABLE</span></div><div class="dating-chances"><span>Chance of meeting someone next year <strong>${pct(anyChance)}</strong></span><span>Up to <strong>${chance.slots}</strong> people with your current appeal</span></div>${people.length?`<div class="encounter-list" data-total="${people.length}">${people.length>1?`<div class="encounter-pagination"><button class="button ghost small" data-action="prospect-page" data-delta="-1" aria-label="Previous person" ${encounterIndex===0?'disabled':''}>Back</button><span>${encounterIndex+1} of ${people.length}</span><button class="button ghost small" data-action="prospect-page" data-delta="1" aria-label="Next person" ${encounterIndex===people.length-1?'disabled':''}>Next</button></div>`:''}<article class="encounter-card" data-person-id="${esc(person.id)}"><div class="family-header"><div class="family-avatar">${avatar(person,true)}</div><div class="family-meta"><h3 tabindex="-1">${esc(person.name)}</h3>${genderBadge(person)}<p>${person.age} years old</p></div></div>${profileStats(person)}<div class="encounter-actions"><button class="button primary" data-action="encounter" data-choice="relationship" data-id="${esc(person.id)}" ${blocked?'disabled':''}>Pursue a relationship <span>${pct(relationshipOdds(state,person))} chance</span></button><button class="button secondary" data-action="encounter" data-choice="casual" data-id="${esc(person.id)}" ${blocked?'disabled':''}>One-night stand <span>${pct(oneNightChance(state,person))} mutual interest</span></button><button class="button ghost" data-action="encounter" data-choice="ignore" data-id="${esc(person.id)}" ${blocked?'disabled':''}>Ignore</button></div></article></div>`:`<div class="empty-state">${icon('heart')}<h4>No new connection this year</h4></div>`}</section>`;
+  return `${remembered}${pregnancyView()}<section class="panel dating-panel"><div class="panel-heading"><h3>${labelWithHelp('People you meet','dating')}</h3><span class="tag">${people.length} AVAILABLE</span></div><div class="dating-chances"><span>Chance of meeting someone next year <strong>${pct(anyChance)}</strong></span><span>Up to <strong>${chance.slots}</strong> people with your current appeal</span></div>${people.length?`<div class="encounter-list" data-total="${people.length}">${people.length>1?`<div class="encounter-pagination"><button class="button ghost small" data-action="prospect-page" data-delta="-1" aria-label="Previous person" ${encounterIndex===0?'disabled':''}>Back</button><span>${encounterIndex+1} of ${people.length}</span><button class="button ghost small" data-action="prospect-page" data-delta="1" aria-label="Next person" ${encounterIndex===people.length-1?'disabled':''}>Next</button></div>`:''}<article class="encounter-card" data-person-id="${esc(person.id)}"><div class="family-header"><div class="family-avatar">${avatar(person,true)}</div><div class="family-meta"><h3 tabindex="-1">${esc(person.name)}</h3>${genderBadge(person)}<p>${person.age} years old</p></div></div>${birthConditionsView(person)}${profileStats(person)}<div class="encounter-actions"><button class="button primary" data-action="encounter" data-choice="relationship" data-id="${esc(person.id)}" ${blocked?'disabled':''}>Pursue a relationship <span>${pct(relationshipOdds(state,person))} chance</span></button><button class="button secondary" data-action="encounter" data-choice="casual" data-id="${esc(person.id)}" ${blocked?'disabled':''}>One-night stand <span>${pct(oneNightChance(state,person))} mutual interest</span></button><button class="button ghost" data-action="encounter" data-choice="ignore" data-id="${esc(person.id)}" ${blocked?'disabled':''}>Ignore</button></div></article></div>`:`<div class="empty-state">${icon('heart')}<h4>No new connection this year</h4></div>`}</section>`;
 }
 
 function connectionNotice() {
@@ -514,12 +534,12 @@ function retirementView() {
   const info = successionInfo(state);
   if (state.age<65 && !state.needsSuccession) return `<section class="panel retirement-panel"><div class="panel-heading"><h3>${labelWithHelp('What carries forward','inheritance')}</h3><span class="tag">AGE 65</span></div>${lifestyleView()}</section>`;
   const titles = {children:state.alive===false?'Continue in the next generation':'Retire into the next generation',siblings:'Keep the story in your family',beneficiary:'A new family, your legacy'};
-  return `<section class="panel retirement-panel" data-route="${info.route}"><div class="panel-heading"><h3>${labelWithHelp(titles[info.route],'inheritance')}</h3><span class="tag">${state.needsSuccession?'NEXT CHAPTER':'RETIREMENT'}</span></div>${!info.eligible?`<p class="game-status retirement-blocked">${esc(info.reason)}</p>`:''}<div class="heir-list">${info.candidates.map(person=>`<article class="heir-candidate ${info.route==='beneficiary'?'beneficiary-preview':''}" data-person-id="${esc(person.id)}"><div class="family-header"><div class="family-avatar">${avatar(person,true)}</div><div class="family-meta"><span class="eyebrow">${info.route==='children'?'YOUR CHILD':info.route==='siblings'?'YOUR SIBLING':'A NEW BEGINNING'}</span><h3>${esc(person.name)}</h3>${genderBadge(person)}<p>${person.age} years old · ${esc(person.familyName)} family</p></div></div>${info.route==='beneficiary'?profileStats(person):`<details class="family-details"><summary>Skills & wellbeing</summary>${miniStats(person)}</details>`}<button class="button primary" data-action="heir" data-id="${esc(person.id)}" ${info.eligible?'':'disabled'}>${state.alive===false?'Continue':'Retire'} & play as ${esc(person.name.split(' ')[0])} ${icon('arrow')}</button></article>`).join('')}</div></section>`;
+  return `<section class="panel retirement-panel" data-route="${info.route}"><div class="panel-heading"><h3>${labelWithHelp(titles[info.route],'inheritance')}</h3><span class="tag">${state.needsSuccession?'NEXT CHAPTER':'RETIREMENT'}</span></div>${!info.eligible?`<p class="game-status retirement-blocked">${esc(info.reason)}</p>`:''}<div class="heir-list">${info.candidates.map(person=>`<article class="heir-candidate ${info.route==='beneficiary'?'beneficiary-preview':''}" data-person-id="${esc(person.id)}"><div class="family-header"><div class="family-avatar">${avatar(person,true)}</div><div class="family-meta"><span class="eyebrow">${info.route==='children'?'YOUR CHILD':info.route==='siblings'?'YOUR SIBLING':'A NEW BEGINNING'}</span><h3>${esc(person.name)}</h3>${genderBadge(person)}<p>${person.age} years old · ${esc(person.familyName)} family</p></div></div>${birthConditionsView(person)}${info.route==='beneficiary'?profileStats(person):`<details class="family-details"><summary>Skills & wellbeing</summary>${miniStats(person)}</details>`}<button class="button primary" data-action="heir" data-id="${esc(person.id)}" ${info.eligible?'':'disabled'}>${state.alive===false?'Continue':'Retire'} & play as ${esc(person.name.split(' ')[0])} ${icon('arrow')}</button></article>`).join('')}</div></section>`;
 }
 
 function personCard(person, role, child = false, parent = false) {
   const employment = {employed:'Employed',unemployed:'Unemployed',retired:'Retired'}[person.career?.status] || 'Employed';
-  return `<article class="family-card" data-person-id="${esc(person.id)}"><div class="family-header"><div class="family-avatar">${avatar(person,true)}</div><div class="family-meta"><span class="eyebrow">${esc(role)}</span><div class="profile-name-row"><h3>${esc(person.name)}</h3>${genderBadge(person)}</div><p>${person.age} years old${person.abandonedAt!=null?' · Left the family':person.guardianRole&&person.alive!==false?' · Guardian':''}${person.alive===false?' · Remembered':''}</p></div></div>${parent?'':`<p class="family-lifestyle">${labelWithHelp('Lifestyle','lifestyle')} <strong>${number(person.lifestyle)}/10</strong>${person.age<18?' · Family household':''}</p>`}${parent?`<div class="parent-career"><span>${labelWithHelp('Career focus','parent-career')} <strong>${person.career?.focus ?? 0}/5</strong></span><span class="employment-status">${employment}</span></div>`:''}${Number.isFinite(person.relationship)?relationshipView(person):''}<details class="family-details" ${parent?'open':''}><summary>${parent?'Wellbeing':'Skills & wellbeing'}</summary>${profileStats(person,parent)}</details>${child&&person.alive===false?'<div class="family-card-footer"><span>Remembered with love</span></div>':''}</article>`;
+  return `<article class="family-card" data-person-id="${esc(person.id)}"><div class="family-header"><div class="family-avatar">${avatar(person,true)}</div><div class="family-meta"><span class="eyebrow">${esc(role)}</span><div class="profile-name-row"><h3>${esc(person.name)}</h3>${genderBadge(person)}</div><p>${person.age} years old${person.abandonedAt!=null?' · Left the family':person.guardianRole&&person.alive!==false?' · Guardian':''}${person.alive===false?' · Remembered':''}</p></div></div>${birthConditionsView(person)}${parent?'':`<p class="family-lifestyle">${labelWithHelp('Lifestyle','lifestyle')} <strong>${number(person.lifestyle)}/10</strong>${person.age<18?' · Family household':''}</p>`}${parent?`<div class="parent-career"><span>${labelWithHelp('Career focus','parent-career')} <strong>${person.career?.focus ?? 0}/5</strong></span><span class="employment-status">${employment}</span></div>`:''}${Number.isFinite(person.relationship)?relationshipView(person):''}<details class="family-details" ${parent?'open':''}><summary>${parent?'Wellbeing':'Skills & wellbeing'}</summary>${profileStats(person,parent)}</details>${child&&person.alive===false?'<div class="family-card-footer"><span>Remembered with love</span></div>':''}</article>`;
 }
 
 function parentsView() {
@@ -605,8 +625,8 @@ function topicHelpModal(topic, id) {
     lifestyle: ['Lifestyle', ['Until 18, you share your parents’ or guardian’s changing household lifestyle. As an adult, work, family and inheritance shape it.']],
     height: ['Height', ['Final height emerges from yearly growth shaped by age, inheritance, health and chance, ending at 14–18. Poor health reduces new growth, never existing height.']],
     cry: ['Cry level', ['Less crying lowers your intelligence and mental stability; more crying raises them. Strength is unaffected. Parent relationships tend to fall at levels 1–2, stay steady at 3, and rise at 4–5, with yearly variation. Harder crying strains their mental stability more.']],
-    focus: ['Your focus', ['Allocate 12 points, at most 5 per area; unused points allow rest. Events can temporarily lower these limits. Focused skills can rise, neglected ones can fall, and results vary yearly.', ...(state.age<18||state.education.status==='college'?['Each row shows that choice compared with 3 points; family relationships are neutral at 2. Each sign is an equal contribution for that choice and stat, before aptitude and current-rating response. Zero effects are hidden, and shared family effects appear once.']:[])]],
-    'toddler-focus': ['Toddler activities', ['Share 12 points among five activities, up to 5 each. Events can temporarily lower these limits. Unused points support mental stability, and results vary each year.', 'Your activity effects are measured from Play 3, Electronics 2, Family time 2, Rest 3, and Arts & crafts 2. Less Electronics supports Social; more reduces it. Zero Arts & crafts shows --Creativity and -Intelligence. Each sign is an equal contribution for that activity and stat, before aptitude and current-rating response. Zero effects are hidden.']],
+    focus: ['Your focus', [`Share ${focusBudget(state)} points across ${Object.keys(state.focus).length} focuses, up to ${MAX_FOCUS} each. The default 2 in each adds no focus-driven stat changes. Conditions and events can change your limits.`, 'Points 1 and 3 have opposite effects; 0 and 4 are three times as strong. Signs can reach six pluses or minuses. Aptitude, current ratings, development and events affect the final result. Zero effects are hidden.']],
+    'toddler-focus': ['Toddler activities', [`Share ${focusBudget(state)} points among five activities, up to 4 each. The default 2 in each adds no activity-driven stat changes. Conditions and events can change your limits.`, 'Points 1 and 3 have opposite effects; 0 and 4 are three times as strong. Less Electronics supports Social; more reduces it. Signs can reach six pluses or minuses. Aptitude, current ratings, development and events affect the final result. Zero effects are hidden.']],
     ...Object.fromEntries(toddlerFocusRows.map(([key,label]) => [`toddler-${key}`, [label,
       toddlerActivityImpacts(key).map(({stat,change,level,target}) => `${(change>0?'+':'-').repeat(level)}${target==='parents'?(caregivers(state).some(person=>person.guardianRole)?'Guardian relationship':'Parent relationships'):skillLabel(stat)}`)
     ]])),
@@ -626,6 +646,11 @@ function topicHelpModal(topic, id) {
     inheritance: ['Retirement & inheritance', ['Succession opens at 65 or on death and is required at 85; choose a child, sibling or unrelated child, in that order. Eligible children share inheritance equally; otherwise the chosen heir receives it.']]
   };
   let entry = help[topic];
+  if (topic.startsWith('condition-')) {
+    const person = [state,...familyCareProfiles(),...state.children,...state.siblings,state.partner,...state.encounters].find(person=>person?.id===id) || successionInfo(state).candidates.find(person=>person.id===id);
+    const condition = getBirthConditions(person).find(condition=>condition.id===topic.slice('condition-'.length));
+    if (condition) entry = [condition.name,[`${person.name}: ${condition.description}`,...birthConditionEffects(condition),'Effects are game rules.']];
+  }
   if(topic==='height' && id===state.id && state.age<18) entry=[entry[0],[...entry[1],'Percentile compares simulated heights at your age.']];
   if (topic==='job') {
     const job = JOBS.find(candidate=>candidate.id===id);
@@ -642,7 +667,7 @@ function topicHelpModal(topic, id) {
 }
 
 function helpModal() {
-  openModal('How to play', `<div class="help-grid"><div class="help-item"><h4>Babies</h4><p>At ages 0–1, choose a cry level from 1–5.</p></div><div class="help-item"><h4>Each year</h4><p>From age 2, share 12 points among activities, up to 5 each. School begins at 5.</p></div><div class="help-item"><h4>Stats</h4><p>Natural aptitude and focus shape abilities; tap ? for details.</p></div><div class="help-item"><h4>Events</h4><p>Age, focus and stats affect random events; some require a choice.</p></div><div class="help-item"><h4>Work</h4><p>At 18, choose work or four years of college.</p></div><div class="help-item"><h4>Family</h4><p>Build relationships, raise children and choose an heir when your chapter ends.</p></div></div>`, '<button class="button primary" data-action="close">Got it</button>');
+  openModal('How to play', `<div class="help-grid"><div class="help-item"><h4>Babies</h4><p>At ages 0–1, choose a cry level from 1–5.</p></div><div class="help-item"><h4>Each year</h4><p>Each focus starts at 2 and can range from 0 to 4. Share 10 points as a toddler and 8 from school age. The extremes have three times the effect of 1 or 3.</p></div><div class="help-item"><h4>Stats</h4><p>Natural aptitude and focus shape abilities; tap ? for details.</p></div><div class="help-item"><h4>Events</h4><p>Age, focus and stats affect random events; some require a choice.</p></div><div class="help-item"><h4>Work</h4><p>At 18, choose work or four years of college.</p></div><div class="help-item"><h4>Family</h4><p>Build relationships, raise children and choose an heir when your chapter ends.</p></div></div>`, '<button class="button primary" data-action="close">Got it</button>');
 }
 
 function oddsModal() {

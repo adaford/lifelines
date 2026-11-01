@@ -1,3 +1,15 @@
+function legacyFocusFixture(value) {
+  if (value.version !== 17 || !value.focus) return;
+  const toddler = value.age >= 2 && value.age < 5;
+  for (const key of Object.keys(value.focus)) {
+    const neutral = toddler && !['work', 'self'].includes(key) ? [0, 1, 2, 3, 5] : [0, 1, 3, 4, 5];
+    value.focus[key] = neutral[value.focus[key]];
+  }
+}
+function removeNewFocusMetadata(value) {
+  if (value.focus && value.workLabel) { delete value.focusMax; delete value.focusBudget; }
+}
+
 const legacyRating = number => Math.max(1, number);
 function legacyRatingField(object, key) {
   const value = object[key];
@@ -37,6 +49,7 @@ function roundLifestyleField(value) {
 // Versions through 12 stored whole lifestyle ratings, including review values.
 export function integerLifestyleForLegacy(value) {
   if (!value || typeof value !== 'object') return value;
+  removeNewFocusMetadata(value);
   legacyRatingFloor(value);
   roundLifestyleField(value);
   Object.values(value).forEach(integerLifestyleForLegacy);
@@ -47,6 +60,8 @@ export function integerLifestyleForLegacy(value) {
 // Call once before downgrading the version.
 export function toLegacyCentimeters(value) {
   if (!value || typeof value !== 'object') return value;
+  legacyFocusFixture(value);
+  removeNewFocusMetadata(value);
   legacyRatingFloor(value);
   roundLifestyleField(value);
   if (value.aptitudes) { delete value.aptitudes.health; delete value.aptitudes.stability; }
@@ -64,6 +79,8 @@ export function toLegacyCentimeters(value) {
 // The pre-v12 format stored only the five skill aptitudes.
 export function stripWellbeingAptitudes(value) {
   if (!value || typeof value !== 'object') return value;
+  legacyFocusFixture(value);
+  removeNewFocusMetadata(value);
   legacyRatingFloor(value);
   roundLifestyleField(value);
   if (value.aptitudes) { delete value.aptitudes.health; delete value.aptitudes.stability; }

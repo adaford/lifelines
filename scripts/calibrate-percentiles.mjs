@@ -2,6 +2,7 @@
 // Reproduce: node scripts/calibrate-percentiles.mjs --samples 2000 --seed 200001
 // Refit development after changing the simulation: add --fit.
 import { readFile, writeFile } from 'node:fs/promises';
+import { defaultFocus, MAX_FOCUS, fitFocusBudget } from '../focus-rules.js';
 import { BIRTH_VARIATION, TODDLER_FOCUS } from '../development.js';
 import {
   createGame, advanceYear, resolveEventChoice, EVENTS, effectiveStats, focusLimits,
@@ -24,7 +25,7 @@ const moment = () => ({ count: 0, sum: 0, sum2: 0 });
 const add = (entry, value) => { entry.count++; entry.sum += value; entry.sum2 += value * value; };
 const mean = entry => entry.sum / entry.count;
 const summarize = entry => ({ mean: round(mean(entry)), sd: round(Math.sqrt(Math.max(0, entry.sum2 / entry.count - mean(entry) ** 2))) });
-const focus = { work: 3, social: 3, family: 3, self: 3 };
+const focus = defaultFocus(5);
 const eventById = new Map(EVENTS.map(event => [event.id, event]));
 
 function choiceRng(seed) {
@@ -49,7 +50,7 @@ function cohort(measureAges) {
       while (state.age < 18 && state.alive) {
         const desired = state.age >= 2 && state.age < 5 ? TODDLER_FOCUS : focus;
         const limits = focusLimits(state);
-        state.focus = Object.fromEntries(Object.entries(desired).map(([key, points]) => [key, Math.min(points, limits[key] ?? 5)]));
+        state.focus = fitFocusBudget(state, Object.fromEntries(Object.entries(desired).map(([key, points]) => [key, Math.min(points, limits[key] ?? MAX_FOCUS)])));
         // Same-age peers include everyone currently alive, irrespective of
         // whether they survive later years. No future projection is involved.
         if (measureAges) {
@@ -111,7 +112,7 @@ const reference = {
   calibration: {
     samplesPerSex: samples, seedStart, survivors: result.survivors,
     cryLevel: 3, cryThroughAge: 1, focus, toddlerFocus: TODDLER_FOCUS, choices: 'uniform, independent seeded draws',
-    focusPolicy: 'balanced targets capped by active event limits; freed points left unused',
+    focusPolicy: 'two-point targets fitted to birth-condition budgets and active condition/event caps; spare points left unused',
     heightUnit: 'inches',
     conditionedOn: 'alive at the observed age',
     observationsByAge: [...result.ageStats.map(stats => stats.health.count), result.stats.health.count],

@@ -32,7 +32,7 @@ function actor(state, id, age, gender = 'female') {
     aptitudes: clone(state.aptitudes), height: 66.93, adultHeight: 66.93, money: 0,
     lifestyle: state.lifestyle, alive: true, relationship: 5, gender,
     canGestate: gender === 'female', attractedTo: [gender === 'female' ? 'male' : 'female'],
-    appearancePeakAge: 30 };
+    appearancePeakAge: 30, conditions: [] };
 }
 function household(seed = 41) {
   const state = survivorAt(25, seed);
@@ -175,11 +175,11 @@ test('year reviews retain the completed year decisions across age and education 
   assert.equal(baby.age, 2);
   assert.deepEqual(baby.yearSummary.decisions, { cryLevel: 4 });
   finishChoices(baby);
-  const focus = { work: 2, social: 4, family: 4, self: 1, creative: 1 };
+  const focus = { work: 1, social: 4, family: 3, self: 1, creative: 1 };
   baby.focus = clone(focus);
   advanceYear(baby, survives);
   baby.focus.self = 0;
-  assert.deepEqual(baby.yearSummary.decisions, { focus, workLabel: 'Play' });
+  assert.deepEqual(baby.yearSummary.decisions, { focus, workLabel: 'Play', focusMax: 4, focusBudget: 10 });
   assert.deepEqual(migrateSave(clone(baby)).yearSummary.decisions, baby.yearSummary.decisions);
   const older = clone(baby);
   delete older.yearSummary.decisions;
@@ -188,7 +188,7 @@ test('year reviews retain the completed year decisions across age and education 
   const student = survivorAt(17, 406);
   const schoolFocus = clone(student.focus);
   advanceYear(student, survives);
-  assert.deepEqual(student.yearSummary.decisions, { focus: schoolFocus, workLabel: 'School' });
+  assert.deepEqual(student.yearSummary.decisions, { focus: schoolFocus, workLabel: 'School', focusMax: 4, focusBudget: 8 });
   finishChoices(student);
   assert.equal(chooseEducation(student, 'college').ok, true);
   while (student.age < 22) { advanceYear(student, survives); finishChoices(student); }
@@ -207,7 +207,7 @@ test('malformed saved year decisions are rejected without changing the original 
   for (const decisions of [
     { cryLevel: 3 },
     { focus: { work: 5, social: 5, family: 5, self: 5 }, workLabel: 'School' },
-    { focus: { work: 3, social: 3, family: 3, self: 3 }, workLabel: '<script>' },
+    { focus: { work: 2, social: 2, family: 2, self: 2 }, workLabel: '<script>' },
     { focus: { work: 3, social: 3, family: 3 }, workLabel: 'School' },
   ]) {
     const bad = clone(child);
@@ -232,7 +232,7 @@ test('v6 saves gain cry level and parent bonds without rerolling progress or que
   const before = clone(legacy);
   const migrated = migrateSave(legacy);
   assert.ok(migrated);
-  assert.equal(migrated.version, 16);
+  assert.equal(migrated.version, 17);
   assert.equal(migrated.cryLevel, 5);
   assert.equal(migrated.alive, true);
   assert.equal(migrated.yearSummary, null);

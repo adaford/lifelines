@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises';
 import { afterEach, describe, test } from 'node:test';
 import { parseHTML } from 'linkedom';
 import { toLegacyCentimeters, stripWellbeingAptitudes, legacyRatingFloor } from './helpers/legacy-height.js';
+import { MAX_FOCUS, focusBudget, defaultFocus } from '../focus-rules.js';
 import { changedRating } from '../rating-changes.js';
 import { choiceImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from '../choice-impacts.js';
 import { SKILLS, JOBS, EVENTS, resolveEventChoice, eventOdds, canTakeJob, chooseEducation, offeredJobs, needsEducationChoice, createGame, advanceYear, annualForecast, haveChild, takeJob, successionInfo, succeed, validateSave, respondToEncounter, proposeMarriage, effectiveStats, relationshipOdds, proposalChance, statPercentiles } from '../engine.js';
@@ -95,7 +96,7 @@ test('mechanics explanations live in help across childhood, college, and adult r
       }
       if(ui.all('[data-topic="focus"]').length) {
         ui.click('[data-topic="focus"]');
-        assert.match(ui.query('.help-popup').textContent,/Focused skills can rise, neglected ones can fall, and results vary yearly/);
+        assert.match(ui.query('.help-popup').textContent,/default 2.*no focus-driven stat changes.*0 and 4 are three times as strong/);
         ui.click('.help-popup [data-action="close"]');
         ui.click('[data-topic="focus-self"]');
         assert.match(ui.query('.help-popup').textContent,/Exercise, learning and self-care support strength/);
@@ -493,17 +494,15 @@ test('only height shows a percentile before eighteen without changing current va
   }
 });
 
-test('aging losses show in the choices list and parents keep their explicit family roles', async () => {
+test('aging losses stay out of focus contributions and parents keep their explicit family roles', async () => {
   const fixture=ageTo(createGame({name:'Jamie Reed',seed:121,gender:'female'}),23);
   fixture.stats.attractiveness=8;
   fixture.parents[0].parentRole='mom';
   fixture.parents[1].parentRole='dad';
   const ui=await mount(fixture);
-  const impact=ui.query('.choice-impact[data-stat="attractiveness"]:not([data-parent-id])');
+  assert.equal(ui.all('.choice-impact[data-stat="attractiveness"]:not([data-parent-id])').length,0);
+  assert.ok(annualForecast(fixture).stats.attractiveness.change<0,'aging still affects the actual routine');
   assert.equal(ui.query('.status-strip [data-stat="attractiveness"] .status-value').firstChild.textContent,'8.0');
-  assert.equal(impact.dataset.direction,'decrease');
-  assert.equal(impact.dataset.level,'1','a background loss identical for every focus option has no stronger relative rank');
-  assert.match(impact.textContent,/-{1,3}\s*Attractiveness/);
   ui.click('.nav-list [data-tab="family"]');
   assert.equal(ui.query(`.roots-panel [data-person-id="${fixture.parents[0].id}"] .eyebrow`).textContent,'Mom');
   assert.equal(ui.query(`.roots-panel [data-person-id="${fixture.parents[1].id}"] .eyebrow`).textContent,'Dad');
@@ -564,11 +563,11 @@ test('new-year review shows actual changes, survives reload, and dismisses persi
   }
   const child=ageTo(createGame({seed:123}),7);
   for (const effect of child.effects) delete effect.focusLimits;
-  child.focus={work:5,social:1,family:2,self:2};
+  child.focus={work:4,social:1,family:1,self:1};
   assert.equal(advanceYear(child,{mortalityRandom:()=>1,growthRandom:()=>0}).ok,true);
   child.focus={work:2,social:1,family:2,self:2};
   ui=await mount(child);
-  assert.match(ui.query('.year-decisions').textContent,/School5\/5Friends1\/5Family2\/5Yourself2\/5Rest2 points/);
+  assert.match(ui.query('.year-decisions').textContent,/School4\/4Friends1\/4Family1\/4Yourself1\/4Unused1 point/);
   assert.doesNotMatch(ui.query('.year-decisions').textContent,/Cry level/);
   assert.deepEqual(ui.saved(),child,'reading past decisions must preserve current controls');
   const historicalCry=ageTo(createGame({seed:123}),3);
@@ -768,7 +767,7 @@ test('event decisions show consequences, block time, and persist across navigati
 test('temporary activity limits show their cause, enforce the cap, and survive reloads', async () => {
   const fixture = createGame({ seed: 78121 });
   fixture.age = 3;
-  fixture.focus = { work: 2, social: 2, family: 2, self: 3, creative: 2 };
+  fixture.focus = { work: 2, social: 2, family: 2, self: 1, creative: 2 };
   fixture.effects = [{ id: 'broken_bone', name: 'Broken bone', description: 'Recovery at home.', years: 1, modifiers: { health: -.5 }, kind: 'negative', focusLimits: { toddler: { work: 2 }, standard: { social: 2 } } }];
   assert.equal(validateSave(fixture), true);
   let ui = await mount(fixture);
@@ -776,7 +775,7 @@ test('temporary activity limits show their cause, enforce the cap, and survive r
   const row = '.focus-row[data-focus-key="work"]';
   assert.match(ui.query(`${row} .focus-limit`).textContent, /Max 2.*Broken bone.*this year/);
   assert.equal(ui.query(`${row} .stepper`).getAttribute('aria-describedby'), 'focus-limit-work');
-  assert.equal(ui.all(`${row} .focus-scale .limited`).length, 3);
+  assert.equal(ui.all(`${row} .focus-scale .limited`).length, 2);
   assert.equal(ui.query(`${row} [data-delta="1"]`).disabled, true);
   ui.click(`${row} [data-delta="1"]`);
   assert.deepEqual(ui.saved(), original, 'disabled controls cannot exceed the limit');
@@ -803,7 +802,7 @@ test('temporary activity limits show their cause, enforce the cap, and survive r
 test('a new event previews activity tradeoffs and frees points when the choice applies', async () => {
   const fixture = createGame({ seed: 78122 });
   fixture.age = 3;
-  fixture.focus = { work: 3, social: 4, family: 2, self: 1, creative: 2 };
+  fixture.focus = { work: 1, social: 4, family: 2, self: 1, creative: 2 };
   fixture.pendingEvents = [{ eventId: 'broken_tablet', age: 3 }];
   fixture.lastYearEvents = ['broken_tablet'];
   let ui = await mount(fixture);
@@ -889,7 +888,7 @@ function encounterFixture() {
   const state=ageTo(createGame({name:'Jordan Reed',seed:1447}),24);
   state.stats.attractiveness=10; state.stats.social=10;
   state.money=100000000; state.lifestyle=10;
-  state.focus={work:2,social:5,family:2,self:3};
+  state.focus={work:1,social:4,family:1,self:2};
   state.effects=[];
   for(let attempt=0;attempt<5;attempt++) {
     assert.equal(advanceYear(state,{mortalityRandom:()=>1,growthRandom:()=>0}).ok,true); resolvePending(state);
@@ -918,6 +917,7 @@ function partnerFixture() {
 
 function beforeFamilySave(state) {
   const old=toLegacyCentimeters(structuredClone(state));old.version=4;
+  for(const effect of old.effects) delete effect.focusLimits;
   for(const key of ['partner','encounters','encounterYear','pregnancy']) delete old[key];
   for(const person of [old,...old.parents,...old.children,...old.siblings,...old.lineage]) {
     for(const key of ['gender','canGestate','attractedTo','appearancePeakAge','relationship','familyName']) delete person[key];
@@ -1296,7 +1296,7 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
   test('the phone navigation keeps one year action and preserves the current life', async () => {
     const fixture = ageTo(createGame({ name: 'Riley Santos', seed: 20 }), 12);
     for (const effect of fixture.effects) delete effect.focusLimits;
-    fixture.focus = { work: 5, social: 2, family: 2, self: 3 };
+    fixture.focus = { work: 4, social: 1, family: 1, self: 2 };
     assert.equal(validateSave(fixture), true);
     const ui = await mount(fixture);
     const originalSave = ui.saved();
@@ -1393,7 +1393,7 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
       if(year===5) {
         assert.deepEqual(ui.saved().yearSummary.decisions.focus, usedChoices, 'the fifth-birthday review retains the exact toddler choices, including event limits');
         for (const [key, label] of [['work','Play'],['social','Electronics'],['family','Family time'],['self','Rest'],['creative','Arts & crafts']]) {
-          assert.ok(ui.query('.year-decisions').textContent.includes(`${label}${usedChoices[key]}/5`));
+          assert.ok(ui.query('.year-decisions').textContent.includes(`${label}${usedChoices[key]}/4`));
         }
       }
       resolveUIEvents(ui);
@@ -1410,8 +1410,8 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
         ui.click('[data-action="focus"][data-key="social"][data-delta="-1"]');
         ui.click('[data-action="focus"][data-key="work"][data-delta="1"]');
         ui.click('[data-topic="toddler-focus"]');
-        assert.match(ui.query('.help-popup').textContent,/12 points.*5 each/);
-        assert.match(ui.query('.help-popup').textContent,/Unused points support mental stability/);
+        assert.match(ui.query('.help-popup').textContent,/10 points.*4 each/);
+        assert.match(ui.query('.help-popup').textContent,/default 2.*no activity-driven stat changes/);
         ui.click('.help-popup [data-action="close"]');
         const persisted=ui.saved();
         ui=await mount(persisted);
@@ -1439,16 +1439,16 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     const minus = '[data-action="focus"][data-key="social"][data-delta="-1"]';
     assert.equal(ui.query(plus).disabled, true);
     ui.click(plus);
-    assert.equal(ui.saved().focus.work, 3, 'disabled controls must not change the state');
+    assert.equal(ui.saved().focus.work, 2, 'disabled controls must not change the state');
     ui.click(minus);
     assert.equal(ui.query(plus).disabled, false);
     assert.equal(ui.saved().focus.social, 1);
     ui.click(plus);
-    assert.equal(ui.saved().focus.work, 4);
-    assert.equal(Object.values(ui.saved().focus).reduce((a, b) => a + b, 0), 12);
+    assert.equal(ui.saved().focus.work, 3);
+    assert.equal(Object.values(ui.saved().focus).reduce((a, b) => a + b, 0), 10);
     assert.equal(ui.query(plus).disabled, true);
     assert.equal(ui.all('.budget-summary').length,0);
-    assert.match(ui.query('.focus-panel .panel-heading .tag').textContent,/12 \/ 12 POINTS/);
+    assert.match(ui.query('.focus-panel .panel-heading .tag').textContent,/10 \/ 10 POINTS/);
   });
 
   test('toddler choices show their own point-sensitive effects without household changes or save mutation', async () => {
@@ -1462,13 +1462,13 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     assert.equal(ui.all('.choice-impact-summary').length,0,'toddler previews appear beneath individual choices');
     assertChoiceImpacts(ui);
     const initialStrength=annualForecast(ui.saved()).stats.strength.change;
-    for(let points=1;points<=5;points++) {
+    for(let points=1;points<=4;points++) {
       ui.click('[data-action="focus"][data-key="work"][data-delta="1"]');
       assertChoiceImpacts(ui);
     }
     assert.ok(annualForecast(ui.saved()).stats.strength.change>initialStrength);
     const previousSocial=annualForecast(ui.saved()).stats.social.change;
-    for(let points=1;points<=5;points++) {
+    for(let points=1;points<=4;points++) {
       ui.click('[data-action="focus"][data-key="social"][data-delta="1"]');
       assertChoiceImpacts(ui);
     }
@@ -1501,7 +1501,7 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     assert.deepEqual(ui.saved().yearSummary,legacy.yearSummary);
     assert.deepEqual(ui.saved().stats,legacy.stats);
     assert.equal(ui.saved().rng,legacy.rng);
-    assert.deepEqual(ui.saved().focus,{...legacy.focus,creative:0});
+    assert.deepEqual(ui.saved().focus,{work:3,social:2,family:3,self:2,creative:0},'only active controls adapt to the new scale; the completed review is untouched');
     for(const key of ['health','stability']) {
       assert.equal(ui.saved().aptitudes[key],0,'legacy wellbeing aptitude is neutral');
       assert.equal(ui.all(`.status-strip [data-stat="${key}"] .aptitude`).length,0);
@@ -1583,7 +1583,7 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     assert.equal(haveChild(fixture).ok, true);
     advanceYear(fixture);
     resolvePending(fixture);
-    fixture.focus = { work: 4, social: 2, family: 3, self: 3 };
+    fixture.focus = { work: 3, social: 1, family: 2, self: 2 };
     fixture.effects = [{ id: 'burnout', name: 'Running on empty', description: 'A difficult stretch.', years: 2, modifiers: { stability: -1.2 }, kind: 'negative' }];
     legacyRatingFloor(fixture);
     const legacy = legacySave(fixture);
@@ -1597,7 +1597,7 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     }
     assert.deepEqual(restored.stats, fixture.stats);
     assert.deepEqual(restored.aptitudes, {...fixture.aptitudes,health:0,stability:0});
-    assert.deepEqual(restored.focus, fixture.focus);
+    assert.deepEqual(restored.focus, fixture.focus,'active legacy controls adapt back to the neutral-two scale');
     assert.deepEqual(restored.history, fixture.history);
     assert.deepEqual(restored.effects[0].modifiers, { stability: -1.2 });
     assert.deepEqual(restored.parents.map(parent => parent.stats), fixture.parents.map(parent => parent.stats));
@@ -1801,7 +1801,7 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     delete legacy.education;
     delete legacy.jobOffers;
     // The v2 schema had stat modifiers only; household effects arrived later.
-    for (const effect of legacy.effects) delete effect.lifestyle;
+    for (const effect of legacy.effects) { delete effect.lifestyle; delete effect.focusLimits; }
     const ui = await mount(legacy);
     const restored = ui.saved();
     assert.equal(restored.version, fixture.version);
@@ -1927,7 +1927,7 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
 
   test('a saved life reloads and the same import can be retried after cancelling restore', async () => {
     const fixture = ageTo(createGame({ name: 'Taylor Brooks', seed: 99 }), 29);
-    fixture.focus = { work: 5, social: 2, family: 2, self: 3 };
+    fixture.focus = { work: 4, social: 1, family: 1, self: 2 };
     const ui = await mount(fixture);
     assert.equal(ui.saved().age, 29);
     assert.deepEqual(ui.saved().focus, fixture.focus);
@@ -2006,7 +2006,7 @@ test('active effects stay accessible on Year with three tabs and no duplicate st
 test('stat boxes show total temporary amounts beside aptitude while bars stay clear', async () => {
   const fixture = createGame({ seed: 84023 });
   fixture.age = 3;
-  fixture.focus = { work: 3, social: 2, family: 2, self: 3, creative: 2 };
+  fixture.focus = { work: 2, social: 2, family: 2, self: 2, creative: 2 };
   fixture.stats.health = 5;
   fixture.stats.intelligence = 5;
   fixture.stats.strength = 6.2;
@@ -2151,13 +2151,13 @@ test('adult combined parent effects do not cancel each other and remembered pare
   fixture.parents.forEach(parent=>{parent.alive=true;delete parent.death;delete parent.abandonedAt;});
   fixture.guardian=null;
   for (const effect of fixture.effects) delete effect.focusLimits;
-  fixture.focus={work:3,social:3,family:3,self:3};
+  fixture.focus={work:1,social:1,family:4,self:2};
   fixture.parents[0].stats.stability=2;
   fixture.parents[1].stats.stability=8;
   let ui=await mount(fixture);
   assertChoiceImpacts(ui);
   assert.equal(ui.query(`.choice-impact[data-parent-id="${fixture.parents[0].id}"][data-stat="stability"]`).dataset.direction,'increase');
-  assert.equal(ui.query(`.choice-impact[data-parent-id="${fixture.parents[1].id}"][data-stat="stability"]`).dataset.direction,'decrease');
+  assert.equal(ui.query(`.choice-impact[data-parent-id="${fixture.parents[1].id}"][data-stat="stability"]`).dataset.direction,'increase');
   fixture.parents[0].alive=false;
   fixture.parents[0].death={cause:'disease',age:fixture.parents[0].age};
   ui=await mount(fixture);
@@ -2231,7 +2231,7 @@ function assertChoiceImpacts(ui) {
     const spoken=entry.querySelector('[role="img"]');
     assert.ok(spoken,'the signed impact has an accessible description');
     assert.match(spoken.getAttribute('aria-label'),new RegExp(`(?:small|medium|large).*${direction}`));
-    assert.doesNotMatch(entry.textContent,/[+\u2212-]\d|\+{4}|-{4}|\u2192/,'forecasts use qualitative signs without numerical deltas');
+    assert.doesNotMatch(entry.textContent,/[+\u2212-]\d|\+{7}|-{7}|\u2192/,'forecasts use qualitative signs without numerical deltas');
     if(parentId) assert.match(entry.textContent,/Dad|Mom|Parent/);
   }
   assert.equal(ui.all('.choice-impact[data-stat="height"]').length,0,'height keeps its separate physical unit');
@@ -2303,7 +2303,7 @@ test('zero ratings stay readable in the header, family, and event outcomes', asy
 test('departed parents remain identified and the guardian receives care previews', async () => {
   const fixture=createGame({seed:121});
   fixture.age=3;
-  fixture.focus={work:3,social:2,family:1,self:3,creative:2};
+  fixture.focus={work:2,social:2,family:1,self:2,creative:2};
   fixture.parents.forEach(parent=>{parent.abandonedAt=0;});
   fixture.guardian={...structuredClone(fixture.parents[0]),id:'relative-guardian',name:'Anna Reed',guardianRole:'aunt',adoptedAt:0};
   delete fixture.guardian.abandonedAt;
@@ -2421,12 +2421,12 @@ test('activity signs compare possible allocations rather than fixed numerical ga
     fixture.effects=[];
     fixture.aptitudes.strength=aptitude;
     fixture.stats.strength=5;
-    fixture.focus={work:5,social:0,family:0,self:0,creative:0};
+    fixture.focus={work:4,social:0,family:0,self:0,creative:0};
     const ui=await mount(fixture),before=ui.saved();
     maximumGains.push(toddlerChoiceImpacts(before,'work').find(entry=>entry.stat==='strength').change);
-    assert.equal(ui.query('.choice-impact[data-stat="strength"]:not([data-parent-id]) b').textContent,'++','maximum Play is two contribution steps for either aptitude');
+    assert.equal(ui.query('.choice-impact[data-stat="strength"]:not([data-parent-id]) b').textContent,'++++++','maximum Play is three double-sign steps for either aptitude');
     ui.click('[data-action="focus"][data-key="work"][data-delta="-1"]');
-    assert.equal(ui.query('.choice-impact[data-stat="strength"]:not([data-parent-id]) b').textContent,'+','one fewer Play point is one step above neutral');
+    assert.equal(ui.query('.choice-impact[data-stat="strength"]:not([data-parent-id]) b').textContent,'++','one fewer Play point is one double-sign step above neutral');
     assert.deepEqual(ui.saved().stats,before.stats);
     assert.equal(ui.saved().rng,before.rng);
   }
@@ -2438,7 +2438,7 @@ test('school and college decisions show signed effects inside each choice and up
     const fixture=ageTo(createGame({seed:121}),age);
     if(age===18) assert.equal(chooseEducation(fixture,'college').ok,true);
     fixture.effects=[];
-    fixture.focus={work:4,social:2,family:2,self:4};
+    fixture.focus={work:3,social:1,family:2,self:2};
     for(const key of Object.keys(fixture.stats)) fixture.stats[key]=5;
     for(const key of Object.keys(fixture.aptitudes)) fixture.aptitudes[key]=0;
     fixture.parents.forEach(parent=>{parent.stats.stability=5;parent.relationship=5;});
@@ -2446,13 +2446,13 @@ test('school and college decisions show signed effects inside each choice and up
     assertChoiceImpacts(ui);
     const work=ui.query('.focus-row[data-focus-key="work"]');
     assert.match(work.querySelector('h4').textContent,age<18?/School/:/College/);
-    assert.equal(work.querySelector('[data-stat="intelligence"] b').textContent,'+');
-    assert.equal(work.querySelector('[data-stat="stability"] b').textContent,'-');
+    assert.equal(work.querySelector('[data-stat="intelligence"] b').textContent,'++');
+    assert.equal(work.querySelector('[data-stat="stability"] b').textContent,'--');
     ui.click('[data-action="focus"][data-key="social"][data-delta="-1"]');
     ui.click('[data-action="focus"][data-key="work"][data-delta="1"]');
     assertChoiceImpacts(ui);
-    assert.equal(ui.query('.focus-row[data-focus-key="work"] [data-stat="intelligence"] b').textContent,'++');
-    assert.equal(ui.query('.focus-row[data-focus-key="work"] [data-stat="stability"] b').textContent,'--');
+    assert.equal(ui.query('.focus-row[data-focus-key="work"] [data-stat="intelligence"] b').textContent,'++++++');
+    assert.equal(ui.query('.focus-row[data-focus-key="work"] [data-stat="stability"] b').textContent,'------');
     assert.deepEqual(ui.saved().stats,before.stats);
     assert.deepEqual(ui.saved().parents,before.parents);
     assert.equal(ui.saved().rng,before.rng);
@@ -2462,7 +2462,7 @@ test('school and college decisions show signed effects inside each choice and up
 test('toddler family effects combine parents without sections and omit neutral or blocked changes', async () => {
   const fixture=ageTo(createGame({seed:121}),3);
   fixture.effects=[];
-  fixture.focus={work:1,social:1,family:4,self:3,creative:2};
+  fixture.focus={work:1,social:1,family:4,self:2,creative:2};
   fixture.parents.forEach(parent=>{parent.stats.stability=5;parent.relationship=5;});
   const ui=await mount(fixture),before=ui.saved();
   const family=()=>ui.query('.focus-row[data-focus-key="family"]');
@@ -2505,7 +2505,7 @@ test('lifestyle never appears in expected changes even when household or adult l
     const ui=await mount(fixture),before=ui.saved();
     assert.equal(ui.all('.choice-impact[data-stat="lifestyle"]').length,0,`age ${age} hides all expected Lifestyle entries`);
     assert.equal(ui.query('.profile-lifestyle .status-value').textContent,'9.0/10','the current rating remains visible');
-    if(age!==3) assert.ok(ui.all('.choice-impact').length>0,'other expected changes remain visible');
+    if(age<2) assert.ok(ui.all('.choice-impact').length>0,'crying effects remain visible');
     assert.deepEqual(ui.saved(),before);
     assert.equal(ui.saved().rng,fixture.rng);
   }
@@ -2518,26 +2518,26 @@ test('Electronics and crafts show the expected signs at every allocation', async
   fixture.stats.social=5;
   fixture.stats.intelligence=5;
   const ui=await mount(fixture),before=ui.saved();
-  const social=['++','+',null,'-','--','---'];
-  const intelligence=['--','-',null,'+','++','+++'];
+  const social=['+++','+',null,'-','---'];
+  const intelligence=['------','--',null,'++','++++++'];
   const signs=stat=>ui.document.querySelector(`.focus-row[data-focus-key="social"] .choice-impact[data-stat="${stat}"] b`)?.textContent ?? null;
-  for(let points=0;points<=5;points++) {
+  for(let points=0;points<=4;points++) {
     assert.equal(ui.query('.focus-row[data-focus-key="social"] output').textContent,String(points));
     assert.equal(signs('social'),social[points],`Electronics ${points}: social`);
     assert.equal(signs('intelligence'),intelligence[points],`Electronics ${points}: intelligence`);
-    if(points<5) ui.click('[data-action="focus"][data-key="social"][data-delta="1"]');
+    if(points<4) ui.click('[data-action="focus"][data-key="social"][data-delta="1"]');
   }
-  for(let points=4;points>=0;points--) {
+  for(let points=3;points>=0;points--) {
     ui.click('[data-action="focus"][data-key="social"][data-delta="-1"]');
     assert.equal(signs('social'),social[points]);
     assert.equal(signs('intelligence'),intelligence[points]);
   }
-  for(let points=0;points<=5;points++) {
+  for(let points=0;points<=4;points++) {
     const craftSigns=ui.document.querySelector('.focus-row[data-focus-key="creative"] .choice-impact[data-stat="intelligence"] b')?.textContent ?? null;
-    assert.equal(craftSigns,['-','-',null,'+','+','++'][points],`Arts & crafts ${points}: intelligence`);
+    assert.equal(craftSigns,['---','-',null,'+','+++'][points],`Arts & crafts ${points}: intelligence`);
     const creativity=ui.document.querySelector('.focus-row[data-focus-key="creative"] .choice-impact[data-stat="creativity"] b')?.textContent ?? null;
-    assert.equal(creativity,['--','-',null,'+','++','+++'][points],`Arts & crafts ${points}: creativity`);
-    if(points<5) ui.click('[data-action="focus"][data-key="creative"][data-delta="1"]');
+    assert.equal(creativity,['------','--',null,'++','++++++'][points],`Arts & crafts ${points}: creativity`);
+    if(points<4) ui.click('[data-action="focus"][data-key="creative"][data-delta="1"]');
   }
   assert.deepEqual(ui.saved().stats,before.stats);
   assert.equal(ui.saved().rng,before.rng);
@@ -2562,7 +2562,7 @@ test('infant practice can change effective ratings outside the ordinary range', 
 test('Year keeps parents above decisions and shows unbounded totals with separate temporary amounts', async () => {
   const fixture=createGame({seed:121});
   fixture.age=3;
-  fixture.focus={work:3,social:2,family:2,self:3,creative:2};
+  fixture.focus={work:2,social:2,family:2,self:2,creative:2};
   fixture.stats.creativity=9.77;
   fixture.stats.health=.13;
   fixture.aptitudes.creativity=2;
@@ -2594,4 +2594,154 @@ test('Year keeps parents above decisions and shows unbounded totals with separat
   }
   assert.deepEqual(ui.saved(),before);
   assert.equal(ui.writes(),writes);
+});
+
+
+test('every focus stage starts neutral at two with its stage budget and a hard four-point cap', async () => {
+  for (const [age, college] of [[3,false],[5,false],[18,true],[30,false]]) {
+    const fixture=ageTo(createGame({seed:125}),age);
+    if(college) assert.equal(chooseEducation(fixture,'college').ok,true);
+    fixture.effects=[];
+    fixture.focus=defaultFocus(age);
+    const before=structuredClone(fixture);
+    const ui=await mount(fixture);
+    const count=age<5?5:4;
+    assert.equal(ui.all('.focus-row').length,count);
+    assert.ok(ui.all('.focus-row output').every(output=>output.textContent==='2'));
+    assert.equal(ui.query('.focus-panel .panel-heading .tag').textContent,`${count*2} / ${count*2} POINTS`);
+    assert.equal(ui.all('.focus-scale span').length,count*MAX_FOCUS);
+    assert.equal(ui.all('.focus-panel .choice-impact').length,0,'two points has no choice-driven stat or caregiver effects');
+    assert.ok(ui.all('.focus-row [data-delta="1"]').every(button=>button.disabled),'default allocation uses the exact stage budget');
+    assert.deepEqual(ui.saved(),before,'reading neutral previews does not mutate saves or RNG');
+    ui.click('.focus-row[data-focus-key="social"] [data-delta="-1"]');
+    ui.click('.focus-row[data-focus-key="social"] [data-delta="-1"]');
+    assert.equal(ui.query('.focus-row[data-focus-key="social"] [data-delta="-1"]').disabled,true);
+    ui.click('.focus-row[data-focus-key="work"] [data-delta="1"]');
+    ui.click('.focus-row[data-focus-key="work"] [data-delta="1"]');
+    assert.equal(ui.saved().focus.work,4);
+    assert.equal(ui.query('.focus-row[data-focus-key="work"] [data-delta="1"]').disabled,true);
+    ui.click('.focus-row[data-focus-key="self"] [data-delta="-1"]');
+    assert.ok(Object.values(ui.saved().focus).reduce((a,b)=>a+b,0)<focusBudget(age));
+    assert.equal(ui.query('.focus-row[data-focus-key="work"] [data-delta="1"]').disabled,true,'a free point cannot bypass the per-focus maximum');
+    ui.click('.focus-row[data-focus-key="work"] [data-delta="1"]');
+    assert.equal(ui.saved().focus.work,4);
+    assert.equal(validateSave(ui.saved()),true);
+    const reloaded=await mount(ui.saved());
+    assert.deepEqual(reloaded.saved(),ui.saved());
+  }
+});
+
+test('focus extremes render six signed strengths with accessible labels and no numeric deltas', async () => {
+  for(const points of [0,1,2,3,4]) {
+    const fixture=ageTo(createGame({seed:125}),3);
+    fixture.effects=[];
+    fixture.focus={work:points,social:0,family:0,self:0,creative:0};
+    fixture.stats.strength=5;
+    fixture.aptitudes.strength=0;
+    const ui=await mount(fixture);
+    const entry=ui.document.querySelector('.focus-row[data-focus-key="work"] [data-stat="strength"]');
+    const expected=['------','--',null,'++','++++++'][points];
+    assert.equal(entry?.querySelector('b').textContent??null,expected);
+    if(entry) {
+      assert.doesNotMatch(entry.textContent,/undefined|NaN|[+-]\d/);
+      assert.match(entry.querySelector('[role="img"]').getAttribute('aria-label'),/Strength: (small|medium|large) expected (increase|decrease)/);
+    }
+  }
+});
+
+test('birth conditions show subject-specific help across Year and family profiles without changing saves', async () => {
+  const fixture=partnerFixture();
+  assert.equal(haveChild(fixture).ok,true);
+  fixture.conditions=['autism','high_energy'];
+  fixture.focus={work:2,social:1,family:2,self:2};
+  fixture.parents[0].conditions=['low_energy'];
+  fixture.partner.conditions=['high_energy'];
+  fixture.children[0].conditions=['autism'];
+  fixture.yearSummary=null; // The fixture changes birth traits after advancing; do not retain the previous trait budget.
+  assert.equal(validateSave(fixture),true);
+  let ui=await mount(fixture);
+  const saved=ui.saved(),writes=ui.writes();
+  assert.deepEqual(ui.all('.profile-bar .birth-condition').map(node=>node.dataset.conditionId),['autism','high_energy']);
+  assert.equal(ui.all('.status-strip > button').length,7,'conditions leave the seven-stat grid intact');
+  assert.doesNotMatch(ui.query('#app').textContent,/Effects are game rules/);
+  const trigger=ui.query('.profile-bar [data-topic="condition-autism"]');
+  assert.match(trigger.getAttribute('aria-label'),new RegExp(`About ${fixture.name}: Autism.*Intelligence at birth.*Friends max 1`));
+  trigger.focus();
+  ui.click('.profile-bar [data-topic="condition-autism"]');
+  assert.match(ui.query('.help-popup').textContent,/\+\.7 Intelligence at birth.*Friends max 1 from age 5, lifelong.*Effects are game rules/);
+  ui.key('.help-popup [data-action="close"]','Escape');
+  assert.equal(ui.document.activeElement,trigger);
+  ui.click('.profile-bar [data-topic="condition-high_energy"]');
+  assert.match(ui.query('.help-popup').textContent,/\+1 focus point each year from age 2, lifelong/);
+  ui.click('.help-popup [data-action="close"]');
+  ui.click('.nav-list [data-tab="family"]');
+  for(const [person,condition] of [[fixture.parents[0],'low_energy'],[fixture.partner,'high_energy'],[fixture.children[0],'autism']]) {
+    const selector=`[data-person-id="${person.id}"] [data-topic="condition-${condition}"]`;
+    assert.match(ui.query(selector).getAttribute('aria-label'),new RegExp(person.name));
+    ui.click(selector);
+    assert.ok(ui.query('.help-popup').textContent.includes(person.name));
+    ui.click('.help-popup [data-action="close"]');
+  }
+  assert.deepEqual(ui.saved(),saved);
+  assert.equal(ui.writes(),writes,'condition help must not assign conditions, apply bonuses, or consume RNG');
+  ui=await mount(saved);
+  assert.equal(ui.all('.profile-bar .birth-condition').length,2);
+  assert.deepEqual(ui.saved(),saved);
+});
+
+test('lifelong condition caps and extra focus points are enforced together and survive reload', async () => {
+  const fixture=createGame({name:'Jamie Reed',seed:89101});
+  fixture.age=10;
+  fixture.conditions=['autism','high_energy'];
+  fixture.focus={work:2,social:1,family:2,self:2};
+  fixture.effects=[];
+  assert.equal(validateSave(fixture),true);
+  let ui=await mount(fixture);
+  const social='.focus-row[data-focus-key="social"]';
+  assert.match(ui.query('.focus-panel .tag').textContent,/7 \/ 9 POINTS/);
+  assert.match(ui.query(`${social} .focus-limit`).textContent,/Max 1.*Autism.*lifelong/);
+  assert.doesNotMatch(ui.query(`${social} .focus-limit`).textContent,/null|years left/);
+  assert.equal(ui.query(`${social} [data-delta="1"]`).disabled,true);
+  assert.equal(ui.query(`${social} .stepper`).getAttribute('aria-describedby'),'focus-limit-social');
+  assert.equal(ui.all(`${social} .focus-scale .limited`).length,3);
+  ui.click('[data-topic="focus"]');
+  assert.match(ui.query('.help-popup').textContent,/Share 9 points across 4 focuses/);
+  ui.click('.help-popup [data-action="close"]');
+  ui.click('.focus-row[data-focus-key="work"] [data-delta="1"]');
+  ui.click('.focus-row[data-focus-key="work"] [data-delta="1"]');
+  assert.equal(ui.saved().focus.work,4);
+  assert.match(ui.query('.focus-panel .tag').textContent,/9 \/ 9 POINTS/);
+  assert.ok(ui.all('.focus-row [data-delta="1"]').every(button=>button.disabled));
+  const saved=ui.saved();
+  ui=await mount(saved);
+  assert.deepEqual(ui.saved(),saved);
+  assert.match(ui.query(`${social} .focus-limit`).textContent,/lifelong/);
+  assert.match(ui.query('.focus-panel .tag').textContent,/9 \/ 9 POINTS/);
+
+  const toddler=createGame({seed:89102});
+  toddler.age=3;toddler.conditions=['high_energy'];toddler.focus=defaultFocus(3);toddler.effects=[];
+  ui=await mount(toddler);
+  assert.match(ui.query('.focus-panel .tag').textContent,/10 \/ 11 POINTS/);
+  ui.click('[data-topic="toddler-focus"]');
+  assert.match(ui.query('.help-popup').textContent,/Share 11 points among five activities/);
+  ui.click('.help-popup [data-action="close"]');
+  ui.click('.focus-row[data-focus-key="work"] [data-delta="1"]');
+  assert.match(ui.query('.focus-panel .tag').textContent,/11 \/ 11 POINTS/);
+  assert.ok(ui.all('.focus-row [data-delta="1"]').every(button=>button.disabled));
+});
+
+test('dating prospects show their own birth conditions and condition-free profiles stay compact', async () => {
+  const fixture=encounterFixture();
+  fixture.conditions=[];
+  fixture.encounters[0].conditions=['autism'];
+  fixture.encounters[1].conditions=[];
+  const ui=await mount(fixture),saved=ui.saved();
+  assert.equal(ui.all('.profile-bar .birth-conditions').length,0);
+  ui.click('.nav-list [data-tab="family"]');
+  ui.click('.encounter-card [data-topic="condition-autism"]');
+  assert.ok(ui.query('.help-popup').textContent.includes(fixture.encounters[0].name));
+  ui.click('.help-popup [data-action="close"]');
+  ui.click('[data-action="prospect-page"][data-delta="1"]');
+  assert.equal(ui.all('.encounter-card .birth-conditions').length,0);
+  assert.deepEqual(ui.saved(),saved,'reading condition profiles preserves stats and RNG');
 });

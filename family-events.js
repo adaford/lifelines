@@ -1,3 +1,4 @@
+import { legacyFocusValue } from './focus-rules.js?v=birth-focus-1';
 // Fictional household events. Subject changes affect the named person; player
 // changes affect you. Relationship changes affect your bond with that person.
 // Individual rolls join the ordinary event pool and share its five-event cap.
@@ -186,7 +187,7 @@ export function familyEventChances(state) {
     ...(state.partner ? [{ subjectType: 'partner', person: state.partner }] : []),
     ...(state.children || []).map(person => ({ subjectType: 'child', person })),
   ];
-  const focus = state.focus || { work: 0, social: 0, family: 0, self: 0 };
+  const focus = Object.fromEntries(['work', 'social', 'family', 'self'].map(key => [key, legacyFocusValue(state.focus?.[key], state.age >= 2 && state.age < 5 && !['work', 'self'].includes(key) ? 2 : 3)]));
   const result = [];
   for (const { subjectType, person } of actors) {
     for (const event of FAMILY_EVENTS.filter(event => event.subjectType === subjectType)) {

@@ -9,7 +9,7 @@ const noVariation = { mortalityRandom: () => 1, growthRandom: () => 0, parentCar
 function child() {
   const state = createGame({ seed: 13579 });
   state.age = 3;
-  state.focus = { work: 3, social: 2, family: 2, self: 3, creative: 2 };
+  state.focus = { work: 2, social: 2, family: 2, self: 2, creative: 2 };
   for (const person of [state, ...state.parents]) for (const key in person.stats) person.stats[key] = 5;
   for (const parent of state.parents) { parent.stats.stability = 0; parent.relationship = 0; }
   return state;
@@ -48,13 +48,13 @@ test('zero ratings survive saves, effective modifiers and full-range review delt
   assert.equal(validateSave(state), false);
 });
 
-test('schema 14 migration changes metadata only and keeps its original floor contract', () => {
+test('schema 14 migration adapts focus and keeps its original rating-floor contract', () => {
   const previous = child();
   previous.version = 14;
   delete previous.guardian;
   for (const parent of previous.parents) { parent.stats.stability = 1.25; parent.relationship = 1.5; }
   const snapshot = copy(previous);
-  assert.deepEqual(migrateSave(previous), { ...snapshot, version: 16 });
+  assert.deepEqual(migrateSave(previous), { ...snapshot, version: 17, focus: { work: 1, social: 2, family: 2, self: 1, creative: 2 } });
   assert.deepEqual(previous, snapshot);
   previous.stats.health = 0;
   assert.equal(migrateSave(previous), null);

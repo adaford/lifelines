@@ -7,7 +7,8 @@ const steadyYear = { mortalityRandom: () => 1, growthRandom: () => 0, parentCare
 function toddler() {
   const state = createGame({ seed: 13579 });
   state.age = 3;
-  state.focus = { work: 3, social: 2, family: 2, self: 3, creative: 2 };
+  state.conditions = [];
+  state.focus = { work: 2, social: 2, family: 2, self: 2, creative: 2 };
   return state;
 }
 function matchingYear(matches) {

@@ -4,7 +4,7 @@ import { desirability, meetingChances, prospectQuality, relationshipOdds, oneNig
 
 const core = ['intelligence', 'strength', 'attractiveness', 'social', 'creativity'];
 const traits = [...core, 'health', 'stability'];
-const actor = (value = 5) => ({ id: 'player', age: 30, stats: Object.fromEntries(traits.map(key=>[key,value])), lifestyle: value, focus: {social:3}, gender:'male', canGestate:false, attractedTo:['female'], appearancePeakAge:30, children:[], partner:null, pregnancy:null });
+const actor = (value = 5) => ({ id: 'player', age: 30, stats: Object.fromEntries(traits.map(key=>[key,value])), lifestyle: value, focus: {social:2}, gender:'male', canGestate:false, attractedTo:['female'], appearancePeakAge:30, children:[], partner:null, pregnancy:null });
 const partner = (value = 5) => ({ ...actor(value), id:'partner', gender:'female', canGestate:true, relationship:5, yearsTogether:0, married:false, lastProposalAge:-1, alive:true });
 function seededHelpers(seed) {
   let rng=seed, nextId=0;
@@ -31,7 +31,7 @@ test('meeting frequency runs from a rare single opportunity to at most five',()=
   }
   const lifestyle=actor(1);lifestyle.lifestyle=10;
   assert.ok(meetingChances(lifestyle).expected>meetingChances(low).expected);
-  const focused=actor(5);focused.focus.social=5;
+  const focused=actor(5);focused.focus.social=4;
   assert.ok(meetingChances(focused).expected>meetingChances(actor(5)).expected);
 });
 

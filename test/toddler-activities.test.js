@@ -1,3 +1,4 @@
+import { focusEffect, defaultFocus } from '../focus-rules.js';
 import { stripWellbeingAptitudes, neutralWellbeingAptitudes } from './helpers/legacy-height.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -13,30 +14,27 @@ const toddler = () => {
 };
 const survives = { mortalityRandom: () => 1, growthRandom: () => 0, parentCareerRandom: () => 1 };
 
-test('activity contributions grow with points, match practice changes, and do not consume RNG', () => {
+test('activity contributions are neutral at two and triple at the endpoints without consuming RNG', () => {
   for (const aptitude of [-3, 0, 3]) {
     const state = toddler();
     for (const key of Object.keys(state.aptitudes)) state.aptitudes[key] = aptitude;
     const before = copy(state);
-    const effects = toddlerActivityEffects(state);
-    assert.deepEqual(state, before);
-    for (const [activity, stats] of Object.entries(effects)) {
-      const without = { ...state, focus: { ...state.focus, [activity]: 0 } };
-      for (const [stat, amount] of Object.entries(stats)) {
-        if (['health', 'stability'].includes(stat)) continue;
-        assert.ok(Math.abs(amount - (skillChanges(state)[stat] - skillChanges(without)[stat])) < 1e-12);
-      }
-      let previous = 0;
-      for (let points = 0; points <= 5; points++) {
-        const impacts = toddlerActivityEffects({ ...state, focus: { ...state.focus, [activity]: points } })[activity];
-        const total = Object.values(impacts).reduce((sum, amount) => sum + Math.abs(amount), 0);
-        assert.ok(total >= previous);
-        previous = total;
-        if (activity === 'social' && points) assert.ok(impacts.intelligence > 0 && impacts.social < 0);
+    for (const [activity, stats] of Object.entries(toddlerActivityEffects(state))) {
+      assert.ok(Object.values(stats).every(amount => amount === 0));
+      for (const points of [0, 1, 2, 3, 4]) {
+        const selected = { ...state, focus: { ...state.focus, [activity]: points } };
+        const effects = toddlerActivityEffects(selected)[activity];
+        for (const [stat, amount] of Object.entries(effects)) {
+          if (!['health', 'stability'].includes(stat)) assert.ok(Math.abs(amount - (skillChanges(selected)[stat] - skillChanges(state)[stat])) < 1e-12);
+          if (points === 0 || points === 4) {
+            const unit = toddlerActivityEffects({ ...state, focus: { ...state.focus, [activity]: points === 0 ? 1 : 3 } })[activity][stat];
+            assert.ok(Math.abs(amount - unit * 3) < 1e-12, `${activity} ${stat} endpoint triples its adjacent choice`);
+          }
+        }
       }
     }
-    assert.equal(Object.hasOwn(effects.work, 'creativity'), false);
-    assert.ok(effects.creative.creativity > 0);
+    assert.deepEqual(state, before);
+    assert.equal(Object.hasOwn(toddlerActivityEffects(state).work, 'creativity'), false);
   }
 });
 
@@ -44,9 +42,9 @@ test('rest uses the halved toddler health response and crafts spend the shared b
   const state = toddler();
   state.aptitudes.health = 0;
   const higher = { ...state, focus: { ...state.focus, self: 4 } };
-  assert.ok(Math.abs(childhoodWellbeing(higher).health - childhoodWellbeing(state).health - .05) < 1e-12);
+  assert.ok(Math.abs(childhoodWellbeing(higher).health - childhoodWellbeing(state).health - .15) < 1e-12);
   assert.equal(setFocus(state, 'creative', 3).ok, false);
-  assert.equal(setFocus(state, 'work', 2).ok, true);
+  assert.equal(setFocus(state, 'work', 1).ok, true);
   assert.equal(setFocus(state, 'creative', 3).ok, true);
   assert.equal(setFocus(state, 'creative', 6).ok, false);
   assert.equal(setFocus(state, 'creative', 1.5).ok, false);
@@ -57,7 +55,7 @@ test('rest uses the halved toddler health response and crafts spend the shared b
   assert.equal(setFocus(state, 'creative', 1).ok, false);
 });
 
-test('each crafts intelligence step is one-third an electronics step while retaining creativity', () => {
+test('each crafts intelligence sign is half an electronics two-sign step while retaining creativity', () => {
   for (const age of [2, 3, 4]) {
     const state = toddler();
     state.age = age;
@@ -70,17 +68,17 @@ test('each crafts intelligence step is one-third an electronics step while retai
     const craftsGain = crafts.intelligence - baseline.intelligence;
     const electronicsGain = electronics.intelligence - baseline.intelligence;
     assert.ok(craftsGain > 0);
-    assert.ok(Math.abs(craftsGain * 3 - electronicsGain) < 1e-12);
+    assert.ok(Math.abs(craftsGain * 2 - electronicsGain) < 1e-12);
     assert.ok(crafts.creativity > baseline.creativity);
     assert.equal(crafts.social, baseline.social);
     assert.equal(crafts.strength, baseline.strength);
     const effects = toddlerActivityEffects(state);
-    assert.ok(Math.abs(effects.creative.intelligence * 6 - effects.social.intelligence) < 1e-12);
+    assert.ok(Math.abs(effects.creative.intelligence * 2 - effects.social.intelligence) < 1e-12);
     assert.deepEqual(state, before, 'development and activity reads preserve the save and RNG');
   }
 });
 
-test('toddler social practice has three, minus one, and two relative units while family time builds parent relationships', () => {
+test('toddler social practice has two, minus one, and two sign units while family time builds parent relationships', () => {
   for (const age of [2, 3, 4]) {
     const state = toddler();
     state.age = age;
@@ -97,8 +95,8 @@ test('toddler social practice has three, minus one, and two relative units while
     const electronicsGain = electronics.social - baseline.social;
     const familyGain = family.social - baseline.social;
     assert.ok(playGain > 0 && electronicsGain < 0 && familyGain > 0);
-    assert.ok(Math.abs(electronicsGain * -3 - playGain) < 1e-12);
-    assert.ok(Math.abs(familyGain * 3 - playGain * 2) < 1e-12);
+    assert.ok(Math.abs(electronicsGain * -2 - playGain) < 1e-12);
+    assert.ok(Math.abs(familyGain - playGain) < 1e-12);
     assert.equal(family.intelligence, baseline.intelligence);
     assert.equal(Object.hasOwn(toddlerActivityEffects(state).family, 'intelligence'), false);
     const neutral = annualForecast(state);
@@ -119,15 +117,15 @@ test('age two unlocks five activities and the school transition preserves the co
   assert.deepEqual(infant.focus, TODDLER_FOCUS);
   const state = toddler();
   state.age = 4;
-  state.focus = { work: 4, social: 0, family: 2, self: 1, creative: 5 };
+  state.focus = { work: 3, social: 0, family: 2, self: 1, creative: 4 };
   const decisions = copy(state.focus);
   const before = copy(state);
   annualForecast(state);
   assert.deepEqual(state, before);
   assert.equal(advanceYear(state, survives).ok, true);
   assert.equal(state.age, 5);
-  assert.deepEqual(state.yearSummary.decisions, { focus: decisions, workLabel: 'Play' });
-  assert.deepEqual(state.focus, { work: 5, social: 0, family: 2, self: 5 });
+  assert.deepEqual(state.yearSummary.decisions, { focus: decisions, workLabel: 'Play', focusMax: 4, focusBudget: 10 });
+  assert.deepEqual(state.focus, { work: 3, social: 0, family: 2, self: 3 });
   assert.equal(validateSave(state), true);
   assert.deepEqual(migrateSave(state), state);
 });
@@ -135,7 +133,7 @@ test('age two unlocks five activities and the school transition preserves the co
 test('v10 toddler saves gain an empty crafts allocation without rewriting progress or old reviews', () => {
   const state = toddler();
   state.age = 3;
-  state.focus = { work: 2, social: 4, family: 3, self: 3 };
+  state.focus = defaultFocus(3);
   advanceYear(state, survives);
   stripWellbeingAptitudes(state);
   state.version = 10;
@@ -145,13 +143,13 @@ test('v10 toddler saves gain an empty crafts allocation without rewriting progre
   const migrated = migrateSave(state);
   assert.deepEqual(state, before);
   assert.ok(migrated);
-  const expected = { ...copy(before), version: 16, focus: { ...before.focus, creative: 0 } };
+  const expected = { ...copy(before), version: 17, focus: { work: 2, social: 2, family: 2, self: 2, creative: 0 } };
   neutralWellbeingAptitudes(expected);
   assert.deepEqual(migrated, expected);
   assert.equal(Object.hasOwn(migrated.yearSummary.decisions.focus, 'creative'), false);
   assert.deepEqual(migrateSave(migrated), migrated);
   for (const focus of [
-    { ...migrated.focus, creative: 1 },
+    { ...migrated.focus, creative: 5 },
     { ...migrated.focus, creative: -1 },
     { ...migrated.focus, creative: .5 },
     { ...migrated.focus, invented: 0 },

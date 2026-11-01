@@ -1,4 +1,6 @@
-import { naturalSkillRating, BIRTH_VARIATION } from './development.js?v=permanent-cross-stat-1';
+import { assignBirthConditions } from './birth-conditions.js?v=birth-focus-1';
+import { legacyFocusValue } from './focus-rules.js?v=birth-focus-1';
+import { naturalSkillRating, BIRTH_VARIATION } from './development.js?v=birth-focus-1';
 // Fictional relationship balance. These are game rules, not real-world estimates.
 // Actor identity and pregnancy capability are separate so future playable genders
 // can use the same relationship system. The current default is men meeting women.
@@ -19,7 +21,7 @@ export function meetingChances(state, stats = state.stats) {
   }
   const strength = clamp((score - 1) / 9, 0, 1);
   const slots = 1 + Math.floor(strength * 4 + 1e-9);
-  const socialFocus = clamp(state.focus?.social ?? 3, 0, 5);
+  const socialFocus = legacyFocusValue(state.focus?.social);
   const chance = clamp((.22 + .7 * strength) * (.7 + socialFocus * .1), .05, .95);
   return { desirability: score, slots, chance, expected: slots * chance };
 }
@@ -110,11 +112,12 @@ export function createProspects(state, helpers, stats = state.stats) {
       actorStats.attractiveness = clamp(actorStats.attractiveness + attractivenessAgeChange({age:pastAge,gender}),0,10);
     }
     actorStats.attractiveness = round(actorStats.attractiveness);
-    prospects.push({
+    const prospect = {
       id: uid('prospect'), name: personName(gender), age, stats: actorStats, aptitudes,
       height, adultHeight: height, lifestyle: round(clamp(center + (random() - .5) * 4, 0, 10)), alive: true,
       gender, canGestate: gender === 'female', attractedTo: [state.gender || 'male'], appearancePeakAge,
-    });
+    };
+    prospects.push(assignBirthConditions(prospect, `${state.seed ?? 0}:${state.rng ?? 0}`));
   }
   return prospects;
 }

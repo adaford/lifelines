@@ -38,7 +38,7 @@ function lifeAt(age, college = false) {
     if (needsEducationChoice(state)) assert.equal(chooseEducation(state, college ? 'college' : 'work').ok, true);
     state.effects = [];
     for (const key of Object.keys(state.stats)) state.stats[key] = 5;
-    state.focus = age >= 2 && age < 5 ? { work: 3, social: 2, family: 2, self: 3, creative: 2 } : { work: 3, social: 3, family: 3, self: 3 };
+    state.focus = age >= 2 && age < 5 ? { work: 2, social: 2, family: 2, self: 2, creative: 2 } : { work: 2, social: 2, family: 2, self: 2 };
     assert.equal(validateSave(state), true);
     cache.set(key, state);
   }
@@ -53,7 +53,7 @@ test('new personal events cover each life stage and remain restricted to appropr
   for (const event of additions) {
     const state = { age: event.minAge, education: { status: event.conditions?.includes('college') ? 'college' : event.minAge < 18 ? 'school' : 'workforce' },
       stats: { health: 5, stability: 5, intelligence: 5, strength: 5, social: 5, creativity: 5, attractiveness: 5 }, lifestyle: 5,
-      focus: { work: 3, social: 2, family: 2, self: 3, creative: 2 }, children: [] };
+      focus: { work: 2, social: 2, family: 2, self: 2, creative: 2 }, children: [] };
     const job = event.conditions?.includes('employed') ? retail : null;
     const chance = candidate => eventChances(candidate, candidate.stats, job).find(entry => entry.id === event.id).chance;
     const original = copy(state);

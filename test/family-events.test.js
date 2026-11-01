@@ -6,7 +6,7 @@ const traits = ['intelligence', 'strength', 'attractiveness', 'social', 'creativ
 const actor = (id, age, value = 5.5) => ({ id, name: id, age, alive: true,
   stats: Object.fromEntries(traits.map(key => [key, value])), relationship: 5.5 });
 function household(childAge = 10) {
-  return { age: 30, focus: { work: 3, social: 3, family: 3, self: 3 },
+  return { age: 30, focus: { work: 2, social: 2, family: 2, self: 2 },
     partner: { ...actor('partner', 30), married: true, yearsTogether: 3 },
     children: [actor('child', childAge)], ended: false, needsSuccession: false };
 }
@@ -83,7 +83,7 @@ test('each family member rolls from their own traits and keeps a distinct target
 
 test('family focus supports connection and reduces neglected relationships', () => {
   const low = household(); low.focus.family = 0;
-  const high = household(); high.focus.family = 5;
+  const high = household(); high.focus.family = 4;
   assert.ok(chanceFor(high, 'household_partner_open') > chanceFor(low, 'household_partner_open') * 4);
   assert.ok(chanceFor(high, 'household_child_gratitude') > chanceFor(low, 'household_child_gratitude') * 4);
   assert.ok(chanceFor(low, 'household_partner_forgotten') > chanceFor(high, 'household_partner_forgotten') * 7);
@@ -117,7 +117,7 @@ test('all retained subject traits influence events, with more frequent but bound
 
 function childhood(age = 0) {
   return { age, parents: [actor('parent-one', age + 30), actor('parent-two', age + 32)],
-    partner: null, children: [], focus: { work: 3, social: 3, family: 3, self: 3 },
+    partner: null, children: [], focus: { work: 2, social: 2, family: 2, self: 2 },
     ended: false, needsSuccession: false };
 }
 

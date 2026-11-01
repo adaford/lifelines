@@ -1,20 +1,22 @@
 // Lifelines: deterministic, browser-independent simulation rules.
 // All public actions mutate their state and return { ok, reason? }.
-import { JOBS } from './jobs.js?v=permanent-cross-stat-1';
-import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=permanent-cross-stat-1';
-import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=permanent-cross-stat-1';
-import { mortalityRisk, rollMortality } from './mortality.js?v=permanent-cross-stat-1';
-import { heightReference, advanceGrowth } from './growth.js?v=permanent-cross-stat-1';
-import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=permanent-cross-stat-1';
-import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, DEVELOPMENT_BALANCE, BIRTH_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=permanent-cross-stat-1';
-import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=permanent-cross-stat-1';
-import { normalPercentile } from './percentiles.js?v=permanent-cross-stat-1';
-import { changedRating } from './rating-changes.js?v=permanent-cross-stat-1';
+import { JOBS } from './jobs.js?v=birth-focus-1';
+import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=birth-focus-1';
+import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=birth-focus-1';
+import { mortalityRisk, rollMortality } from './mortality.js?v=birth-focus-1';
+import { heightReference, advanceGrowth } from './growth.js?v=birth-focus-1';
+import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=birth-focus-1';
+import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, standardFocusPractice, DEVELOPMENT_BALANCE, BIRTH_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=birth-focus-1';
+import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=birth-focus-1';
+import { normalPercentile } from './percentiles.js?v=birth-focus-1';
+import { changedRating } from './rating-changes.js?v=birth-focus-1';
+import { MAX_FOCUS, DEFAULT_FOCUS, focusEffect, focusKeysForAge, focusBudget, defaultFocus, legacyFocusValue } from './focus-rules.js?v=birth-focus-1';
+import { assignBirthConditions, getBirthConditions, conditionFocusLimits, validateBirthConditions } from './birth-conditions.js?v=birth-focus-1';
 export { DEVELOPMENT_BALANCE };
-export { heightPercentile } from './growth.js?v=permanent-cross-stat-1';
-export { mortalityRisk } from './mortality.js?v=permanent-cross-stat-1';
-import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=permanent-cross-stat-1';
-export { JOBS, JOB_CATEGORIES } from './jobs.js?v=permanent-cross-stat-1';
+export { heightPercentile } from './growth.js?v=birth-focus-1';
+export { mortalityRisk } from './mortality.js?v=birth-focus-1';
+import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=birth-focus-1';
+export { JOBS, JOB_CATEGORIES } from './jobs.js?v=birth-focus-1';
 export const EVENTS = [...PERSONAL_EVENTS, ...FAMILY_EVENTS];
 
 export const SKILLS = [
@@ -27,7 +29,7 @@ export const SKILLS = [
 const CORE = SKILLS.map(s => s.key);
 const STAT_KEYS = [...CORE, 'health', 'stability'];
 const FOCUS_KEYS = ['work', 'social', 'family', 'self'];
-const focusKeys = age => age >= 2 && age < 5 ? [...FOCUS_KEYS, 'creative'] : FOCUS_KEYS;
+const focusKeys = focusKeysForAge;
 function focusAfterBirthday(state) {
   if (state.age === 2) state.focus = { ...TODDLER_FOCUS };
   if (state.age === 5 && Object.hasOwn(state.focus, 'creative')) {
@@ -36,7 +38,8 @@ function focusAfterBirthday(state) {
     clampFocusToLimits(state);
     const limits = focusLimits(state);
     for (const key of ['self', 'work', 'social', 'family']) {
-      const transferred = Math.min(remaining, limits[key] - state.focus[key]);
+      const available = focusBudget(state) - Object.values(state.focus).reduce((sum, points) => sum + points, 0);
+      const transferred = Math.min(remaining, available, limits[key] - state.focus[key]);
       state.focus[key] += transferred;
       remaining -= transferred;
     }
@@ -170,7 +173,8 @@ function makeParent(state, lastName, gender) {
   const height = fromCentimeters(heightCm);
   const growthFactor = Math.round(clamp(1 + (heightCm - reference.median) / (reference.median - heightReference(0, gender).median), .8, 1.2) * 10000) / 10000;
   const aptitudes = randomAptitudes(state);
-  return demographics({ id: uid(state, 'parent'), name: personName(state, lastName, gender), familyName: lastName, parentRole: gender === 'female' ? 'mom' : 'dad', age, stats: randomStats(state, aptitudes), aptitudes, height, adultHeight: height, growthFactor, alive: true, relationship: initialBond(state) }, gender);
+  const parent = demographics({ id: uid(state, 'parent'), name: personName(state, lastName, gender), familyName: lastName, parentRole: gender === 'female' ? 'mom' : 'dad', age, stats: randomStats(state, aptitudes), aptitudes, height, adultHeight: height, growthFactor, alive: true, relationship: initialBond(state) }, gender);
+  return assignBirthConditions(parent, state.seed);
 }
 function active(state) {
   if (state.pendingEvents.length) return fail('Resolve your event choices before continuing.');
@@ -181,9 +185,9 @@ function active(state) {
 
 export function createGame({ name, surname: chosenSurname, firstName, seed, gender = 'male', canGestate, attractedTo } = {}) {
   const initialSeed = Number.isFinite(seed) ? seed >>> 0 : (Date.now() ^ Math.floor(Math.random() * 0xFFFFFFFF)) >>> 0;
-  const state = { version: 16, seed: initialSeed, rng: initialSeed, nextId: 0, id: `life-${initialSeed}`, age: 0, generation: 1,
+  const state = { version: 17, seed: initialSeed, rng: initialSeed, nextId: 0, id: `life-${initialSeed}`, age: 0, generation: 1,
     name: '', stats: {}, aptitudes: {}, height: fromCentimeters(50), adultHeight: null,
-    focus: { work: 3, social: 3, family: 3, self: 3 }, babyChoice: 'quiet', cryLevel: 1, alive: true, death: null, yearSummary: null,
+    focus: defaultFocus(0), babyChoice: 'quiet', cryLevel: 1, alive: true, death: null, yearSummary: null,
     parents: [], guardian: null, children: [], siblings: [], money: 0, income: 0, expenses: 0, lifestyle: 1,
     jobId: null, jobYears: 0, performance: 0, schoolProgress: 0, lastChildAge: -1,
     education: { status: 'school', years: 0 }, jobOffers: [],
@@ -205,6 +209,8 @@ export function createGame({ name, surname: chosenSurname, firstName, seed, gend
   state.aptitudes = inheritAptitudes(state, state.parents[0].aptitudes, state.parents[1].aptitudes);
   state.stats = randomStats(state, state.aptitudes);
   newbornGrowth(state, state, state.parents);
+  assignBirthConditions(state, state.seed, state.parents);
+  clampFocusToLimits(state);
   log(state, 'A life begins', `${state.name} is born.`, 'milestone');
   return state;
 }
@@ -233,19 +239,30 @@ function focusLabel(state, key) {
 export function focusLimitDetails(state) {
   const stage = focusStage(state);
   if (!stage) return [];
-  return currentEffects(state).flatMap(effect => Object.entries(effect.focusLimits?.[stage] || {})
-    .filter(([, max]) => max < 5)
-    .map(([key, max]) => ({ key, max, effectId: effect.id, name: effect.name, years: effect.years })));
+  const permanent = getBirthConditions(state).flatMap(condition => Object.entries(condition.focusLimits?.[stage] || {})
+    .filter(([, max]) => max < MAX_FOCUS)
+    .map(([key, max]) => ({ key, max, effectId: `birth-condition:${condition.id}`, name: condition.name, years: null, permanent: true })));
+  return [...permanent, ...currentEffects(state).flatMap(effect => Object.entries(effect.focusLimits?.[stage] || {})
+    .filter(([, max]) => max < MAX_FOCUS)
+    .map(([key, max]) => ({ key, max, effectId: effect.id, name: effect.name, years: effect.years })))];
 }
 export function focusLimits(state) {
-  const limits = Object.fromEntries(focusKeys(state.age).map(key => [key, 5]));
+  const limits = Object.fromEntries(focusKeys(state.age).map(key => [key, MAX_FOCUS]));
   for (const { key, max } of focusLimitDetails(state)) limits[key] = Math.min(limits[key], max);
   return limits;
 }
 function clampFocusToLimits(state) {
-  if (state.age < 2) return;
   for (const [key, max] of Object.entries(focusLimits(state))) {
     if (state.focus[key] > max) state.focus[key] = max;
+  }
+  // Stage transitions and legacy allocations may exceed the smaller budget.
+  // Remove only excess points, deterministically, without filling spare points.
+  const keys = focusKeys(state.age);
+  let excess = keys.reduce((sum, key) => sum + (state.focus[key] || 0), 0) - focusBudget(state);
+  while (excess > 0) {
+    const key = keys.reduce((largest, next) => state.focus[next] > state.focus[largest] ? next : largest);
+    state.focus[key]--;
+    excess--;
   }
 }
 function focusLimitViolation(state) {
@@ -256,11 +273,11 @@ export function setFocus(state, key, value) {
   const status = active(state); if (!status.ok) return status;
   if (state.age < 2) return fail('Activity choices unlock at age 2.');
   const keys = focusKeys(state.age);
-  if (!keys.includes(key) || !Number.isInteger(value) || value < 0 || value > 5) return fail('Each focus must be a whole number from 0 to 5.');
+  if (!keys.includes(key) || !Number.isInteger(value) || value < 0 || value > MAX_FOCUS) return fail(`Each focus must be a whole number from 0 to ${MAX_FOCUS}.`);
   const maximum = focusLimits(state)[key];
   if (value > maximum) return fail(`${focusLabel(state, key)} is limited to ${maximum} this year.`);
   const total = keys.reduce((sum, other) => sum + (other === key ? value : state.focus[other] ?? 0), 0);
-  if (total > 12) return fail('You have 12 focus points. Lower another focus first.');
+  if (total > focusBudget(state)) return fail(`You have ${focusBudget(state)} focus points. Lower another focus first.`);
   state.focus[key] = value;
   return ok();
 }
@@ -467,18 +484,17 @@ function growYear(state) {
   const studying = state.age >= 5 && state.age < 18 || state.education.status === 'college';
   const appearanceChange = attractivenessAgeChange(state);
   if (appearanceChange) addStat(state, 'attractiveness', appearanceChange);
-  const spare = 12 - Object.values(f).reduce((sum, value) => sum + value, 0);
   if (state.age < 18) {
     for (const [key, amount] of Object.entries(childhoodWellbeing(state))) addStat(state, key, amount);
   } else {
-    addStat(state, 'stability', wellbeingResponse(state, 'stability', -.1 * (f.work - 2) + f.self * .07 + f.family * .025 + f.social * .018 + spare * .04));
-    addStat(state, 'health', wellbeingResponse(state, 'health', (f.self - 2) * .035) - (state.age >= 65 ? .1 : 0));
+    const practice = standardFocusPractice(state);
+    addStat(state, 'stability', wellbeingResponse(state, 'stability', practice.stability));
+    addStat(state, 'health', wellbeingResponse(state, 'health', practice.health) - (state.age >= 65 ? .1 : 0));
   }
-  if (studying) state.schoolProgress = round(clamp(state.schoolProgress + f.work * .9, 0, 100));
-  const toddler = state.age < 5;
+  if (studying) state.schoolProgress = round(clamp(state.schoolProgress + legacyFocusValue(f.work) * .9, 0, 100));
   for (const parent of caregivers(state)) {
-    addStat(parent, 'stability', .08 * (5 - parent.stats.stability) + wellbeingResponse(parent, 'stability', (f.family - (toddler ? 2 : 3)) * .025));
-    parent.relationship = round(clamp(parent.relationship + (f.family - 2) * PARENT_FAMILY_RELATIONSHIP_GAIN, 0, 10));
+    addStat(parent, 'stability', .08 * (5 - parent.stats.stability) + wellbeingResponse(parent, 'stability', focusEffect(f.family) * .025));
+    parent.relationship = round(clamp(parent.relationship + focusEffect(f.family) * PARENT_FAMILY_RELATIONSHIP_GAIN, 0, 10));
   }
 }
 // Money remains internal: the player sees only a 0–10 lifestyle score.
@@ -532,7 +548,7 @@ function annualFinances(state) {
   }
   const job = JOBS.find(candidate => candidate.id === state.jobId);
   if (job) {
-    state.performance = round(clamp(jobFit(state, job) * .7 + state.focus.work * .055 + Math.min(state.jobYears, 20) * .004 - Math.max(0, 6 - effectiveStats(state).stability) * .02, .1, 1));
+    state.performance = round(clamp(jobFit(state, job) * .7 + legacyFocusValue(state.focus.work) * .055 + Math.min(state.jobYears, 20) * .004 - Math.max(0, 6 - effectiveStats(state).stability) * .02, .1, 1));
     state.income = Math.round(job.baseSalary * (.55 + .95 * state.performance) * (1 + Math.min(state.jobYears, 25) * .024));
     state.jobYears += 1;
   } else { state.income = 0; state.performance = 0; }
@@ -544,19 +560,19 @@ function annualFinances(state) {
   state.expenses = Math.round(9000 + state.income * (.32 + state.lifestyle * .025) + dependents * 2500 + reserveUpkeep);
   state.money = Math.max(0, Math.round(state.money + state.income - state.expenses));
   state.lifestyle = lifestyleFromResources(state.income, state.money);
-  if (!job && state.education.status !== 'college' && state.focus.work >= 3) addStat(state, 'stability', YEARLY_DECISION_SCALE * -.15);
+  if (!job && state.education.status !== 'college' && focusEffect(state.focus.work) > 0) addStat(state, 'stability', wellbeingResponse(state, 'stability', -.15 * focusEffect(state.focus.work)));
 }
 function ageFamily(state) {
   for (const parent of [...state.parents, state.guardian].filter(Boolean)) {
     if (parent.alive === false) continue;
-    developSkills(parent, { ...parent, focus: { work: parent.career?.focus ?? 3, social: 3, family: 3, self: 3 } }, null, 1);
+    developSkills(parent, { ...parent, autonomousFocus: true, focus: { work: parent.career?.focus ?? 3, social: 3, family: 3, self: 3 } }, null, 1);
     addStat(parent, 'attractiveness', attractivenessAgeChange(parent));
     if (parent.age >= 65) addStat(parent, 'health', -.07);
     parent.age += 1;
   }
   for (const child of state.children) {
     if (child.alive === false) continue;
-    const care = { ...child, cryLevel: 3, careFocus: state.focus.family, focus: child.age >= 2 && child.age < 5 ? { ...TODDLER_FOCUS, family: state.focus.family, self: state.focus.family } : { work: 3, social: 3, family: state.focus.family, self: state.focus.family } };
+    const care = { ...child, cryLevel: 3, careFocus: state.focus.family, focus: child.age >= 2 && child.age < 5 ? { ...TODDLER_FOCUS, family: state.focus.family, self: state.focus.family } : { work: DEFAULT_FOCUS, social: DEFAULT_FOCUS, family: state.focus.family, self: state.focus.family } };
     developSkills(child, care);
     const appearanceChange = attractivenessAgeChange(child);
     child.age += 1;
@@ -564,22 +580,22 @@ function ageFamily(state) {
     if (child.age <= 18) {
       for (const [key, amount] of Object.entries(childhoodWellbeing(care))) addStat(child, key, amount);
     } else {
-      addStat(child, 'stability', wellbeingResponse(child, 'stability', -.08 + state.focus.family * .045));
-      addStat(child, 'health', wellbeingResponse(child, 'health', (state.focus.family - 2) * .02));
+      addStat(child, 'stability', wellbeingResponse(child, 'stability', focusEffect(state.focus.family) * .045));
+      addStat(child, 'health', wellbeingResponse(child, 'health', focusEffect(state.focus.family) * .02));
     }
-    child.relationship = round(clamp(child.relationship + YEARLY_DECISION_SCALE * (state.focus.family - 2) * .13, 0, 10));
+    child.relationship = round(clamp(child.relationship + YEARLY_DECISION_SCALE * focusEffect(state.focus.family) * .13, 0, 10));
     if (child.age >= 18) child.money += Math.round(1500 + child.stats.intelligence * 250);
     if (child.age >= 65) addStat(child, 'health', -.07);
   }
-  for (const sibling of state.siblings) if (sibling.alive !== false) { developSkills(sibling, sibling, null, 1); addStat(sibling, 'attractiveness', attractivenessAgeChange(sibling)); if (sibling.age >= 65) addStat(sibling, 'health', -.07); sibling.age += 1; }
+  for (const sibling of state.siblings) if (sibling.alive !== false) { developSkills(sibling, { ...sibling, autonomousFocus: true }, null, 1); addStat(sibling, 'attractiveness', attractivenessAgeChange(sibling)); if (sibling.age >= 65) addStat(sibling, 'health', -.07); sibling.age += 1; }
   const partner = livingPartner(state);
   if (partner) {
     const appearanceChange = attractivenessAgeChange(partner);
-    developSkills(partner, { ...partner, focus: { work: 3, social: 3, family: state.focus.family, self: 3 } });
+    developSkills(partner, { ...partner, focus: { ...defaultFocus(partner.age), family: state.focus.family } });
     if (appearanceChange) addStat(partner, 'attractiveness', appearanceChange);
-    addStat(partner, 'stability', wellbeingResponse(partner, 'stability', (state.focus.family - 2) * .035));
+    addStat(partner, 'stability', wellbeingResponse(partner, 'stability', focusEffect(state.focus.family) * .035));
     if (partner.age >= 65) addStat(partner, 'health', -.07);
-    partner.relationship = round(clamp(partner.relationship + YEARLY_DECISION_SCALE * (state.focus.family - 2) * .11, 0, 10));
+    partner.relationship = round(clamp(partner.relationship + YEARLY_DECISION_SCALE * focusEffect(state.focus.family) * .11, 0, 10));
     partner.yearsTogether += 1; partner.age += 1;
   }
 }
@@ -652,7 +668,7 @@ function applyOutcome(state, event, outcome = event, context = {}) {
   const result = changes.length ? `${changes.join('; ')}.` : 'No stat changes.';
   const duration = temporaryYears ? ` Temporary effects: ${temporaryYears} ${temporaryYears === 1 ? 'year' : 'years'}.` : '';
   const limits = Object.entries(outcome.focusLimits?.[focusStage(state)] || {})
-    .filter(([, max]) => max < 5)
+    .filter(([, max]) => max < MAX_FOCUS)
     .map(([key, max]) => `${focusLabel(state, key)} max ${max}`);
   const restrictions = limits.length ? ` ${limits.join('; ')}.` : '';
   // Keep the event context separate from the concise journal outcome. The year
@@ -830,12 +846,15 @@ function applyDeath(state, person, death) {
 export function advanceYear(state, { mortalityRandom, growthRandom, parentCareerRandom } = {}) {
   const status = active(state); if (!status.ok) return status;
   if (needsEducationChoice(state)) return fail('Choose college or a career before advancing the year.');
+  if (state.age >= 2 && focusKeys(state.age).some(key => !Number.isInteger(state.focus[key]) || state.focus[key] < 0 || state.focus[key] > MAX_FOCUS)) return fail('Each focus must be a whole number from 0 to 4.');
+  if (state.age >= 2 && Object.values(state.focus).reduce((sum, points) => sum + points, 0) > focusBudget(state)) return fail(`You have ${focusBudget(state)} focus points. Lower another focus first.`);
   const violation = focusLimitViolation(state);
   if (violation) return fail(`${focusLabel(state, violation[0])} is limited to ${violation[1]} this year. Lower it before continuing.`);
   const before = yearSnapshot(state);
   const decisions = state.age < 2 ? { cryLevel: state.cryLevel } : {
     focus: state.age < 5 ? { ...state.focus, creative: state.focus.creative ?? 0 } : { ...state.focus },
     workLabel: state.age < 5 ? 'Play' : state.age < 18 ? 'School' : state.education.status === 'college' ? 'College' : 'Career',
+    focusMax: MAX_FOCUS, focusBudget: focusBudget(state),
   };
   const oldMemories = new Set(state.history.map(memory => memory.id));
   // Each eligible event has its own independent roll. Shuffle before limiting
@@ -922,6 +941,7 @@ function welcomeChild(state, adopted, otherParent = null) {
   const gender = random(state) < .5 ? 'female' : 'male';
   const child = demographics({ id: uid(state, 'child'), name: personName(state, state.familyName, gender), familyName: state.familyName, age: 0, stats: randomStats(state, aptitudes), aptitudes, height: fromCentimeters(50), adultHeight: null, money: 0, lifestyle: state.lifestyle, alive: true, adopted, relationship: initialBond(state) }, gender);
   newbornGrowth(state, child, adopted ? [] : [state, otherParent].filter(Boolean));
+  assignBirthConditions(child, `${state.seed}:${state.rng}`, adopted ? [] : [state, otherParent].filter(Boolean));
   const coParent = adopted ? livingPartner(state) : otherParent;
   child.parentIds = [state.id, ...(coParent ? [coParent.id] : [])];
   state.children.push(child); state.lastChildAge = state.age;
@@ -956,13 +976,14 @@ function legacyBeneficiary(state) {
   };
   demographics(person, gender);
   newbornGrowth(draft, person);
+  person.stats.attractiveness = round(clamp(5 + normal(draft) * BIRTH_VARIATION.appearance, 0, 10));
+  assignBirthConditions(person, state.seed);
   while (person.age < age) {
     Object.assign(person, advanceGrowth(person, normal(draft)));
     developSkills(person, person, null, 1);
     for (const key of CORE) if (key !== 'attractiveness') addStat(person, key, normal(draft) * .06);
     person.age++;
   }
-  person.stats.attractiveness = round(clamp(5 + normal(draft) * BIRTH_VARIATION.appearance, 0, 10));
   return person;
 }
 
@@ -989,7 +1010,7 @@ export function succeed(state, heirId) {
   const heir = ensureGrowth(clone(candidate));
   const familyName = info.route === 'beneficiary' ? heir.familyName : state.familyName;
   useFamilyName(heir, familyName);
-  const identity = { gender: state.gender, canGestate: state.canGestate, attractedTo: [...state.attractedTo], appearancePeakAge: state.appearancePeakAge, familyName: state.familyName, growthSex: state.growthSex, growthFactor: state.growthFactor, maturityAge: state.maturityAge, birthHeight: state.birthHeight, adultHeight: state.adultHeight, growthAnchor: clone(state.growthAnchor) };
+  const identity = { gender: state.gender, canGestate: state.canGestate, attractedTo: [...state.attractedTo], appearancePeakAge: state.appearancePeakAge, familyName: state.familyName, growthSex: state.growthSex, growthFactor: state.growthFactor, maturityAge: state.maturityAge, birthHeight: state.birthHeight, adultHeight: state.adultHeight, growthAnchor: clone(state.growthAnchor), conditions: [...state.conditions] };
   const previous = { id: state.id, name: state.name, age: state.age, generation: state.generation, stats: clone(state.stats), aptitudes: clone(state.aptitudes), height: state.height, money: state.money, estate: info.estate, share: info.share, lifestyle: state.lifestyle, children: info.children.map(person => ({ id: person.id, name: person.name, inheritance: info.share })), alive: state.alive, death: state.death, retired: true, successor: { id: heir.id, name: heir.name, route: info.route }, ...identity };
   const formerParents = clone(state.parents);
   const formerGuardian = state.guardian ? clone(state.guardian) : null;
@@ -1005,7 +1026,7 @@ export function succeed(state, heirId) {
     // standalone profile must not create an artificial support jump next year.
     for (const parent of state.parents) {
       parent.lifestyle = previous.lifestyle;
-      parent.career = { ...(parent.career || initialParentCareer(parent, parent.id === previous.id ? state.focus.work : 1 + personHash(parent) % 5)), progress: clamp(previous.lifestyle, 0, 10) };
+      parent.career = { ...(parent.career || initialParentCareer(parent, parent.id === previous.id ? Math.round(legacyFocusValue(state.focus.work)) : 1 + personHash(parent) % 5)), progress: clamp(previous.lifestyle, 0, 10) };
     }
   } else if (info.route === 'siblings') {
     state.siblings = formerSiblings.filter(person => person.id !== heir.id);
@@ -1017,11 +1038,13 @@ export function succeed(state, heirId) {
   }
   state.id = heir.id; state.name = heir.name; state.familyName = familyName; state.age = heir.age; state.generation += 1;
   state.stats = heir.stats; state.aptitudes = heir.aptitudes; state.height = heir.height; state.adultHeight = heir.adultHeight;
+  state.conditions = [...heir.conditions];
   for (const key of ['growthSex', 'growthFactor', 'maturityAge', 'birthHeight', 'growthAnchor']) state[key] = clone(heir[key]);
-  for (const parent of state.parents) parent.career ??= initialParentCareer(parent, parent.id === previous.id ? state.focus.work : 1 + personHash(parent) % 5);
+  for (const parent of state.parents) parent.career ??= initialParentCareer(parent, parent.id === previous.id ? Math.round(legacyFocusValue(state.focus.work)) : 1 + personHash(parent) % 5);
   state.gender = heir.gender; state.canGestate = heir.canGestate; state.attractedTo = [...heir.attractedTo]; state.appearancePeakAge = heir.appearancePeakAge;
   state.money = heir.money + info.share;
-  state.children = []; state.effects = []; state.pendingEvents = []; state.lastYearEvents = []; state.focus = state.age >= 2 && state.age < 5 ? { ...TODDLER_FOCUS } : { work: 3, social: 3, family: 3, self: 3 };
+  state.children = []; state.effects = []; state.pendingEvents = []; state.lastYearEvents = []; state.focus = defaultFocus(state.age);
+  clampFocusToLimits(state);
   state.partner = null; state.pregnancy = null; state.encounters = []; state.encounterYear = state.age;
   state.jobId = null; state.jobYears = 0; state.performance = 0; state.income = 0; state.expenses = 0; state.lifestyle = lifestyleFromResources(0, state.money);
   state.babyChoice = 'quiet'; state.cryLevel = 1; state.alive = true; state.death = null; state.yearSummary = null; state.schoolProgress = 0; state.lastChildAge = -1; state.ended = false; state.needsSuccession = false;
@@ -1055,14 +1078,14 @@ function validSchema(raw, version) {
     const validAdultHeight = person => version >= 9 ? (person.adultHeight === null && person.age < (person.maturityAge ?? 18) || finite(person.adultHeight, heightBound(40), heightBound(240))) : finite(person.adultHeight, 145, 205);
     const validGrowth = person => ['male','female'].includes(person.growthSex) && Number.isInteger(person.maturityAge) && finite(person.maturityAge, 14, 18) && finite(person.birthHeight, heightBound(40), heightBound(60)) && validAdultHeight(person) && (version < 9 || finite(person.growthFactor, .8, 1.2)) && (person.growthAnchor === null || person.growthAnchor && Number.isInteger(person.growthAnchor.age) && finite(person.growthAnchor.age, 0, person.age) && finite(person.growthAnchor.height, heightBound(40), heightBound(210)));
     const validDeath = person => person.death === undefined || person.death === null || person.alive === false && ['disease', 'accident'].includes(person.death.cause) && person.death.age === person.age;
-    const validPerson = person => person && text(person.id, 100) && text(person.name, 50) && Number.isInteger(person.age) && finite(person.age, 0, version >= 7 ? 200 : 120) && finite(person.height, heightBound(40), heightBound(version >= 9 ? 240 : 210)) && validStats(person.stats) && validAptitudes(person.aptitudes) && (version === 1 || validLifestyle(person.lifestyle)) && (person.adopted === undefined || typeof person.adopted === 'boolean') && (version < 5 || validIdentity(person)) && (version < 6 || text(person.familyName, 30) && normalizeSurname(person.familyName) === person.familyName) && (version < 7 || validDeath(person));
+    const validPerson = person => person && text(person.id, 100) && text(person.name, 50) && Number.isInteger(person.age) && finite(person.age, 0, version >= 7 ? 200 : 120) && finite(person.height, heightBound(40), heightBound(version >= 9 ? 240 : 210)) && validStats(person.stats) && validAptitudes(person.aptitudes) && (version < 17 || validateBirthConditions(person.conditions)) && (version === 1 || validLifestyle(person.lifestyle)) && (person.adopted === undefined || typeof person.adopted === 'boolean') && (version < 5 || validIdentity(person)) && (version < 6 || text(person.familyName, 30) && normalizeSurname(person.familyName) === person.familyName) && (version < 7 || validDeath(person));
     if (!validPerson(raw) || raw.age > 85 || !Number.isInteger(raw.generation) || !finite(raw.generation, 1, 100000)) return false;
     if (version >= 8 && (!validGrowth(raw) || ![...raw.parents, ...(version >= 15 && raw.guardian ? [raw.guardian] : []), ...raw.children, ...raw.siblings, ...raw.lineage, raw.partner, ...raw.encounters, raw.pregnancy?.otherParent].filter(Boolean).every(person => (['growthSex','maturityAge','birthHeight','growthAnchor'].every(key => person[key] === undefined) || validGrowth(person)) && (person.parentRole === undefined || ['mom','dad','parent'].includes(person.parentRole))))) return false;
     if (![raw.seed, raw.rng, raw.nextId].every(value => Number.isInteger(value) && finite(value, 0, Number.MAX_SAFE_INTEGER))) return false;
     if (!finite(raw.height, heightBound(40), heightBound(version >= 9 ? 240 : 210)) || !validAdultHeight(raw)) return false;
-    const validFocus = (focus, keys) => focus && Object.keys(focus).length === keys.length && keys.every(key => Number.isInteger(focus[key]) && finite(focus[key], 0, 5)) && keys.reduce((sum, key) => sum + focus[key], 0) <= 12;
-    const currentFocusKeys = version >= 11 && raw.age >= 2 && raw.age < 5 && Object.hasOwn(raw.focus || {}, 'creative') ? focusKeys(raw.age) : FOCUS_KEYS;
-    if (!validFocus(raw.focus, currentFocusKeys)) return false;
+    const validFocus = (focus, keys, maximum = version >= 17 ? MAX_FOCUS : 5, budget = version >= 17 ? DEFAULT_FOCUS * keys.length : 12) => focus && Object.keys(focus).length === keys.length && keys.every(key => Number.isInteger(focus[key]) && finite(focus[key], 0, maximum)) && keys.reduce((sum, key) => sum + focus[key], 0) <= budget;
+    const currentFocusKeys = version >= 17 || version >= 11 && raw.age >= 2 && raw.age < 5 && Object.hasOwn(raw.focus || {}, 'creative') ? focusKeys(raw.age) : FOCUS_KEYS;
+    if (!validFocus(raw.focus, currentFocusKeys, version >= 17 ? MAX_FOCUS : 5, version >= 17 ? focusBudget(raw) : 12)) return false;
     if (!['cry', 'quiet'].includes(raw.babyChoice) || ![raw.ended, raw.needsSuccession].every(value => typeof value === 'boolean')) return false;
     const validLivingAge = person => typeof person.alive === 'boolean' && (version >= 7 || person.age <= 85 && (!person.alive || person.age < 85));
     if (version >= 7) {
@@ -1081,8 +1104,10 @@ function validSchema(raw, version) {
           if (summary.fromAge >= 3 || Object.keys(decisions).length !== 1 || !Number.isInteger(decisions.cryLevel) || !finite(decisions.cryLevel, 1, 5)) return false;
         } else {
           const focus = decisions.focus;
-          const keys = version >= 11 && decisions.workLabel === 'Play' && summary.fromAge >= 2 && summary.fromAge < 5 && Object.hasOwn(focus || {}, 'creative') ? focusKeys(summary.fromAge) : FOCUS_KEYS;
-          if (summary.fromAge < (version >= 10 ? 2 : 3) || Object.keys(decisions).length !== 2 || !(version >= 10 ? ['Play', 'School', 'College', 'Career'] : ['School', 'College', 'Career']).includes(decisions.workLabel) || !validFocus(focus, keys)) return false;
+          const keys = version >= 17 && decisions.focusMax !== undefined || version >= 11 && decisions.workLabel === 'Play' && summary.fromAge >= 2 && summary.fromAge < 5 && Object.hasOwn(focus || {}, 'creative') ? focusKeys(summary.fromAge) : FOCUS_KEYS;
+          const currentRules = decisions.focusMax !== undefined || decisions.focusBudget !== undefined;
+          if (currentRules && (version < 17 || decisions.focusMax !== MAX_FOCUS || decisions.focusBudget !== focusBudget({ ...raw, age: summary.fromAge }))) return false;
+          if (summary.fromAge < (version >= 10 ? 2 : 3) || Object.keys(decisions).length !== (currentRules ? 4 : 2) || !(version >= 10 ? ['Play', 'School', 'College', 'Career'] : ['School', 'College', 'Career']).includes(decisions.workLabel) || !validFocus(focus, keys, currentRules ? MAX_FOCUS : 5, currentRules ? decisions.focusBudget : 12)) return false;
         }
       }
       if (summary?.height !== undefined && (!finite(summary.height.before, heightBound(40), heightBound(240)) || !finite(summary.height.after, heightBound(40), heightBound(240)) || !finite(summary.height.change, 0, heightBound(200)) || Math.abs(round(summary.height.after - summary.height.before) - summary.height.change) > .001)) return false;
@@ -1143,7 +1168,14 @@ function validSchema(raw, version) {
     // those old effects expire. This expands capacity without changing records.
     const effectCapacity = version >= 16 ? 64 : legacy ? 10 : version >= 15 ? 27 : 25;
     if (!Array.isArray(raw.effects) || raw.effects.length > effectCapacity || !raw.effects.every(effect => text(effect.id, 100) && text(effect.name, 100) && typeof effect.description === 'string' && Number.isInteger(effect.years) && finite(effect.years, 1, legacy ? 3 : 5) && effect.modifiers && Object.entries(effect.modifiers).every(([key, value]) => statKeys.includes(key) && finite(value, -10, 10)) && (effect.lifestyle === undefined || !legacy && Number.isInteger(effect.lifestyle) && finite(effect.lifestyle, -10, 10)) && (effect.focusLimits === undefined || version >= 14 && validLimits(effect.focusLimits)))) return false;
-    if (version >= 14 && focusLimitViolation(raw)) return false;
+    if (version >= 14) {
+      const stage = focusStage(raw);
+      const maximum = version >= 17 ? MAX_FOCUS : 5;
+      const limits = Object.fromEntries(focusKeys(raw.age).map(key => [key, maximum]));
+      if (version >= 17 && stage) for (const [key, max] of Object.entries(conditionFocusLimits(raw, stage))) limits[key] = Math.min(limits[key], max);
+      for (const effect of raw.effects) for (const [key, max] of Object.entries(effect.focusLimits?.[stage] || {})) limits[key] = Math.min(limits[key], max);
+      if (Object.entries(limits).some(([key, max]) => raw.focus[key] > max)) return false;
+    }
     if (!legacy) {
       const knownKey = key => typeof key === 'string' && (PERSONAL_EVENTS.some(event => event.id === key) || version >= 5 && FAMILY_EVENTS.some(event => key.startsWith(`${event.id}:`) && key.length <= 200));
       if (!Array.isArray(raw.lastYearEvents) || raw.lastYearEvents.length > 5 || new Set(raw.lastYearEvents).size !== raw.lastYearEvents.length || !raw.lastYearEvents.every(knownKey)) return false;
@@ -1170,7 +1202,7 @@ function validSchema(raw, version) {
   } catch { return false; }
 }
 
-export function validateSave(raw) { return validSchema(raw, 16); }
+export function validateSave(raw) { return validSchema(raw, 17); }
 
 // Version 10 stores every measurement in inches. Source growth tables stay in
 // centimetres; historical prose is rendered separately without rewriting it.
@@ -1186,11 +1218,32 @@ function convertSavedHeights(value) {
   }
 }
 
+// Adapt only the active allocation. Completed reviews keep their recorded old
+// controls, and all ratings, effects, pending decisions and RNG are preserved.
+function upgradeFocus(state) {
+  const toddler = state.age >= 2 && state.age < 5;
+  const legacyNeutralThree = [0, 1, 1, 2, 3, 4];
+  const legacyNeutralTwo = [0, 1, 2, 3, 3, 4];
+  state.focus = Object.fromEntries(focusKeys(state.age).map(key => {
+    const mapping = toddler && !['work', 'self'].includes(key) ? legacyNeutralTwo : legacyNeutralThree;
+    return [key, mapping[state.focus[key]] ?? DEFAULT_FOCUS];
+  }));
+  clampFocusToLimits(state);
+}
+
 export function migrateSave(raw) {
   try {
     if (validateSave(raw)) return clone(raw);
-    if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].some(version => validSchema(raw, version))) return null;
+    if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16].some(version => validSchema(raw, version))) return null;
     const state = clone(raw);
+    // Existing people keep their recorded ratings and receive no newly rolled
+    // conditions. This also covers lineage and saved pregnancy partner copies.
+    const addKnownConditions = value => {
+      if (!value || typeof value !== 'object') return;
+      if (value.stats && value.aptitudes) value.conditions ??= [];
+      Object.values(value).forEach(addKnownConditions);
+    };
+    addKnownConditions(state);
     // Existing lives receive neutral wellbeing aptitudes without rerolling
     // ratings or consuming random numbers, including saved pregnancy copies.
     const addWellbeingAptitudes = value => {
@@ -1204,7 +1257,8 @@ export function migrateSave(raw) {
     if (state.version >= 9) {
       // Version 16 allows effective totals outside 0-10; base ratings stay bounded.
       // Existing values and the random state stay unchanged.
-      state.version = 16;
+      upgradeFocus(state);
+      state.version = 17;
       return validateSave(state) ? state : null;
     }
     if (state.version === 1) {
@@ -1286,7 +1340,8 @@ export function migrateSave(raw) {
       }
       names.add(parent.name.toLocaleLowerCase());
     });
-    state.version = 16;
+    upgradeFocus(state);
+    state.version = 17;
     return validateSave(state) ? state : null;
   } catch { return null; }
 }

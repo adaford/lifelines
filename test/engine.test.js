@@ -89,7 +89,7 @@ test('all five stats exist at birth with established natural ratings and average
     const baby = createGame({ seed });
     for (const { key } of SKILLS) assert.ok(baby.stats[key] >= 0 && baby.stats[key] <= 10, `${key} at birth`);
     assert.ok(baby.stats.attractiveness >= 0 && baby.stats.attractiveness <= 10);
-    assert.equal(baby.version, 16);
+    assert.equal(baby.version, 17);
     for (const key of ['health', 'stability']) {
       assert.ok(baby.stats[key] >= 0 && baby.stats[key] <= 10);
       wellbeing[key].push(baby.stats[key]);
@@ -182,7 +182,7 @@ test('one click advances one year, toddler activities start at two, school at fi
     if (age === 2) {
       assert.equal(setBabyChoice(state, 'cry').ok, false);
       assert.equal(setFocus(state, 'work', 0).ok, true);
-      assert.equal(setFocus(state, 'work', 3).ok, true);
+      assert.equal(setFocus(state, 'work', 2).ok, true);
     }
     if (age <= 5) assert.equal(state.schoolProgress, 0, 'school practice begins in the year played at age five');
     if (age === 6) assert.ok(state.schoolProgress > 0);
@@ -209,12 +209,12 @@ test('aptitude changes development speed without leaving the stat scale', () => 
   assert.ok(fast.stats.intelligence > slow.stats.intelligence);
 });
 
-test('focus has four independent 0–5 values and a hard 12-point budget', () => {
+test('focus has four independent 0-4 values and a hard eight-point budget', () => {
   const state = adult();
-  state.focus = { work: 3, social: 3, family: 3, self: 3 };
+  state.focus = { work: 2, social: 2, family: 2, self: 2 };
   assert.equal(setFocus(state, 'work', 5).ok, false);
-  assert.equal(setFocus(state, 'social', 1).ok, true);
-  assert.equal(setFocus(state, 'work', 5).ok, true);
+  assert.equal(setFocus(state, 'social', 0).ok, true);
+  assert.equal(setFocus(state, 'work', 4).ok, true);
   assert.equal(setFocus(state, 'self', 5.1).ok, false);
   assert.equal(setFocus(state, 'unknown', 0).ok, false);
   assert.equal(setFocus(state, 'work', -1).ok, false);
@@ -237,8 +237,8 @@ test('stability effects and self care follow the higher-is-calmer scale', () => 
   assert.ok(EVENTS.find(event => event.id === 'friendship').statChanges.stability > 0);
   const resting = adult(88); resting.stats.stability = 5; resting.effects = [];
   const pressured = copy(resting);
-  resting.focus = { work: 0, social: 3, family: 4, self: 5 };
-  pressured.focus = { work: 5, social: 0, family: 0, self: 0 };
+  resting.focus = { work: 0, social: 1, family: 3, self: 4 };
+  pressured.focus = { work: 4, social: 0, family: 0, self: 0 };
   advanceMatchedQuietYears(resting, pressured);
   assert.ok(resting.stats.stability > 5);
   assert.ok(pressured.stats.stability < 5);
@@ -264,8 +264,8 @@ test('jobs respect age and requirements; fit and focus influence earnings and li
   offerJob(state, JOBS.find(job => job.id === 'doctor'));
   assert.equal(takeJob(state, 'doctor').ok, true);
   const stronger = copy(state), weaker = copy(state);
-  stronger.focus = { work: 5, social: 2, family: 2, self: 3 };
-  weaker.focus = { work: 0, social: 4, family: 4, self: 4 };
+  stronger.focus = { work: 4, social: 1, family: 1, self: 2 };
+  weaker.focus = { work: 0, social: 2, family: 3, self: 3 };
   weaker.stats.intelligence = 3;
   assert.ok(jobFit(stronger, 'doctor') > jobFit(weaker, 'doctor'));
   advanceYear(stronger); advanceYear(weaker);
@@ -316,7 +316,7 @@ test('every career can be entered, simulated, and restored with a qualified adul
   while (qualified.age < 35) advanceYear(qualified);
   for (const skill of SKILLS) qualified.stats[skill.key] = 10;
   qualified.effects = [];
-  qualified.focus = { work: 5, social: 2, family: 2, self: 3 };
+  qualified.focus = { work: 4, social: 1, family: 1, self: 2 };
   for (const job of JOBS) {
     const state = copy(qualified);
     offerJob(state, job);
@@ -381,7 +381,7 @@ test('choosing an offered career starts work directly and restricts changes to t
 
 test('college lasts four years, develops skills, and then offers fifteen careers with degree options', () => {
   const state = decision(503);
-  state.focus = { work: 5, social: 1, family: 3, self: 3 };
+  state.focus = { work: 4, social: 0, family: 2, self: 2 };
   const intelligence = state.stats.intelligence;
   assert.equal(chooseEducation(state, 'college').ok, true);
   assert.deepEqual(state.education, { status: 'college', years: 0 });
@@ -417,7 +417,7 @@ test('study focus and skill affinity affect development during college', () => {
   chooseEducation(studying, 'college');
   studying.stats.intelligence = 3;
   studying.aptitudes.intelligence = 3;
-  studying.focus = { work: 5, social: 1, family: 3, self: 3 };
+  studying.focus = { work: 4, social: 0, family: 2, self: 2 };
   const distracted = copy(studying), lowAffinity = copy(studying);
   distracted.focus.work = 0;
   lowAffinity.aptitudes.intelligence = -3;
@@ -473,7 +473,7 @@ test('v2 upgrades preserve school, current careers, and adults without consuming
       const snapshot = copy(old);
       const upgraded = migrateSave(old);
       assert.equal(validateSave(upgraded), true);
-      assert.equal(upgraded.version, 16);
+      assert.equal(upgraded.version, 17);
       assert.equal(upgraded.education.status, status);
       assert.equal(upgraded.education.years, status === 'graduate' ? 4 : 0);
       assert.equal(upgraded.jobOffers.length, count);
@@ -553,8 +553,8 @@ test('family focus improves children, and arrivals are limited to one per year',
   caring.effects = [];
   assert.equal(haveChild(caring).ok, true); assert.equal(haveChild(caring).ok, false);
   const distant = copy(caring);
-  caring.focus = { work: 2, social: 2, family: 5, self: 3 };
-  distant.focus = { work: 4, social: 4, family: 0, self: 4 };
+  caring.focus = { work: 1, social: 1, family: 4, self: 2 };
+  distant.focus = { work: 3, social: 3, family: 0, self: 2 };
   advanceMatchedQuietYears(caring, distant);
   assert.equal(caring.children[0].age, 1);
   for (const skill of SKILLS.filter(skill => skill.key !== 'attractiveness')) assert.ok(caring.children[0].stats[skill.key] > distant.children[0].stats[skill.key]);
@@ -1242,8 +1242,8 @@ test('family focus grows partner and child relationships; dependent children hav
   assert.equal(base.lifestyle,Math.max(0,beforeLifestyle-1));
   assert.equal(effectiveStats(base).social,Math.min(10,Math.round((beforeSocial+.2)*100)/100));
   const caring=copy(base),distant=copy(base);
-  caring.focus={work:2,social:2,family:5,self:3};
-  distant.focus={work:3,social:3,family:0,self:3};
+  caring.focus={work:1,social:1,family:4,self:2};
+  distant.focus={work:3,social:3,family:0,self:2};
   advanceMatchedQuietYears(caring, distant);
   assert.ok(caring.partner.relationship>distant.partner.relationship);
   assert.ok(caring.children[0].relationship>distant.children[0].relationship);
@@ -1280,9 +1280,10 @@ test('attractiveness has mean decline after thirty despite self focus or an appe
   for(let seed=1;seed<=30;seed++) {
     const state=adult(2200+seed);
     assert.ok(state.appearancePeakAge>=27&&state.appearancePeakAge<=33);
+    state.conditions=[]; // Isolate aging from birth-specific activity restrictions.
     state.age=state.appearancePeakAge; state.encounters=[];
     state.stats.attractiveness=8;
-    state.focus={work:5,social:0,family:0,self:5};
+    state.focus={work:4,social:0,family:0,self:4};
     state.aptitudes.attractiveness=3;
     const job=JOBS.find(job=>job.id==='performer'); offerJob(state,job);
     state.jobId=job.id; state.effects=[];
@@ -1441,7 +1442,7 @@ test('old childless endings become valid retirement choices without resetting th
   for (const parent of previous.parents) { parent.age = Math.min(85, parent.age); if (parent.age === 85) parent.alive = false; }
   for(const person of [previous,...previous.parents,...previous.children,...previous.siblings,...previous.lineage,...previous.encounters,previous.partner,previous.pregnancy?.otherParent].filter(Boolean)) { delete person.familyName; person.appearancePeakAge = 30; }
   const migrated=migrateSave(previous);
-  assert.equal(validateSave(migrated),true); assert.equal(migrated.version,16);
+  assert.equal(validateSave(migrated),true); assert.equal(migrated.version,17);
   assert.equal(migrated.ended,false); assert.equal(migrated.needsSuccession,true);
   for(const key of ['id','name','age','rng','nextId','stats','aptitudes','history','money','education','jobOffers','effects','pendingEvents']) assert.deepEqual(migrated[key],neutralWellbeingAptitudes(copy(previous))[key]);
   const info=successionInfo(migrated);
@@ -1471,7 +1472,7 @@ test('v5 family migration preserves partnership, pregnancy, offers, and future s
 });
 
 
-test('v12 upgrades only the schema version and preserves wellbeing aptitudes and pending progress', () => {
+test('v12 upgrades current focus while preserving wellbeing aptitudes, historical choices and pending progress', () => {
   const legacy = createGame({ seed: 91301 });
   advanceYear(legacy);
   legacy.age = 4;
@@ -1489,7 +1490,7 @@ test('v12 upgrades only the schema version and preserves wellbeing aptitudes and
   legacy.version = 12;
   const original = copy(legacy);
   const upgraded = migrateSave(legacy);
-  assert.deepEqual(upgraded, { ...original, version: 16 });
+  assert.deepEqual(upgraded, { ...original, version: 17, focus: { work: 1, social: 3, family: 2, self: 1, creative: 3 } });
   assert.deepEqual(legacy, original, 'migration preserves its source');
   assert.equal(validateSave(upgraded), true);
   assert.deepEqual(migrateSave(JSON.parse(JSON.stringify(upgraded))), upgraded);

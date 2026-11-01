@@ -30,7 +30,7 @@ function fixture(event) {
   if (event.subjectType === 'parent') {
     const state = createGame({ seed: 87102 });
     state.age = event.minPlayerAge;
-    if (state.age >= 2 && state.age < 5) state.focus = { work: 3, social: 2, family: 2, self: 3, creative: 2 };
+    if (state.age >= 2 && state.age < 5) state.focus = { work: 2, social: 2, family: 2, self: 2, creative: 2 };
     return { state, subject: state.parents[0] };
   }
   const state = adult();
@@ -115,7 +115,7 @@ test('care, repairs, and driving trade time for lasting stress without temporary
       return state;
     });
     assert.equal(focusLimits(branches[0])[key],max);
-    assert.equal(focusLimits(branches[1])[key],5);
+    assert.equal(focusLimits(branches[1])[key],4);
     assert.equal(branches[0].lifestyle,branches[1].lifestyle,'help has no temporary lifestyle modifier');
     assert.ok(branches[0].effects.some(effect=>effect.years===1 && effect.focusLimits));
     assert.equal(branches[1].effects.length,0);

@@ -52,8 +52,8 @@ test('a strong baby ranks above same-age peers and changing focus only changes t
   assert.equal(annualForecast(louder).stats.strength.change, annualForecast(state).stats.strength.change);
   state.age = 8;
   const active = structuredClone(state), inactive = structuredClone(state);
-  active.focus = { work: 3, self: 5, social: 2, family: 2 };
-  inactive.focus = { work: 4, self: 1, social: 3, family: 4 };
+  active.focus = { work: 2, self: 4, social: 1, family: 1 };
+  inactive.focus = { work: 3, self: 0, social: 2, family: 3 };
   assert.deepEqual(statPercentiles(active), statPercentiles(inactive));
   assert.ok(annualForecast(active).stats.strength.change > 0);
   assert.ok(annualForecast(inactive).stats.strength.change < 0);
