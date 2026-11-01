@@ -2,6 +2,8 @@
 
 Updated 1 November 2026 for permanent event outcomes, rare cross-stat aptitude experiences, proportional activity signs, and directional stat movement. Lifelines is a phone-first, generational life simulator. Preserve saves, lifestyle-only finances, and GitHub Pages deployment.
 
+Release verification: GitHub Pages reports `built` for gameplay commit **d1d3874e4e64fc13b419fb0b01f2af4e7dccf923**; workflow **41307799312** build and deploy jobs succeeded. All **20 live HTTP assets** return 200 and match Git's committed files byte-for-byte. All **366 tests**, including 81 DOM checks, pass on Node 24.14.0 after `npm ci`. The 4,000-life reference reproduces exactly and the independent 1,600-life cohort passes. Visual checks remain omitted by preference.
+
 The current update makes new event stat changes permanent, retaining timed effects only for activity restrictions and preserving old active buffs/debuffs until expiry. The 305-event catalog includes 84 rare aptitude variants covering every ordered pair of different personal stats in both directions. Source stats influence odds; the target gains/loses one aptitude step and base 0.3 rating. Most automatic stat-triggered events now affect other stats. Injury consequences emphasize activity caps and modest lasting appearance changes. All seven personal ratings use a mild logarithmic directional multiplier: changes toward nearby 0/10 boundaries slow while recovery away is faster. Existing saves remain schema 16 and keep all ratings, RNG, history, and pending choices; v16 now permits 64 concurrent effects so legacy modifiers and new restrictions can coexist.
 
 Electronics Social is neutral at 2 points. At zero Arts & crafts, Creativity shows -- and Intelligence -. Shared actual contribution steps drive these signs; crafts intelligence uses -1,-1,0,1,1,2 across 0-5 points. Other toddler and School/College rows use one sign per raw step rather than stretching two-point gains to three signs. Aptitude, age, directional damping, rounding, and unrelated routine development still determine final ratings. See README for full tables.
@@ -58,7 +60,7 @@ The earlier gameplay baseline was commit **4da3288**; **6e56897** added portable
 | Cloud environment | lifelines, published privately in the owner's ChatGPT account |
 | Runtime | Node.js 24 for development and tests; static browser files in production |
 | Save schema | Version 16; browser key remains lifelines.save.v1 |
-| Automated checks | All 366 tests pass, including 81 DOM checks. All 20 local HTTP assets match source; the 4,000-life reference reproduces byte-for-byte and the independent 1,600-life cohort passes. Visual checks omitted as requested. Current release deployment verification pending publication; previous verified gameplay release 95e7ab5. |
+| Automated checks | All 366 tests pass, including 81 DOM checks. All 20 local HTTP assets match source; the 4,000-life reference reproduces byte-for-byte and the independent 1,600-life cohort passes. Visual checks omitted as requested. GitHub Pages built gameplay commit **d1d3874** successfully (workflow **41307799312**); all 20 live assets match the committed release. |
 
 Read [AGENTS.md](AGENTS.md) before changing the project and [README.md](README.md) for the detailed current rules. Game progress lives in the player's browser, not in GitHub or the coding environment.
 
