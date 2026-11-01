@@ -34,22 +34,22 @@ function selected(state, activity, points) {
   return candidate;
 }
 
-test('activity previews show half-strength gains and losses without changing relative signs', () => {
+test('activity previews show stronger gains and losses without changing relative signs', () => {
   const cases = [
-    ['work', 4, 'strength', .09, 3],
-    ['work', 0, 'strength', -.09, 3],
-    ['social', 0, 'social', .05, 3],
-    ['social', 4, 'intelligence', .08, 3],
-    ['creative', 0, 'intelligence', -.03, 1],
-    ['creative', 4, 'creativity', .09, 3],
-    ['self', 4, 'health', .08, 3],
-    ['self', 0, 'stability', -.06, 3],
-    ['family', 4, 'stability', .06, 3],
+    ['work', 4, 'strength', .52, 3],
+    ['work', 0, 'strength', -.52, 3],
+    ['social', 0, 'social', .28, 3],
+    ['social', 4, 'intelligence', .47, 3],
+    ['creative', 0, 'intelligence', -.16, 1],
+    ['creative', 4, 'creativity', .57, 3],
+    ['self', 4, 'health', .45, 3],
+    ['self', 0, 'stability', -.36, 3],
+    ['family', 4, 'stability', .36, 3],
   ];
   for (const [activity, points, stat, expected, level] of cases) {
     const entries = toddlerChoiceImpacts(selected(toddler(), activity, points), activity);
     const entry = entries.find(entry => entry.stat === stat && !entry.parentId);
-    assert.ok(Math.abs(entry.change - expected) < 1e-10, `${activity} ${points}: ${stat} has the halved contribution rounded to stat precision`);
+    assert.ok(Math.abs(entry.change - expected) < 1e-10, `${activity} ${points}: ${stat} has the rebalanced contribution rounded to stat precision`);
     assert.equal(entry.level, level, `${activity} ${points}: signs retain their relative strength`);
     assert.ok(entries.every(entry => entry.stat !== 'lifestyle'));
   }
@@ -67,14 +67,14 @@ test('activity previews show half-strength gains and losses without changing rel
   }
 });
 
-test('crying previews halve personal and caregiver effects once and match the annual forecast', () => {
+test('crying previews strengthen personal effects while preserving caregiver costs and the annual forecast', () => {
   const state = toddler();
   state.age = 1;
   state.focus = { work: 3, social: 3, family: 3, self: 3 };
   const expected = {
-    intelligence: [-.05, -.02, .02, .05, .07],
-    stability: [-.12, -.06, .06, .12, .18],
-    health: [-.01, -.01, 0, .01, .01],
+    intelligence: [-.28, -.14, .14, .28, .41],
+    stability: [-.24, -.12, .12, .24, .36],
+    health: [-.09, -.04, 0, .05, .09],
   };
   const parentStability = [.1, 0, -.3, -.6, -.9];
   for (let cryLevel = 1; cryLevel <= 5; cryLevel++) {

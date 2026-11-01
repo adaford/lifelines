@@ -1,22 +1,22 @@
 // Lifelines: deterministic, browser-independent simulation rules.
 // All public actions mutate their state and return { ok, reason? }.
-import { JOBS } from './jobs.js?v=parent-relationships-7';
-import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=parent-relationships-7';
-import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=parent-relationships-7';
-import { mortalityRisk, rollMortality } from './mortality.js?v=parent-relationships-7';
-import { heightReference, advanceGrowth } from './growth.js?v=parent-relationships-7';
-import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=parent-relationships-7';
-import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, standardFocusPractice, DEVELOPMENT_BALANCE, BIRTH_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, PARENT_FAMILY_STABILITY_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=parent-relationships-7';
-import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=parent-relationships-7';
-import { normalPercentile } from './percentiles.js?v=parent-relationships-7';
-import { changedRating } from './rating-changes.js?v=parent-relationships-7';
-import { MAX_FOCUS, DEFAULT_FOCUS, focusEffect, focusKeysForAge, focusBudget, defaultFocus, legacyFocusValue } from './focus-rules.js?v=parent-relationships-7';
-import { assignBirthConditions, getBirthConditions, conditionFocusLimits, validateBirthConditions } from './birth-conditions.js?v=parent-relationships-7';
+import { JOBS } from './jobs.js?v=choice-stat-rebalance';
+import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=choice-stat-rebalance';
+import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=choice-stat-rebalance';
+import { mortalityRisk, rollMortality } from './mortality.js?v=choice-stat-rebalance';
+import { heightReference, advanceGrowth } from './growth.js?v=choice-stat-rebalance';
+import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=choice-stat-rebalance';
+import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, standardFocusPractice, DEVELOPMENT_BALANCE, BIRTH_VARIATION, SKILL_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, PARENT_FAMILY_STABILITY_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=choice-stat-rebalance';
+import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=choice-stat-rebalance';
+import { normalPercentile } from './percentiles.js?v=choice-stat-rebalance';
+import { changedRating } from './rating-changes.js?v=choice-stat-rebalance';
+import { MAX_FOCUS, DEFAULT_FOCUS, focusEffect, focusKeysForAge, focusBudget, defaultFocus, legacyFocusValue } from './focus-rules.js?v=choice-stat-rebalance';
+import { assignBirthConditions, getBirthConditions, conditionFocusLimits, validateBirthConditions } from './birth-conditions.js?v=choice-stat-rebalance';
 export { DEVELOPMENT_BALANCE };
-export { heightPercentile } from './growth.js?v=parent-relationships-7';
-export { mortalityRisk } from './mortality.js?v=parent-relationships-7';
-import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=parent-relationships-7';
-export { JOBS, JOB_CATEGORIES } from './jobs.js?v=parent-relationships-7';
+export { heightPercentile } from './growth.js?v=choice-stat-rebalance';
+export { mortalityRisk } from './mortality.js?v=choice-stat-rebalance';
+import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=choice-stat-rebalance';
+export { JOBS, JOB_CATEGORIES } from './jobs.js?v=choice-stat-rebalance';
 export const EVENTS = [...PERSONAL_EVENTS, ...FAMILY_EVENTS];
 
 export const SKILLS = [
@@ -756,7 +756,7 @@ function routineYear(state, growthRandom, careerRandom) {
       // this residual provides modest, reproducible year-to-year variation.
       const draw = growthRandom();
       const wellbeing = key === 'health' || key === 'stability';
-      const sd = Math.abs(change) * (wellbeing ? .25 : key === 'attractiveness' ? .3 : .2) + (wellbeing ? .02 : key === 'attractiveness' ? .04 : .06);
+      const sd = Math.abs(change) * (wellbeing ? .25 : key === 'attractiveness' ? .3 : SKILL_VARIATION.proportional) + (wellbeing ? .02 : key === 'attractiveness' ? .04 : SKILL_VARIATION.base);
       addStat(person, key, clamp(draw, -3, 3) * sd);
     }
     if (Number.isFinite(previous.relationship) && person.abandonedAt === undefined) {

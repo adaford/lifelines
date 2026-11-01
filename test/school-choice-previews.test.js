@@ -60,17 +60,17 @@ test('school and college show each choice contribution with toddler-style relati
   }
 });
 
-test('school contribution magnitudes include halved practice and stress without background or unused rest', () => {
+test('school contribution magnitudes include stronger practice and stress without background or unused rest', () => {
   const state = student();
   const low = selected(state, 'work', 0);
   let effects = schoolFocusEffects(low, 'work');
-  assert.ok(Math.abs(effects.intelligence + .0646875) < 1e-10);
-  assert.ok(Math.abs(effects.stability - .075) < 1e-10, 'less School relieves only its own stress');
+  assert.ok(Math.abs(effects.intelligence + .388125) < 1e-10);
+  assert.ok(Math.abs(effects.stability - .45) < 1e-10, 'less School relieves only its own stress');
   assert.equal(effects.health, 0);
   const high = selected(state, 'self', 4);
   effects = schoolFocusEffects(high, 'self');
-  for (const [stat, amount] of Object.entries({ intelligence: .0646875, strength: .08625, creativity: .069, health: .02625, stability: .075 })) {
-    assert.ok(Math.abs(effects[stat] - amount) < 1e-10, `${stat} uses half-strength self-focus`);
+  for (const [stat, amount] of Object.entries({ intelligence: .388125, strength: .5175, creativity: .414, health: .1575, stability: .45 })) {
+    assert.ok(Math.abs(effects[stat] - amount) < 1e-10, `${stat} uses rebalanced self-focus`);
   }
   const initial = schoolChoiceImpacts(low, 'work');
   low.parents.forEach(parent => { parent.career.status = 'unemployed'; parent.stats.stability = 1; });
@@ -83,8 +83,8 @@ test('school contribution magnitudes include halved practice and stress without 
     initial.map(({ stat, change, level }) => ({ stat, change: Math.round(change * 100), level })), 'household decline, reversion, and spare points stay out of the School row');
   const college = selected(student(19), 'work', 4);
   const collegeEffects = schoolFocusEffects(college, 'work');
-  assert.ok(Math.abs(collegeEffects.intelligence - .05625) < 1e-10);
-  assert.ok(Math.abs(collegeEffects.stability + .075) < 1e-10);
+  assert.ok(Math.abs(collegeEffects.intelligence - .3375) < 1e-10);
+  assert.ok(Math.abs(collegeEffects.stability + .45) < 1e-10);
 });
 
 test('Family previews retain school caregiver neutral points and follow guardians', () => {

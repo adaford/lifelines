@@ -6,7 +6,7 @@ import { createGame, advanceYear, resolveEventChoice, EVENTS, effectiveStats, fo
 import { eventChances } from '../events.js';
 import { PERCENTILE_REFERENCE } from '../percentile-reference.js';
 
-test('childhood deductions retain ten percent strength while crying and positive background growth stay intact', () => {
+test('childhood deductions retain ten percent strength alongside stronger crying and unchanged positive background growth', () => {
   assert.equal(CHILDHOOD_DEDUCTION_SCALE, .1);
   const near = (actual, expected, label) => assert.ok(Math.abs(actual - expected) < 1e-12, `${label}: ${actual} vs ${expected}`);
   const person = {
@@ -23,10 +23,10 @@ test('childhood deductions retain ten percent strength while crying and positive
     const state = { ...person, age };
     const before = structuredClone(state);
     const crying = infantChoiceEffects(state), total = skillChanges(state);
-    near(crying.intelligence, .069, 'maximum crying Intelligence contribution');
-    near(crying.social, .023, 'maximum crying Social contribution');
-    near(total.intelligence, .062475, 'Intelligence after the smaller deduction');
-    near(total.social, .0144165, 'Social after the smaller deduction');
+    near(crying.intelligence, .414, 'maximum crying Intelligence contribution');
+    near(crying.social, .138, 'maximum crying Social contribution');
+    near(total.intelligence, .407475, 'Intelligence after the smaller deduction');
+    near(total.social, .1294165, 'Social after the smaller deduction');
     assert.deepEqual(state, before, 'reading development leaves ratings and choices unchanged');
   }
   assert.deepEqual(skillChanges({ ...person, age: 18, focus: { work: 2, social: 2, family: 2, self: 2 } }),
@@ -115,9 +115,9 @@ test('aptitude has a gentler influence on starting ratings, practice and routine
   assert.equal(naturalSkillRating(3), 6.8);
   for (const aptitude of [-3, 0, 3]) {
     const person = { age: 25, stats: { strength: naturalSkillRating(aptitude) }, aptitudes: { strength: aptitude, health: aptitude }, focus: { self: 4 } };
-    assert.ok(Math.abs(skillChanges(person).strength - .075 * (1 + aptitude * .08)) < 1e-12);
+    assert.ok(Math.abs(skillChanges(person).strength - .45 * (1 + aptitude * .08)) < 1e-12);
     person.focus.self = 1;
-    assert.ok(Math.abs(skillChanges(person).strength + .025 * (1 - aptitude * .07)) < 1e-12);
+    assert.ok(Math.abs(skillChanges(person).strength + .15 * (1 - aptitude * .07)) < 1e-12);
     assert.ok(Math.abs(wellbeingResponse(person, 'health', .2) - .1 * (1 + aptitude * .08)) < 1e-12);
     assert.ok(Math.abs(wellbeingResponse(person, 'health', -.2) + .1 * (1 - aptitude * .07)) < 1e-12);
   }

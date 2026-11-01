@@ -185,6 +185,33 @@ test('infant crying supports intelligence and mental stability without training 
   }
 });
 
+test('low and high crying have meaningful Intelligence changes even across the full ordinary noise range', () => {
+  const expectedMeans = [-.28, -.14, .13, .27, .41];
+  for (const age of [0, 1]) for (let level = 1; level <= 5; level++) {
+    const template = createGame({ seed: 57 });
+    template.age = age;
+    template.cryLevel = level;
+    for (const key of Object.keys(template.stats)) template.stats[key] = 5;
+    for (const key of Object.keys(template.aptitudes)) template.aptitudes[key] = 0;
+    const before = copy(template);
+    assert.equal(annualForecast(template).stats.intelligence.change, expectedMeans[level - 1]);
+    assert.deepEqual(template, before, 'the stronger forecast remains pure');
+    for (const draw of [-3, -1, 0, 1, 3]) {
+      let quiet;
+      for (let rng = 1; rng <= 300; rng++) {
+        const candidate = { ...copy(template), rng };
+        assert.equal(advanceYear(candidate, { ...survives, growthRandom: () => draw, parentCareerRandom: () => 1 }).ok, true);
+        if (!candidate.lastYearEvents.length) { quiet = candidate; break; }
+      }
+      assert.ok(quiet, 'a quiet year isolates choices and their ordinary variation');
+      const actual = quiet.stats.intelligence;
+      assert.ok(level <= 2 ? actual < 5 : actual > 5, `cry ${level}, noise ${draw}: Intelligence ${actual}`);
+      if (level === 1) assert.ok(actual <= 4.9, 'minimum crying still visibly lowers a midscale rating under the largest positive residual');
+      if (level === 5) assert.ok(actual >= 5.2, 'maximum crying still visibly raises a midscale rating under the largest negative residual');
+    }
+  }
+});
+
 test('annual development varies around the pure mean forecast and is reproducible from a saved seed', () => {
   const template = createGame({ seed: 76 });
   template.aptitudes.intelligence = 0;
@@ -214,10 +241,33 @@ test('annual development varies around the pure mean forecast and is reproducibl
   const expectedGain = forecast.stats.intelligence.change;
   assert.ok(Math.abs(median(gains) - expectedGain) < .025);
   const spread = standardDeviation(gains);
-  assert.ok(spread > .035 && spread < .12, 'small annual variation remains even when the mean change is near zero');
-  assert.ok(gains.some(gain => gain < 0) && gains.some(gain => gain > 0), 'ordinary yearly variation can move ratings in either direction');
+  assert.ok(spread > .02 && spread < .05, 'annual variation remains smaller than the chosen gain');
+  assert.ok(gains.every(gain => gain > 0), 'ordinary noise does not reverse this positive crying choice at a midscale rating');
   const expectedStressSpread = Math.abs(forecast.parents[0].stability.change) * .25 + .02;
   assert.ok(Math.abs(standardDeviation(stressChanges) - expectedStressSpread) < .025, 'parent variation follows the reduced mean strain');
+});
+
+test('neutral focus retains small random gains and losses without consuming RNG in previews', () => {
+  const template = createGame({ seed: 76 });
+  template.age = 3;
+  template.conditions = [];
+  template.effects = [];
+  template.focus = { work: 2, social: 2, family: 2, self: 2, creative: 2 };
+  template.stats.intelligence = 5;
+  template.aptitudes.intelligence = 0;
+  const before = copy(template);
+  const forecast = annualForecast(template);
+  assert.deepEqual(template, before);
+  const gains = [];
+  for (let rng = 1; rng <= 600; rng++) {
+    const state = { ...copy(template), rng };
+    assert.equal(advanceYear(state, { ...survives, parentCareerRandom: () => 1 }).ok, true);
+    if (!state.lastYearEvents.length) gains.push(round(state.stats.intelligence - 5));
+  }
+  assert.ok(gains.length > 60);
+  assert.ok(gains.some(gain => gain < 0) && gains.some(gain => gain > 0), 'neutral choices still permit small variation in both directions');
+  assert.ok(Math.abs(average(gains) - forecast.stats.intelligence.change) < .015);
+  assert.ok(standardDeviation(gains) > .015 && standardDeviation(gains) < .03, 'neutral variation is modest and nonzero');
 });
 
 test('v7 migration preserves existing height, bonds, random state and non-infant appearance', () => {

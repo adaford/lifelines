@@ -1,4 +1,4 @@
-import { MAX_FOCUS, DEFAULT_FOCUS, focusEffect, defaultFocus } from './focus-rules.js?v=parent-relationships-7';
+import { MAX_FOCUS, DEFAULT_FOCUS, focusEffect, defaultFocus } from './focus-rules.js?v=choice-stat-rebalance';
 // Ratings use the same scale throughout life. Balanced toddler activities use
 // TODDLER_FOCUS; every stage uses 2 per area. Keep the historical calibration
 // offsets, with childhood deductions reduced to the requested tenth strength.
@@ -39,21 +39,28 @@ export const TODDLER_FOCUS = defaultFocus(2);
 // Scale only yearly decision contributions, leaving natural development,
 // aging, and event outcomes independent of the player's allocation.
 export const YEARLY_DECISION_SCALE = .5;
+// Choices should move ratings visibly without restoring the old background
+// deductions. Keep caregiver strain and autonomous development independent.
+export const CHOICE_STAT_MULTIPLIER = 6;
+export const INFANT_STABILITY_MULTIPLIER = 2;
+export const SKILL_VARIATION = { base: .02, proportional: .1 };
+const choiceCoefficients = activities => Object.fromEntries(Object.entries(activities).map(([area, effects]) =>
+  [area, Object.fromEntries(Object.entries(effects).map(([stat, amount]) => [stat, amount * CHOICE_STAT_MULTIPLIER]))]));
 export const PARENT_FAMILY_RELATIONSHIP_GAIN = .08 * YEARLY_DECISION_SCALE;
 export const PARENT_FAMILY_STABILITY_GAIN = .025;
-export const TODDLER_ACTIVITY_EFFECTS = {
+export const TODDLER_ACTIVITY_EFFECTS = choiceCoefficients({
   work: { strength: .05, social: .0275 },
   social: { intelligence: .045, social: -.0275 },
   family: { social: .0275, stability: .04 },
   self: { health: .05, stability: .04 },
   creative: { creativity: .055, intelligence: .045 },
-};
-export const STANDARD_FOCUS_EFFECTS = {
+});
+export const STANDARD_FOCUS_EFFECTS = choiceCoefficients({
   work: { intelligence: .0375, stability: -.05 },
   social: { social: .04, creativity: .04, stability: .05 },
   family: { social: .04, stability: .05 },
   self: { intelligence: .0375, strength: .05, creativity: .04, health: .0175, stability: .05 },
-};
+});
 // One sign has one raw magnitude for the same stat across player choices.
 // Every affected stat uses one unit at 1/3 points and three at 0/4 points.
 export function focusEffectStrength(coefficients, area, stat) {
@@ -69,7 +76,7 @@ const AUTONOMOUS_FOCUS_EFFECTS = {
 export function standardFocusCoefficients(person, career = null) {
   const coefficients = Object.fromEntries(Object.entries(person.autonomousFocus ? AUTONOMOUS_FOCUS_EFFECTS : STANDARD_FOCUS_EFFECTS).map(([area, effects]) => [area, { ...effects }]));
   if (person.age >= 18) for (const key of skills) {
-    const extra = .035 * clamp(number(career?.weights?.[key], 0), 0, 1);
+    const extra = .035 * (person.autonomousFocus ? 1 : CHOICE_STAT_MULTIPLIER) * clamp(number(career?.weights?.[key], 0), 0, 1);
     if (extra) coefficients.work[key] = (coefficients.work[key] || 0) + extra;
   }
   return coefficients;
@@ -116,10 +123,10 @@ function toddlerWellbeingPractice(focus) {
 function infantPractice(person) {
   const level = clamp(number(person.cryLevel, 3), 1, 5);
   return {
-    intelligence: [-.08, -.04, .04, .08, .12][level - 1],
+    intelligence: CHOICE_STAT_MULTIPLIER * [-.08, -.04, .04, .08, .12][level - 1],
     strength: 0,
-    social: .02 * (level - 3),
-    creativity: .02 * (level - 3),
+    social: CHOICE_STAT_MULTIPLIER * .02 * (level - 3),
+    creativity: CHOICE_STAT_MULTIPLIER * .02 * (level - 3),
   };
 }
 
@@ -129,14 +136,14 @@ export function infantChoiceEffects(person) {
   const effects = { intelligence: 0, strength: 0, social: 0, creativity: 0, health: 0, stability: 0 };
   if (person.alive === false || person.age >= 2) return effects;
   const practice = infantPractice(person);
-  const care = .02 * focusEffect(number(person.careFocus, DEFAULT_FOCUS));
+  const care = CHOICE_STAT_MULTIPLIER * .02 * focusEffect(number(person.careFocus, DEFAULT_FOCUS));
   for (const skill of skills) {
     const aptitude = clamp(number(person.aptitudes?.[skill], 0), -3, 3);
     effects[skill] = YEARLY_DECISION_SCALE * 1.15 * (practiceResponse(practice[skill] + care, aptitude) - practiceResponse(care, aptitude));
   }
   const level = clamp(number(person.cryLevel, 3), 1, 5);
-  effects.health = wellbeingResponse(person, 'health', .06 * ((level - 1) / 4 - .5));
-  effects.stability = wellbeingResponse(person, 'stability', [-.24, -.12, .12, .24, .36][level - 1]);
+  effects.health = wellbeingResponse(person, 'health', CHOICE_STAT_MULTIPLIER * .06 * ((level - 1) / 4 - .5));
+  effects.stability = wellbeingResponse(person, 'stability', INFANT_STABILITY_MULTIPLIER * [-.24, -.12, .12, .24, .36][level - 1]);
   return effects;
 }
 
@@ -167,7 +174,7 @@ export function skillChanges(person, career = null, practiceScale = YEARLY_DECIS
   if (person.alive === false) return Object.fromEntries(skills.map(key => [key, 0]));
   const age = number(person.age, 18);
   const flexibility = age < 18 ? 1.15 : age < 40 ? 1 : age < 60 ? .85 : .65;
-  const babyCare = .02 * focusEffect(number(person.careFocus, DEFAULT_FOCUS));
+  const babyCare = CHOICE_STAT_MULTIPLIER * .02 * focusEffect(number(person.careFocus, DEFAULT_FOCUS));
   const practice = age < 2
     ? Object.fromEntries(Object.entries(infantPractice(person)).map(([key, effect]) => [key, effect + babyCare]))
     : age < 5 ? toddlerPractice(toddlerFocus(person)) : standardFocusPractice(person, career);

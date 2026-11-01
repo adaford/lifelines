@@ -4,7 +4,7 @@
 // Skill deductions are an explicit gameplay setting and must not be refitted.
 import { readFile, writeFile } from 'node:fs/promises';
 import { defaultFocus, MAX_FOCUS, fitFocusBudget } from '../focus-rules.js';
-import { BIRTH_VARIATION, TODDLER_FOCUS, CHILDHOOD_DEDUCTION_SCALE } from '../development.js';
+import { BIRTH_VARIATION, TODDLER_FOCUS, CHILDHOOD_DEDUCTION_SCALE, CHOICE_STAT_MULTIPLIER, INFANT_STABILITY_MULTIPLIER, SKILL_VARIATION } from '../development.js';
 import {
   createGame, advanceYear, resolveEventChoice, EVENTS, effectiveStats, focusLimits,
   DEVELOPMENT_BALANCE,
@@ -110,6 +110,9 @@ const reference = {
     observationsByAge: [...result.ageStats.map(stats => stats.health.count), result.stats.health.count],
     birthVariation: BIRTH_VARIATION,
     childhoodDeductionScale: CHILDHOOD_DEDUCTION_SCALE,
+    choiceStatMultiplier: CHOICE_STAT_MULTIPLIER,
+    infantStabilityMultiplier: INFANT_STABILITY_MULTIPLIER,
+    skillVariation: SKILL_VARIATION,
     development: DEVELOPMENT_BALANCE,
     reproduce: `node scripts/calibrate-percentiles.mjs --samples ${samples} --seed ${seedStart}`,
   },

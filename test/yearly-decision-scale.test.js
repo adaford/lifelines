@@ -36,7 +36,7 @@ function quietMean(state) {
   assert.fail('No quiet mean-year fixture found');
 }
 
-test('each crying contribution is half strength before bounds, including aptitude response', () => {
+test('stronger crying contributions retain the yearly factor and aptitude response without magnifying caregiver strain', () => {
   assert.equal(YEARLY_DECISION_SCALE, .5);
   for (const aptitude of [-3, 0, 3]) {
     for (let level = 1; level <= 5; level++) {
@@ -45,10 +45,10 @@ test('each crying contribution is half strength before bounds, including aptitud
       for (const key of statKeys) state.aptitudes[key] = aptitude;
       const response = value => value * (value >= 0 ? 1 + aptitude * .08 : 1 - aptitude * .07);
       const effects = infantChoiceEffects(state);
-      close(effects.intelligence, response([-.08, -.04, .04, .08, .12][level - 1]) * .575, 'intelligence');
-      close(effects.stability, response([-.24, -.12, .12, .24, .36][level - 1]) * .5, 'mental stability');
-      close(effects.health, response(.06 * ((level - 1) / 4 - .5)) * .5, 'health');
-      for (const key of ['social', 'creativity']) close(effects[key], response(.02 * (level - 3)) * .575, key);
+      close(effects.intelligence, response([-.48, -.24, .24, .48, .72][level - 1]) * .575, 'intelligence');
+      close(effects.stability, response([-.48, -.24, .24, .48, .72][level - 1]) * .5, 'mental stability');
+      close(effects.health, response(.36 * ((level - 1) / 4 - .5)) * .5, 'health');
+      for (const key of ['social', 'creativity']) close(effects[key], response(.12 * (level - 3)) * .575, key);
       assert.equal(effects.strength, 0);
       const forecast = annualForecast(state);
       for (const parent of forecast.parents) {
@@ -59,14 +59,14 @@ test('each crying contribution is half strength before bounds, including aptitud
   }
 });
 
-test('all toddler activity effects use half-strength contributions and unused points add no stat changes', () => {
+test('stronger toddler activity effects retain proportional signs and unused points add no stat changes', () => {
   const state = stateAt(3);
   const coefficients = {
-    work: { strength: .05, social: .0275 },
-    social: { intelligence: .045, social: -.0275 },
-    family: { social: .0275, stability: .04 },
-    self: { health: .05, stability: .04 },
-    creative: { creativity: .055, intelligence: .045 },
+    work: { strength: .3, social: .165 },
+    social: { intelligence: .27, social: -.165 },
+    family: { social: .165, stability: .24 },
+    self: { health: .3, stability: .24 },
+    creative: { creativity: .33, intelligence: .27 },
   };
   for (const [activity, stats] of Object.entries(coefficients)) {
     for (const points of [0, 1, 2, 3, 4]) {
@@ -87,10 +87,10 @@ test('all toddler activity effects use half-strength contributions and unused po
   }
 });
 
-test('school, career, and later-life practice halve both gains and losses without scaling background development', () => {
+test('school, career, and later-life practice have stronger gains and losses without scaling background development', () => {
   const focused = { work: 4, social: 0, family: 0, self: 4 };
   const neglected = { work: 0, social: 4, family: 4, self: 0 };
-  const halfPractice = { intelligence: .1125, strength: .075, social: -.12, creativity: 0 };
+  const practice = { intelligence: .675, strength: .45, social: -.72, creativity: 0 };
   for (const [age, flexibility] of [[10, 1.15], [25, 1], [50, .85], [75, .65]]) {
     const state = stateAt(age);
     state.stats.intelligence = 8;
@@ -98,12 +98,12 @@ test('school, career, and later-life practice halve both gains and losses withou
     close(baseline.intelligence, -.036 * flexibility + (age < 18 ? DEVELOPMENT_BALANCE.childhoodBias.intelligence * CHILDHOOD_DEDUCTION_SCALE : 0), 'innate tendency and reduced childhood deduction');
     for (const [focus, sign] of [[focused, 1], [neglected, -1]]) {
       const changed = skillChanges({ ...state, focus });
-      for (const key of learned) close(changed[key] - baseline[key], halfPractice[key] * flexibility * sign, `${age} ${key}`);
+      for (const key of learned) close(changed[key] - baseline[key], practice[key] * flexibility * sign, `${age} ${key}`);
     }
     if (age >= 18) {
       const working = { ...state, focus: focused };
       const career = skillChanges(working, { weights: { intelligence: 1 } });
-      close(career.intelligence - skillChanges(working).intelligence, .0525 * flexibility, 'career practice is halved');
+      close(career.intelligence - skillChanges(working).intelligence, .315 * flexibility, 'career practice uses the stronger choice coefficient');
     }
   }
   const child = stateAt(10);
@@ -118,11 +118,11 @@ test('school, career, and later-life practice halve both gains and losses withou
   const adult = stateAt(30);
   adult.focus = { work: 4, social: 2, family: 0, self: 0 };
   const adultForecast = annualForecast(adult);
-  assert.equal(adultForecast.stats.health.after, 4.97, 'adult self-focus health loss is halved before rounding');
-  assert.equal(adultForecast.stats.stability.after, changedRating(changedRating(5, -.225), -.225), 'adult strain and high-work unemployment penalty are each halved');
+  assert.equal(adultForecast.stats.health.after, 4.84, 'adult self-focus health loss is substantial before rounding');
+  assert.equal(adultForecast.stats.stability.after, changedRating(changedRating(5, -1.35), -.225), 'focus strain is stronger while the unemployment penalty retains its existing scale');
 });
 
-test('caregiver, partner, and child routine relationships and wellbeing receive half-strength family decisions', () => {
+test('stronger child focus practice preserves caregiver strain and family relationship pacing', () => {
   for (const family of [0, 4]) {
     const state = stateAt(30);
     state.focus = { work: family === 4 ? 0 : 2, social: 2, family, self: 2 };
@@ -130,7 +130,7 @@ test('caregiver, partner, and child routine relationships and wellbeing receive 
     state.partner = { ...copy(state.parents[0]), id: 'partner', age: 30, canGestate: false, married: true, yearsTogether: 2, lastProposalAge: -1 };
     state.children = [0, 3, 12, 25].map((age, i) => ({ ...copy(state.parents[0]), id: `child-${i}`, age, canGestate: false }));
     const result = quietMean(state);
-    assert.equal(result.stats.stability, round(5 + (-.05 * focusEffect(state.focus.work) + .05 * effort) * .5), 'adult routine wellbeing is halved');
+    assert.equal(result.stats.stability, round(5 + (-.3 * focusEffect(state.focus.work) + .3 * effort) * .5), 'adult focus wellbeing uses the stronger coefficients');
     for (const parent of result.parents) {
       assert.equal(parent.relationship, round(5 + effort * .04));
       assert.equal(parent.stats.stability, round(5 + effort * .0125));
@@ -144,22 +144,22 @@ test('caregiver, partner, and child routine relationships and wellbeing receive 
         assert.equal(grown.stats.stability, round(5 + (effort * .045) * .5));
         assert.equal(grown.stats.health, round(5 + effort * .01));
       } else if (child.age === 0) {
-        const carePractice = .02 * effort;
-        assert.equal(grown.stats.intelligence, round(5 + (.04 + carePractice) * .575 + DEVELOPMENT_BALANCE.childhoodBias.intelligence * CHILDHOOD_DEDUCTION_SCALE));
+        const carePractice = .12 * effort;
+        assert.equal(grown.stats.intelligence, round(5 + (.24 + carePractice) * .575 + DEVELOPMENT_BALANCE.childhoodBias.intelligence * CHILDHOOD_DEDUCTION_SCALE));
       } else {
         const toddler = child.age < 5;
         const skillPractice = toddler
-          ? { intelligence: 0, strength: 0, social: .0275 * effort, creativity: 0 }
-          : { intelligence: .0375 * effort, strength: .05 * effort, social: .04 * effort, creativity: .04 * effort };
+          ? { intelligence: 0, strength: 0, social: .165 * effort, creativity: 0 }
+          : { intelligence: .225 * effort, strength: .3 * effort, social: .24 * effort, creativity: .24 * effort };
         for (const key of learned) {
           const bias = DEVELOPMENT_BALANCE.childhoodBias[key];
           const background = bias < 0 ? bias * CHILDHOOD_DEDUCTION_SCALE : bias;
           assert.equal(grown.stats[key], round(5 + skillPractice[key] * .575 + background), `${child.age}-year-old child ${key} care`);
         }
-        const healthPractice = (toddler ? .05 : .0175) * effort;
+        const healthPractice = (toddler ? .3 : .105) * effort;
         const stabilityPractice = toddler
-          ? .04 * effort + .04 * effort
-          : .1 * effort;
+          ? .24 * effort + .24 * effort
+          : .6 * effort;
         assert.equal(grown.stats.health, round(5 + .06 * (DEVELOPMENT_BALANCE.wellbeingTarget.health - 5) + healthPractice * .5));
         assert.equal(grown.stats.stability, round(5 + .08 * (DEVELOPMENT_BALANCE.wellbeingTarget.stability - 5) + stabilityPractice * .5));
       }

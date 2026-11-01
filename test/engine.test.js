@@ -1440,6 +1440,10 @@ test('old childless endings become valid retirement choices without resetting th
   const state=createGame({seed:3105});
   while(state.age<85) advanceYear(state);
   const previous=toLegacyCentimeters(copy(state)); previous.version=5; previous.ended=true; previous.needsSuccession=false;
+  // Restriction-only effects cannot represent a v5 buff. Include a genuine
+  // legacy modifier so this still checks preservation of old active effects.
+  previous.effects = previous.effects.filter(effect => Object.keys(effect.modifiers).length);
+  previous.effects.push({ id: 'legacy_support', name: 'Support', description: 'Support from family.', years: 2, modifiers: { stability: .4 }, kind: 'positive' });
   for (const effect of previous.effects) delete effect.focusLimits; // Activity limits did not exist in schema 5.
   for (const parent of previous.parents) { parent.age = Math.min(85, parent.age); if (parent.age === 85) parent.alive = false; }
   for(const person of [previous,...previous.parents,...previous.children,...previous.siblings,...previous.lineage,...previous.encounters,previous.partner,previous.pregnancy?.otherParent].filter(Boolean)) { delete person.familyName; person.appearancePeakAge = 30; }

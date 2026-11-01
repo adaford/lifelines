@@ -38,11 +38,11 @@ test('activity contributions are neutral at two and ordinary effects triple at e
   }
 });
 
-test('rest uses the halved toddler health response and crafts spend the shared budget', () => {
+test('rest uses the stronger toddler health response and crafts spend the shared budget', () => {
   const state = toddler();
   state.aptitudes.health = 0;
   const higher = { ...state, focus: { ...state.focus, self: 4 } };
-  assert.ok(Math.abs(childhoodWellbeing(higher).health - childhoodWellbeing(state).health - .075) < 1e-12);
+  assert.ok(Math.abs(childhoodWellbeing(higher).health - childhoodWellbeing(state).health - .45) < 1e-12);
   assert.equal(setFocus(state, 'creative', 3).ok, false);
   assert.equal(setFocus(state, 'work', 1).ok, true);
   assert.equal(setFocus(state, 'creative', 3).ok, true);

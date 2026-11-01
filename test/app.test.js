@@ -251,7 +251,7 @@ test('Mom helping with the load keeps each actual stat change on a separate revi
       const lines = results.innerHTML.split('<br>');
       assert.equal(results.querySelectorAll('br').length, 3, 'four changes need three actual HTML line breaks');
       assert.equal(lines.length, 4);
-      assert.match(lines[0], /Your Mental stability 6\.5 \u2192 6\.7/);
+      assert.match(lines[0], /Your Mental stability 6\.4 \u2192 6\.5/);
       assert.match(lines[1], /Mental stability 3\.1 \u2192 3\.7/);
       assert.match(lines[2], /Health 6\.8 \u2192 6\.9/);
       assert.match(lines[3], /Relationship 7\.6 \u2192 7\.8/);
