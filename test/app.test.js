@@ -202,7 +202,7 @@ test('journal and review preserve negative effective endpoints and signed tempor
   assert.deepEqual(ui.saved(), fixture);
 });
 
-test('journal outcomes put every stat on its own line while reviews group each person', async () => {
+test('journal and year-review outcomes put every stat on its own line', async () => {
   const fixture = ageTo(createGame({ surname: 'St. Clair', seed: 78123 }), 1);
   const dad = fixture.parents.find(parent=>parent.role==='Dad') || fixture.parents[1];
   const entry = { title: `${dad.name}: Tired days after broken nights`, text: `Your mental stability 5.2 → 5; ${dad.name}: Mental stability 6.3 → 6; ${dad.name}: Health 7.1 → 7.`, kind: 'negative' };
@@ -212,8 +212,10 @@ test('journal outcomes put every stat on its own line while reviews group each p
   const ui = await mount(fixture);
   assert.equal(ui.query('.year-event-description').textContent, `${dad.name} (Dad) struggles to rest, leaving you both unsettled.`, 'a period in a family name does not truncate its explanation');
   const reviewLines = ui.query('.year-review-events .year-event-results').innerHTML.split('<br>');
-  assert.equal(reviewLines.length, 2, 'reviews retain their separate explanation and grouped-person results');
-  assert.match(reviewLines[1], /Mental stability 6\.3 → 6\.0; .*Health 7\.1 → 7\.0/);
+  assert.equal(reviewLines.length, 3, 'reviews show each stat separately, even for the same person');
+  assert.match(reviewLines[1], /Mental stability 6\.3 \u2192 6\.0/);
+  assert.match(reviewLines[2], /Health 7\.1 \u2192 7\.0/);
+  assert.ok(reviewLines.every(line => !line.includes(';')), 'stat outcomes never share a semicolon-separated review line');
   const journalLines = ui.query('.journal-entry p').innerHTML.split('<br>');
   assert.equal(journalLines.length, 3, 'every stat gets its own line in the journal');
   assert.match(journalLines[0], /Your Mental stability 5\.2 → 5\.0/);
@@ -222,6 +224,42 @@ test('journal outcomes put every stat on its own line while reviews group each p
   assert.match(journalLines[1], /Mental stability 6\.3 → 6\.0/);
   assert.match(journalLines[2], /Health 7\.1 → 7\.0/);
   assert.deepEqual(ui.saved(), fixture, 'line breaks do not rewrite event history or ratings');
+});
+
+test('Mom helping with the load keeps each actual stat change on a separate review line after reload', async () => {
+  const original = createGame({ surname: 'St. Clair', seed: 6 });
+  const mom = original.parents.find(parent => parent.parentRole === 'mom');
+  mom.stats.stability = 3;
+  assert.equal(advanceYear(original, { mortalityRandom: () => 1, growthRandom: () => 0, parentCareerRandom: () => 1 }).ok, true);
+  const event = EVENTS.find(event => event.id === 'household_parent_support');
+  const entry = original.yearSummary.events.find(entry => entry.title === `${mom.name}: ${event.name}`);
+  assert.ok(entry, 'the actual automatic household event rolled for Mom');
+  assert.equal(entry.text.split(';').length, 4, 'the engine recorded player wellbeing plus Mom wellbeing, health, and relationship');
+  assert.equal(validateSave(original), true);
+
+  for (const legacy of [false, true]) {
+    const fixture = structuredClone(original);
+    if (legacy) delete fixture.yearSummary.events.find(item => item.title === entry.title).description;
+    const before = structuredClone(fixture);
+    let ui = await mount(fixture);
+    for (let reload = 0; reload < 2; reload++) {
+      const card = ui.all('.year-review-events li').find(item => item.querySelector('strong').textContent.includes(event.name));
+      assert.ok(card);
+      assert.equal(card.querySelector('.year-event-description').textContent, `${mom.name} (Mom) accepts help with everyday responsibilities.`);
+      const results = card.querySelector('.year-event-results');
+      const lines = results.innerHTML.split('<br>');
+      assert.equal(results.querySelectorAll('br').length, 3, 'four changes need three actual HTML line breaks');
+      assert.equal(lines.length, 4);
+      assert.match(lines[0], /Your Mental stability 6\.5 \u2192 6\.7/);
+      assert.match(lines[1], /Mental stability 3\.1 \u2192 3\.7/);
+      assert.match(lines[2], /Health 6\.8 \u2192 6\.9/);
+      assert.match(lines[3], /Relationship 8\.6 \u2192 8\.8/);
+      assert.ok(lines.slice(1).every(line => line.includes(`${mom.name} (Mom)`)), 'each Mom change keeps its subject label');
+      assert.doesNotMatch(results.textContent, /;/, "Mom's multiple outcomes are never joined by semicolons");
+      assert.deepEqual(ui.saved(), before, 'rendering and reloading never rewrite saved history, ratings, or RNG');
+      if (reload === 0) ui = await mount(ui.saved());
+    }
+  }
 });
 
 test('year reviews show one saved explanation while journals retain only titles and results', async () => {

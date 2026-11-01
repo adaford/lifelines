@@ -48,38 +48,10 @@ const buffPart = new RegExp(`^(?<prefix>.*?)(?<buff>[+-](?:${amount}|\\.\\d+))\\
 const aptitudePart = new RegExp(`^(?:(?<person>.+?):\\s*${outcomeStat}|(?<prefix>.*?)Your\\s+${outcomeStat})\\s+learning ability\\s+(?<before>[+-]?[0-3])${arrow}(?<after>[+-]?[0-3])(?<suffix>[.!?](?:\\s.*)?)?$`, 'iu');
 const parseOutcome = text => outcomePart.exec(text) || aptitudePart.exec(text) || buffPart.exec(text);
 
-// Separate recorded effects by person without changing saved prose or treating
-// an ordinary semicolon in a custom story as an effect boundary.
-export function splitEventOutcome(text) {
-  const source = String(text ?? '');
-  const parts = source.split(';');
-  if (parts.length < 2) return [source];
-  const parsed = parts.map((part, index) => {
-    const match = parseOutcome(part.trim());
-    if (!match) return null;
-    const { person, prefix, lifestylePrefix, suffix } = match.groups;
-    if (index > 0 && (prefix || lifestylePrefix) || index < parts.length - 1 && suffix) return null;
-    return { person: person?.trim() || null };
-  });
-  if (parsed.some(part => !part)) return [source];
-  // A selected option can precede the first named person's recorded effects.
-  // A later exact name lets us keep that person's following effects together.
-  if (parsed[0].person) {
-    const repeated = parsed.slice(1).find(part => part.person && parsed[0].person.endsWith(`. ${part.person}`));
-    if (repeated) parsed[0].person = repeated.person;
-  }
-  const lines = [parts[0]];
-  for (let index = 1; index < parts.length; index++) {
-    if (parsed[index].person === parsed[index - 1].person) lines[lines.length - 1] += `;${parts[index]}`;
-    else lines.push(parts[index].trimStart());
-  }
-  return lines;
-}
-
-// Journal results give every recorded stat its own line. Only a consecutive
-// list of valid rating changes is split; remaining prose, limits and durations
+// Both year reviews and the journal give every recorded stat its own line.
+// Only consecutive valid changes are split; custom prose, limits and durations
 // stay intact on the final line, including any semicolons they contain.
-export function splitJournalEventOutcome(text) {
+export function splitEventOutcome(text) {
   const source = String(text ?? '');
   const parts = source.split(';');
   if (parts.length < 2) return [source];
@@ -100,6 +72,9 @@ export function splitJournalEventOutcome(text) {
   }
   return lines;
 }
+
+// Retain the existing export for callers; both surfaces share one rule.
+export const splitJournalEventOutcome = splitEventOutcome;
 
 function formatValues(text, age) {
   return text

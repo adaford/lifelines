@@ -8,13 +8,14 @@ import { eventChances } from '../events.js';
 const stats = rating => Object.fromEntries(['health', 'stability', 'intelligence', 'strength', 'attractiveness', 'social', 'creativity'].map(key => [key, rating]));
 const adult = rating => ({ age: 30, alive: true, stats: stats(rating), lifestyle: rating, focus: { work: 3, social: 3, family: 3, self: 3 }, effects: [], children: [], education: { status: 'workforce' } });
 
-test('zero and fractional ratings remain formatted and grouped by affected person', () => {
+test('zero and fractional ratings remain formatted on separate stat lines', () => {
   assert.equal(formatRating(0), '0.0');
   assert.equal(formatRating(.04), '0.0');
   const text = 'Your mental stability 1.2 -> 0; Alex Reed: Health 0.1 -> 0; Alex Reed: Relationship 0 -> 0.2.';
   assert.deepEqual(splitEventOutcome(text).map(line => formatStatNarrative(line)), [
     'Your mental stability 1.2 -> 0.0',
-    'Alex Reed: Health 0.1 -> 0.0; Alex Reed: Relationship 0.0 -> 0.2.',
+    'Alex Reed: Health 0.1 -> 0.0',
+    'Alex Reed: Relationship 0.0 -> 0.2.',
   ]);
   assert.equal(formatStatNarrative('Dr. Health 0: Health 0 -> 0.23.', { guardian: { name: 'Dr. Health 0' } }), 'Dr. Health 0: Health 0.0 -> 0.2.', 'guardian names take precedence over numeric formatting');
 });
