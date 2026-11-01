@@ -52,8 +52,7 @@ test('school and college show each choice contribution with toddler-style relati
       assert.deepEqual(entries.map(entry => entry.stat).sort(), points === 2 ? [] : Object.keys(affected).sort(), `${age} ${area} ${points} includes only the choice's stats`);
       for (const entry of entries) {
         assert.equal(Math.sign(entry.change), Math.sign(focusEffect(points)) * affected[entry.stat]);
-        const maximum = Math.max(...Object.values(STANDARD_FOCUS_EFFECTS).map(effects => Math.abs(effects[entry.stat] || 0)));
-        const strength = Math.ceil(2 * Math.abs(STANDARD_FOCUS_EFFECTS[area][entry.stat]) / maximum - 1e-8);
+        const strength = 1;
         assert.equal(entry.level, Math.abs(focusEffect(points)) * strength, `${age} ${area} ${points} ${entry.stat}`);
       }
       assert.deepEqual(candidate, before, 'comparison does not mutate choices, saves, or RNG');
@@ -65,12 +64,12 @@ test('school contribution magnitudes include halved practice and stress without 
   const state = student();
   const low = selected(state, 'work', 0);
   let effects = schoolFocusEffects(low, 'work');
-  assert.ok(Math.abs(effects.intelligence + .129375) < 1e-10);
-  assert.ok(Math.abs(effects.stability - .15) < 1e-10, 'less School relieves only its own stress');
+  assert.ok(Math.abs(effects.intelligence + .0646875) < 1e-10);
+  assert.ok(Math.abs(effects.stability - .075) < 1e-10, 'less School relieves only its own stress');
   assert.equal(effects.health, 0);
   const high = selected(state, 'self', 4);
   effects = schoolFocusEffects(high, 'self');
-  for (const [stat, amount] of Object.entries({ intelligence: .0646875, strength: .1725, creativity: .138, health: .0525, stability: .15 })) {
+  for (const [stat, amount] of Object.entries({ intelligence: .0646875, strength: .08625, creativity: .069, health: .02625, stability: .075 })) {
     assert.ok(Math.abs(effects[stat] - amount) < 1e-10, `${stat} uses half-strength self-focus`);
   }
   const initial = schoolChoiceImpacts(low, 'work');
@@ -84,8 +83,8 @@ test('school contribution magnitudes include halved practice and stress without 
     initial.map(({ stat, change, level }) => ({ stat, change: Math.round(change * 100), level })), 'household decline, reversion, and spare points stay out of the School row');
   const college = selected(student(19), 'work', 4);
   const collegeEffects = schoolFocusEffects(college, 'work');
-  assert.ok(Math.abs(collegeEffects.intelligence - .1125) < 1e-10);
-  assert.ok(Math.abs(collegeEffects.stability + .15) < 1e-10);
+  assert.ok(Math.abs(collegeEffects.intelligence - .05625) < 1e-10);
+  assert.ok(Math.abs(collegeEffects.stability + .075) < 1e-10);
 });
 
 test('Family previews retain school caregiver neutral points and follow guardians', () => {
@@ -98,12 +97,12 @@ test('Family previews retain school caregiver neutral points and follow guardian
       if (points === 2) assert.equal(stability, undefined);
       else {
         assert.ok(Math.abs(stability.change - (Math.round((5 + (focusEffect(points)) * .0125) * 100) / 100 - 5)) < 1e-10);
-        assert.equal(stability.level, [6, 2, 0, 2, 6][points]);
+        assert.equal(stability.level, [3, 1, 0, 1, 3][points]);
       }
       if (points === 2) assert.equal(relationship, undefined);
       else {
         assert.ok(Math.abs(relationship.change - (focusEffect(points)) * .04) < 1e-10);
-        assert.equal(relationship.level, [6, 2, 0, 2, 6][points]);
+        assert.equal(relationship.level, [3, 1, 0, 1, 3][points]);
       }
     }
     assert.ok(entries.every(entry => entry.stat !== 'lifestyle'));
@@ -120,14 +119,14 @@ test('school rows respect active caps and rating limits without reranking signs'
   state.effects = [{ id: 'limited-school', name: 'Recovery', years: 1, modifiers: {}, focusLimits: { standard: { work: 1 } } }];
   const before = structuredClone(state);
   const capped = schoolChoiceImpacts(state, 'work');
-  assert.equal(capped.find(entry => entry.stat === 'intelligence').level, 2);
+  assert.equal(capped.find(entry => entry.stat === 'intelligence').level, 1);
   assert.ok(capped.find(entry => entry.stat === 'intelligence').change < 0);
   assert.deepEqual(state, before, 'reading the cap never reallocates saved points');
   state.effects = [];
   state.stats.intelligence = 9.99;
   let entry = schoolChoiceImpacts(state, 'work').find(entry => entry.stat === 'intelligence');
   assert.ok(entry.change > 0 && entry.change < .02);
-  assert.equal(entry.level, 6);
+  assert.equal(entry.level, 3);
   state.stats.intelligence = 10;
   assert.ok(!schoolChoiceImpacts(state, 'work').some(entry => entry.stat === 'intelligence'));
   state.stats.intelligence = 9;

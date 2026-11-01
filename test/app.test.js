@@ -2424,9 +2424,9 @@ test('activity signs compare possible allocations rather than fixed numerical ga
     fixture.focus={work:4,social:0,family:0,self:0,creative:0};
     const ui=await mount(fixture),before=ui.saved();
     maximumGains.push(toddlerChoiceImpacts(before,'work').find(entry=>entry.stat==='strength').change);
-    assert.equal(ui.query('.choice-impact[data-stat="strength"]:not([data-parent-id]) b').textContent,'++++++','maximum Play is three double-sign steps for either aptitude');
+    assert.equal(ui.query('.choice-impact[data-stat="strength"]:not([data-parent-id]) b').textContent,'+++','maximum Play is three single-sign steps for either aptitude');
     ui.click('[data-action="focus"][data-key="work"][data-delta="-1"]');
-    assert.equal(ui.query('.choice-impact[data-stat="strength"]:not([data-parent-id]) b').textContent,'++','one fewer Play point is one double-sign step above neutral');
+    assert.equal(ui.query('.choice-impact[data-stat="strength"]:not([data-parent-id]) b').textContent,'+','one fewer Play point is one sign above neutral');
     assert.deepEqual(ui.saved().stats,before.stats);
     assert.equal(ui.saved().rng,before.rng);
   }
@@ -2446,13 +2446,13 @@ test('school and college decisions show signed effects inside each choice and up
     assertChoiceImpacts(ui);
     const work=ui.query('.focus-row[data-focus-key="work"]');
     assert.match(work.querySelector('h4').textContent,age<18?/School/:/College/);
-    assert.equal(work.querySelector('[data-stat="intelligence"] b').textContent,'++');
-    assert.equal(work.querySelector('[data-stat="stability"] b').textContent,'--');
+    assert.equal(work.querySelector('[data-stat="intelligence"] b').textContent,'+');
+    assert.equal(work.querySelector('[data-stat="stability"] b').textContent,'-');
     ui.click('[data-action="focus"][data-key="social"][data-delta="-1"]');
     ui.click('[data-action="focus"][data-key="work"][data-delta="1"]');
     assertChoiceImpacts(ui);
-    assert.equal(ui.query('.focus-row[data-focus-key="work"] [data-stat="intelligence"] b').textContent,'++++++');
-    assert.equal(ui.query('.focus-row[data-focus-key="work"] [data-stat="stability"] b').textContent,'------');
+    assert.equal(ui.query('.focus-row[data-focus-key="work"] [data-stat="intelligence"] b').textContent,'+++');
+    assert.equal(ui.query('.focus-row[data-focus-key="work"] [data-stat="stability"] b').textContent,'---');
     assert.deepEqual(ui.saved().stats,before.stats);
     assert.deepEqual(ui.saved().parents,before.parents);
     assert.equal(ui.saved().rng,before.rng);
@@ -2519,7 +2519,7 @@ test('Electronics and crafts show the expected signs at every allocation', async
   fixture.stats.intelligence=5;
   const ui=await mount(fixture),before=ui.saved();
   const social=['+++','+',null,'-','---'];
-  const intelligence=['------','--',null,'++','++++++'];
+  const intelligence=['---','-',null,'+','+++'];
   const signs=stat=>ui.document.querySelector(`.focus-row[data-focus-key="social"] .choice-impact[data-stat="${stat}"] b`)?.textContent ?? null;
   for(let points=0;points<=4;points++) {
     assert.equal(ui.query('.focus-row[data-focus-key="social"] output').textContent,String(points));
@@ -2536,7 +2536,7 @@ test('Electronics and crafts show the expected signs at every allocation', async
     const craftSigns=ui.document.querySelector('.focus-row[data-focus-key="creative"] .choice-impact[data-stat="intelligence"] b')?.textContent ?? null;
     assert.equal(craftSigns,['---','-',null,'+','+++'][points],`Arts & crafts ${points}: intelligence`);
     const creativity=ui.document.querySelector('.focus-row[data-focus-key="creative"] .choice-impact[data-stat="creativity"] b')?.textContent ?? null;
-    assert.equal(creativity,['------','--',null,'++','++++++'][points],`Arts & crafts ${points}: creativity`);
+    assert.equal(creativity,['---','-',null,'+','+++'][points],`Arts & crafts ${points}: creativity`);
     if(points<4) ui.click('[data-action="focus"][data-key="creative"][data-delta="1"]');
   }
   assert.deepEqual(ui.saved().stats,before.stats);
@@ -2631,7 +2631,7 @@ test('every focus stage starts neutral at two with its stage budget and a hard f
   }
 });
 
-test('focus extremes render six signed strengths with accessible labels and no numeric deltas', async () => {
+test('individual focus effects render one or three signs with accessible labels and no numeric deltas', async () => {
   for(const points of [0,1,2,3,4]) {
     const fixture=ageTo(createGame({seed:125}),3);
     fixture.effects=[];
@@ -2640,11 +2640,63 @@ test('focus extremes render six signed strengths with accessible labels and no n
     fixture.aptitudes.strength=0;
     const ui=await mount(fixture);
     const entry=ui.document.querySelector('.focus-row[data-focus-key="work"] [data-stat="strength"]');
-    const expected=['------','--',null,'++','++++++'][points];
+    const expected=['---','-',null,'+','+++'][points];
     assert.equal(entry?.querySelector('b').textContent??null,expected);
     if(entry) {
       assert.doesNotMatch(entry.textContent,/undefined|NaN|[+-]\d/);
       assert.match(entry.querySelector('[role="img"]').getAttribute('aria-label'),/Strength: (small|medium|large) expected (increase|decrease)/);
+    }
+  }
+});
+
+test('every toddler activity and family effect follows the requested one-or-three-sign scale after reload', async () => {
+  const effects={
+    work:[['you','strength'],['you','social']],
+    social:[['you','intelligence'],['you','social',true]],
+    family:[['you','social'],['you','stability'],['family','stability'],['family','relationship']],
+    self:[['you','health'],['you','stability']],
+    creative:[['you','creativity'],['you','intelligence']],
+  };
+  for(const [area,expectedEffects] of Object.entries(effects)) {
+    const fixture=createGame({seed:121});
+    fixture.age=3;
+    fixture.conditions=[];
+    fixture.effects=[];
+    fixture.focus={work:0,social:0,family:0,self:0,creative:0};
+    for(const person of [fixture,...fixture.parents]) {
+      for(const stat of Object.keys(person.stats)) person.stats[stat]=5;
+      for(const stat of Object.keys(person.aptitudes)) person.aptitudes[stat]=0;
+      if('relationship' in person) person.relationship=5;
+    }
+    let ui=await mount(fixture);
+    const before=ui.saved();
+    for(let points=0;points<=4;points++) {
+      if(points) ui.click(`.focus-row[data-focus-key="${area}"] [data-delta="1"]`);
+      for(let reload=0;reload<2;reload++) {
+        const row=ui.query(`.focus-row[data-focus-key="${area}"]`);
+        assert.equal(row.querySelector('output').textContent,String(points));
+        assert.equal(row.querySelectorAll('.choice-impact').length,points===2?0:expectedEffects.length);
+        for(const [target,stat,reversed] of expectedEffects) {
+          const entry=row.querySelector(`[data-target="${target}"][data-stat="${stat}"]`);
+          const expected=(reversed?['+++','+',null,'-','---']:['---','-',null,'+','+++'])[points];
+          assert.equal(entry?.querySelector('b').textContent??null,expected,`${area} ${points}: ${target} ${stat}, reload ${reload}`);
+          if(entry && target==='family') {
+            assert.deepEqual(entry.dataset.parentIds.split(' ').sort(),fixture.parents.map(parent=>parent.id).sort());
+            assert.match(entry.querySelector('[role="img"]').getAttribute('aria-label'),/Dad|Mom/);
+          }
+        }
+        assert.deepEqual(ui.saved().stats,before.stats);
+        assert.deepEqual(ui.saved().parents,before.parents);
+        assert.equal(ui.saved().rng,before.rng);
+        if(!reload) {
+          const saved=ui.saved();
+          ui=await mount(saved);
+          assert.deepEqual(ui.saved(),saved,'reload preserves every recorded value');
+          const writes=ui.writes();
+          ui.click('.nav-list [data-tab="year"]');
+          assert.equal(ui.writes(),writes,'rendering previews never writes the save');
+        }
+      }
     }
   }
 });

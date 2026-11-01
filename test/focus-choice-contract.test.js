@@ -63,13 +63,20 @@ test('every raw choice effect triples at zero and four before rating bounds and 
   }
 });
 
-test('strong choice previews show two signs for adjacent choices and six at endpoints', () => {
-  for (const [age, area, stat, preview] of [[3, 'work', 'strength', toddlerChoiceImpacts], [12, 'work', 'intelligence', schoolChoiceImpacts]]) {
+test('every individual focus effect uses one sign next to neutral and three at endpoints', () => {
+  for (const age of [3, 12, 19]) {
     const state = life(age);
-    for (const [points, signs] of [[0, '------'], [1, '--'], [2, ''], [3, '++'], [4, '++++++']]) {
-      state.focus[area] = points;
-      const entry = preview(state, area).find(entry => entry.stat === stat && !entry.parentId);
-      assert.equal(entry ? (entry.change > 0 ? '+' : '-').repeat(entry.level) : '', signs);
+    state.conditions = [];
+    if (age === 19) state.education = { status: 'college', years: 1 };
+    const preview = age < 5 ? toddlerChoiceImpacts : schoolChoiceImpacts;
+    for (const area of Object.keys(state.focus)) for (const [points, level] of [[0, 3], [1, 1], [2, 0], [3, 1], [4, 3]]) {
+      const selected = { ...state, focus: { ...defaultFocus(age), [area]: points } };
+      const entries = preview(selected, area);
+      if (level === 0) assert.deepEqual(entries, []);
+      else {
+        assert.ok(entries.length, `${age} ${area} at ${points} points has effects`);
+        for (const entry of entries) assert.equal(entry.level, level, `${age} ${area} ${entry.parentId || 'you'} ${entry.stat}`);
+      }
     }
   }
 });

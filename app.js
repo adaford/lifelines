@@ -5,13 +5,13 @@ import {
   offeredJobs, needsEducationChoice, pendingEventSubject, focusLimits, focusLimitDetails, caregivers,
   relationshipOdds, meetingChances, proposalChance, pregnancyChance, oneNightChance,
   respondToEncounter, proposeMarriage, endRelationship, normalizeSurname, heightPercentile, statPercentiles
-} from './engine.js?v=birth-focus-1';
-import { annotateNarrative } from './narrative.js?v=birth-focus-1';
-import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome } from './display.js?v=birth-focus-1';
+} from './engine.js?v=focus-single-1';
+import { annotateNarrative } from './narrative.js?v=focus-single-1';
+import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome } from './display.js?v=focus-single-1';
 
-import { MAX_FOCUS, focusBudget } from './focus-rules.js?v=birth-focus-1';
-import { getBirthConditions } from './birth-conditions.js?v=birth-focus-1';
-import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=birth-focus-1';
+import { MAX_FOCUS, focusBudget } from './focus-rules.js?v=focus-single-1';
+import { getBirthConditions } from './birth-conditions.js?v=focus-single-1';
+import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=focus-single-1';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const app = document.querySelector('#app');
@@ -625,8 +625,8 @@ function topicHelpModal(topic, id) {
     lifestyle: ['Lifestyle', ['Until 18, you share your parents’ or guardian’s changing household lifestyle. As an adult, work, family and inheritance shape it.']],
     height: ['Height', ['Final height emerges from yearly growth shaped by age, inheritance, health and chance, ending at 14–18. Poor health reduces new growth, never existing height.']],
     cry: ['Cry level', ['Less crying lowers your intelligence and mental stability; more crying raises them. Strength is unaffected. Parent relationships tend to fall at levels 1–2, stay steady at 3, and rise at 4–5, with yearly variation. Harder crying strains their mental stability more.']],
-    focus: ['Your focus', [`Share ${focusBudget(state)} points across ${Object.keys(state.focus).length} focuses, up to ${MAX_FOCUS} each. The default 2 in each adds no focus-driven stat changes. Conditions and events can change your limits.`, 'Points 1 and 3 have opposite effects; 0 and 4 are three times as strong. Signs can reach six pluses or minuses. Aptitude, current ratings, development and events affect the final result. Zero effects are hidden.']],
-    'toddler-focus': ['Toddler activities', [`Share ${focusBudget(state)} points among five activities, up to 4 each. The default 2 in each adds no activity-driven stat changes. Conditions and events can change your limits.`, 'Points 1 and 3 have opposite effects; 0 and 4 are three times as strong. Less Electronics supports Social; more reduces it. Signs can reach six pluses or minuses. Aptitude, current ratings, development and events affect the final result. Zero effects are hidden.']],
+    focus: ['Your focus', [`Share ${focusBudget(state)} points across ${Object.keys(state.focus).length} focuses, up to ${MAX_FOCUS} each. The default 2 in each adds no focus-driven stat changes. Conditions and events can change your limits.`, 'Points 1 and 3 show one sign per effect; 0 and 4 are three times as strong and show three. Combined effects can reach six signs. Aptitude, current ratings, development and events affect the final result. Zero effects are hidden.']],
+    'toddler-focus': ['Toddler activities', [`Share ${focusBudget(state)} points among five activities, up to 4 each. The default 2 in each adds no activity-driven stat changes. Conditions and events can change your limits.`, 'Points 1 and 3 show one sign per effect; 0 and 4 are three times as strong and show three. Less Electronics supports Social; more reduces it. Aptitude, current ratings, development and events affect the final result. Zero effects are hidden.']],
     ...Object.fromEntries(toddlerFocusRows.map(([key,label]) => [`toddler-${key}`, [label,
       toddlerActivityImpacts(key).map(({stat,change,level,target}) => `${(change>0?'+':'-').repeat(level)}${target==='parents'?(caregivers(state).some(person=>person.guardianRole)?'Guardian relationship':'Parent relationships'):skillLabel(stat)}`)
     ]])),

@@ -1,4 +1,4 @@
-import { conditionFocusPoints } from './birth-conditions.js?v=birth-focus-1';
+import { conditionFocusPoints } from './birth-conditions.js?v=focus-single-1';
 
 // One shared allocation scale for all playable focus stages.
 export const MAX_FOCUS = 4;

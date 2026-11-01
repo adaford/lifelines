@@ -87,9 +87,9 @@ test('aptitude has a gentler influence on starting ratings, practice and routine
   assert.equal(naturalSkillRating(3), 6.8);
   for (const aptitude of [-3, 0, 3]) {
     const person = { age: 25, stats: { strength: naturalSkillRating(aptitude) }, aptitudes: { strength: aptitude, health: aptitude }, focus: { self: 4 } };
-    assert.ok(Math.abs(skillChanges(person).strength - .15 * (1 + aptitude * .08)) < 1e-12);
+    assert.ok(Math.abs(skillChanges(person).strength - .075 * (1 + aptitude * .08)) < 1e-12);
     person.focus.self = 1;
-    assert.ok(Math.abs(skillChanges(person).strength + .05 * (1 - aptitude * .07)) < 1e-12);
+    assert.ok(Math.abs(skillChanges(person).strength + .025 * (1 - aptitude * .07)) < 1e-12);
     assert.ok(Math.abs(wellbeingResponse(person, 'health', .2) - .1 * (1 + aptitude * .08)) < 1e-12);
     assert.ok(Math.abs(wellbeingResponse(person, 'health', -.2) + .1 * (1 - aptitude * .07)) < 1e-12);
   }

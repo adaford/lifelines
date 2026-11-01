@@ -1,4 +1,4 @@
-import { MAX_FOCUS, DEFAULT_FOCUS, focusEffect, defaultFocus } from './focus-rules.js?v=birth-focus-1';
+import { MAX_FOCUS, DEFAULT_FOCUS, focusEffect, defaultFocus } from './focus-rules.js?v=focus-single-1';
 // Ratings use the same scale throughout life. Balanced toddler activities use
 // TODDLER_FOCUS; every stage uses 2 per area. Childhood event drift is fitted by
 // scripts/calibrate-percentiles.mjs.
@@ -38,26 +38,24 @@ export const TODDLER_FOCUS = defaultFocus(2);
 // aging, and event outcomes independent of the player's allocation.
 export const YEARLY_DECISION_SCALE = .5;
 export const PARENT_FAMILY_RELATIONSHIP_GAIN = .08 * YEARLY_DECISION_SCALE;
+export const PARENT_FAMILY_STABILITY_GAIN = .025;
 export const TODDLER_ACTIVITY_EFFECTS = {
-  work: { strength: .1, social: .055 },
-  social: { intelligence: .09, social: -.0275 },
-  family: { social: .055, stability: .04 },
-  self: { health: .1, stability: .08 },
-  creative: { creativity: .11, intelligence: .045 },
+  work: { strength: .05, social: .0275 },
+  social: { intelligence: .045, social: -.0275 },
+  family: { social: .0275, stability: .04 },
+  self: { health: .05, stability: .04 },
+  creative: { creativity: .055, intelligence: .045 },
 };
 export const STANDARD_FOCUS_EFFECTS = {
-  work: { intelligence: .075, stability: -.1 },
-  social: { social: .08, creativity: .04, stability: .05 },
+  work: { intelligence: .0375, stability: -.05 },
+  social: { social: .04, creativity: .04, stability: .05 },
   family: { social: .04, stability: .05 },
-  self: { intelligence: .0375, strength: .1, creativity: .08, health: .035, stability: .1 },
+  self: { intelligence: .0375, strength: .05, creativity: .04, health: .0175, stability: .05 },
 };
 // One sign has one raw magnitude for the same stat across player choices.
-// Strong coefficients are exactly twice weaker coefficients, so the UI never
-// promises a different ratio than the simulation applies.
+// Every affected stat uses one unit at 1/3 points and three at 0/4 points.
 export function focusEffectStrength(coefficients, area, stat) {
-  const amount = Math.abs(coefficients[area]?.[stat] || 0);
-  const maximum = Math.max(...Object.values(coefficients).map(effects => Math.abs(effects[stat] || 0)));
-  return maximum && amount ? Math.max(1, Math.round(2 * amount / maximum)) : 0;
+  return coefficients[area]?.[stat] ? 1 : 0;
 }
 // Autonomous parents retain their former practice model and internal 0-5 scale.
 const AUTONOMOUS_FOCUS_EFFECTS = {

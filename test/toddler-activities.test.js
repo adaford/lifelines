@@ -42,7 +42,7 @@ test('rest uses the halved toddler health response and crafts spend the shared b
   const state = toddler();
   state.aptitudes.health = 0;
   const higher = { ...state, focus: { ...state.focus, self: 4 } };
-  assert.ok(Math.abs(childhoodWellbeing(higher).health - childhoodWellbeing(state).health - .15) < 1e-12);
+  assert.ok(Math.abs(childhoodWellbeing(higher).health - childhoodWellbeing(state).health - .075) < 1e-12);
   assert.equal(setFocus(state, 'creative', 3).ok, false);
   assert.equal(setFocus(state, 'work', 1).ok, true);
   assert.equal(setFocus(state, 'creative', 3).ok, true);
@@ -55,7 +55,7 @@ test('rest uses the halved toddler health response and crafts spend the shared b
   assert.equal(setFocus(state, 'creative', 1).ok, false);
 });
 
-test('each crafts intelligence sign is half an electronics two-sign step while retaining creativity', () => {
+test('crafts and electronics share the same intelligence contribution per sign', () => {
   for (const age of [2, 3, 4]) {
     const state = toddler();
     state.age = age;
@@ -68,17 +68,17 @@ test('each crafts intelligence sign is half an electronics two-sign step while r
     const craftsGain = crafts.intelligence - baseline.intelligence;
     const electronicsGain = electronics.intelligence - baseline.intelligence;
     assert.ok(craftsGain > 0);
-    assert.ok(Math.abs(craftsGain * 2 - electronicsGain) < 1e-12);
+    assert.ok(Math.abs(craftsGain - electronicsGain) < 1e-12);
     assert.ok(crafts.creativity > baseline.creativity);
     assert.equal(crafts.social, baseline.social);
     assert.equal(crafts.strength, baseline.strength);
     const effects = toddlerActivityEffects(state);
-    assert.ok(Math.abs(effects.creative.intelligence * 2 - effects.social.intelligence) < 1e-12);
+    assert.ok(Math.abs(effects.creative.intelligence - effects.social.intelligence) < 1e-12);
     assert.deepEqual(state, before, 'development and activity reads preserve the save and RNG');
   }
 });
 
-test('toddler social practice has two, minus one, and two sign units while family time builds parent relationships', () => {
+test('toddler social practice has equal signed units while family time builds parent relationships', () => {
   for (const age of [2, 3, 4]) {
     const state = toddler();
     state.age = age;
@@ -95,7 +95,7 @@ test('toddler social practice has two, minus one, and two sign units while famil
     const electronicsGain = electronics.social - baseline.social;
     const familyGain = family.social - baseline.social;
     assert.ok(playGain > 0 && electronicsGain < 0 && familyGain > 0);
-    assert.ok(Math.abs(electronicsGain * -2 - playGain) < 1e-12);
+    assert.ok(Math.abs(electronicsGain * -1 - playGain) < 1e-12);
     assert.ok(Math.abs(familyGain - playGain) < 1e-12);
     assert.equal(family.intelligence, baseline.intelligence);
     assert.equal(Object.hasOwn(toddlerActivityEffects(state).family, 'intelligence'), false);

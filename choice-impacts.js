@@ -1,7 +1,7 @@
-import { annualForecast, effectiveStats, needsEducationChoice, focusLimits, caregivers, JOBS } from './engine.js?v=birth-focus-1';
-import { infantChoiceEffects, wellbeingResponse, toddlerActivityEffects, toddlerActivityNeutral, toddlerActivitySteps, schoolFocusEffects, focusChoiceEffects, focusEffectStrength, standardFocusCoefficients, STANDARD_FOCUS_EFFECTS, TODDLER_FOCUS, TODDLER_ACTIVITY_EFFECTS, PARENT_FAMILY_RELATIONSHIP_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=birth-focus-1';
-import { DEFAULT_FOCUS, focusEffect } from './focus-rules.js?v=birth-focus-1';
-import { changedRating } from './rating-changes.js?v=birth-focus-1';
+import { annualForecast, effectiveStats, needsEducationChoice, focusLimits, caregivers, JOBS } from './engine.js?v=focus-single-1';
+import { infantChoiceEffects, wellbeingResponse, toddlerActivityEffects, toddlerActivityNeutral, schoolFocusEffects, focusChoiceEffects, focusEffectStrength, standardFocusCoefficients, TODDLER_FOCUS, TODDLER_ACTIVITY_EFFECTS, PARENT_FAMILY_STABILITY_GAIN, PARENT_FAMILY_RELATIONSHIP_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=focus-single-1';
+import { DEFAULT_FOCUS, focusEffect } from './focus-rules.js?v=focus-single-1';
+import { changedRating } from './rating-changes.js?v=focus-single-1';
 
 const nonzero = value => Math.abs(value) > .000001;
 const keyOf = entry => `${entry.parentId || 'you'}:${entry.stat}`;
@@ -15,7 +15,7 @@ export function toddlerActivityImpacts(activity) {
     return { stat, change, level };
   });
   // Family time is the only toddler activity that improves parent relationships.
-  if (activity === 'family') impacts.push({ stat: 'relationship', change: PARENT_FAMILY_RELATIONSHIP_GAIN, level: 2, target: 'parents' });
+  if (activity === 'family') impacts.push({ stat: 'relationship', change: PARENT_FAMILY_RELATIONSHIP_GAIN, level: 1, target: 'parents' });
   return impacts;
 }
 
@@ -40,7 +40,7 @@ function toddlerChoiceEntries(state, activity, points, clip) {
   const entries = personalChoiceEntries(state, effects, clip);
   if (activity === 'family') {
     for (const parent of caregivers(state)) {
-      const stability = wellbeingResponse(parent, 'stability', .025 * focusEffect(points));
+      const stability = wellbeingResponse(parent, 'stability', PARENT_FAMILY_STABILITY_GAIN * focusEffect(points));
       const relationship = PARENT_FAMILY_RELATIONSHIP_GAIN * focusEffect(points);
       entries.push({ stat: 'stability', parentId: parent.id, group: 'others', change: clip ? changedRating(parent.stats.stability, stability) - parent.stats.stability : stability });
       entries.push({ stat: 'relationship', parentId: parent.id, group: 'relationships', change: clip ? bounded(parent.relationship, relationship) : relationship });
@@ -56,14 +56,14 @@ export function toddlerChoiceImpacts(state, activity) {
   if (state.age < 2 || state.age >= 5 || !Object.hasOwn(TODDLER_FOCUS, activity) || state.ended || state.alive === false || state.needsSuccession || state.pendingEvents.length || needsEducationChoice(state)) return [];
   const points = Math.max(0, Math.min(focusLimits(state)[activity], state.focus[activity] ?? DEFAULT_FOCUS));
   const entries = toddlerChoiceEntries(state, activity, points, true);
-  return proportionalChoiceEntries(entries, points, entry => entry.parentId ? 2 : focusEffectStrength(TODDLER_ACTIVITY_EFFECTS, activity, entry.stat));
+  return proportionalChoiceEntries(entries, points);
 }
 
 // Each sign represents an equal raw contribution for this activity/person/stat.
 // Aptitude and current-rating response affect the outcome, never this scale.
-function proportionalChoiceEntries(entries, points, strengthFor) {
+function proportionalChoiceEntries(entries, points) {
   return entries.filter(entry => nonzero(entry.change)).map(entry => ({
-    ...entry, level: Math.min(6, Math.abs(focusEffect(points)) * strengthFor(entry)),
+    ...entry, level: Math.abs(focusEffect(points)),
   }));
 }
 
@@ -72,7 +72,7 @@ function schoolChoiceEntries(state, area, points, clip) {
   const entries = personalChoiceEntries(state, schoolFocusEffects(candidate, area), clip);
   if (area === 'family') {
     for (const parent of caregivers(state)) {
-      const stability = wellbeingResponse(parent, 'stability', .025 * focusEffect(points));
+      const stability = wellbeingResponse(parent, 'stability', PARENT_FAMILY_STABILITY_GAIN * focusEffect(points));
       const relationship = PARENT_FAMILY_RELATIONSHIP_GAIN * focusEffect(points);
       entries.push({ stat: 'stability', parentId: parent.id, group: 'others', change: clip ? changedRating(parent.stats.stability, stability) - parent.stats.stability : stability });
       entries.push({ stat: 'relationship', parentId: parent.id, group: 'relationships', change: clip ? bounded(parent.relationship, relationship) : relationship });
@@ -89,7 +89,7 @@ export function schoolChoiceImpacts(state, area) {
       || state.alive === false || state.needsSuccession || state.pendingEvents.length || needsEducationChoice(state)) return [];
   const points = Math.max(0, Math.min(focusLimits(state)[area], state.focus[area] ?? 0));
   const entries = schoolChoiceEntries(state, area, points, true);
-  return proportionalChoiceEntries(entries, points, entry => entry.parentId ? 2 : focusEffectStrength(STANDARD_FOCUS_EFFECTS, area, entry.stat));
+  return proportionalChoiceEntries(entries, points);
 }
 
 function forecastEntries(state, forecast) {
@@ -149,7 +149,7 @@ function adultFocusEntries(state, clip) {
     : stability.change + unemployedStrain;
   const effort = focusEffect(state.focus.family);
   for (const parent of caregivers(state)) {
-    const stability = wellbeingResponse(parent, 'stability', .025 * effort);
+    const stability = wellbeingResponse(parent, 'stability', PARENT_FAMILY_STABILITY_GAIN * effort);
     const relationship = PARENT_FAMILY_RELATIONSHIP_GAIN * effort;
     entries.push({ stat: 'stability', parentId: parent.id, group: 'others', change: clip ? changedRating(parent.stats.stability, stability) - parent.stats.stability : stability });
     entries.push({ stat: 'relationship', parentId: parent.id, group: 'relationships', change: clip ? bounded(parent.relationship, relationship) : relationship });
@@ -158,7 +158,7 @@ function adultFocusEntries(state, clip) {
 }
 
 function adultFocusLevel(state, entry) {
-  if (entry.parentId) return 2 * Math.abs(focusEffect(state.focus.family));
+  if (entry.parentId) return Math.abs(focusEffect(state.focus.family));
   const career = JOBS.find(job => job.id === state.jobId);
   const coefficients = standardFocusCoefficients(state, career);
   if (!career && state.education.status !== 'college' && focusEffect(state.focus.work) > 0) coefficients.work.stability -= .15;

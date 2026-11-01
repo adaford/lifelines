@@ -1,22 +1,22 @@
 // Lifelines: deterministic, browser-independent simulation rules.
 // All public actions mutate their state and return { ok, reason? }.
-import { JOBS } from './jobs.js?v=birth-focus-1';
-import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=birth-focus-1';
-import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=birth-focus-1';
-import { mortalityRisk, rollMortality } from './mortality.js?v=birth-focus-1';
-import { heightReference, advanceGrowth } from './growth.js?v=birth-focus-1';
-import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=birth-focus-1';
-import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, standardFocusPractice, DEVELOPMENT_BALANCE, BIRTH_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=birth-focus-1';
-import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=birth-focus-1';
-import { normalPercentile } from './percentiles.js?v=birth-focus-1';
-import { changedRating } from './rating-changes.js?v=birth-focus-1';
-import { MAX_FOCUS, DEFAULT_FOCUS, focusEffect, focusKeysForAge, focusBudget, defaultFocus, legacyFocusValue } from './focus-rules.js?v=birth-focus-1';
-import { assignBirthConditions, getBirthConditions, conditionFocusLimits, validateBirthConditions } from './birth-conditions.js?v=birth-focus-1';
+import { JOBS } from './jobs.js?v=focus-single-1';
+import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=focus-single-1';
+import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=focus-single-1';
+import { mortalityRisk, rollMortality } from './mortality.js?v=focus-single-1';
+import { heightReference, advanceGrowth } from './growth.js?v=focus-single-1';
+import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=focus-single-1';
+import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, standardFocusPractice, DEVELOPMENT_BALANCE, BIRTH_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, PARENT_FAMILY_STABILITY_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=focus-single-1';
+import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=focus-single-1';
+import { normalPercentile } from './percentiles.js?v=focus-single-1';
+import { changedRating } from './rating-changes.js?v=focus-single-1';
+import { MAX_FOCUS, DEFAULT_FOCUS, focusEffect, focusKeysForAge, focusBudget, defaultFocus, legacyFocusValue } from './focus-rules.js?v=focus-single-1';
+import { assignBirthConditions, getBirthConditions, conditionFocusLimits, validateBirthConditions } from './birth-conditions.js?v=focus-single-1';
 export { DEVELOPMENT_BALANCE };
-export { heightPercentile } from './growth.js?v=birth-focus-1';
-export { mortalityRisk } from './mortality.js?v=birth-focus-1';
-import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=birth-focus-1';
-export { JOBS, JOB_CATEGORIES } from './jobs.js?v=birth-focus-1';
+export { heightPercentile } from './growth.js?v=focus-single-1';
+export { mortalityRisk } from './mortality.js?v=focus-single-1';
+import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=focus-single-1';
+export { JOBS, JOB_CATEGORIES } from './jobs.js?v=focus-single-1';
 export const EVENTS = [...PERSONAL_EVENTS, ...FAMILY_EVENTS];
 
 export const SKILLS = [
@@ -493,7 +493,7 @@ function growYear(state) {
   }
   if (studying) state.schoolProgress = round(clamp(state.schoolProgress + legacyFocusValue(f.work) * .9, 0, 100));
   for (const parent of caregivers(state)) {
-    addStat(parent, 'stability', .08 * (5 - parent.stats.stability) + wellbeingResponse(parent, 'stability', focusEffect(f.family) * .025));
+    addStat(parent, 'stability', .08 * (5 - parent.stats.stability) + wellbeingResponse(parent, 'stability', focusEffect(f.family) * PARENT_FAMILY_STABILITY_GAIN));
     parent.relationship = round(clamp(parent.relationship + focusEffect(f.family) * PARENT_FAMILY_RELATIONSHIP_GAIN, 0, 10));
   }
 }
