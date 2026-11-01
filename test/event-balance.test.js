@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { EVENTS } from '../events.js';
 import { FAMILY_EVENTS } from '../family-events.js';
 import { createGame, advanceYear, effectiveStats, validateSave, migrateSave } from '../engine.js';
+import { changedRating } from '../rating-changes.js';
 
 const event = id => EVENTS.find(entry => entry.id === id);
 
@@ -20,14 +21,15 @@ test('ordinary discoveries and connections give modest lasting gains across life
   assert.ok(timedPositiveStats.length <= 10, 'ordinary gains should mostly be permanent');
 });
 
-test('time-limited wellbeing, lifestyle, restrictions and serious setbacks retain their purpose', () => {
-  assert.deepEqual(event('soothing_routine').modifiers, { stability: .3 });
-  assert.deepEqual(event('healthy_stretch').modifiers, { health: .3, stability: .2 });
-  assert.equal(event('work_idea').lifestyle, 1);
-  assert.equal(event('work_idea').years, 2);
+test('new wellbeing and material events are permanent while injuries retain activity limits', () => {
+  assert.deepEqual(event('soothing_routine').statChanges, { stability: .3 });
+  assert.deepEqual(event('healthy_stretch').statChanges, { strength: .2, stability: .2 });
+  assert.equal(event('work_idea').lifestyle, undefined);
+  assert.equal(event('work_idea').years, 0);
   assert.equal(event('broken_bone').focusLimits.toddler.work, 2);
-  assert.deepEqual(event('injury').modifiers, { strength: -1, health: -.7 });
-  assert.deepEqual(FAMILY_EVENTS.find(entry => entry.id === 'household_parent_abandonment').modifiers,
+  assert.deepEqual(event('injury').statChanges, { attractiveness: -.1 });
+  assert.equal(event('injury').focusLimits.toddler.work, 2);
+  assert.deepEqual(FAMILY_EVENTS.find(entry => entry.id === 'household_parent_abandonment').playerChanges,
     { stability: -3, social: -1.5, health: -1 });
 });
 
@@ -48,7 +50,7 @@ test('a backyard invention records permanent two-tenths gains without creating a
   for (const key of ['intelligence', 'creativity']) {
     const values = recorded.text.match(new RegExp(`Your ${key} (\\d+(?:\\.\\d+)?) → (\\d+(?:\\.\\d+)?)`));
     assert.ok(values, `${key} has a permanent before/after result`);
-    assert.ok(Math.abs(Number(values[2]) - Number(values[1]) - .2) < .001);
+    assert.equal(Number(values[2]), changedRating(Number(values[1]), .2));
   }
   assert.equal(found.effects.some(effect => effect.id === 'treehouse'), false);
   assert.equal(validateSave(found), true);

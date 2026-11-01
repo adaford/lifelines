@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises';
 import { afterEach, describe, test } from 'node:test';
 import { parseHTML } from 'linkedom';
 import { toLegacyCentimeters, stripWellbeingAptitudes, legacyRatingFloor } from './helpers/legacy-height.js';
+import { changedRating } from '../rating-changes.js';
 import { choiceImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from '../choice-impacts.js';
 import { SKILLS, JOBS, EVENTS, resolveEventChoice, eventOdds, canTakeJob, chooseEducation, offeredJobs, needsEducationChoice, createGame, advanceYear, annualForecast, haveChild, takeJob, successionInfo, succeed, validateSave, respondToEncounter, proposeMarriage, effectiveStats, relationshipOdds, proposalChance, statPercentiles } from '../engine.js';
 
@@ -63,7 +64,7 @@ test('health, appearance, growth, crying, and household help contain the request
     ['height',/Final height emerges from yearly growth.*14–18.*Poor health reduces new growth, never existing height/],
     ['attractiveness',/tiny random changes each year.*rather than gains from practice.*after 30 for men and 22 for women/],
     ['cry',/relationships tend to fall at levels 1–2, stay steady at 3, and rise at 4–5.*yearly variation.*Harder crying strains their mental stability more/],
-    ['lifestyle',/Until 18.*parents.*changing household lifestyle.*adult.*work, family, events and inheritance/],
+    ['lifestyle',/Until 18.*parents.*changing household lifestyle.*adult.*work, family and inheritance/],
   ];
   for(const [topic,content] of topics) {
     ui.click(`.nav-list [data-tab="${'year'}"]`);
@@ -800,7 +801,7 @@ test('every displayed option applies its own lasting consequences without advanc
     assert.equal(saved.age,fixture.age);
     assert.equal(saved.pendingEvents.length,0);
     for(const [key,change] of Object.entries(choice.statChanges||{})) {
-      const expected=Math.round(Math.max(1,Math.min(10,fixture.stats[key]+change))*100)/100;
+      const expected=changedRating(fixture.stats[key],change);
       assert.equal(saved.stats[key],expected);
     }
     assert.ok(saved.history.some(memory=>memory.text.includes(choice.label)));
@@ -1237,7 +1238,9 @@ describe('Dating and family DOM integration', {concurrency:false},()=>{
   });
 
   test('a v4 save preserves pending decisions and progress through the family update',async()=>{
-    const fixture=pendingFixture(2),legacy=beforeFamilySave(fixture);
+    const fixture=pendingFixture(2);
+    legacyRatingFloor(fixture);
+    const legacy=beforeFamilySave(fixture);
     let ui=await mount(legacy);
     const restored=ui.saved();
     assert.equal(restored.version,fixture.version);
@@ -2379,11 +2382,11 @@ test('activity signs compare possible allocations rather than fixed numerical ga
     const fixture=ageTo(createGame({seed:121}),3);
     fixture.effects=[];
     fixture.aptitudes.strength=aptitude;
-    fixture.stats.strength=5+.8*aptitude;
+    fixture.stats.strength=5;
     fixture.focus={work:5,social:0,family:0,self:0,creative:0};
     const ui=await mount(fixture),before=ui.saved();
     maximumGains.push(toddlerChoiceImpacts(before,'work').find(entry=>entry.stat==='strength').change);
-    assert.equal(ui.query('.choice-impact[data-stat="strength"]:not([data-parent-id]) b').textContent,'+++','maximum Play is the strongest gain for either aptitude');
+    assert.equal(ui.query('.choice-impact[data-stat="strength"]:not([data-parent-id]) b').textContent,'++','maximum Play is two contribution steps for either aptitude');
     ui.click('[data-action="focus"][data-key="work"][data-delta="-1"]');
     assert.equal(ui.query('.choice-impact[data-stat="strength"]:not([data-parent-id]) b').textContent,'+','one fewer Play point is one step above neutral');
     assert.deepEqual(ui.saved().stats,before.stats);
@@ -2410,8 +2413,8 @@ test('school and college decisions show signed effects inside each choice and up
     ui.click('[data-action="focus"][data-key="social"][data-delta="-1"]');
     ui.click('[data-action="focus"][data-key="work"][data-delta="1"]');
     assertChoiceImpacts(ui);
-    assert.equal(ui.query('.focus-row[data-focus-key="work"] [data-stat="intelligence"] b').textContent,'+++');
-    assert.equal(ui.query('.focus-row[data-focus-key="work"] [data-stat="stability"] b').textContent,'---');
+    assert.equal(ui.query('.focus-row[data-focus-key="work"] [data-stat="intelligence"] b').textContent,'++');
+    assert.equal(ui.query('.focus-row[data-focus-key="work"] [data-stat="stability"] b').textContent,'--');
     assert.deepEqual(ui.saved().stats,before.stats);
     assert.deepEqual(ui.saved().parents,before.parents);
     assert.equal(ui.saved().rng,before.rng);
@@ -2464,7 +2467,7 @@ test('lifestyle never appears in expected changes even when household or adult l
     const ui=await mount(fixture),before=ui.saved();
     assert.equal(ui.all('.choice-impact[data-stat="lifestyle"]').length,0,`age ${age} hides all expected Lifestyle entries`);
     assert.equal(ui.query('.profile-lifestyle .status-value').textContent,'9.0/10','the current rating remains visible');
-    assert.ok(ui.all('.choice-impact').length>0,'other expected changes remain visible');
+    if(age!==3) assert.ok(ui.all('.choice-impact').length>0,'other expected changes remain visible');
     assert.deepEqual(ui.saved(),before);
     assert.equal(ui.saved().rng,fixture.rng);
   }
@@ -2477,7 +2480,7 @@ test('Electronics and crafts show the expected signs at every allocation', async
   fixture.stats.social=5;
   fixture.stats.intelligence=5;
   const ui=await mount(fixture),before=ui.saved();
-  const social=['+++','++','+',null,'-','--'];
+  const social=['++','+',null,'-','--','---'];
   const intelligence=['--','-',null,'+','++','+++'];
   const signs=stat=>ui.document.querySelector(`.focus-row[data-focus-key="social"] .choice-impact[data-stat="${stat}"] b`)?.textContent ?? null;
   for(let points=0;points<=5;points++) {
@@ -2493,9 +2496,9 @@ test('Electronics and crafts show the expected signs at every allocation', async
   }
   for(let points=0;points<=5;points++) {
     const craftSigns=ui.document.querySelector('.focus-row[data-focus-key="creative"] .choice-impact[data-stat="intelligence"] b')?.textContent ?? null;
-    assert.equal(craftSigns,intelligence[points],`Arts & crafts ${points}: intelligence`);
+    assert.equal(craftSigns,['-','-',null,'+','+','++'][points],`Arts & crafts ${points}: intelligence`);
     const creativity=ui.document.querySelector('.focus-row[data-focus-key="creative"] .choice-impact[data-stat="creativity"] b')?.textContent ?? null;
-    assert.equal(creativity,['---','-',null,'+','++','+++'][points],`Arts & crafts ${points}: creativity`);
+    assert.equal(creativity,['--','-',null,'+','++','+++'][points],`Arts & crafts ${points}: creativity`);
     if(points<5) ui.click('[data-action="focus"][data-key="creative"][data-delta="1"]');
   }
   assert.deepEqual(ui.saved().stats,before.stats);

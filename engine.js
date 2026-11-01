@@ -1,19 +1,20 @@
 // Lifelines: deterministic, browser-independent simulation rules.
 // All public actions mutate their state and return { ok, reason? }.
-import { JOBS } from './jobs.js?v=stat-buffs-balance-1';
-import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=stat-buffs-balance-1';
-import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=stat-buffs-balance-1';
-import { mortalityRisk, rollMortality } from './mortality.js?v=stat-buffs-balance-1';
-import { heightReference, advanceGrowth } from './growth.js?v=stat-buffs-balance-1';
-import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=stat-buffs-balance-1';
-import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, DEVELOPMENT_BALANCE, BIRTH_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=stat-buffs-balance-1';
-import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=stat-buffs-balance-1';
-import { normalPercentile } from './percentiles.js?v=stat-buffs-balance-1';
+import { JOBS } from './jobs.js?v=permanent-cross-stat-1';
+import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=permanent-cross-stat-1';
+import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=permanent-cross-stat-1';
+import { mortalityRisk, rollMortality } from './mortality.js?v=permanent-cross-stat-1';
+import { heightReference, advanceGrowth } from './growth.js?v=permanent-cross-stat-1';
+import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=permanent-cross-stat-1';
+import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, DEVELOPMENT_BALANCE, BIRTH_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=permanent-cross-stat-1';
+import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=permanent-cross-stat-1';
+import { normalPercentile } from './percentiles.js?v=permanent-cross-stat-1';
+import { changedRating } from './rating-changes.js?v=permanent-cross-stat-1';
 export { DEVELOPMENT_BALANCE };
-export { heightPercentile } from './growth.js?v=stat-buffs-balance-1';
-export { mortalityRisk } from './mortality.js?v=stat-buffs-balance-1';
-import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=stat-buffs-balance-1';
-export { JOBS, JOB_CATEGORIES } from './jobs.js?v=stat-buffs-balance-1';
+export { heightPercentile } from './growth.js?v=permanent-cross-stat-1';
+export { mortalityRisk } from './mortality.js?v=permanent-cross-stat-1';
+import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=permanent-cross-stat-1';
+export { JOBS, JOB_CATEGORIES } from './jobs.js?v=permanent-cross-stat-1';
 export const EVENTS = [...PERSONAL_EVENTS, ...FAMILY_EVENTS];
 
 export const SKILLS = [
@@ -88,7 +89,7 @@ function log(state, title, text, kind = 'neutral', description) {
   state.history.unshift({ id: uid(state, 'memory'), age: state.age, generation: state.generation, title, text, kind, ...(description === undefined ? {} : { description }) });
   state.history = state.history.slice(0, 500);
 }
-function addStat(person, key, amount) { person.stats[key] = round(clamp(person.stats[key] + amount, 0, 10)); }
+function addStat(person, key, amount) { person.stats[key] = changedRating(person.stats[key], amount); }
 function developSkills(person, context = person, career = null, practiceScale = YEARLY_DECISION_SCALE) {
   for (const [key, amount] of Object.entries(skillChanges(context, career, practiceScale))) addStat(person, key, amount);
 }
@@ -591,21 +592,36 @@ export function pendingEventSubject(state, pending) {
 }
 function applyOutcome(state, event, outcome = event, context = {}) {
   const subject = pendingEventSubject(state, context);
-  const before = { stats: effectiveStats(state), lifestyle: state.lifestyle, subjectStats: subject ? { ...subject.stats } : {}, relationship: subject?.relationship };
+  const before = { stats: effectiveStats(state), aptitudes: { ...state.aptitudes }, lifestyle: state.lifestyle, subjectStats: subject ? { ...subject.stats } : {}, relationship: subject?.relationship };
   const key = eventKey({ eventId: event.id, ...context });
   const description = (outcome.description || event.description).replaceAll('{name}', subject?.name || 'Your family member');
-  for (const [key, amount] of Object.entries(outcome.statChanges || {})) addStat(state, key, amount);
-  for (const [key, amount] of Object.entries(outcome.playerChanges || {})) addStat(state, key, amount);
+  // Newly received effects are permanent. Keep the modifier engine below for
+  // existing saves and future use, but never create a new timed stat/lifestyle
+  // bonus or penalty while this mode is disabled.
+  const timedStatsEnabled = false;
+  const permanent = {};
+  for (const source of [outcome.statChanges, outcome.playerChanges, timedStatsEnabled ? null : outcome.modifiers]) {
+    for (const [key, amount] of Object.entries(source || {})) permanent[key] = (permanent[key] || 0) + amount;
+  }
+  if (!timedStatsEnabled && outcome.lifestyle) permanent.stability = (permanent.stability || 0) + .2 * outcome.lifestyle;
+  for (const [key, amount] of Object.entries(permanent)) addStat(state, key, amount);
+  for (const [key, amount] of Object.entries(outcome.aptitudeChanges || {})) {
+    if (STAT_KEYS.includes(key) && Number.isInteger(amount)) state.aptitudes[key] = clamp(state.aptitudes[key] + amount, -3, 3);
+  }
   if (subject && subject !== state) {
     for (const [key, amount] of Object.entries(outcome.subjectChanges || {})) addStat(subject, key, amount);
     if (outcome.relationship) subject.relationship = round(clamp(subject.relationship + outcome.relationship, 0, 10));
   }
   const afterPermanent = effectiveStats(state);
   let temporaryYears = 0;
-  if (outcome.years > 0 && (Object.keys(outcome.modifiers || {}).length || outcome.lifestyle || outcome.focusLimits)) {
-    const old = state.effects.find(effect => effect.id === key);
-    const effect = { id: key, name: `${context.subjectId ? `${subject.name}: ` : ''}${event.name}`, description, years: Math.max(old?.years || 0, outcome.years), modifiers: { ...outcome.modifiers }, kind: event.kind };
-    if (outcome.lifestyle) effect.lifestyle = outcome.lifestyle;
+  if (outcome.years > 0 && (timedStatsEnabled && (Object.keys(outcome.modifiers || {}).length || outcome.lifestyle) || outcome.focusLimits)) {
+    // A new restriction must not overwrite a still-running legacy stat bonus
+    // with the same event ID.
+    const legacyStatEffect = state.effects.some(effect => effect.id === key && (Object.values(effect.modifiers).some(Boolean) || effect.lifestyle));
+    const restrictionKey = !timedStatsEnabled && legacyStatEffect ? `${key}:limits` : key;
+    const old = state.effects.find(effect => effect.id === restrictionKey);
+    const effect = { id: restrictionKey, name: `${context.subjectId ? `${subject.name}: ` : ''}${event.name}`, description, years: Math.max(old?.years || 0, outcome.years), modifiers: timedStatsEnabled ? { ...outcome.modifiers } : {}, kind: event.kind };
+    if (timedStatsEnabled && outcome.lifestyle) effect.lifestyle = outcome.lifestyle;
     if (outcome.focusLimits) effect.focusLimits = clone(outcome.focusLimits);
     if (old) {
       delete old.focusLimits;
@@ -617,17 +633,21 @@ function applyOutcome(state, event, outcome = event, context = {}) {
   clampFocusToLimits(state);
   syncFamilyLifestyles(state);
   const label = key => SKILLS.find(skill => skill.key === key)?.label || ({ health: 'Health', stability: 'Mental stability' }[key]);
-  const keys = new Set([...Object.keys(outcome.statChanges || {}), ...Object.keys(outcome.playerChanges || {})]);
+  const keys = new Set(Object.keys(permanent));
   const changes = [...keys].map(key => `Your ${label(key).toLowerCase()} ${before.stats[key]} → ${afterPermanent[key]}`);
+  const signedAptitude = value => `${value > 0 ? '+' : ''}${value}`;
+  for (const key of Object.keys(outcome.aptitudeChanges || {})) {
+    if (STAT_KEYS.includes(key)) changes.push(`Your ${label(key).toLowerCase()} learning ability ${signedAptitude(before.aptitudes[key])} → ${signedAptitude(state.aptitudes[key])}`);
+  }
   const signed = amount => `${amount > 0 ? '+' : '-'}${Math.abs(amount).toFixed(1).replace(/^0\./, '.')}`;
-  if (temporaryYears) for (const [key, amount] of Object.entries(outcome.modifiers || {})) {
+  if (timedStatsEnabled && temporaryYears) for (const [key, amount] of Object.entries(outcome.modifiers || {})) {
     if (amount) changes.push(`${signed(amount)} ${label(key)}`);
   }
   if (subject && subject !== state) {
     for (const key of Object.keys(outcome.subjectChanges || {})) changes.push(`${subject.name}: ${label(key)} ${before.subjectStats[key]} → ${subject.stats[key]}`);
     if (outcome.relationship) changes.push(`${subject.name}: Relationship ${before.relationship} → ${subject.relationship}`);
   }
-  if (temporaryYears && outcome.lifestyle && state.age >= 18) changes.push(`${signed(outcome.lifestyle)} Lifestyle`);
+  if (timedStatsEnabled && temporaryYears && outcome.lifestyle && state.age >= 18) changes.push(`${signed(outcome.lifestyle)} Lifestyle`);
   const decision = outcome === event ? '' : `${outcome.label}. `;
   const result = changes.length ? `${changes.join('; ')}.` : 'No stat changes.';
   const duration = temporaryYears ? ` Temporary effects: ${temporaryYears} ${temporaryYears === 1 ? 'year' : 'years'}.` : '';
@@ -721,7 +741,7 @@ function routineYear(state, growthRandom, careerRandom) {
       const draw = growthRandom();
       const wellbeing = key === 'health' || key === 'stability';
       const sd = Math.abs(change) * (wellbeing ? .25 : key === 'attractiveness' ? .3 : .2) + (wellbeing ? .02 : key === 'attractiveness' ? .04 : .06);
-      person.stats[key] = round(clamp(previous.stats[key] + change + clamp(draw, -3, 3) * sd, 0, 10));
+      addStat(person, key, clamp(draw, -3, 3) * sd);
     }
     if (Number.isFinite(previous.relationship) && person.abandonedAt === undefined) {
       const change = person.relationship - previous.relationship;
@@ -1119,7 +1139,10 @@ function validSchema(raw, version) {
       const keys = stage === 'toddler' ? [...FOCUS_KEYS, 'creative'] : stage === 'standard' ? FOCUS_KEYS : null;
       return keys && caps && typeof caps === 'object' && !Array.isArray(caps) && Object.keys(caps).length > 0 && Object.entries(caps).every(([key, max]) => keys.includes(key) && Number.isInteger(max) && finite(max, 0, 5));
     });
-    if (!Array.isArray(raw.effects) || raw.effects.length > (legacy ? 10 : version >= 15 ? 27 : 25) || !raw.effects.every(effect => text(effect.id, 100) && text(effect.name, 100) && typeof effect.description === 'string' && Number.isInteger(effect.years) && finite(effect.years, 1, legacy ? 3 : 5) && effect.modifiers && Object.entries(effect.modifiers).every(([key, value]) => statKeys.includes(key) && finite(value, -10, 10)) && (effect.lifestyle === undefined || !legacy && Number.isInteger(effect.lifestyle) && finite(effect.lifestyle, -10, 10)) && (effect.focusLimits === undefined || version >= 14 && validLimits(effect.focusLimits)))) return false;
+    // New restrictions can coexist with the full legacy modifier history while
+    // those old effects expire. This expands capacity without changing records.
+    const effectCapacity = version >= 16 ? 64 : legacy ? 10 : version >= 15 ? 27 : 25;
+    if (!Array.isArray(raw.effects) || raw.effects.length > effectCapacity || !raw.effects.every(effect => text(effect.id, 100) && text(effect.name, 100) && typeof effect.description === 'string' && Number.isInteger(effect.years) && finite(effect.years, 1, legacy ? 3 : 5) && effect.modifiers && Object.entries(effect.modifiers).every(([key, value]) => statKeys.includes(key) && finite(value, -10, 10)) && (effect.lifestyle === undefined || !legacy && Number.isInteger(effect.lifestyle) && finite(effect.lifestyle, -10, 10)) && (effect.focusLimits === undefined || version >= 14 && validLimits(effect.focusLimits)))) return false;
     if (version >= 14 && focusLimitViolation(raw)) return false;
     if (!legacy) {
       const knownKey = key => typeof key === 'string' && (PERSONAL_EVENTS.some(event => event.id === key) || version >= 5 && FAMILY_EVENTS.some(event => key.startsWith(`${event.id}:`) && key.length <= 200));

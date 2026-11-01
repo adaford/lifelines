@@ -1,3 +1,4 @@
+import { changedRating } from '../rating-changes.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { infantChoiceEffects } from '../development.js';
@@ -101,7 +102,7 @@ test('mean attractiveness stays at its initial level and declines only after the
     finishChoices(adult);
     adult.stats.attractiveness = 7;
     adult.effects = [];
-    assert.equal(annualForecast(adult).stats.attractiveness.change, -.06);
+    assert.equal(annualForecast(adult).stats.attractiveness.after, changedRating(7, -.06));
     assert.equal(adult.appearancePeakAge, threshold);
   }
 });
@@ -118,7 +119,7 @@ test('crying has neutral parent mental stability at two and distinct increasing 
       const forecast = annualForecast(state);
       assert.deepEqual(state, before, 'reading every cry forecast preserves ratings, history, and RNG');
       assert.deepEqual(annualForecast(state), forecast);
-      assert.ok(forecast.parents.every(parent => parent.stability.change === expected[level - 1]));
+      assert.ok(forecast.parents.every(parent => parent.stability.change === round(changedRating(7, expected[level - 1]) - 7)));
       assert.ok(forecast.parents.every(parent => parent.relationship.change === round(.1 * (level - 3))));
       advanceQuietMean(state);
       assert.deepEqual(state.lastYearEvents, [], 'quiet fixture isolates routine development');

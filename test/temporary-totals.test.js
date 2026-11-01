@@ -1,3 +1,4 @@
+import { changedRating } from '../rating-changes.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createGame, effectiveStats, annualForecast, advanceYear, EVENTS, resolveEventChoice, migrateSave, validateSave, haveChild, succeed } from '../engine.js';
@@ -41,7 +42,7 @@ test('out-of-range effective reviews survive expiration and a save round trip', 
   assert.deepEqual(migrateSave(structuredClone(state)), state);
 });
 
-test('mixed event results distinguish permanent gains from refreshed temporary amounts', () => {
+test('new event results merge permanent gains and preserve existing temporary amounts', () => {
   const state = createGame({ seed: 8404 });
   state.age = 8;
   state.stats.intelligence = 8.4;
@@ -53,9 +54,11 @@ test('mixed event results distinguish permanent gains from refreshed temporary a
   event.choices = [{ id: 'test', label: 'Join', description: 'A test.', statChanges: { intelligence: .2 }, modifiers: { intelligence: .3 }, years: 2 }];
   try {
     assert.equal(resolveEventChoice(state, 'test', event.id).ok, true);
-    assert.equal(state.stats.intelligence, 8.6);
-    assert.equal(effectiveStats(state).intelligence, 8.9);
-    assert.match(state.history[0].text, /Your intelligence 8\.9 → 9\.1; \+\.3 Intelligence\. Temporary effects: 2 years/);
+    assert.equal(state.stats.intelligence, changedRating(8.4, .5));
+    assert.equal(effectiveStats(state).intelligence, Math.round((changedRating(8.4, .5) + .5) * 100) / 100);
+    assert.match(state.history[0].text, /Your intelligence 8\.9 → /);
+    assert.doesNotMatch(state.history[0].text, /Temporary effects/);
+    assert.deepEqual(state.effects[0].modifiers, { intelligence: .5 });
     assert.equal(state.effects.length, 1);
   } finally { event.choices = original; }
 });

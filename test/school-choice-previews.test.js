@@ -51,7 +51,7 @@ test('school and college show each choice contribution with toddler-style relati
       assert.deepEqual(entries.map(entry => entry.stat).sort(), points === 3 ? [] : Object.keys(affected).sort(), `${age} ${area} ${points} includes only the choice's stats`);
       for (const entry of entries) {
         assert.equal(Math.sign(entry.change), Math.sign(points - 3) * affected[entry.stat]);
-        assert.equal(entry.level, [3, 2, 1, 0, 1, 3][points], `${age} ${area} ${points} ${entry.stat}`);
+        assert.equal(entry.level, [3, 2, 1, 0, 1, 2][points], `${age} ${area} ${points} ${entry.stat}`);
       }
       assert.deepEqual(candidate, before, 'comparison does not mutate choices, saves, or RNG');
     }
@@ -72,7 +72,7 @@ test('school contribution magnitudes include halved practice and stress without 
   }
   const initial = schoolChoiceImpacts(low, 'work');
   low.parents.forEach(parent => { parent.career.status = 'unemployed'; parent.stats.stability = 1; });
-  low.stats.intelligence = 4;
+  low.stats.intelligence = 5;
   low.stats.health = 1;
   low.focus.social = 0;
   low.focus.family = 0;
@@ -94,8 +94,8 @@ test('Family previews retain school caregiver neutral points and follow guardian
       const relationship = entries.find(entry => entry.parentId === parent.id && entry.stat === 'relationship');
       if (points === 3) assert.equal(stability, undefined);
       else {
-        assert.ok(Math.abs(stability.change - (points - 3) * .0125) < 1e-10);
-        assert.equal(stability.level, [3, 2, 1, 0, 1, 3][points]);
+        assert.ok(Math.abs(stability.change - (Math.round((5 + (points - 3) * .0125) * 100) / 100 - 5)) < 1e-10);
+        assert.equal(stability.level, [3, 2, 1, 0, 1, 2][points]);
       }
       if (points === 2) assert.equal(relationship, undefined);
       else {
@@ -124,7 +124,7 @@ test('school rows respect active caps and rating limits without reranking signs'
   state.stats.intelligence = 9.99;
   let entry = schoolChoiceImpacts(state, 'work').find(entry => entry.stat === 'intelligence');
   assert.ok(entry.change > 0 && entry.change < .02);
-  assert.equal(entry.level, 3);
+  assert.equal(entry.level, 2);
   state.stats.intelligence = 10;
   assert.ok(!schoolChoiceImpacts(state, 'work').some(entry => entry.stat === 'intelligence'));
   state.stats.intelligence = 9;

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createGame, migrateSave, annualForecast } from '../engine.js';
-import { TODDLER_FOCUS, TODDLER_ACTIVITY_EFFECTS, toddlerActivityNeutral } from '../development.js';
+import { TODDLER_FOCUS, TODDLER_ACTIVITY_EFFECTS, toddlerActivityNeutral, skillChanges } from '../development.js';
 import { toddlerChoiceImpacts, toddlerActivityImpacts, choiceImpacts } from '../choice-impacts.js';
 
 function toddler() {
@@ -35,13 +35,13 @@ function selected(state, activity, points) {
 
 test('activity previews show half-strength gains and losses without changing relative signs', () => {
   const cases = [
-    ['work', 5, 'strength', .12, 3],
+    ['work', 5, 'strength', .12, 2],
     ['work', 0, 'strength', -.17, 3],
-    ['social', 0, 'social', .03, 3],
+    ['social', 0, 'social', .02, 2],
     ['social', 5, 'intelligence', .16, 3],
-    ['creative', 0, 'intelligence', -.03, 2],
+    ['creative', 0, 'intelligence', -.02, 1],
     ['creative', 5, 'creativity', .19, 3],
-    ['self', 5, 'health', .1, 3],
+    ['self', 5, 'health', .1, 2],
     ['self', 0, 'stability', -.12, 3],
     ['family', 5, 'stability', .05, 3],
   ];
@@ -61,7 +61,7 @@ test('activity previews show half-strength gains and losses without changing rel
       if (points === 2) assert.equal(relationship, undefined);
       else assert.ok(Math.abs(relationship.change - (points - 2) * .04) < 1e-10);
       if (points === 2) assert.equal(stability, undefined);
-      else assert.ok(Math.abs(stability.change - (points - 2) * .0125) < 1e-10);
+      else assert.ok(Math.abs(stability.change - (Math.round((5 + (points - 2) * .0125) * 100) / 100 - 5)) < 1e-10);
     }
   }
 });
@@ -102,7 +102,7 @@ test('crying previews halve personal and caregiver effects once and match the an
 
 test('Play shows only its own skill contribution below and above the balanced allocation', () => {
   const state = toddler();
-  const expected = [[-1, 3], [-1, 2], [-1, 1], null, [1, 1], [1, 3]];
+  const expected = [[-1, 3], [-1, 2], [-1, 1], null, [1, 1], [1, 2]];
   for (let points = 0; points <= 5; points++) {
     const entries = toddlerChoiceImpacts(selected(state, 'work', points), 'work');
     if (!expected[points]) {
@@ -123,32 +123,39 @@ test('Play shows only its own skill contribution below and above the balanced al
   assert.deepEqual(entries.map(entry => entry.stat), ['strength', 'social'], 'household changes, wellbeing reversion and unused-point rest do not belong to Play');
 });
 
-test('Electronics social costs begin above three and zero crafts shows the strongest creativity loss', () => {
-  const state = toddler();
-  const low = toddlerChoiceImpacts(selected(state, 'social', 0), 'social');
-  assert.equal(Math.sign(low.find(entry => entry.stat === 'intelligence').change), -1);
-  assert.equal(Math.sign(low.find(entry => entry.stat === 'social').change), 1);
-  assert.equal(low.find(entry => entry.stat === 'social').level, 3);
-  assert.equal(low.find(entry => entry.stat === 'intelligence').level, 2);
-  assert.equal(toddlerChoiceImpacts(selected(state, 'social', 1), 'social').find(entry => entry.stat === 'social').level, 2);
-  assert.deepEqual(toddlerChoiceImpacts(state, 'social').map(entry => [entry.stat, entry.level]), [['social', 1]]);
-  for (const points of [3, 4, 5]) {
-    const entries = toddlerChoiceImpacts(selected(state, 'social', points), 'social');
-    assert.equal(entries.find(entry => entry.stat === 'intelligence').level, points - 2);
-    const social = entries.find(entry => entry.stat === 'social');
-    if (points === 3) assert.equal(social, undefined);
-    else {
-      assert.ok(social.change < 0);
-      assert.equal(social.level, points - 3);
+test('Electronics and crafts use the requested signs across all six allocations', () => {
+  const state = toddler(), before = structuredClone(state);
+  const expected = {
+    social: { social: ['++', '+', '', '-', '--', '---'], intelligence: ['--', '-', '', '+', '++', '+++'] },
+    creative: { creativity: ['--', '-', '', '+', '++', '+++'], intelligence: ['-', '-', '', '+', '+', '++'] },
+  };
+  for (const [activity, stats] of Object.entries(expected)) for (let points = 0; points <= 5; points++) {
+    const entries = toddlerChoiceImpacts(selected(state, activity, points), activity);
+    for (const [stat, signs] of Object.entries(stats)) {
+      const entry = entries.find(entry => entry.stat === stat);
+      assert.equal(entry ? (entry.change > 0 ? '+' : '-').repeat(entry.level) : '', signs[points], `${activity} ${points}: ${stat}`);
     }
   }
-  const crafts = toddlerChoiceImpacts(selected(state, 'creative', 5), 'creative');
-  assert.equal(crafts.find(entry => entry.stat === 'intelligence').level, 3);
-  assert.equal(crafts.find(entry => entry.stat === 'creativity').level, 3);
-  const noCrafts = toddlerChoiceImpacts(selected(state, 'creative', 0), 'creative').find(entry => entry.stat === 'intelligence');
-  assert.ok(noCrafts.change < 0);
-  assert.equal(noCrafts.level, 2);
-  assert.equal(toddlerChoiceImpacts(selected(state, 'creative', 0), 'creative').find(entry => entry.stat === 'creativity').level, 3);
+  assert.deepEqual(state, before, 'reading each allocation preserves stats and RNG');
+});
+
+test('toddler skill changes are proportional to displayed signs before aptitude and boundary response', () => {
+  const state = toddler();
+  for (const [activity, coefficients] of Object.entries(TODDLER_ACTIVITY_EFFECTS)) {
+    for (const stat of ['intelligence', 'strength', 'social', 'creativity'].filter(stat => coefficients[stat])) {
+      const baseline = { ...state, focus: { work: 0, social: 0, family: 0, self: 0, creative: 0, [activity]: 2 } };
+      baseline.focus[activity] = toddlerActivityNeutral(activity, stat);
+      const neutral = skillChanges(baseline)[stat];
+      for (let points = 0; points <= 5; points++) {
+        const candidate = { ...baseline, focus: { ...baseline.focus, [activity]: points } };
+        const actual = skillChanges(candidate)[stat] - neutral;
+        const entry = toddlerChoiceImpacts(candidate, activity).find(entry => entry.stat === stat);
+        if (!entry) assert.ok(Math.abs(actual) < 1e-10, `${activity} ${points}: hidden effect is neutral`);
+        else assert.ok(Math.abs(actual / (Math.sign(entry.change) * entry.level) - Math.abs(coefficients[stat]) * .5 * 1.15) < 1e-10,
+          `${activity} ${points}: each displayed sign has one equal raw skill contribution`);
+      }
+    }
+  }
 });
 
 test('every activity follows reduced-point ranks and increased-point endpoints across aptitudes and allocations', () => {
@@ -175,11 +182,9 @@ test('every activity follows reduced-point ranks and increased-point endpoints a
           else {
             assert.ok(entry, label);
             assert.equal(Math.sign(entry.change), Math.sign(distance), label);
-            const options = points < neutral ? neutral : 5 - neutral;
-            let expectedLevel = points < neutral ? Math.abs(distance)
-              : options < 2 ? 1 : 1 + Math.round(2 * (Math.abs(distance) - 1) / (options - 1));
-            if (!parentId && activity === 'creative' && stat === 'creativity' && points === 0) expectedLevel = 3;
-            if (!parentId && activity === 'social' && stat === 'social') expectedLevel = Math.abs(points - 3);
+            let expectedLevel = Math.abs(distance);
+            if (!parentId && activity === 'creative' && stat === 'intelligence') expectedLevel = Math.ceil(Math.abs(distance) / 2);
+            if (!parentId && activity === 'social' && stat === 'social') expectedLevel = Math.abs(points - 2);
             assert.equal(entry.level, expectedLevel, label);
           }
         }
@@ -194,7 +199,7 @@ test('temporary activity caps preserve the full sign scale and static help stays
   const state = selected(toddler(), 'social', 1);
   state.effects = [{ id: 'limited-screen', name: 'Limited screen time', description: '', years: 1, modifiers: {}, kind: 'neutral', focusLimits: { toddler: { social: 1 } } }];
   const electronics = toddlerChoiceImpacts(state, 'social');
-  assert.equal(electronics.find(entry => entry.stat === 'social').level, 2, 'a temporary maximum does not turn one point into the strongest option');
+  assert.equal(electronics.find(entry => entry.stat === 'social').level, 1, 'a temporary maximum does not turn one point into the strongest option');
   assert.equal(electronics.find(entry => entry.stat === 'intelligence').level, 1);
   const helpLevel = (activity, stat) => toddlerActivityImpacts(activity).find(entry => entry.stat === stat).level;
   assert.equal(helpLevel('social', 'social'), 1);
@@ -227,7 +232,7 @@ test('activity previews hide blocked effects without reranking partial gains or 
   state.stats.strength = 9.99;
   let strength = toddlerChoiceImpacts(state, 'work').find(entry => entry.stat === 'strength');
   assert.ok(strength.change > 0 && strength.change < .02);
-  assert.equal(strength.level, 3);
+  assert.equal(strength.level, 2);
   state.stats.strength = 10;
   assert.ok(!toddlerChoiceImpacts(state, 'work').some(entry => entry.stat === 'strength'));
   state.stats.strength = 9;

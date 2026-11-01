@@ -5,11 +5,11 @@ import {
   offeredJobs, needsEducationChoice, pendingEventSubject, focusLimits, focusLimitDetails, caregivers,
   relationshipOdds, meetingChances, proposalChance, pregnancyChance, oneNightChance,
   respondToEncounter, proposeMarriage, endRelationship, normalizeSurname, heightPercentile, statPercentiles
-} from './engine.js?v=stat-buffs-balance-1';
-import { annotateNarrative } from './narrative.js?v=stat-buffs-balance-1';
-import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome, splitJournalEventOutcome } from './display.js?v=stat-buffs-balance-1';
+} from './engine.js?v=permanent-cross-stat-1';
+import { annotateNarrative } from './narrative.js?v=permanent-cross-stat-1';
+import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome, splitJournalEventOutcome } from './display.js?v=permanent-cross-stat-1';
 
-import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=stat-buffs-balance-1';
+import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=permanent-cross-stat-1';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const app = document.querySelector('#app');
@@ -229,17 +229,17 @@ function outcomeSummary(outcome, subject, pending) {
   const result = resolveEventChoice(preview,outcome.id,pending.eventId,pending.subjectId || undefined);
   if (!result.ok) return '';
   const change = (label,start,end) => `${label} ${beforeAfter({before:start,after:end})}`;
-  const permanentKeys = [...new Set([...Object.keys(outcome.statChanges || {}),...Object.keys(outcome.playerChanges || {})])];
+  const permanentKeys = [...new Set([...Object.keys(outcome.statChanges || {}),...Object.keys(outcome.playerChanges || {}),...Object.keys(outcome.modifiers || {}),...(outcome.lifestyle?['stability']:[])])];
   const before = effectiveStats(state);
   const afterPermanent = effectiveStats({ ...preview, effects: state.effects });
   const changes = permanentKeys.map(key => change(skillLabel(key),before[key],afterPermanent[key]));
-  changes.push(...Object.entries(outcome.modifiers || {}).filter(([,amount])=>amount).map(([key,amount])=>`${signedModifier(amount)} ${skillLabel(key)}`));
-  if (outcome.lifestyle) changes.push(`${signedModifier(outcome.lifestyle)} Lifestyle`);
+  const signedAptitude = value => value > 0 ? `+${value}` : String(value);
+  for (const key of Object.keys(outcome.aptitudeChanges || {})) changes.push(`${skillLabel(key)} learning ability ${signedAptitude(state.aptitudes[key])} → ${signedAptitude(preview.aptitudes[key])}`);
   const nextSubject = pendingEventSubject(preview,pending);
   for (const key of Object.keys(outcome.subjectChanges || {})) changes.push(change(`${subject?.name || 'Your loved one'}: ${skillLabel(key)}`,subject?.stats[key],nextSubject?.stats[key]));
   if (outcome.relationship) changes.push(change(`Relationship with ${subject?.name || 'your loved one'}`,subject?.relationship,nextSubject?.relationship));
   changes.push(...outcomeLimits(outcome));
-  if (outcome.years && (Object.keys(outcome.modifiers || {}).length || outcome.lifestyle || outcome.focusLimits)) changes.push(`${outcome.years} year${outcome.years===1?'':'s'}`);
+  if (outcome.years && outcome.focusLimits) changes.push(`${outcome.years} year${outcome.years===1?'':'s'}`);
   return changes.join(' · ');
 }
 
@@ -598,15 +598,15 @@ function topicHelpModal(topic, id) {
     social: ['Social', ['Ease with people for your age; social practice can improve it.']],
     creativity: ['Creativity', ['Creative potential for your age, shaped by exploration and practice.']],
     attractiveness: ['Attractiveness', ['Starts near its adult value, with tiny random changes each year rather than gains from practice. In this game, aging lowers it after 30 for men and 22 for women.']],
-    affinity: ['Natural aptitude', ['This inherited −3 to +3 trait affects starting ability and responsiveness to focus; higher is stronger. Health and mental stability aptitude improve routine gains and soften losses. Practice does not increase attractiveness.']],
+    affinity: ['Natural aptitude', ['This inherited −3 to +3 trait affects starting ability and responsiveness to focus; higher is stronger. Health and mental stability aptitude improve routine gains and soften losses. Rare experiences shaped by another stat can raise or lower aptitude by one. Practice does not increase attractiveness.']],
     forecast: ['Expected changes', ['Signs compare increases and decreases with the other choices for that stat. Zero changes are hidden. Infant stats show crying effects; adult stats show routine changes. Background development, events and yearly variation can alter the result.']],
     health: ['Health', ['Self-care supports health; illness and aging reduce it. Poor health raises disease risk and reduces childhood height gains.']],
     stability: ['Mental stability', ['Higher means calmer; rest and relationships help. Low parental mental stability can lead to difficult childhood events.']],
-    lifestyle: ['Lifestyle', ['Until 18, you share your parents’ or guardian’s changing household lifestyle. As an adult, work, family, events and inheritance shape it.']],
+    lifestyle: ['Lifestyle', ['Until 18, you share your parents’ or guardian’s changing household lifestyle. As an adult, work, family and inheritance shape it.']],
     height: ['Height', ['Final height emerges from yearly growth shaped by age, inheritance, health and chance, ending at 14–18. Poor health reduces new growth, never existing height.']],
     cry: ['Cry level', ['Less crying lowers your intelligence and mental stability; more crying raises them. Strength is unaffected. Parent relationships tend to fall at levels 1–2, stay steady at 3, and rise at 4–5, with yearly variation. Harder crying strains their mental stability more.']],
-    focus: ['Your focus', ['Allocate 12 points, at most 5 per area; unused points allow rest. Events can temporarily lower these limits. Focused skills can rise, neglected ones can fall, and results vary yearly.', ...(state.age<18||state.education.status==='college'?['Each row shows that choice compared with 3 points; family relationships are neutral at 2. Signs run from one for the weakest effect to three for the strongest. Zero effects are hidden, and shared family effects appear once.']:[])]],
-    'toddler-focus': ['Toddler activities', ['Share 12 points among five activities, up to 5 each. Events can temporarily lower these limits. Unused points support mental stability, and results vary each year.', 'Your activity effects are measured from Play 3, Electronics 2, Family time 2, Rest 3, and Arts & crafts 2. All Family time effects are neutral at 2; Electronics Social is neutral at 3. Zero Arts & crafts gives the strongest creativity loss. Signs compare effect strength, and zero effects are hidden.']],
+    focus: ['Your focus', ['Allocate 12 points, at most 5 per area; unused points allow rest. Events can temporarily lower these limits. Focused skills can rise, neglected ones can fall, and results vary yearly.', ...(state.age<18||state.education.status==='college'?['Each row shows that choice compared with 3 points; family relationships are neutral at 2. Each sign is an equal contribution for that choice and stat, before aptitude and current-rating response. Zero effects are hidden, and shared family effects appear once.']:[])]],
+    'toddler-focus': ['Toddler activities', ['Share 12 points among five activities, up to 5 each. Events can temporarily lower these limits. Unused points support mental stability, and results vary each year.', 'Your activity effects are measured from Play 3, Electronics 2, Family time 2, Rest 3, and Arts & crafts 2. Less Electronics supports Social; more reduces it. Zero Arts & crafts shows --Creativity and -Intelligence. Each sign is an equal contribution for that activity and stat, before aptitude and current-rating response. Zero effects are hidden.']],
     ...Object.fromEntries(toddlerFocusRows.map(([key,label]) => [`toddler-${key}`, [label,
       toddlerActivityImpacts(key).map(({stat,change,level,target}) => `${(change>0?'+':'-').repeat(level)}${target==='parents'?(caregivers(state).some(person=>person.guardianRole)?'Guardian relationship':'Parent relationships'):skillLabel(stat)}`)
     ]])),
@@ -632,6 +632,7 @@ function topicHelpModal(topic, id) {
     if (job) entry = [job.name,[job.description,'+3 marks a core skill; skill fit reflects your current match.']];
   }
   if (!entry) return;
+  if (id===state.id && DISPLAY_STATS.some(stat=>stat.key===topic)) entry=[entry[0],[...entry[1],'Gains slow near 10 and losses slow near 0; moving away from either limit is faster. Rare experiences shaped by other stats can change natural aptitude by one.']];
   if (id===state.id) entry=[entry[0],[...entry[1],...statEffects(topic).map(({effect,amount})=>`${effect.name}: ${signedModifier(amount)} ${skillLabel(topic)} (${effect.years} year${effect.years===1?'':'s'} remaining)`)]];
   openModal(esc(entry[0]),`${entry[1].map(paragraph=>`<p>${esc(paragraph)}</p>`).join('')}`);
   modalRoot.querySelector('.modal').classList.add('help-popup');

@@ -1,3 +1,4 @@
+import { changedRating } from '../rating-changes.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -70,7 +71,8 @@ test('all toddler activity effects and unused-point rest use half-strength contr
     for (const points of [0, 1, 5]) {
       const effects = toddlerActivityEffects({ ...state, focus: { ...state.focus, [activity]: points } })[activity];
       for (const [stat, coefficient] of Object.entries(stats)) {
-        close(effects[stat], coefficient * points * (learned.includes(stat) ? .575 : .5), `${activity} ${stat} at ${points}`);
+        const contributionSteps = activity === 'creative' && stat === 'intelligence' ? [0, 0, 1, 2, 2, 3][points] : points;
+        close(effects[stat], coefficient * contributionSteps * (learned.includes(stat) ? .575 : .5), `${activity} ${stat} at ${points}`);
       }
     }
   }
@@ -115,7 +117,7 @@ test('school, career, and later-life practice halve both gains and losses withou
   adult.focus = { work: 5, social: 2, family: 0, self: 0 };
   const adultForecast = annualForecast(adult);
   assert.equal(adultForecast.stats.health.after, 4.97, 'adult self-focus health loss is halved before rounding');
-  assert.equal(adultForecast.stats.stability.after, round(round(5 - .032) - .075), 'adult strain and high-work unemployment penalty are each halved');
+  assert.equal(adultForecast.stats.stability.after, changedRating(changedRating(5, -.032), -.075), 'adult strain and high-work unemployment penalty are each halved');
 });
 
 test('caregiver, partner, and child routine relationships and wellbeing receive half-strength family decisions', () => {
@@ -144,7 +146,7 @@ test('caregiver, partner, and child routine relationships and wellbeing receive 
       } else {
         const toddler = child.age < 5;
         const skillPractice = toddler
-          ? { intelligence: 0, strength: 0, social: .055 * 2 / 3 * (family - 2) + .055 / 3, creativity: 0 }
+          ? { intelligence: 0, strength: 0, social: .055 * 2 / 3 * (family - 2), creativity: 0 }
           : { intelligence: .035 * (family - 3), strength: .1 * (family - 3), social: .025 * (family - 3), creativity: .08 * (family - 3) };
         for (const key of learned) assert.equal(grown.stats[key], round(5 + skillPractice[key] * .575 + DEVELOPMENT_BALANCE.childhoodBias[key]), `${child.age}-year-old child ${key} care`);
         const healthPractice = (toddler ? .1 : .035) * (family - 3);

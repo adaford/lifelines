@@ -45,7 +45,8 @@ const heightInches = (value, unit) => Number(value) / (unit.toLowerCase() === 'c
 const outcomeStat = '(?:Intelligence|Strength|Attractiveness|Social(?: ability)?|Creativity|Health|(?:Mental\\s+)?stability|Lifestyle|Relationships?)';
 const outcomePart = new RegExp(`^(?:(?<person>.+?):\\s*${outcomeStat}|(?<prefix>.*?)Your\\s+${outcomeStat}|(?<lifestylePrefix>.*?)Lifestyle)\\s+(?<before>${ratingAmount})${arrow}(?<after>${ratingAmount})(?<suffix>[.!?](?:\\s.*)?)?$`, 'iu');
 const buffPart = new RegExp(`^(?<prefix>.*?)(?<buff>[+-](?:${amount}|\\.\\d+))\\s+${outcomeStat}(?<suffix>[.!?](?:\\s.*)?)?$`, 'iu');
-const parseOutcome = text => outcomePart.exec(text) || buffPart.exec(text);
+const aptitudePart = new RegExp(`^(?:(?<person>.+?):\\s*${outcomeStat}|(?<prefix>.*?)Your\\s+${outcomeStat})\\s+learning ability\\s+(?<before>[+-]?[0-3])${arrow}(?<after>[+-]?[0-3])(?<suffix>[.!?](?:\\s.*)?)?$`, 'iu');
+const parseOutcome = text => outcomePart.exec(text) || aptitudePart.exec(text) || buffPart.exec(text);
 
 // Separate recorded effects by person without changing saved prose or treating
 // an ordinary semicolon in a custom story as an effect boundary.

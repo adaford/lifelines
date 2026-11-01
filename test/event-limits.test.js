@@ -70,7 +70,8 @@ test('resolving an event clamps only over-limit allocations and records restrict
     assert.equal(state.rng, rng);
     assert.equal(state.effects.at(-1).years, 1);
     assert.match(state.history[0].text, /School max 2; Friends max 1\. Temporary effects: 1 year\./);
-    assert.match(state.history[0].text, /-\.4 Health/);
+    assert.match(state.history[0].text, /Your health .* ? /);
+    assert.deepEqual(state.effects.at(-1).modifiers, {});
     assert.doesNotMatch(state.history[0].text, /Filler/);
     assert.equal(validateSave(state), true);
     assert.deepEqual(migrateSave(copy(state)), state);
@@ -103,7 +104,7 @@ test('a restriction-only event works and refreshed effects replace old caps', ()
   const original = event.choices;
   event.choices = [
     { id: 'cap', label: 'Commit', description: '', years: 2, focusLimits: { standard: { social: 0 } } },
-    { id: 'alternate', label: 'Change plan', description: '', years: 1, modifiers: { stability: .2 } },
+    { id: 'alternate', label: 'Change plan', description: '', years: 1, statChanges: { stability: .2 }, focusLimits: { standard: { work: 2 } } },
   ];
   try {
     assert.equal(resolveEventChoice(state, 'cap', event.id).ok, true);
@@ -113,7 +114,7 @@ test('a restriction-only event works and refreshed effects replace old caps', ()
     queuedTeam(state);
     assert.equal(resolveEventChoice(state, 'alternate', event.id).ok, true);
     assert.equal(state.effects.length, 1);
-    assert.equal(state.effects[0].focusLimits, undefined);
+    assert.deepEqual(state.effects[0].focusLimits, { standard: { work: 2 } });
     assert.equal(state.effects[0].years, 2, 'a refresh preserves the existing longer duration');
     assert.equal(focusLimits(state).social, 5);
     assert.equal(state.focus.social, 0, 'removing a limit never restores or reallocates points silently');

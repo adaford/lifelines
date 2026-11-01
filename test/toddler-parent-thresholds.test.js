@@ -1,3 +1,4 @@
+import { changedRating } from '../rating-changes.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createGame, annualForecast } from '../engine.js';
@@ -51,7 +52,7 @@ test('toddler parent mental stability preserves aptitude response and background
     const forecast = annualForecast(state);
     for (const parent of state.parents) {
       const change = .08 * (5 - parent.stats.stability) + wellbeingResponse(parent, 'stability', (points - 2) * .025);
-      assert.equal(forecast.parents.find(row => row.id === parent.id).stability.after, round(parent.stats.stability + change));
+      assert.equal(forecast.parents.find(row => row.id === parent.id).stability.after, changedRating(parent.stats.stability, change));
     }
   }
   const state = familyTime(3, 0);

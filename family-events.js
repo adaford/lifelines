@@ -5,7 +5,17 @@ const low = key => [key, 'low'];
 const high = key => [key, 'high'];
 export const FAMILY_EVENT_RATE_MULTIPLIER = 2.5;
 const option = (id, label, description, outcome) => ({ id, label, description, ...outcome });
-const group = (subjectType, defaults, entries) => entries.map(event => ({
+function permanentOutcome(outcome) {
+  const result = { ...outcome, playerChanges: { ...outcome.playerChanges }, modifiers: {}, years: outcome.focusLimits ? outcome.years || 1 : 0 };
+  for (const [key, amount] of Object.entries(outcome.modifiers || {})) result.playerChanges[key] = (result.playerChanges[key] || 0) + amount;
+  if (outcome.lifestyle) result.playerChanges.stability = (result.playerChanges.stability || 0) + outcome.lifestyle * .2;
+  result.playerChanges = Object.fromEntries(Object.entries(result.playerChanges).filter(([, amount]) => amount));
+  if (!Object.keys(result.playerChanges).length) delete result.playerChanges;
+  delete result.lifestyle;
+  if (outcome.choices) result.choices = outcome.choices.map(permanentOutcome);
+  return result;
+}
+const group = (subjectType, defaults, entries) => entries.map(event => permanentOutcome({
   subjectType, category: subjectType === 'parent' ? 'Growing up at home' : subjectType === 'partner' ? 'Your relationship' : 'Your children',
   years: 0, modifiers: {}, kind: 'positive', ...defaults, ...event,
 }));
@@ -59,7 +69,7 @@ export const FAMILY_EVENTS = [
     ] },
     { id: 'household_partner_shared_load', name: 'The household needs a reset', description: 'You and {name} disagree about how the everyday responsibilities are shared.', kind: 'neutral', conditions: ['married'], neglectFactors: ['family'], choices: [
       option('share', 'Take on more together', 'The extra effort tires you, but {name} feels supported.', { subjectChanges: { stability: .3 }, playerChanges: { health: -.2 }, relationship: .5 }),
-      option('help', 'Arrange some outside help', 'A simpler routine helps you and {name} breathe, at a cost to your lifestyle.', { subjectChanges: { stability: .3 }, playerChanges: { stability: .3 }, relationship: .2, lifestyle: -1, years: 1 }),
+      option('help', 'Arrange some outside help', 'A simpler routine helps you and {name} breathe, with some worry about relying on outside help.', { subjectChanges: { stability: .3 }, playerChanges: { stability: .3 }, relationship: .2, lifestyle: -1, years: 1 }),
     ] },
     { id: 'household_partner_anniversary', name: 'Remembering how it began', description: 'You and {name} look back on your time together and notice how much you have shared.', conditions: ['togetherYear'], focusFactors: ['family'], relationshipFactor: 'high', subjectChanges: { stability: .3 }, playerChanges: { stability: .3 }, relationship: .5 },
   ]),
@@ -115,7 +125,7 @@ export const FAMILY_EVENTS = [
     ] },
     { id: 'household_partner_roof_leak', name: 'A leaking roof', description: 'A roof leak disrupts your home with {name}.', kind: 'negative', baseChance: .005, choices: [
       option('repair', 'Handle the repairs together', 'Repair work uses your spare evenings.', { subjectChanges: { strength: .2, stability: -.15 }, playerChanges: { strength: .25, health: -.15 }, relationship: .25, years: 1, focusLimits: { standard: { social: 1 } } }),
-      option('hire', 'Hire repair help', 'Outside help protects your time but lowers lifestyle.', { subjectChanges: { stability: .15 }, playerChanges: { stability: .15 }, lifestyle: -1, years: 1 }),
+      option('hire', 'Hire repair help', 'Outside help protects your time, though arranging it is stressful.', { subjectChanges: { stability: .15 }, playerChanges: { stability: .15 }, lifestyle: -1, years: 1 }),
     ] },
     { id: 'household_partner_travel_plans', name: 'Separate travel plans', description: 'You and {name} want different trips.', kind: 'neutral', choices: [
       option('together', 'Plan a shared trip', 'A longer trip leaves less time for work.', { subjectChanges: { stability: .2 }, playerChanges: { creativity: .25 }, relationship: .4, years: 1, focusLimits: { standard: { work: 3 } } }),
@@ -126,7 +136,7 @@ export const FAMILY_EVENTS = [
   ...group('child', { minAge: 0, maxAge: 17, minPlayerAge: 18, baseChance: .007 }, [
     { id: 'household_child_care_closure', name: 'Childcare closes', description: "{name}'s childcare provider closes unexpectedly.", maxAge: 4, kind: 'negative', choices: [
       option('home', 'Provide care yourself', 'Caregiving leaves less time for work.', { subjectChanges: { stability: .2 }, playerChanges: { stability: -.15 }, relationship: .3, years: 1, focusLimits: { standard: { work: 2 } } }),
-      option('replace', 'Arrange replacement care', 'New care protects your schedule but lowers lifestyle.', { subjectChanges: { social: .2 }, relationship: .1, lifestyle: -1, years: 1 }),
+      option('replace', 'Arrange replacement care', 'New care protects your schedule, though the transition brings worry.', { subjectChanges: { social: .2 }, relationship: .1, lifestyle: -1, years: 1 }),
     ] },
     { id: 'household_child_science_fair', name: 'A science fair', description: '{name} asks for help building a science exhibit.', minAge: 6, maxAge: 16, choices: [
       option('build', 'Build it together', 'The project takes time from your own activities.', { subjectChanges: { intelligence: .35, creativity: .25 }, playerChanges: { intelligence: .15 }, relationship: .3, years: 1, focusLimits: { standard: { self: 2 } } }),
@@ -134,7 +144,7 @@ export const FAMILY_EVENTS = [
     ] },
     { id: 'household_child_driving', name: 'Driving practice', description: '{name} wants help learning to drive.', minAge: 16, maxAge: 17, kind: 'neutral', choices: [
       option('teach', 'Practice together', 'Driving sessions replace some time with friends.', { subjectChanges: { intelligence: .3, stability: .2 }, playerChanges: { stability: -.1 }, relationship: .35, years: 1, focusLimits: { standard: { social: 2 } } }),
-      option('instructor', 'Arrange driving lessons', 'Lessons protect your time but lower lifestyle.', { subjectChanges: { intelligence: .35, stability: .15 }, playerChanges: { stability: .15 }, relationship: .1, lifestyle: -1, years: 1 }),
+      option('instructor', 'Arrange driving lessons', 'Lessons protect your time, though arranging them is stressful.', { subjectChanges: { intelligence: .35, stability: .15 }, playerChanges: { stability: .15 }, relationship: .1, lifestyle: -1, years: 1 }),
     ] },
     { id: 'household_child_rescued_stray', name: 'A rescued stray', description: '{name} helps a lost animal reach its owner.', minAge: 6, subjectChanges: { social: .25, stability: .15 }, playerChanges: { stability: .1 }, relationship: .15 },
   ]),

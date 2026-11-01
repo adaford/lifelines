@@ -13,14 +13,14 @@ export const DEVELOPMENT_BALANCE = {
   "innateScale": 0.6,
   "skillReversion": 0.012,
   "childhoodBias": {
-    "intelligence": -0.094083,
-    "strength": -0.014534,
-    "social": -0.098102,
-    "creativity": -0.097077
+    "intelligence": -0.062654,
+    "strength": 0.014429,
+    "social": -0.082272,
+    "creativity": -0.07666
   },
   "wellbeingTarget": {
-    "health": 5.161767,
-    "stability": 4.292949
+    "health": 5.24477,
+    "stability": 5.431694
   },
   "wellbeingReversion": {
     "health": 0.06,
@@ -44,12 +44,19 @@ export const TODDLER_ACTIVITY_EFFECTS = {
   self: { health: .1, stability: .08 },
   creative: { creativity: .11, intelligence: .03 },
 };
-// Electronics supports learning from two points; its social cost starts only
-// beyond three. Other activity effects keep the balanced allocation neutral.
-export const toddlerActivityNeutral = (activity, stat) => activity === 'social' && stat === 'social' ? 3 : TODDLER_FOCUS[activity];
+// Each activity is neutral at its balanced allocation, including Electronics
+// Social: less screen time supports Social; more screen time reduces it.
+export const toddlerActivityNeutral = (activity, stat) => TODDLER_FOCUS[activity];
+// One preview sign is one contribution step for this activity/stat. Crafts
+// learning moves in smaller, paired-point steps than its creativity practice.
+export function toddlerActivitySteps(activity, stat, points) {
+  const steps = points - toddlerActivityNeutral(activity, stat);
+  return activity === 'creative' && stat === 'intelligence'
+    ? Math.sign(steps) * Math.ceil(Math.abs(steps) / 2) : steps;
+}
 const toddlerFocus = person => Object.fromEntries(Object.keys(TODDLER_FOCUS).map(key => [key, clamp(number(person.focus?.[key], key === 'creative' ? 0 : 3), 0, 5)]));
 function toddlerPractice(focus) {
-  return Object.fromEntries(skills.map(skill => [skill, Object.entries(TODDLER_ACTIVITY_EFFECTS).reduce((sum, [key, coefficients]) => sum + (coefficients[skill] || 0) * (focus[key] - toddlerActivityNeutral(key, skill)), 0)]));
+  return Object.fromEntries(skills.map(skill => [skill, Object.entries(TODDLER_ACTIVITY_EFFECTS).reduce((sum, [key, coefficients]) => sum + (coefficients[skill] || 0) * toddlerActivitySteps(key, skill, focus[key]), 0)]));
 }
 function practiceResponse(effort, aptitude) {
   return effort * (effort >= 0 ? 1 + aptitude * .08 : 1 - aptitude * .07);

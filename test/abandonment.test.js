@@ -1,3 +1,4 @@
+import { changedRating } from '../rating-changes.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createGame, advanceYear, annualForecast, caregivers, effectiveStats, eventOdds, householdLifestyle, mortalityOdds, migrateSave, validateSave, EVENTS, resolveEventChoice, chooseEducation, needsEducationChoice, successionInfo, succeed } from '../engine.js';
@@ -94,10 +95,11 @@ test('one parent leaves once, the other takes over, and both receive the recorde
   assert.equal(departed.relationship, 0);
   assert.deepEqual(caregivers(state), [remaining]);
   assert.equal(state.guardian, null);
-  assert.equal(remaining.stats.stability, Math.round((forecast.parents[1].stability.after - 3) * 100) / 100);
+  assert.equal(remaining.stats.stability, changedRating(forecast.parents[1].stability.after, -3));
   assert.equal(remaining.stats.health, 4);
-  assert.equal(state.effects[0].years, 3);
-  assert.deepEqual(state.effects[0].modifiers, { stability: -3, social: -1.5, health: -1 });
+  assert.equal(state.effects.length, 0);
+  assert.equal(state.stats.stability, changedRating(forecast.stats.stability.after, -3));
+  assert.equal(state.stats.social, changedRating(forecast.stats.social.after, -1.5));
   assert.equal(state.lifestyle, Math.round(remaining.career.progress * 100) / 100);
   assert.ok(state.history.some(entry => entry.title.includes('Takes over your care') && entry.text.includes('Health 5')));
   assert.equal(validateSave(state), true);
@@ -112,10 +114,10 @@ test('one parent leaves once, the other takes over, and both receive the recorde
 test('two departures in one year stack setbacks and create one persistent adult-relative guardian', () => {
   const state = adopted();
   assert.equal(state.lastYearEvents.length, 2);
-  assert.equal(state.effects.length, 3);
-  assert.equal(state.effects.filter(effect => effect.id.startsWith('household_parent_abandonment:')).length, 2);
-  assert.deepEqual(state.effects.find(effect => effect.id.startsWith('relative_adoption:')).modifiers, { stability: -1.5, social: -.5 });
-  assert.equal(effectiveStats(state).stability, Math.round((state.stats.stability - 7.5) * 100) / 100);
+  assert.equal(state.effects.length, 0);
+  assert.equal(state.history.filter(entry => entry.title.includes('Abandons you')).length, 2);
+  assert.equal(effectiveStats(state).stability, state.stats.stability);
+  assert.ok(state.stats.stability < 1, 'separate departures and adoption leave lasting setbacks');
   assert.ok(state.guardian.age >= 18);
   assert.ok(['aunt', 'uncle'].includes(state.guardian.guardianRole));
   assert.equal(state.guardian.familyName, state.familyName);
@@ -146,7 +148,7 @@ test('a remaining parent dying after abandonment transfers care without repeatin
   advanceYear(state, { ...noVariation, mortalityRandom: () => ++person === 3 ? 0 : 1 });
   assert.equal(state.parents[1].alive, false);
   assert.ok(state.guardian?.alive);
-  assert.equal(state.effects.filter(effect => effect.id.startsWith('relative_adoption:')).length, 1);
+  assert.equal(state.history.filter(entry => entry.title.includes('adopts you')).length, 1);
   assert.equal(state.effects.filter(effect => effect.id.startsWith('household_parent_abandonment:')).length, 0);
   assert.equal(validateSave(state), true);
 });
@@ -158,7 +160,7 @@ test('a guardian ages and can die; a replacement relative is saved once with a n
   assert.notEqual(state.guardian.id, oldGuardian);
   assert.ok(state.guardian.alive);
   assert.ok(state.history.some(entry => entry.title.startsWith('Remembering')));
-  assert.equal(state.effects.filter(effect => effect.id.startsWith('relative_adoption:')).length, 2);
+  assert.equal(state.history.filter(entry => entry.title.includes('adopts you')).length, 2);
   assert.equal(validateSave(state), true);
   assert.deepEqual(migrateSave(copy(state)), state);
 });
@@ -169,6 +171,7 @@ test('adoption effects fit alongside the maximum ordinary temporary-effect histo
   state.effects.push(...Array.from({ length: 2 }, (_, index) => ({ id: `relative_adoption:${index}`, name: 'Adopted', description: '', years: 2, modifiers: { stability: -1.5, social: -.5 }, kind: 'negative' })));
   assert.equal(validateSave(state), true);
   assert.deepEqual(migrateSave(copy(state)), state);
+  state.version = 15;
   state.effects.push(copy(state.effects[0]));
   assert.equal(validateSave(state), false);
 });

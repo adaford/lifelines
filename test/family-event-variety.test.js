@@ -96,7 +96,7 @@ test('every new household choice applies to its named relative and preserves a v
   }
 });
 
-test('care, repairs, and driving trade time for lifestyle without hiding the other person effects', () => {
+test('care, repairs, and driving trade time for lasting stress without temporary ratings', () => {
   for (const [id,timeChoice,paidChoice,key,max] of [
     ['household_child_care_closure','home','replace','work',2],
     ['household_partner_roof_leak','repair','hire','social',1],
@@ -116,8 +116,10 @@ test('care, repairs, and driving trade time for lifestyle without hiding the oth
     });
     assert.equal(focusLimits(branches[0])[key],max);
     assert.equal(focusLimits(branches[1])[key],5);
-    assert.equal(branches[0].lifestyle-branches[1].lifestyle,1,'paid help exchanges lifestyle for available time');
-    assert.ok(branches.every(state=>state.effects.some(effect=>effect.years===1)));
+    assert.equal(branches[0].lifestyle,branches[1].lifestyle,'help has no temporary lifestyle modifier');
+    assert.ok(branches[0].effects.some(effect=>effect.years===1 && effect.focusLimits));
+    assert.equal(branches[1].effects.length,0);
+    assert.ok(branches[1].stats.stability < original.state.stats.stability,'arranging help leaves lasting stress');
     assert.ok(branches.every(validateSave));
   }
 });

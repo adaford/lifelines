@@ -83,7 +83,8 @@ test('changing-plan outcomes offer distinct rewards and enforceable one-year com
   const fracture = EVENTS.find(event => event.id === 'broken_bone');
   assert.equal(fracture.focusLimits.toddler.work, 2);
   assert.equal(fracture.focusLimits.standard.social, 2);
-  assert.ok(fracture.modifiers.health < 0);
+  assert.ok(fracture.statChanges.stability < 0);
+  assert.deepEqual(fracture.modifiers, {});
   for (const event of EVENTS.filter(event => event.category === 'Changing plans')) {
     const outcomes = event.choices || [event];
     assert.ok(outcomes.some(outcome => outcome.focusLimits), event.id);

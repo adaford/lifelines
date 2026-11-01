@@ -57,7 +57,7 @@ test('rest uses the halved toddler health response and crafts spend the shared b
   assert.equal(setFocus(state, 'creative', 1).ok, false);
 });
 
-test('crafts develop intelligence at one-third the electronics rate while retaining creativity', () => {
+test('each crafts intelligence step is one-third an electronics step while retaining creativity', () => {
   for (const age of [2, 3, 4]) {
     const state = toddler();
     state.age = age;
@@ -75,7 +75,7 @@ test('crafts develop intelligence at one-third the electronics rate while retain
     assert.equal(crafts.social, baseline.social);
     assert.equal(crafts.strength, baseline.strength);
     const effects = toddlerActivityEffects(state);
-    assert.ok(Math.abs(effects.creative.intelligence * 3 - effects.social.intelligence) < 1e-12);
+    assert.ok(Math.abs(effects.creative.intelligence * 6 - effects.social.intelligence) < 1e-12);
     assert.deepEqual(state, before, 'development and activity reads preserve the save and RNG');
   }
 });
