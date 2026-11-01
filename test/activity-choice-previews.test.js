@@ -40,7 +40,7 @@ test('activity previews show half-strength gains and losses without changing rel
     ['work', 0, 'strength', -.09, 3],
     ['social', 0, 'social', .05, 3],
     ['social', 4, 'intelligence', .08, 3],
-    ['creative', 0, 'intelligence', -.08, 3],
+    ['creative', 0, 'intelligence', -.03, 1],
     ['creative', 4, 'creativity', .09, 3],
     ['self', 4, 'health', .08, 3],
     ['self', 0, 'stability', -.06, 3],
@@ -128,7 +128,7 @@ test('Electronics and crafts use the requested signs across all five allocations
   const state = toddler(), before = structuredClone(state);
   const expected = {
     social: { social: ['+++', '+', '', '-', '---'], intelligence: ['---', '-', '', '+', '+++'] },
-    creative: { creativity: ['---', '-', '', '+', '+++'], intelligence: ['---', '-', '', '+', '+++'] },
+    creative: { creativity: ['---', '-', '', '+', '+++'], intelligence: ['-', '', '', '', '+'] },
   };
   for (const [activity, stats] of Object.entries(expected)) for (let points = 0; points <= 4; points++) {
     const entries = toddlerChoiceImpacts(selected(state, activity, points), activity);
@@ -170,25 +170,24 @@ test('every activity follows reduced-point ranks and increased-point endpoints a
       for (let points = 0; points <= 4; points++) {
         const candidate = selected(state, activity, points), before = structuredClone(candidate);
         const entries = toddlerChoiceImpacts(candidate, activity);
-        const expected = Object.entries(coefficients).map(([stat, coefficient]) => ({ stat, direction: Math.sign(coefficient), neutral: toddlerActivityNeutral(activity, stat) }));
+        const steps = stat => activity === 'creative' && stat === 'intelligence' ? [-1, 0, 0, 0, 1][points] : focusEffect(points);
+        const expected = Object.entries(coefficients).map(([stat, coefficient]) => ({ stat, direction: Math.sign(coefficient) }));
         if (activity === 'family') for (const parent of state.parents) {
-          expected.push({ stat: 'stability', parentId: parent.id, direction: 1, neutral: 2 });
-          expected.push({ stat: 'relationship', parentId: parent.id, direction: 1, neutral: 2 });
+          expected.push({ stat: 'stability', parentId: parent.id, direction: 1 });
+          expected.push({ stat: 'relationship', parentId: parent.id, direction: 1 });
         }
-        for (const { stat, parentId, direction, neutral } of expected) {
+        for (const { stat, parentId, direction } of expected) {
           const entry = entries.find(entry => entry.stat === stat && entry.parentId === parentId);
-          const distance = (points - neutral) * direction;
+          const distance = steps(stat) * direction;
           const label = `${activity} ${points}: ${parentId || 'you'} ${stat}, aptitude ${aptitude}`;
           if (!distance) assert.equal(entry, undefined, `${label} hides neutral effects`);
           else {
             assert.ok(entry, label);
             assert.equal(Math.sign(entry.change), Math.sign(distance), label);
-            const strength = parentId ? 1 : toddlerActivityImpacts(activity).find(item => item.stat === stat).level;
-            const expectedLevel = Math.abs(focusEffect(points)) * strength;
-            assert.equal(entry.level, expectedLevel, label);
+            assert.equal(entry.level, Math.abs(distance), label);
           }
         }
-        assert.equal(entries.length, expected.filter(({ neutral }) => points !== neutral).length);
+        assert.equal(entries.length, expected.filter(({ stat }) => steps(stat) !== 0).length);
         assert.deepEqual(candidate, before, 'reading every alternative preserves the save and RNG');
       }
     }

@@ -3,7 +3,7 @@ import { changedRating } from '../rating-changes.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  YEARLY_DECISION_SCALE, DEVELOPMENT_BALANCE, TODDLER_FOCUS,
+  YEARLY_DECISION_SCALE, DEVELOPMENT_BALANCE, TODDLER_FOCUS, CHILDHOOD_DEDUCTION_SCALE,
   infantChoiceEffects, toddlerActivityEffects, skillChanges, childhoodWellbeing,
 } from '../development.js';
 import { createGame, annualForecast, advanceYear, chooseEducation, resolveEventChoice, effectiveStats } from '../engine.js';
@@ -72,7 +72,8 @@ test('all toddler activity effects use half-strength contributions and unused po
     for (const points of [0, 1, 2, 3, 4]) {
       const effects = toddlerActivityEffects({ ...state, focus: { ...state.focus, [activity]: points } })[activity];
       for (const [stat, coefficient] of Object.entries(stats)) {
-        const contributionSteps = focusEffect(points);
+        const contributionSteps = activity === 'creative' && stat === 'intelligence'
+          ? [-1, 0, 0, 0, 1][points] : focusEffect(points);
         close(effects[stat], coefficient * contributionSteps * (learned.includes(stat) ? .575 : .5), `${activity} ${stat} at ${points}`);
       }
     }
@@ -94,7 +95,7 @@ test('school, career, and later-life practice halve both gains and losses withou
     const state = stateAt(age);
     state.stats.intelligence = 8;
     const baseline = skillChanges(state);
-    close(baseline.intelligence, -.036 * flexibility + (age < 18 ? DEVELOPMENT_BALANCE.childhoodBias.intelligence : 0), 'innate tendency and fitted bias');
+    close(baseline.intelligence, -.036 * flexibility + (age < 18 ? DEVELOPMENT_BALANCE.childhoodBias.intelligence * CHILDHOOD_DEDUCTION_SCALE : 0), 'innate tendency and reduced childhood deduction');
     for (const [focus, sign] of [[focused, 1], [neglected, -1]]) {
       const changed = skillChanges({ ...state, focus });
       for (const key of learned) close(changed[key] - baseline[key], halfPractice[key] * flexibility * sign, `${age} ${key}`);
@@ -144,13 +145,17 @@ test('caregiver, partner, and child routine relationships and wellbeing receive 
         assert.equal(grown.stats.health, round(5 + effort * .01));
       } else if (child.age === 0) {
         const carePractice = .02 * effort;
-        assert.equal(grown.stats.intelligence, round(5 + (.04 + carePractice) * .575 + DEVELOPMENT_BALANCE.childhoodBias.intelligence));
+        assert.equal(grown.stats.intelligence, round(5 + (.04 + carePractice) * .575 + DEVELOPMENT_BALANCE.childhoodBias.intelligence * CHILDHOOD_DEDUCTION_SCALE));
       } else {
         const toddler = child.age < 5;
         const skillPractice = toddler
           ? { intelligence: 0, strength: 0, social: .0275 * effort, creativity: 0 }
           : { intelligence: .0375 * effort, strength: .05 * effort, social: .04 * effort, creativity: .04 * effort };
-        for (const key of learned) assert.equal(grown.stats[key], round(5 + skillPractice[key] * .575 + DEVELOPMENT_BALANCE.childhoodBias[key]), `${child.age}-year-old child ${key} care`);
+        for (const key of learned) {
+          const bias = DEVELOPMENT_BALANCE.childhoodBias[key];
+          const background = bias < 0 ? bias * CHILDHOOD_DEDUCTION_SCALE : bias;
+          assert.equal(grown.stats[key], round(5 + skillPractice[key] * .575 + background), `${child.age}-year-old child ${key} care`);
+        }
         const healthPractice = (toddler ? .05 : .0175) * effort;
         const stabilityPractice = toddler
           ? .04 * effort + .04 * effort

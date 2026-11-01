@@ -24,6 +24,9 @@ function lifeAt(age) {
 
 test('v9 centimetre saves convert every family measurement and review while preserving all other progress', () => {
   const state = lifeAt(35);
+  // V9 predates focus-limit effects; isolate the height migration from newly
+  // rolled restrictions that cannot be represented in that older schema.
+  state.effects = state.effects.filter(effect => !effect.focusLimits);
   assert.equal(haveChild(state).ok, true);
   const adult = { ...copy(state.parents[1]), id: 'unit-adult', name: 'Summer Reed', age: 30, money: 0, gender: 'female', canGestate: true, attractedTo: ['male'] };
   state.siblings = [{ ...copy(adult), id: 'unit-sibling', name: 'Casey Reed' }];

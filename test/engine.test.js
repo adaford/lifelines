@@ -415,13 +415,15 @@ test('college lasts four years, develops skills, and then offers fifteen careers
 test('study focus and skill affinity affect development during college', () => {
   const studying = decision(504);
   chooseEducation(studying, 'college');
+  studying.effects = [];
+  studying.conditions = [];
   studying.stats.intelligence = 3;
   studying.aptitudes.intelligence = 3;
   studying.focus = { work: 4, social: 0, family: 2, self: 2 };
   const distracted = copy(studying), lowAffinity = copy(studying);
   distracted.focus.work = 0;
   lowAffinity.aptitudes.intelligence = -3;
-  advanceYearRaw(studying); advanceYearRaw(distracted); advanceYearRaw(lowAffinity);
+  advanceMatchedQuietYears(studying, distracted, lowAffinity);
   assert.ok(studying.stats.intelligence > distracted.stats.intelligence);
   assert.ok(studying.stats.intelligence > lowAffinity.stats.intelligence);
 });

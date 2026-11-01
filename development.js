@@ -1,7 +1,7 @@
-import { MAX_FOCUS, DEFAULT_FOCUS, focusEffect, defaultFocus } from './focus-rules.js?v=focus-single-1';
+import { MAX_FOCUS, DEFAULT_FOCUS, focusEffect, defaultFocus } from './focus-rules.js?v=childhood-deduction-1';
 // Ratings use the same scale throughout life. Balanced toddler activities use
-// TODDLER_FOCUS; every stage uses 2 per area. Childhood event drift is fitted by
-// scripts/calibrate-percentiles.mjs.
+// TODDLER_FOCUS; every stage uses 2 per area. Keep the historical calibration
+// offsets, with childhood deductions reduced to the requested tenth strength.
 export const BIRTH_VARIATION = {
   skill: 2,
   health: 2,
@@ -28,6 +28,8 @@ export const DEVELOPMENT_BALANCE = {
     "stability": 0.08
   }
 };
+
+export const CHILDHOOD_DEDUCTION_SCALE = .1;
 
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
 const number = (value, fallback) => Number.isFinite(value) ? value : fallback;
@@ -80,9 +82,15 @@ export function standardFocusPractice(person, career = null) {
   }
   return result;
 }
-// Every activity uses the same neutral point and triple-strength endpoints.
+// Every activity is neutral at two. Crafts Intelligence only changes at the
+// endpoints, by one unit; its Creativity keeps the normal triple endpoints.
 export const toddlerActivityNeutral = () => DEFAULT_FOCUS;
-export const toddlerActivitySteps = (activity, stat, points) => focusEffect(points);
+export function toddlerActivitySteps(activity, stat, points) {
+  const effort = focusEffect(points);
+  return activity === 'creative' && stat === 'intelligence'
+    ? Math.abs(effort) === 3 ? Math.sign(effort) : 0
+    : effort;
+}
 const toddlerFocus = person => Object.fromEntries(Object.keys(TODDLER_FOCUS).map(key => [key, clamp(number(person.focus?.[key], DEFAULT_FOCUS), 0, MAX_FOCUS)]));
 function toddlerPractice(focus) {
   return Object.fromEntries(skills.map(skill => [skill, Object.entries(TODDLER_ACTIVITY_EFFECTS).reduce((sum, [key, coefficients]) => sum + (coefficients[skill] || 0) * toddlerActivitySteps(key, skill, focus[key]), 0)]));
@@ -170,7 +178,8 @@ export function skillChanges(person, career = null, practiceScale = YEARLY_DECIS
     const response = practiceScale * practiceResponse(effort, aptitude);
     const current = number(person.stats?.[key], naturalSkillRating(aptitude));
     const tendency = DEVELOPMENT_BALANCE.skillReversion * (naturalSkillRating(aptitude) - current);
-    const eventBias = age < 18 ? number(DEVELOPMENT_BALANCE.childhoodBias[key], 0) : 0;
+    const calibratedBias = age < 18 ? number(DEVELOPMENT_BALANCE.childhoodBias[key], 0) : 0;
+    const eventBias = calibratedBias * (calibratedBias < 0 ? CHILDHOOD_DEDUCTION_SCALE : 1);
     return [key, (response + tendency) * flexibility + eventBias];
   }));
 }

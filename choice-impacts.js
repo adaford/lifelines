@@ -1,7 +1,7 @@
-import { annualForecast, effectiveStats, needsEducationChoice, focusLimits, caregivers, JOBS } from './engine.js?v=focus-single-1';
-import { infantChoiceEffects, wellbeingResponse, toddlerActivityEffects, toddlerActivityNeutral, schoolFocusEffects, focusChoiceEffects, focusEffectStrength, standardFocusCoefficients, TODDLER_FOCUS, TODDLER_ACTIVITY_EFFECTS, PARENT_FAMILY_STABILITY_GAIN, PARENT_FAMILY_RELATIONSHIP_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=focus-single-1';
-import { DEFAULT_FOCUS, focusEffect } from './focus-rules.js?v=focus-single-1';
-import { changedRating } from './rating-changes.js?v=focus-single-1';
+import { annualForecast, effectiveStats, needsEducationChoice, focusLimits, caregivers, JOBS } from './engine.js?v=childhood-deduction-1';
+import { infantChoiceEffects, wellbeingResponse, toddlerActivityEffects, toddlerActivityNeutral, toddlerActivitySteps, schoolFocusEffects, focusChoiceEffects, focusEffectStrength, standardFocusCoefficients, TODDLER_FOCUS, TODDLER_ACTIVITY_EFFECTS, PARENT_FAMILY_STABILITY_GAIN, PARENT_FAMILY_RELATIONSHIP_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=childhood-deduction-1';
+import { DEFAULT_FOCUS, focusEffect } from './focus-rules.js?v=childhood-deduction-1';
+import { changedRating } from './rating-changes.js?v=childhood-deduction-1';
 
 const nonzero = value => Math.abs(value) > .000001;
 const keyOf = entry => `${entry.parentId || 'you'}:${entry.stat}`;
@@ -56,14 +56,14 @@ export function toddlerChoiceImpacts(state, activity) {
   if (state.age < 2 || state.age >= 5 || !Object.hasOwn(TODDLER_FOCUS, activity) || state.ended || state.alive === false || state.needsSuccession || state.pendingEvents.length || needsEducationChoice(state)) return [];
   const points = Math.max(0, Math.min(focusLimits(state)[activity], state.focus[activity] ?? DEFAULT_FOCUS));
   const entries = toddlerChoiceEntries(state, activity, points, true);
-  return proportionalChoiceEntries(entries, points);
+  return proportionalChoiceEntries(entries, points, entry => toddlerActivitySteps(activity, entry.stat, points));
 }
 
 // Each sign represents an equal raw contribution for this activity/person/stat.
 // Aptitude and current-rating response affect the outcome, never this scale.
-function proportionalChoiceEntries(entries, points) {
+function proportionalChoiceEntries(entries, points, stepsFor = () => focusEffect(points)) {
   return entries.filter(entry => nonzero(entry.change)).map(entry => ({
-    ...entry, level: Math.abs(focusEffect(points)),
+    ...entry, level: Math.abs(stepsFor(entry)),
   }));
 }
 

@@ -14,7 +14,7 @@ const toddler = () => {
 };
 const survives = { mortalityRandom: () => 1, growthRandom: () => 0, parentCareerRandom: () => 1 };
 
-test('activity contributions are neutral at two and triple at the endpoints without consuming RNG', () => {
+test('activity contributions are neutral at two and ordinary effects triple at endpoints without consuming RNG', () => {
   for (const aptitude of [-3, 0, 3]) {
     const state = toddler();
     for (const key of Object.keys(state.aptitudes)) state.aptitudes[key] = aptitude;
@@ -26,7 +26,7 @@ test('activity contributions are neutral at two and triple at the endpoints with
         const effects = toddlerActivityEffects(selected)[activity];
         for (const [stat, amount] of Object.entries(effects)) {
           if (!['health', 'stability'].includes(stat)) assert.ok(Math.abs(amount - (skillChanges(selected)[stat] - skillChanges(state)[stat])) < 1e-12);
-          if (points === 0 || points === 4) {
+          if ((points === 0 || points === 4) && !(activity === 'creative' && stat === 'intelligence')) {
             const unit = toddlerActivityEffects({ ...state, focus: { ...state.focus, [activity]: points === 0 ? 1 : 3 } })[activity][stat];
             assert.ok(Math.abs(amount - unit * 3) < 1e-12, `${activity} ${stat} endpoint triples its adjacent choice`);
           }
@@ -55,25 +55,27 @@ test('rest uses the halved toddler health response and crafts spend the shared b
   assert.equal(setFocus(state, 'creative', 1).ok, false);
 });
 
-test('crafts and electronics share the same intelligence contribution per sign', () => {
-  for (const age of [2, 3, 4]) {
+test('crafts intelligence changes only at zero or four points by one electronics step', () => {
+  for (const age of [2, 3, 4]) for (const aptitude of [-3, 0, 3]) {
     const state = toddler();
     state.age = age;
-    state.aptitudes.intelligence = 0;
+    state.aptitudes.intelligence = aptitude;
     state.focus.work = 2;
     const before = copy(state);
     const baseline = skillChanges(state);
-    const crafts = skillChanges({ ...state, focus: { ...state.focus, creative: 3 } });
-    const electronics = skillChanges({ ...state, focus: { ...state.focus, social: 3 } });
-    const craftsGain = crafts.intelligence - baseline.intelligence;
-    const electronicsGain = electronics.intelligence - baseline.intelligence;
-    assert.ok(craftsGain > 0);
-    assert.ok(Math.abs(craftsGain - electronicsGain) < 1e-12);
-    assert.ok(crafts.creativity > baseline.creativity);
-    assert.equal(crafts.social, baseline.social);
-    assert.equal(crafts.strength, baseline.strength);
-    const effects = toddlerActivityEffects(state);
-    assert.ok(Math.abs(effects.creative.intelligence - effects.social.intelligence) < 1e-12);
+    for (const points of [0, 1, 2, 3, 4]) {
+      const crafts = skillChanges({ ...state, focus: { ...state.focus, creative: points } });
+      const intelligenceChange = crafts.intelligence - baseline.intelligence;
+      if (points === 0 || points === 4) {
+        const electronics = skillChanges({ ...state, focus: { ...state.focus, social: points === 0 ? 1 : 3 } });
+        assert.ok(Math.abs(intelligenceChange - (electronics.intelligence - baseline.intelligence)) < 1e-12,
+          `crafts ${points} matches one Electronics step at age ${age}, aptitude ${aptitude}`);
+        assert.equal(Math.sign(intelligenceChange), points === 0 ? -1 : 1);
+      } else assert.equal(intelligenceChange, 0, `crafts ${points} does not train or neglect Intelligence`);
+      assert.equal(Math.sign(crafts.creativity - baseline.creativity), Math.sign(points - 2));
+      assert.equal(crafts.social, baseline.social);
+      assert.equal(crafts.strength, baseline.strength);
+    }
     assert.deepEqual(state, before, 'development and activity reads preserve the save and RNG');
   }
 });

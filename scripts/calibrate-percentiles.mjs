@@ -1,9 +1,10 @@
 // Offline calibration only. Rendering uses the generated reference constants.
 // Reproduce: node scripts/calibrate-percentiles.mjs --samples 2000 --seed 200001
-// Refit development after changing the simulation: add --fit.
+// Refit childhood wellbeing after changing the simulation: add --fit.
+// Skill deductions are an explicit gameplay setting and must not be refitted.
 import { readFile, writeFile } from 'node:fs/promises';
 import { defaultFocus, MAX_FOCUS, fitFocusBudget } from '../focus-rules.js';
-import { BIRTH_VARIATION, TODDLER_FOCUS } from '../development.js';
+import { BIRTH_VARIATION, TODDLER_FOCUS, CHILDHOOD_DEDUCTION_SCALE } from '../development.js';
 import {
   createGame, advanceYear, resolveEventChoice, EVENTS, effectiveStats, focusLimits,
   DEVELOPMENT_BALANCE,
@@ -19,7 +20,6 @@ const option = (name, fallback) => {
 const samples = option('--samples', 2000);
 const seedStart = option('--seed', 200001);
 const statKeys = ['intelligence', 'strength', 'attractiveness', 'social', 'creativity', 'health', 'stability'];
-const learned = ['intelligence', 'strength', 'social', 'creativity'];
 const round = value => Math.round(value * 1000000) / 1000000;
 const moment = () => ({ count: 0, sum: 0, sum2: 0 });
 const add = (entry, value) => { entry.count++; entry.sum += value; entry.sum2 += value * value; };
@@ -85,17 +85,9 @@ if (args.includes('--fit')) {
     const measured = cohort(false);
     const averages = Object.fromEntries(statKeys.map(key => [key, round(mean(measured.stats[key]))]));
     console.log(`Fit ${iteration + 1}: ${JSON.stringify(averages)}`);
-    const error = [...learned, 'health', 'stability'].reduce((sum, key) => sum + (averages[key] - 5) ** 2, 0);
+    const error = ['health', 'stability'].reduce((sum, key) => sum + (averages[key] - 5) ** 2, 0);
     if (error < best.error) best = { error, balance: structuredClone(DEVELOPMENT_BALANCE) };
-    if ([...learned, 'health', 'stability'].every(key => Math.abs(averages[key] - 5) <= .025)) break;
-    for (const key of learned) {
-      // Fit an annual event-drift intercept, preserving normal starting ratings
-      // and focus effects. A small annual offset accumulates with weak reversion.
-      const reversion = DEVELOPMENT_BALANCE.skillReversion * 1.15;
-      const response = reversion ? (1 - (1 - reversion) ** 18) / reversion : 18;
-      const next = DEVELOPMENT_BALANCE.childhoodBias[key] + .8 * (5 - averages[key]) / response;
-      DEVELOPMENT_BALANCE.childhoodBias[key] = round(Math.max(-.2, Math.min(.2, next)));
-    }
+    if (['health', 'stability'].every(key => Math.abs(averages[key] - 5) <= .025)) break;
     for (const key of ['health', 'stability']) {
       const response = 1 - (1 - DEVELOPMENT_BALANCE.wellbeingReversion[key]) ** 18;
       DEVELOPMENT_BALANCE.wellbeingTarget[key] = round(DEVELOPMENT_BALANCE.wellbeingTarget[key] + (5 - averages[key]) / response);
@@ -117,6 +109,7 @@ const reference = {
     conditionedOn: 'alive at the observed age',
     observationsByAge: [...result.ageStats.map(stats => stats.health.count), result.stats.health.count],
     birthVariation: BIRTH_VARIATION,
+    childhoodDeductionScale: CHILDHOOD_DEDUCTION_SCALE,
     development: DEVELOPMENT_BALANCE,
     reproduce: `node scripts/calibrate-percentiles.mjs --samples ${samples} --seed ${seedStart}`,
   },

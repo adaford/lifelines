@@ -43,7 +43,7 @@ test('all default choices have no personal or caregiver effect previews, includi
   }
 });
 
-test('every raw choice effect triples at zero and four before rating bounds and rounding', () => {
+test('raw choice effects use triple endpoints with the single-unit crafts Intelligence exception', () => {
   for (const age of [2, 12, 19, 35, 70]) for (const aptitude of [-3, 0, 3]) {
     const state = life(age);
     for (const stat of Object.keys(state.aptitudes)) state.aptitudes[stat] = aptitude;
@@ -57,13 +57,20 @@ test('every raw choice effect triples at zero and four before rating bounds and 
       assert.ok(Object.values(neutral).every(amount => Math.abs(amount) < 1e-10));
       for (const [endpoint, adjacent] of [[0, 1], [4, 3]]) {
         const extreme = effects(endpoint), unit = effects(adjacent);
-        for (const stat of Object.keys(extreme)) near(extreme[stat], 3 * unit[stat], `${age} ${area} ${stat}, aptitude ${aptitude}`);
+        for (const stat of Object.keys(extreme)) {
+          if (age < 5 && area === 'creative' && stat === 'intelligence') {
+            near(unit[stat], 0, 'crafts Intelligence is unchanged at one or three points');
+            const electronicsPoints = endpoint === 0 ? 1 : 3;
+            const electronics = toddlerActivityEffects({ ...state, focus: { ...state.focus, social: electronicsPoints } }).social.intelligence;
+            near(extreme[stat], electronics, 'crafts endpoints have one Intelligence unit');
+          } else near(extreme[stat], 3 * unit[stat], `${age} ${area} ${stat}, aptitude ${aptitude}`);
+        }
       }
     }
   }
 });
 
-test('every individual focus effect uses one sign next to neutral and three at endpoints', () => {
+test('individual effects retain their point curves, including endpoint-only crafts Intelligence', () => {
   for (const age of [3, 12, 19]) {
     const state = life(age);
     state.conditions = [];
@@ -75,7 +82,11 @@ test('every individual focus effect uses one sign next to neutral and three at e
       if (level === 0) assert.deepEqual(entries, []);
       else {
         assert.ok(entries.length, `${age} ${area} at ${points} points has effects`);
-        for (const entry of entries) assert.equal(entry.level, level, `${age} ${area} ${entry.parentId || 'you'} ${entry.stat}`);
+        for (const entry of entries) {
+          const expected = age < 5 && area === 'creative' && entry.stat === 'intelligence' ? [1, 0, 0, 0, 1][points] : level;
+          assert.equal(entry.level, expected, `${age} ${area} ${entry.parentId || 'you'} ${entry.stat}`);
+        }
+        if (age < 5 && area === 'creative') assert.equal(entries.some(entry => entry.stat === 'intelligence'), points === 0 || points === 4);
       }
     }
   }
@@ -92,6 +103,11 @@ test('each sign has the same raw stat magnitude across toddler and school activi
       const entries = preview(selected, area);
       for (const stat of Object.keys(stats)) {
         const entry = entries.find(entry => entry.stat === stat && !entry.parentId);
+        if (age < 5 && area === 'creative' && stat === 'intelligence' && [1, 3].includes(points)) {
+          assert.equal(entry, undefined);
+          near(effects[stat], 0, 'crafts has no Intelligence change at the inner allocations');
+          continue;
+        }
         assert.ok(entry, `${age} ${area} ${stat} remains visible away from bounds`);
         assert.equal(Math.sign(entry.change), Math.sign(effects[stat]));
         const magnitude = Math.abs(effects[stat]) / entry.level;

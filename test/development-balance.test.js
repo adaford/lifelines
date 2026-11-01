@@ -1,9 +1,37 @@
 import { fitFocusBudget } from '../focus-rules.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { naturalSkillRating, skillChanges, childhoodWellbeing, infantChoiceEffects, wellbeingResponse, TODDLER_FOCUS } from '../development.js';
+import { naturalSkillRating, skillChanges, childhoodWellbeing, infantChoiceEffects, wellbeingResponse, TODDLER_FOCUS, CHILDHOOD_DEDUCTION_SCALE } from '../development.js';
 import { createGame, advanceYear, resolveEventChoice, EVENTS, effectiveStats, focusLimits } from '../engine.js';
 import { eventChances } from '../events.js';
+import { PERCENTILE_REFERENCE } from '../percentile-reference.js';
+
+test('childhood deductions retain ten percent strength while crying and positive background growth stay intact', () => {
+  assert.equal(CHILDHOOD_DEDUCTION_SCALE, .1);
+  const near = (actual, expected, label) => assert.ok(Math.abs(actual - expected) < 1e-12, `${label}: ${actual} vs ${expected}`);
+  const person = {
+    alive: true, cryLevel: 5,
+    stats: { intelligence: 5, strength: 5, social: 5, creativity: 5 },
+    aptitudes: { intelligence: 0, strength: 0, social: 0, creativity: 0 },
+  };
+  const expected = { intelligence: -.006525, strength: .008169, social: -.0085835, creativity: -.0082402 };
+  for (const age of [2, 5, 17]) {
+    const state = { ...person, age, focus: age < 5 ? { ...TODDLER_FOCUS } : { work: 2, social: 2, family: 2, self: 2 } };
+    for (const [key, amount] of Object.entries(expected)) near(skillChanges(state)[key], amount, `${age}: ${key}`);
+  }
+  for (const age of [0, 1]) {
+    const state = { ...person, age };
+    const before = structuredClone(state);
+    const crying = infantChoiceEffects(state), total = skillChanges(state);
+    near(crying.intelligence, .069, 'maximum crying Intelligence contribution');
+    near(crying.social, .023, 'maximum crying Social contribution');
+    near(total.intelligence, .062475, 'Intelligence after the smaller deduction');
+    near(total.social, .0144165, 'Social after the smaller deduction');
+    assert.deepEqual(state, before, 'reading development leaves ratings and choices unchanged');
+  }
+  assert.deepEqual(skillChanges({ ...person, age: 18, focus: { work: 2, social: 2, family: 2, self: 2 } }),
+    { intelligence: 0, strength: 0, social: 0, creativity: 0 }, 'adults have no childhood adjustment');
+});
 
 test('newborn ratings span the scale around five with broad variation and aptitude correlation', () => {
   const learned = ['intelligence', 'strength', 'social', 'creativity'];
@@ -222,7 +250,7 @@ test('toddler events follow play, electronics and crafts while school events beg
   assert.ok(odds({ ...state, age: 5 }).good_grades > 0);
 });
 
-test('independent game lives reach age 18 with average ratings near five and retain variation', () => {
+test('independent game lives match the reduced-deduction reference while retaining wellbeing balance and variation', () => {
   const keys = ['intelligence', 'strength', 'attractiveness', 'social', 'creativity', 'health', 'stability'];
   const samples = Object.fromEntries(keys.map(key => [key, []]));
   const events = new Map(EVENTS.map(event => [event.id, event]));
@@ -255,7 +283,12 @@ test('independent game lives reach age 18 with average ratings near five and ret
     assert.ok(values.length > samplesPerProfile * 2 * .95);
     const average = values.reduce((sum, value) => sum + value, 0) / values.length;
     const sd = Math.sqrt(values.reduce((sum, value) => sum + (value - average) ** 2, 0) / values.length);
-    assert.ok(Math.abs(average - 5) < .2, `${key} mean ${average}`);
+    // Trainable skills may rise above five with the intentionally smaller
+    // deductions. Held-out lives must still reproduce the measured population;
+    // appearance and wellbeing retain their original near-five balance check.
+    const target = ['intelligence', 'strength', 'social', 'creativity'].includes(key)
+      ? PERCENTILE_REFERENCE.stats[key].observedMean : 5;
+    assert.ok(Math.abs(average - target) < .2, `${key} mean ${average}, expected near ${target}`);
     assert.ok(sd > .25 && sd < 3, `${key} SD ${sd}`);
     assert.ok(new Set(values).size > 50, `${key} varies between lives`);
   }

@@ -1927,7 +1927,9 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
 
   test('a saved life reloads and the same import can be retried after cancelling restore', async () => {
     const fixture = ageTo(createGame({ name: 'Taylor Brooks', seed: 99 }), 29);
+    fixture.effects = []; // Isolate import persistence from this seed's newly rolled focus caps.
     fixture.focus = { work: 4, social: 1, family: 1, self: 2 };
+    assert.equal(validateSave(fixture), true);
     const ui = await mount(fixture);
     assert.equal(ui.saved().age, 29);
     assert.deepEqual(ui.saved().focus, fixture.focus);
@@ -2518,6 +2520,9 @@ test('Electronics and crafts show the expected signs at every allocation', async
   fixture.stats.social=5;
   fixture.stats.intelligence=5;
   const ui=await mount(fixture),before=ui.saved();
+  ui.click('[data-topic="toddler-focus"]');
+  assert.match(ui.query('.help-popup').textContent,/Arts & crafts Intelligence shows one minus at 0, no effect at 1–3, and one plus at 4/);
+  ui.click('.help-popup [data-action="close"]');
   const social=['+++','+',null,'-','---'];
   const intelligence=['---','-',null,'+','+++'];
   const signs=stat=>ui.document.querySelector(`.focus-row[data-focus-key="social"] .choice-impact[data-stat="${stat}"] b`)?.textContent ?? null;
@@ -2534,7 +2539,7 @@ test('Electronics and crafts show the expected signs at every allocation', async
   }
   for(let points=0;points<=4;points++) {
     const craftSigns=ui.document.querySelector('.focus-row[data-focus-key="creative"] .choice-impact[data-stat="intelligence"] b')?.textContent ?? null;
-    assert.equal(craftSigns,['---','-',null,'+','+++'][points],`Arts & crafts ${points}: intelligence`);
+    assert.equal(craftSigns,['-',null,null,null,'+'][points],`Arts & crafts ${points}: intelligence`);
     const creativity=ui.document.querySelector('.focus-row[data-focus-key="creative"] .choice-impact[data-stat="creativity"] b')?.textContent ?? null;
     assert.equal(creativity,['---','-',null,'+','+++'][points],`Arts & crafts ${points}: creativity`);
     if(points<4) ui.click('[data-action="focus"][data-key="creative"][data-delta="1"]');
@@ -2649,7 +2654,7 @@ test('individual focus effects render one or three signs with accessible labels 
   }
 });
 
-test('every toddler activity and family effect follows the requested one-or-three-sign scale after reload', async () => {
+test('toddler and family effects retain their point curves and crafts Intelligence threshold after reload', async () => {
   const effects={
     work:[['you','strength'],['you','social']],
     social:[['you','intelligence'],['you','social',true]],
@@ -2658,6 +2663,9 @@ test('every toddler activity and family effect follows the requested one-or-thre
     creative:[['you','creativity'],['you','intelligence']],
   };
   for(const [area,expectedEffects] of Object.entries(effects)) {
+    const signsFor=(stat,reversed,points)=>(area==='creative' && stat==='intelligence'
+      ? ['-',null,null,null,'+']
+      : reversed?['+++','+',null,'-','---']:['---','-',null,'+','+++'])[points];
     const fixture=createGame({seed:121});
     fixture.age=3;
     fixture.conditions=[];
@@ -2675,10 +2683,10 @@ test('every toddler activity and family effect follows the requested one-or-thre
       for(let reload=0;reload<2;reload++) {
         const row=ui.query(`.focus-row[data-focus-key="${area}"]`);
         assert.equal(row.querySelector('output').textContent,String(points));
-        assert.equal(row.querySelectorAll('.choice-impact').length,points===2?0:expectedEffects.length);
+        assert.equal(row.querySelectorAll('.choice-impact').length,expectedEffects.filter(([,stat,reversed])=>signsFor(stat,reversed,points)!==null).length);
         for(const [target,stat,reversed] of expectedEffects) {
           const entry=row.querySelector(`[data-target="${target}"][data-stat="${stat}"]`);
-          const expected=(reversed?['+++','+',null,'-','---']:['---','-',null,'+','+++'])[points];
+          const expected=signsFor(stat,reversed,points);
           assert.equal(entry?.querySelector('b').textContent??null,expected,`${area} ${points}: ${target} ${stat}, reload ${reload}`);
           if(entry && target==='family') {
             assert.deepEqual(entry.dataset.parentIds.split(' ').sort(),fixture.parents.map(parent=>parent.id).sort());

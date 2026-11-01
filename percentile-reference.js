@@ -56,6 +56,7 @@ export const PERCENTILE_REFERENCE = {
       "appearance": 2,
       "inheritedAppearance": 1.5
     },
+    "childhoodDeductionScale": 0.1,
     "development": {
       "innateScale": 0.6,
       "skillReversion": 0.012,
@@ -79,8 +80,8 @@ export const PERCENTILE_REFERENCE = {
   "stats": {
     "intelligence": {
       "mean": 5,
-      "observedMean": 5.015439,
-      "sd": 1.579746,
+      "observedMean": 5.915467,
+      "sd": 1.618627,
       "ages": [
         {
           "mean": 5,
@@ -89,95 +90,95 @@ export const PERCENTILE_REFERENCE = {
         },
         {
           "mean": 5,
-          "observedMean": 5.066563,
-          "sd": 2.148868
+          "observedMean": 5.128369,
+          "sd": 2.150264
         },
         {
           "mean": 5,
-          "observedMean": 5.071401,
-          "sd": 2.109166
+          "observedMean": 5.193691,
+          "sd": 2.11207
         },
         {
           "mean": 5,
-          "observedMean": 5.061936,
-          "sd": 2.066693
+          "observedMean": 5.241567,
+          "sd": 2.073785
         },
         {
           "mean": 5,
-          "observedMean": 5.03612,
-          "sd": 2.026985
+          "observedMean": 5.271893,
+          "sd": 2.038486
         },
         {
           "mean": 5,
-          "observedMean": 4.9992,
-          "sd": 1.985114
+          "observedMean": 5.290604,
+          "sd": 2.001284
         },
         {
           "mean": 5,
-          "observedMean": 5.008699,
-          "sd": 1.938549
+          "observedMean": 5.353326,
+          "sd": 1.958041
         },
         {
           "mean": 5,
-          "observedMean": 5.028589,
-          "sd": 1.896774
+          "observedMean": 5.424903,
+          "sd": 1.91903
         },
         {
           "mean": 5,
-          "observedMean": 5.045024,
-          "sd": 1.858171
+          "observedMean": 5.492043,
+          "sd": 1.882575
         },
         {
           "mean": 5,
-          "observedMean": 5.059814,
-          "sd": 1.820599
+          "observedMean": 5.556226,
+          "sd": 1.847534
         },
         {
           "mean": 5,
-          "observedMean": 5.075416,
-          "sd": 1.790368
+          "observedMean": 5.619482,
+          "sd": 1.819926
         },
         {
           "mean": 5,
-          "observedMean": 5.092718,
-          "sd": 1.760226
+          "observedMean": 5.684619,
+          "sd": 1.79061
         },
         {
           "mean": 5,
-          "observedMean": 5.107038,
-          "sd": 1.724486
+          "observedMean": 5.746386,
+          "sd": 1.755605
         },
         {
           "mean": 5,
-          "observedMean": 5.119333,
-          "sd": 1.691692
+          "observedMean": 5.805069,
+          "sd": 1.724741
         },
         {
           "mean": 5,
-          "observedMean": 5.095237,
-          "sd": 1.670137
+          "observedMean": 5.82459,
+          "sd": 1.703413
         },
         {
           "mean": 5,
-          "observedMean": 5.073719,
-          "sd": 1.647989
+          "observedMean": 5.844853,
+          "sd": 1.680278
         },
         {
           "mean": 5,
-          "observedMean": 5.056415,
-          "sd": 1.627976
+          "observedMean": 5.872397,
+          "sd": 1.664219
         },
         {
           "mean": 5,
-          "observedMean": 5.040653,
-          "sd": 1.596441
+          "observedMean": 5.897601,
+          "sd": 1.634321
         }
       ]
     },
     "strength": {
       "mean": 5,
-      "observedMean": 5.007158,
-      "sd": 1.751145,
+      "observedMean": 5.009162,
+      "sd": 1.750564,
       "ages": [
         {
           "mean": 5,
@@ -211,70 +212,70 @@ export const PERCENTILE_REFERENCE = {
         },
         {
           "mean": 5,
-          "observedMean": 5.036513,
-          "sd": 2.010076
+          "observedMean": 5.036317,
+          "sd": 2.010018
         },
         {
           "mean": 5,
-          "observedMean": 5.034362,
-          "sd": 1.986689
+          "observedMean": 5.034164,
+          "sd": 1.986393
         },
         {
           "mean": 5,
-          "observedMean": 5.035753,
-          "sd": 1.963267
+          "observedMean": 5.035932,
+          "sd": 1.963305
         },
         {
           "mean": 5,
-          "observedMean": 5.034264,
-          "sd": 1.935463
+          "observedMean": 5.034667,
+          "sd": 1.935658
         },
         {
           "mean": 5,
-          "observedMean": 5.032038,
-          "sd": 1.913377
+          "observedMean": 5.032639,
+          "sd": 1.913955
         },
         {
           "mean": 5,
-          "observedMean": 5.03225,
-          "sd": 1.891161
+          "observedMean": 5.032806,
+          "sd": 1.891736
         },
         {
           "mean": 5,
-          "observedMean": 5.033184,
-          "sd": 1.869065
+          "observedMean": 5.033544,
+          "sd": 1.869204
         },
         {
           "mean": 5,
-          "observedMean": 5.035505,
-          "sd": 1.851853
+          "observedMean": 5.036031,
+          "sd": 1.852046
         },
         {
           "mean": 5,
-          "observedMean": 5.029663,
-          "sd": 1.829249
+          "observedMean": 5.030546,
+          "sd": 1.82922
         },
         {
           "mean": 5,
-          "observedMean": 5.024251,
-          "sd": 1.807962
+          "observedMean": 5.025966,
+          "sd": 1.807955
         },
         {
           "mean": 5,
-          "observedMean": 5.017802,
-          "sd": 1.788849
+          "observedMean": 5.019836,
+          "sd": 1.788016
         },
         {
           "mean": 5,
-          "observedMean": 5.009051,
-          "sd": 1.770538
+          "observedMean": 5.011564,
+          "sd": 1.76922
         }
       ]
     },
     "attractiveness": {
       "mean": 5,
-      "observedMean": 4.875588,
-      "sd": 1.944816,
+      "observedMean": 4.876837,
+      "sd": 1.943684,
       "ages": [
         {
           "mean": 5,
@@ -303,75 +304,75 @@ export const PERCENTILE_REFERENCE = {
         },
         {
           "mean": 5,
-          "observedMean": 4.917155,
-          "sd": 2.006931
+          "observedMean": 4.91713,
+          "sd": 2.006927
         },
         {
           "mean": 5,
-          "observedMean": 4.910445,
-          "sd": 2.002538
+          "observedMean": 4.910533,
+          "sd": 2.002446
         },
         {
           "mean": 5,
-          "observedMean": 4.902725,
-          "sd": 1.997497
+          "observedMean": 4.90283,
+          "sd": 1.997408
         },
         {
           "mean": 5,
-          "observedMean": 4.894979,
-          "sd": 1.992177
+          "observedMean": 4.895099,
+          "sd": 1.992116
         },
         {
           "mean": 5,
-          "observedMean": 4.888023,
-          "sd": 1.986832
+          "observedMean": 4.888314,
+          "sd": 1.986595
         },
         {
           "mean": 5,
-          "observedMean": 4.879663,
-          "sd": 1.981889
+          "observedMean": 4.879889,
+          "sd": 1.981678
         },
         {
           "mean": 5,
-          "observedMean": 4.87184,
-          "sd": 1.976464
+          "observedMean": 4.872175,
+          "sd": 1.976482
         },
         {
           "mean": 5,
-          "observedMean": 4.864956,
-          "sd": 1.973046
+          "observedMean": 4.865323,
+          "sd": 1.973042
         },
         {
           "mean": 5,
-          "observedMean": 4.858427,
-          "sd": 1.969479
+          "observedMean": 4.859023,
+          "sd": 1.969213
         },
         {
           "mean": 5,
-          "observedMean": 4.859778,
-          "sd": 1.965228
+          "observedMean": 4.860534,
+          "sd": 1.964664
         },
         {
           "mean": 5,
-          "observedMean": 4.865094,
-          "sd": 1.960134
+          "observedMean": 4.866004,
+          "sd": 1.959503
         },
         {
           "mean": 5,
-          "observedMean": 4.868999,
-          "sd": 1.953917
+          "observedMean": 4.870396,
+          "sd": 1.953273
         },
         {
           "mean": 5,
-          "observedMean": 4.871211,
-          "sd": 1.949311
+          "observedMean": 4.872714,
+          "sd": 1.947962
         }
       ]
     },
     "social": {
       "mean": 5,
-      "observedMean": 5.008867,
-      "sd": 1.603008,
+      "observedMean": 6.159291,
+      "sd": 1.639214,
       "ages": [
         {
           "mean": 5,
@@ -380,95 +381,95 @@ export const PERCENTILE_REFERENCE = {
         },
         {
           "mean": 5,
-          "observedMean": 4.975299,
-          "sd": 2.162322
+          "observedMean": 5.052734,
+          "sd": 2.170834
         },
         {
           "mean": 5,
-          "observedMean": 4.955351,
-          "sd": 2.111422
+          "observedMean": 5.108891,
+          "sd": 2.126904
         },
         {
           "mean": 5,
-          "observedMean": 4.955869,
-          "sd": 2.060857
+          "observedMean": 5.183073,
+          "sd": 2.083074
         },
         {
           "mean": 5,
-          "observedMean": 4.916128,
-          "sd": 2.016804
+          "observedMean": 5.215383,
+          "sd": 2.045784
         },
         {
           "mean": 5,
-          "observedMean": 4.85954,
-          "sd": 1.976359
+          "observedMean": 5.229605,
+          "sd": 2.011153
         },
         {
           "mean": 5,
-          "observedMean": 4.864332,
-          "sd": 1.936222
+          "observedMean": 5.303288,
+          "sd": 1.976122
         },
         {
           "mean": 5,
-          "observedMean": 4.884332,
-          "sd": 1.896428
+          "observedMean": 5.389733,
+          "sd": 1.939812
         },
         {
           "mean": 5,
-          "observedMean": 4.910636,
-          "sd": 1.853509
+          "observedMean": 5.481011,
+          "sd": 1.899715
         },
         {
           "mean": 5,
-          "observedMean": 4.928468,
-          "sd": 1.822473
+          "observedMean": 5.563024,
+          "sd": 1.870605
         },
         {
           "mean": 5,
-          "observedMean": 4.948287,
-          "sd": 1.787601
+          "observedMean": 5.646629,
+          "sd": 1.835676
         },
         {
           "mean": 5,
-          "observedMean": 4.965089,
-          "sd": 1.759204
+          "observedMean": 5.725799,
+          "sd": 1.807227
         },
         {
           "mean": 5,
-          "observedMean": 4.986164,
-          "sd": 1.72478
+          "observedMean": 5.808251,
+          "sd": 1.774338
         },
         {
           "mean": 5,
-          "observedMean": 5.013257,
-          "sd": 1.696633
+          "observedMean": 5.895769,
+          "sd": 1.748375
         },
         {
           "mean": 5,
-          "observedMean": 5.013945,
-          "sd": 1.675206
+          "observedMean": 5.953107,
+          "sd": 1.724139
         },
         {
           "mean": 5,
-          "observedMean": 5.018529,
-          "sd": 1.650809
+          "observedMean": 6.013377,
+          "sd": 1.70231
         },
         {
           "mean": 5,
-          "observedMean": 5.024094,
-          "sd": 1.643738
+          "observedMean": 6.071205,
+          "sd": 1.686461
         },
         {
           "mean": 5,
-          "observedMean": 5.023025,
-          "sd": 1.62305
+          "observedMean": 6.120232,
+          "sd": 1.664464
         }
       ]
     },
     "creativity": {
       "mean": 5,
-      "observedMean": 5.009775,
-      "sd": 1.628075,
+      "observedMean": 6.143236,
+      "sd": 1.684074,
       "ages": [
         {
           "mean": 5,
@@ -477,95 +478,95 @@ export const PERCENTILE_REFERENCE = {
         },
         {
           "mean": 5,
-          "observedMean": 4.991299,
-          "sd": 2.156869
+          "observedMean": 5.065671,
+          "sd": 2.164904
         },
         {
           "mean": 5,
-          "observedMean": 4.940996,
-          "sd": 2.111669
+          "observedMean": 5.088283,
+          "sd": 2.127087
         },
         {
           "mean": 5,
-          "observedMean": 4.909173,
-          "sd": 2.071176
+          "observedMean": 5.127216,
+          "sd": 2.09262
         },
         {
           "mean": 5,
-          "observedMean": 4.873475,
-          "sd": 2.037061
+          "observedMean": 5.160508,
+          "sd": 2.063664
         },
         {
           "mean": 5,
-          "observedMean": 4.824052,
-          "sd": 2.001853
+          "observedMean": 5.179178,
+          "sd": 2.034234
         },
         {
           "mean": 5,
-          "observedMean": 4.833067,
-          "sd": 1.963349
+          "observedMean": 5.254488,
+          "sd": 2.000098
         },
         {
           "mean": 5,
-          "observedMean": 4.856239,
-          "sd": 1.930053
+          "observedMean": 5.343879,
+          "sd": 1.969628
         },
         {
           "mean": 5,
-          "observedMean": 4.875512,
-          "sd": 1.895033
+          "observedMean": 5.427801,
+          "sd": 1.937618
         },
         {
           "mean": 5,
-          "observedMean": 4.894516,
-          "sd": 1.857389
+          "observedMean": 5.510267,
+          "sd": 1.903517
         },
         {
           "mean": 5,
-          "observedMean": 4.914003,
-          "sd": 1.830483
+          "observedMean": 5.593215,
+          "sd": 1.878132
         },
         {
           "mean": 5,
-          "observedMean": 4.936723,
-          "sd": 1.804821
+          "observedMean": 5.674508,
+          "sd": 1.853308
         },
         {
           "mean": 5,
-          "observedMean": 4.951243,
-          "sd": 1.772838
+          "observedMean": 5.751948,
+          "sd": 1.823163
         },
         {
           "mean": 5,
-          "observedMean": 4.967158,
-          "sd": 1.746696
+          "observedMean": 5.828346,
+          "sd": 1.799343
         },
         {
           "mean": 5,
-          "observedMean": 4.979972,
-          "sd": 1.719822
+          "observedMean": 5.898316,
+          "sd": 1.773771
         },
         {
           "mean": 5,
-          "observedMean": 4.992022,
-          "sd": 1.697014
+          "observedMean": 5.965757,
+          "sd": 1.750879
         },
         {
           "mean": 5,
-          "observedMean": 5.006436,
-          "sd": 1.678539
+          "observedMean": 6.034497,
+          "sd": 1.730892
         },
         {
           "mean": 5,
-          "observedMean": 5.019309,
-          "sd": 1.657176
+          "observedMean": 6.101562,
+          "sd": 1.710804
         }
       ]
     },
     "health": {
       "mean": 5,
-      "observedMean": 4.999205,
-      "sd": 0.684066,
+      "observedMean": 5.010946,
+      "sd": 0.682701,
       "ages": [
         {
           "mean": 5,
@@ -584,85 +585,85 @@ export const PERCENTILE_REFERENCE = {
         },
         {
           "mean": 5,
-          "observedMean": 4.885509,
-          "sd": 1.74895
+          "observedMean": 4.885466,
+          "sd": 1.748997
         },
         {
           "mean": 5,
-          "observedMean": 4.923694,
-          "sd": 1.622712
+          "observedMean": 4.923656,
+          "sd": 1.622756
         },
         {
           "mean": 5,
-          "observedMean": 4.957729,
-          "sd": 1.510188
+          "observedMean": 4.957694,
+          "sd": 1.510229
         },
         {
           "mean": 5,
-          "observedMean": 4.976682,
-          "sd": 1.406974
+          "observedMean": 4.976536,
+          "sd": 1.406888
         },
         {
           "mean": 5,
-          "observedMean": 4.99444,
-          "sd": 1.310659
+          "observedMean": 4.994332,
+          "sd": 1.310692
         },
         {
           "mean": 5,
-          "observedMean": 5.009884,
-          "sd": 1.224737
+          "observedMean": 5.010048,
+          "sd": 1.224674
         },
         {
           "mean": 5,
-          "observedMean": 5.025738,
-          "sd": 1.142649
+          "observedMean": 5.026332,
+          "sd": 1.142455
         },
         {
           "mean": 5,
-          "observedMean": 5.039036,
-          "sd": 1.066793
+          "observedMean": 5.039708,
+          "sd": 1.066712
         },
         {
           "mean": 5,
-          "observedMean": 5.052877,
-          "sd": 1.002556
+          "observedMean": 5.054062,
+          "sd": 1.002376
         },
         {
           "mean": 5,
-          "observedMean": 5.064138,
-          "sd": 0.939517
+          "observedMean": 5.065865,
+          "sd": 0.938998
         },
         {
           "mean": 5,
-          "observedMean": 5.074188,
-          "sd": 0.879588
+          "observedMean": 5.076343,
+          "sd": 0.87885
         },
         {
           "mean": 5,
-          "observedMean": 5.054428,
-          "sd": 0.837568
+          "observedMean": 5.058031,
+          "sd": 0.835645
         },
         {
           "mean": 5,
-          "observedMean": 5.039554,
-          "sd": 0.796468
+          "observedMean": 5.044674,
+          "sd": 0.793686
         },
         {
           "mean": 5,
-          "observedMean": 5.024306,
-          "sd": 0.756457
+          "observedMean": 5.031991,
+          "sd": 0.753523
         },
         {
           "mean": 5,
-          "observedMean": 5.012066,
-          "sd": 0.720351
+          "observedMean": 5.021478,
+          "sd": 0.718583
         }
       ]
     },
     "stability": {
       "mean": 5,
-      "observedMean": 4.987017,
-      "sd": 0.835588,
+      "observedMean": 5.167024,
+      "sd": 0.825228,
       "ages": [
         {
           "mean": 5,
@@ -676,91 +677,91 @@ export const PERCENTILE_REFERENCE = {
         },
         {
           "mean": 5,
-          "observedMean": 5.132452,
-          "sd": 1.826597
+          "observedMean": 5.132665,
+          "sd": 1.826588
         },
         {
           "mean": 5,
-          "observedMean": 5.102866,
-          "sd": 1.644123
+          "observedMean": 5.10436,
+          "sd": 1.64413
         },
         {
           "mean": 5,
-          "observedMean": 5.133244,
-          "sd": 1.486507
+          "observedMean": 5.135564,
+          "sd": 1.48667
         },
         {
           "mean": 5,
-          "observedMean": 5.159017,
-          "sd": 1.354722
+          "observedMean": 5.16243,
+          "sd": 1.354732
         },
         {
           "mean": 5,
-          "observedMean": 5.157708,
-          "sd": 1.23745
+          "observedMean": 5.167869,
+          "sd": 1.2376
         },
         {
           "mean": 5,
-          "observedMean": 5.132068,
-          "sd": 1.141703
+          "observedMean": 5.155054,
+          "sd": 1.139949
         },
         {
           "mean": 5,
-          "observedMean": 5.106465,
-          "sd": 1.061143
+          "observedMean": 5.142128,
+          "sd": 1.05851
         },
         {
           "mean": 5,
-          "observedMean": 5.087316,
-          "sd": 1.012283
+          "observedMean": 5.136103,
+          "sd": 1.008363
         },
         {
           "mean": 5,
-          "observedMean": 5.065743,
-          "sd": 0.956062
+          "observedMean": 5.125746,
+          "sd": 0.950903
         },
         {
           "mean": 5,
-          "observedMean": 5.047634,
-          "sd": 0.91326
+          "observedMean": 5.122681,
+          "sd": 0.909183
         },
         {
           "mean": 5,
-          "observedMean": 5.04218,
-          "sd": 0.870524
+          "observedMean": 5.133151,
+          "sd": 0.865031
         },
         {
           "mean": 5,
-          "observedMean": 5.033534,
-          "sd": 0.847628
+          "observedMean": 5.139064,
+          "sd": 0.841054
         },
         {
           "mean": 5,
-          "observedMean": 5.024058,
-          "sd": 0.843392
+          "observedMean": 5.144612,
+          "sd": 0.833235
         },
         {
           "mean": 5,
-          "observedMean": 5.011544,
-          "sd": 0.843263
+          "observedMean": 5.145888,
+          "sd": 0.832739
         },
         {
           "mean": 5,
-          "observedMean": 5.016327,
-          "sd": 0.83597
+          "observedMean": 5.163196,
+          "sd": 0.825936
         },
         {
           "mean": 5,
-          "observedMean": 4.998093,
-          "sd": 0.834812
+          "observedMean": 5.162651,
+          "sd": 0.827527
         }
       ]
     }
   },
   "height": {
     "male": {
-      "mean": 68.425406,
-      "sd": 3.455506,
+      "mean": 68.427514,
+      "sd": 3.453632,
       "ages": [
         {
           "mean": 19.629805,
@@ -791,54 +792,54 @@ export const PERCENTILE_REFERENCE = {
           "sd": 2.084324
         },
         {
-          "mean": 47.06188,
-          "sd": 2.232594
+          "mean": 47.062172,
+          "sd": 2.232603
         },
         {
-          "mean": 49.422453,
-          "sd": 2.369262
+          "mean": 49.423183,
+          "sd": 2.36916
         },
         {
-          "mean": 51.610945,
-          "sd": 2.497897
+          "mean": 51.61178,
+          "sd": 2.497932
         },
         {
-          "mean": 53.608904,
-          "sd": 2.624885
+          "mean": 53.609814,
+          "sd": 2.62491
         },
         {
-          "mean": 55.560116,
-          "sd": 2.765813
+          "mean": 55.561127,
+          "sd": 2.765797
         },
         {
-          "mean": 57.782535,
-          "sd": 2.962273
+          "mean": 57.78329,
+          "sd": 2.962336
         },
         {
-          "mean": 60.523622,
-          "sd": 3.234999
+          "mean": 60.524849,
+          "sd": 3.234731
         },
         {
-          "mean": 63.421967,
-          "sd": 3.43021
+          "mean": 63.423587,
+          "sd": 3.429817
         },
         {
-          "mean": 65.84001,
-          "sd": 3.493762
+          "mean": 65.841595,
+          "sd": 3.492575
         },
         {
-          "mean": 67.459678,
-          "sd": 3.474193
+          "mean": 67.461637,
+          "sd": 3.472572
         },
         {
-          "mean": 68.247918,
-          "sd": 3.454557
+          "mean": 68.24997,
+          "sd": 3.452735
         }
       ]
     },
     "female": {
-      "mean": 63.265119,
-      "sd": 3.046224,
+      "mean": 63.265851,
+      "sd": 3.045978,
       "ages": [
         {
           "mean": 19.370765,
@@ -857,60 +858,60 @@ export const PERCENTILE_REFERENCE = {
           "sd": 1.602186
         },
         {
-          "mean": 39.067274,
-          "sd": 1.750767
+          "mean": 39.067269,
+          "sd": 1.750771
         },
         {
-          "mean": 41.714172,
-          "sd": 1.899301
+          "mean": 41.714157,
+          "sd": 1.899314
         },
         {
-          "mean": 44.424632,
-          "sd": 2.05442
+          "mean": 44.424607,
+          "sd": 2.054441
         },
         {
-          "mean": 47.045322,
-          "sd": 2.198107
+          "mean": 47.045292,
+          "sd": 2.198135
         },
         {
-          "mean": 49.399451,
-          "sd": 2.326083
+          "mean": 49.399416,
+          "sd": 2.326109
         },
         {
-          "mean": 51.470624,
-          "sd": 2.444377
+          "mean": 51.470614,
+          "sd": 2.444435
         },
         {
-          "mean": 53.472286,
-          "sd": 2.568151
+          "mean": 53.472226,
+          "sd": 2.56837
         },
         {
-          "mean": 55.841184,
-          "sd": 2.76499
+          "mean": 55.841244,
+          "sd": 2.765196
         },
         {
-          "mean": 58.552302,
-          "sd": 2.978537
+          "mean": 58.552413,
+          "sd": 2.978825
         },
         {
-          "mean": 60.91003,
-          "sd": 3.082975
+          "mean": 60.910534,
+          "sd": 3.082866
         },
         {
-          "mean": 62.421159,
-          "sd": 3.076829
+          "mean": 62.421779,
+          "sd": 3.076648
         },
         {
-          "mean": 63.107414,
-          "sd": 3.055761
+          "mean": 63.108135,
+          "sd": 3.055535
         },
         {
-          "mean": 63.258875,
-          "sd": 3.047514
+          "mean": 63.259606,
+          "sd": 3.04727
         },
         {
-          "mean": 63.265283,
-          "sd": 3.045463
+          "mean": 63.266015,
+          "sd": 3.045218
         }
       ]
     }
@@ -945,48 +946,48 @@ export const PERCENTILE_REFERENCE = {
       "sd": 1.868253
     },
     {
-      "mean": 5.692264,
-      "sd": 1.84674
+      "mean": 5.692367,
+      "sd": 1.846898
     },
     {
-      "mean": 5.790123,
-      "sd": 1.823183
+      "mean": 5.790131,
+      "sd": 1.823419
     },
     {
-      "mean": 5.885748,
-      "sd": 1.798823
+      "mean": 5.885741,
+      "sd": 1.799098
     },
     {
-      "mean": 5.983391,
-      "sd": 1.777456
+      "mean": 5.983371,
+      "sd": 1.777669
     },
     {
-      "mean": 6.075024,
-      "sd": 1.754629
+      "mean": 6.074994,
+      "sd": 1.754839
     },
     {
-      "mean": 6.162059,
-      "sd": 1.728326
+      "mean": 6.161991,
+      "sd": 1.728527
     },
     {
-      "mean": 6.251744,
-      "sd": 1.707903
+      "mean": 6.251719,
+      "sd": 1.708047
     },
     {
-      "mean": 6.33495,
-      "sd": 1.690803
+      "mean": 6.335013,
+      "sd": 1.690868
     },
     {
-      "mean": 6.419015,
-      "sd": 1.6733
+      "mean": 6.419207,
+      "sd": 1.673431
     },
     {
-      "mean": 6.503433,
-      "sd": 1.650608
+      "mean": 6.503864,
+      "sd": 1.650105
     },
     {
-      "mean": 6.586559,
-      "sd": 1.630312
+      "mean": 6.58727,
+      "sd": 1.629848
     }
   ]
 };
