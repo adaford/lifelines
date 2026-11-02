@@ -1,23 +1,23 @@
 // Lifelines: deterministic, browser-independent simulation rules.
 // All public actions mutate their state and return { ok, reason? }.
-import { JOBS } from './jobs.js?v=perk-affinities';
-import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=perk-affinities';
-import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=perk-affinities';
-import { mortalityRisk, rollMortality } from './mortality.js?v=perk-affinities';
-import { heightReference, advanceGrowth } from './growth.js?v=perk-affinities';
-import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=perk-affinities';
-import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, standardFocusPractice, schoolAppearanceChange, DEVELOPMENT_BALANCE, BIRTH_VARIATION, SKILL_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, PARENT_FAMILY_STABILITY_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=perk-affinities';
-import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=perk-affinities';
-import { normalPercentile } from './percentiles.js?v=perk-affinities';
-import { changedRating } from './rating-changes.js?v=perk-affinities';
-import { MAX_FOCUS, DEFAULT_FOCUS, SCHOOL_FOCUS_KEYS, focusMaxFor, focusNeutralFor, isSchoolActivityFocus, focusEffect, focusKeysForAge, focusBudget, defaultFocus, legacyFocusValue } from './focus-rules.js?v=perk-affinities';
-import { SCHOOL_OFFER_COUNT, schoolActivity, gradeScore, activitySuccessChange, activityEligible, annualSchoolOffers, createSchoolRecord } from './school.js?v=perk-affinities';
-import { assignBirthConditions, applyBirthConditions, getBirthConditions, conditionFocusPoints, conditionFocusLimits, validateBirthConditions } from './birth-conditions.js?v=perk-affinities';
+import { JOBS } from './jobs.js?v=playgroup-creativity';
+import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=playgroup-creativity';
+import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=playgroup-creativity';
+import { mortalityRisk, rollMortality } from './mortality.js?v=playgroup-creativity';
+import { heightReference, advanceGrowth } from './growth.js?v=playgroup-creativity';
+import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=playgroup-creativity';
+import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, standardFocusPractice, schoolAppearanceChange, DEVELOPMENT_BALANCE, BIRTH_VARIATION, SKILL_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, PARENT_FAMILY_STABILITY_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=playgroup-creativity';
+import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=playgroup-creativity';
+import { normalPercentile } from './percentiles.js?v=playgroup-creativity';
+import { changedRating } from './rating-changes.js?v=playgroup-creativity';
+import { MAX_FOCUS, DEFAULT_FOCUS, SCHOOL_FOCUS_KEYS, focusMaxFor, focusNeutralFor, isSchoolActivityFocus, focusEffect, focusKeysForAge, focusBudget, defaultFocus, legacyFocusValue } from './focus-rules.js?v=playgroup-creativity';
+import { SCHOOL_OFFER_COUNT, schoolActivity, gradeScore, activitySuccessChange, activityEligible, annualSchoolOffers, createSchoolRecord } from './school.js?v=playgroup-creativity';
+import { assignBirthConditions, applyBirthConditions, getBirthConditions, conditionFocusPoints, conditionFocusLimits, validateBirthConditions } from './birth-conditions.js?v=playgroup-creativity';
 export { DEVELOPMENT_BALANCE };
-export { heightPercentile } from './growth.js?v=perk-affinities';
-export { mortalityRisk } from './mortality.js?v=perk-affinities';
-import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=perk-affinities';
-export { JOBS, JOB_CATEGORIES } from './jobs.js?v=perk-affinities';
+export { heightPercentile } from './growth.js?v=playgroup-creativity';
+export { mortalityRisk } from './mortality.js?v=playgroup-creativity';
+import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=playgroup-creativity';
+export { JOBS, JOB_CATEGORIES } from './jobs.js?v=playgroup-creativity';
 export const EVENTS = [...PERSONAL_EVENTS, ...FAMILY_EVENTS];
 
 export const SKILLS = [

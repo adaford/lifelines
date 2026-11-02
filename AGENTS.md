@@ -1,5 +1,9 @@
 # Lifelines
 
+## Playgroup musician reward (3 November 2026)
+
+A musician at playgroup (`musical_baby`) permanently adds base +0.2 Creativity, subject to the usual directional rating response and bounds. It no longer adds Social. Preserve its ID, story, eligibility, odds, and all recorded past outcomes.
+
 ## Perk affinities and readable profiles (3 November 2026)
 
 Perks never directly change a stat rating. Every former positive/negative stat effect now changes that stat's affinity (stored as aptitude) by +1/-1. Sum the effects of all assigned perks, then clamp each affinity to -3 through +3. For example, Sharp memory grants +1 Intelligence affinity. Apply these changes once after generating a new person's ratings; do not rerate them. Perks may still grant or remove focus points and impose lifelong activity limits. Preserve all 100 IDs, odds, inheritance rules, exclusion groups, and existing focus effects.

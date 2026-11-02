@@ -1,8 +1,8 @@
 // Fictional life-sim probabilities and consequences, not real-world risk estimates.
 // Each eligible event gets an independent yearly roll. The engine caps a year at five.
 // Low/high factors are curved so extreme traits matter much more than small changes.
-import { legacyFocusValue } from './focus-rules.js?v=perk-affinities';
-import { APTITUDE_EVENTS } from './cross-aptitude-events.js?v=perk-affinities';
+import { legacyFocusValue } from './focus-rules.js?v=playgroup-creativity';
+import { APTITUDE_EVENTS } from './cross-aptitude-events.js?v=playgroup-creativity';
 
 const low = key => [key, 'low'];
 const high = key => [key, 'high'];
@@ -60,7 +60,7 @@ export const EVENTS = [
     { id: 'first_words', name: 'A relative comes to stay', description: 'A visiting relative spends afternoons chatting and playing peekaboo with you, helping you feel at ease around people.', statFactors: [high('intelligence')], ...change({ social: .2, stability: .15 }) },
     { id: 'wobbly_steps', name: 'A play tunnel arrives', description: 'A family friend brings a play tunnel with hidden toys and spends visits helping you explore it.', statFactors: [high('strength')], ...change({ intelligence: .2 }) },
     { id: 'bedtime_stories', name: 'A clever relative visits', description: 'A clever relative starts visiting regularly, reading picture books and teaching you little naming games.', ...change({ intelligence: .2, stability: .1 }) },
-    { id: 'musical_baby', name: 'A musician at playgroup', description: 'A visiting musician gets you and the other babies taking turns with songs and rattles.', statFactors: [high('creativity')], ...change({ social: .2 }) },
+    { id: 'musical_baby', name: 'A musician at playgroup', description: 'A visiting musician gets you and the other babies taking turns with songs and rattles.', statFactors: [high('creativity')], ...change({ creativity: .2 }) },
     { id: 'gentle_playgroup', name: 'An invitation to baby group', description: 'A neighbor invites your caregiver to a small baby group, giving you new children to play beside.', ...change({ social: .2 }) },
     { id: 'baby_cold', name: 'A cold spreads at playgroup', description: 'You catch a cold at a playgroup gathering, and a blocked nose makes feeding and sleep uncomfortable.', kind: 'negative', statFactors: [low('health')], ...temporary({ stability: -.3 }) },
     { id: 'teething', name: 'A noisy building repair', description: 'Emergency repairs fill your home with drilling and unfamiliar workers, leaving you distressed.', kind: 'negative', ...temporary({ stability: -.4 }) },

@@ -1,7 +1,7 @@
-import { annualForecast, effectiveStats, needsEducationChoice, focusLimits, caregivers, JOBS } from './engine.js?v=perk-affinities';
-import { infantChoiceEffects, wellbeingResponse, toddlerActivityEffects, toddlerActivityNeutral, toddlerActivitySteps, schoolFocusEffects, schoolFocusSteps, focusChoiceEffects, focusEffectStrength, standardFocusCoefficients, TODDLER_FOCUS, TODDLER_ACTIVITY_EFFECTS, PARENT_FAMILY_STABILITY_GAIN, PARENT_FAMILY_RELATIONSHIP_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=perk-affinities';
-import { DEFAULT_FOCUS, focusEffect, focusNeutralFor } from './focus-rules.js?v=perk-affinities';
-import { changedRating } from './rating-changes.js?v=perk-affinities';
+import { annualForecast, effectiveStats, needsEducationChoice, focusLimits, caregivers, JOBS } from './engine.js?v=playgroup-creativity';
+import { infantChoiceEffects, wellbeingResponse, toddlerActivityEffects, toddlerActivityNeutral, toddlerActivitySteps, schoolFocusEffects, schoolFocusSteps, focusChoiceEffects, focusEffectStrength, standardFocusCoefficients, TODDLER_FOCUS, TODDLER_ACTIVITY_EFFECTS, PARENT_FAMILY_STABILITY_GAIN, PARENT_FAMILY_RELATIONSHIP_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=playgroup-creativity';
+import { DEFAULT_FOCUS, focusEffect, focusNeutralFor } from './focus-rules.js?v=playgroup-creativity';
+import { changedRating } from './rating-changes.js?v=playgroup-creativity';
 
 const nonzero = value => Math.abs(value) > .000001;
 const keyOf = entry => `${entry.parentId || 'you'}:${entry.stat}`;

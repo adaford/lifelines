@@ -6,15 +6,15 @@ import {
   offeredJobs, needsEducationChoice, pendingEventSubject, focusLimits, focusLimitDetails, caregivers,
   relationshipOdds, meetingChances, proposalChance, pregnancyChance, oneNightChance,
   respondToEncounter, proposeMarriage, endRelationship, normalizeSurname, heightPercentile, statPercentiles
-} from './engine.js?v=perk-affinities';
-import { LEGACY_EVENT_COPY } from './event-copy-history.js?v=perk-affinities';
-import { annotateNarrative } from './narrative.js?v=perk-affinities';
-import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome } from './display.js?v=perk-affinities';
+} from './engine.js?v=playgroup-creativity';
+import { LEGACY_EVENT_COPY } from './event-copy-history.js?v=playgroup-creativity';
+import { annotateNarrative } from './narrative.js?v=playgroup-creativity';
+import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome } from './display.js?v=playgroup-creativity';
 
-import { MAX_FOCUS, focusBudget, focusMaxFor } from './focus-rules.js?v=perk-affinities';
-import { schoolActivity, gradeLetter, activityEligible } from './school.js?v=perk-affinities';
-import { getBirthConditions } from './birth-conditions.js?v=perk-affinities';
-import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=perk-affinities';
+import { MAX_FOCUS, focusBudget, focusMaxFor } from './focus-rules.js?v=playgroup-creativity';
+import { schoolActivity, gradeLetter, activityEligible } from './school.js?v=playgroup-creativity';
+import { getBirthConditions } from './birth-conditions.js?v=playgroup-creativity';
+import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=playgroup-creativity';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const app = document.querySelector('#app');
