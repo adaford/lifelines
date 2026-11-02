@@ -1,5 +1,15 @@
 # Lifelines
 
+## Activity participation and height advantages (3 November 2026)
+
+These rules supersede neutral-at-one activity training and initially displayed 5.0 success. The school budget remains 10, activity maxima remain 2, and joining still assigns 1 point.
+
+Sports and extracurricular training use contribution units **-1, +1, +2** at 0, 1, and 2 points. One point gives one positive sign per trained stat, and two give two signs with twice the raw training. Apply the existing yearly factor, aptitude/age response, directional damping, and bounds once. Every sport still trains Strength and Social; clubs train only their own listed stats. For a player school record with no extracurricular enrollment, apply one negative unit each of Creativity and Social (.24 coefficients), including the preview while its controls stay locked at 0. School-age family members without enrollment records retain their automatic practice rules. No sport enrollment has no sports training effect. Paused ineligible sports remain inactive. Other focus curves and career/college rules are unchanged.
+
+Swimming performance uses 70% Strength and 30% taller same-age height; wrestling uses 70% Strength and 30% shorter same-age height. Use the existing age-relative height rating and invert it only for wrestling (`heightPreference: 'shorter'`). Keep all weights positive and retain Strength's larger role. These height advantages affect performance and success, not stat training or height growth. Offer cards state the preferred height direction.
+
+New or switched activity enrollment saves `success: null` and displays **N/A** without a numeric meter. No enrollment also shows Success N/A. The first eligible completed year applies the established success change to an internal baseline of 5, then displays the earned one-decimal result. Success still responds to focus relative to 1, abilities, and one bounded normal draw; this progression is separate from the new training scale. An ineligible activity stays N/A until actual participation. New first-year reports record `before: null`; a paused unrated report may also have `after: null`. Render these as N/A, never 0.0. Existing numeric success ratings and historical reports remain unchanged on reload, as do all other saved progress and RNG. Schema 19 accepts explicit unrated values without rerolling or resetting existing activities.
+
 ## Gentler health effects on height (3 November 2026)
 
 Health 3-4 now reduces each growing year's height gain by roughly one percentile point near the middle of the same-age height distribution, compared with an otherwise identical Health-5 life. This is the health contribution, not a fixed total change in the displayed percentile: inherited growth, maturation timing, yearly variation, and location within the distribution still matter. Health 5+ remains neutral.

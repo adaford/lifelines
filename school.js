@@ -1,16 +1,17 @@
-import { heightReference } from './growth.js?v=gentler-height-growth';
+import { heightReference } from './growth.js?v=activity-participation';
 
 // Fictional school activities and success rules, independent of save mutation
 // and the gameplay RNG. The engine supplies effective ratings and any draw.
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
 const finite = (value, fallback = 0) => Number.isFinite(value) ? value : fallback;
 const round = (value, places) => Math.round(value * 10 ** places) / 10 ** places;
-const activity = (id, name, weights, training, minLifestyle) => Object.freeze({
+const activity = (id, name, weights, training, minLifestyle, heightPreference) => Object.freeze({
   id, name, weights: Object.freeze(weights), training: Object.freeze(training),
   ...(minLifestyle === undefined ? {} : { minLifestyle }),
+  ...(heightPreference === undefined ? {} : { heightPreference }),
 });
-const sport = (id, name, weights = { strength: 1 }, extraTraining = {}, minLifestyle) =>
-  activity(id, name, weights, { strength: .3, social: .24, ...extraTraining }, minLifestyle);
+const sport = (id, name, weights = { strength: 1 }, extraTraining = {}, minLifestyle, heightPreference) =>
+  activity(id, name, weights, { strength: .3, social: .24, ...extraTraining }, minLifestyle, heightPreference);
 const instrument = (id, name) => activity(id, name, { creativity: 1 }, { creativity: .24 });
 
 export const SPORTS = Object.freeze([
@@ -22,11 +23,11 @@ export const SPORTS = Object.freeze([
   sport('lacrosse', 'Lacrosse', { strength: 1 }, {}, 7),
   sport('fencing', 'Fencing', { strength: .6, intelligence: .4 }, { intelligence: .225 }),
   sport('gymnastics', 'Gymnastics', { strength: .7, creativity: .3 }, { creativity: .24 }),
-  sport('swimming', 'Swimming'),
+  sport('swimming', 'Swimming', { strength: .7, height: .3 }),
   sport('track', 'Track and field'),
   sport('cross_country', 'Cross-country running'),
   sport('volleyball', 'Volleyball', { strength: .7, height: .3 }),
-  sport('wrestling', 'Wrestling'),
+  sport('wrestling', 'Wrestling', { strength: .7, height: .3 }, {}, undefined, 'shorter'),
   sport('martial_arts', 'Martial arts'),
   sport('badminton', 'Badminton'),
   sport('table_tennis', 'Table tennis'),
@@ -97,7 +98,8 @@ export function activityPerformance(person, selected) {
   let score = 0, total = 0;
   for (const [stat, rawWeight] of Object.entries(selected.weights)) {
     const weight = Math.max(0, finite(rawWeight));
-    const value = stat === 'height' ? heightRating(person) : clamp(finite(person?.stats?.[stat], 5), 0, 10);
+    const rating = stat === 'height' ? heightRating(person) : clamp(finite(person?.stats?.[stat], 5), 0, 10);
+    const value = stat === 'height' && selected.heightPreference === 'shorter' ? 10 - rating : rating;
     score += weight * value;
     total += weight;
   }

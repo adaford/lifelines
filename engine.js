@@ -1,23 +1,23 @@
 // Lifelines: deterministic, browser-independent simulation rules.
 // All public actions mutate their state and return { ok, reason? }.
-import { JOBS } from './jobs.js?v=gentler-height-growth';
-import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=gentler-height-growth';
-import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=gentler-height-growth';
-import { mortalityRisk, rollMortality } from './mortality.js?v=gentler-height-growth';
-import { heightReference, advanceGrowth } from './growth.js?v=gentler-height-growth';
-import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=gentler-height-growth';
-import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, standardFocusPractice, schoolAppearanceChange, DEVELOPMENT_BALANCE, BIRTH_VARIATION, SKILL_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, PARENT_FAMILY_STABILITY_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=gentler-height-growth';
-import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=gentler-height-growth';
-import { normalPercentile } from './percentiles.js?v=gentler-height-growth';
-import { changedRating } from './rating-changes.js?v=gentler-height-growth';
-import { MAX_FOCUS, DEFAULT_FOCUS, SCHOOL_FOCUS_KEYS, focusMaxFor, focusNeutralFor, isSchoolActivityFocus, focusEffect, focusKeysForAge, focusBudget, defaultFocus, legacyFocusValue } from './focus-rules.js?v=gentler-height-growth';
-import { schoolActivity, gradeScore, activitySuccessChange, activityEligible, annualSchoolOffers, createSchoolRecord } from './school.js?v=gentler-height-growth';
-import { assignBirthConditions, getBirthConditions, conditionFocusPoints, conditionFocusLimits, validateBirthConditions } from './birth-conditions.js?v=gentler-height-growth';
+import { JOBS } from './jobs.js?v=activity-participation';
+import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=activity-participation';
+import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=activity-participation';
+import { mortalityRisk, rollMortality } from './mortality.js?v=activity-participation';
+import { heightReference, advanceGrowth } from './growth.js?v=activity-participation';
+import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=activity-participation';
+import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, standardFocusPractice, schoolAppearanceChange, DEVELOPMENT_BALANCE, BIRTH_VARIATION, SKILL_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, PARENT_FAMILY_STABILITY_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=activity-participation';
+import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=activity-participation';
+import { normalPercentile } from './percentiles.js?v=activity-participation';
+import { changedRating } from './rating-changes.js?v=activity-participation';
+import { MAX_FOCUS, DEFAULT_FOCUS, SCHOOL_FOCUS_KEYS, focusMaxFor, focusNeutralFor, isSchoolActivityFocus, focusEffect, focusKeysForAge, focusBudget, defaultFocus, legacyFocusValue } from './focus-rules.js?v=activity-participation';
+import { schoolActivity, gradeScore, activitySuccessChange, activityEligible, annualSchoolOffers, createSchoolRecord } from './school.js?v=activity-participation';
+import { assignBirthConditions, getBirthConditions, conditionFocusPoints, conditionFocusLimits, validateBirthConditions } from './birth-conditions.js?v=activity-participation';
 export { DEVELOPMENT_BALANCE };
-export { heightPercentile } from './growth.js?v=gentler-height-growth';
-export { mortalityRisk } from './mortality.js?v=gentler-height-growth';
-import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=gentler-height-growth';
-export { JOBS, JOB_CATEGORIES } from './jobs.js?v=gentler-height-growth';
+export { heightPercentile } from './growth.js?v=activity-participation';
+export { mortalityRisk } from './mortality.js?v=activity-participation';
+import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=activity-participation';
+export { JOBS, JOB_CATEGORIES } from './jobs.js?v=activity-participation';
 export const EVENTS = [...PERSONAL_EVENTS, ...FAMILY_EVENTS];
 
 export const SKILLS = [
@@ -296,11 +296,11 @@ export function enrollSchoolActivity(state, kind, id) {
   if (!state.school.offers[kind].includes(id)) return fail('Choose one of this year’s offered activities.');
   const activity = schoolActivity(kind, id);
   if (!activity || !activityEligible(state, activity)) return fail('Your lifestyle does not meet this activity’s requirement.');
-  const candidate = { ...state, school: { ...state.school, [kind]: { id, success: 5 } } };
+  const candidate = { ...state, school: { ...state.school, [kind]: { id, success: null } } };
   if (focusLimits(candidate)[kind] < 1) return fail('This activity is currently restricted.');
   const required = state.focus[kind] > 0 ? 0 : 1;
   if (Object.values(state.focus).reduce((sum, value) => sum + value, 0) + required > focusBudget(state)) return fail('Free one focus point before joining this activity.');
-  state.school[kind] = { id, success: 5 };
+  state.school[kind] = { id, success: null };
   state.focus[kind] = Math.max(1, state.focus[kind]);
   return ok();
 }
@@ -777,7 +777,7 @@ function schoolYear(state, growthRandom) {
     const before = enrollment.success;
     if (activityEligible(person, activity)) {
       const delta = activitySuccessChange(person, activity, state.focus[kind], growthRandom ? growthRandom() : 0);
-      enrollment.success = round(clamp(before + delta, 0, 10));
+      enrollment.success = round(clamp((before ?? 5) + delta, 0, 10));
     }
     report.activities.push({ kind, id: activity.id, name: activity.name, focus: state.focus[kind], before, after: enrollment.success });
   }
@@ -1153,7 +1153,7 @@ function validSchema(raw, version) {
     if (!validFocus(raw.focus, currentFocusKeys, currentMaximum, currentBudget)) return false;
     if (version >= 19) {
       const school = raw.school;
-      const validEnrollment = (entry, kind) => entry === null || entry && Object.keys(entry).length === 2 && Boolean(schoolActivity(kind, entry.id)) && finite(entry.success, 0, 10);
+      const validEnrollment = (entry, kind) => entry === null || entry && Object.keys(entry).length === 2 && Boolean(schoolActivity(kind, entry.id)) && (entry.success === null || finite(entry.success, 0, 10));
       const validOffers = (ids, kind) => Array.isArray(ids) && ids.length === 5 && new Set(ids).size === 5 && ids.every(id => Boolean(schoolActivity(kind, id)));
       if (school === null) { if (raw.age >= 5 && raw.age < 18) return false; }
       else if (raw.age < 5 || !school || Object.keys(school).length !== 6 || !finite(school.gpa, 50, 100)
@@ -1201,7 +1201,9 @@ function validSchema(raw, version) {
           || !Number.isInteger(report.study) || !finite(report.study, 0, 4) || !finite(report.intelligence, effectiveFloor, effectiveCeiling)
           || !Array.isArray(report.activities) || report.activities.length > 2
           || new Set(report.activities.map(activity => activity.kind)).size !== report.activities.length
-          || !report.activities.every(activity => ['sports', 'extracurricular'].includes(activity.kind) && Boolean(schoolActivity(activity.kind, activity.id)) && text(activity.name, 100) && Number.isInteger(activity.focus) && finite(activity.focus, 0, 2) && finite(activity.before, 0, 10) && finite(activity.after, 0, 10))) return false;
+          || !report.activities.every(activity => ['sports', 'extracurricular'].includes(activity.kind) && Boolean(schoolActivity(activity.kind, activity.id)) && text(activity.name, 100) && Number.isInteger(activity.focus) && finite(activity.focus, 0, 2)
+            && (activity.before === null || finite(activity.before, 0, 10))
+            && (activity.after === null ? activity.before === null && activity.focus === 0 : finite(activity.after, 0, 10)))) return false;
       }
       if (summary?.height !== undefined && (!finite(summary.height.before, heightBound(40), heightBound(240)) || !finite(summary.height.after, heightBound(40), heightBound(240)) || !finite(summary.height.change, 0, heightBound(200)) || Math.abs(round(summary.height.after - summary.height.before) - summary.height.change) > .001)) return false;
       if (summary !== null && (!summary || typeof summary.dismissed !== 'boolean' || summary.toAge !== raw.age || summary.fromAge !== raw.age - 1 || !summary.stats || Object.keys(summary.stats).length !== STAT_KEYS.length || !STAT_KEYS.every(key => validDelta(summary.stats[key], true)) || !validDelta(summary.lifestyle, true) || !Array.isArray(summary.parents) || summary.parents.length > (version >= 15 ? 3 : 2) || !summary.parents.every(parent => text(parent.id, 100) && text(parent.name, 50) && validDelta(parent.stability) && validDelta(parent.relationship) && (parent.lifestyle === undefined || validDelta(parent.lifestyle, true))) || !Array.isArray(summary.events) || summary.events.length > 30 || !summary.events.every(event => text(event.title, 200) && text(event.text, 2000) && text(event.kind, 50) && (event.description === undefined || text(event.description, 1000))))) return false;

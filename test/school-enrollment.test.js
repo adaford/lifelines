@@ -62,7 +62,7 @@ test('joining requires an offered affordable activity and unlocks one of two foc
   assert.deepEqual(state, lowLifestyle);
   state.lifestyle = 7;
   assert.equal(enrollSchoolActivity(state, 'sports', 'lacrosse').ok, true);
-  assert.deepEqual(state.school.sports, { id: 'lacrosse', success: 5 });
+  assert.deepEqual(state.school.sports, { id: 'lacrosse', success: null });
   assert.equal(state.focus.sports, 1);
   assert.equal(focusLimits(state).sports, 2);
   join(state, 'extracurricular', 'chess');
@@ -77,13 +77,17 @@ test('joining requires an offered affordable activity and unlocks one of two foc
 test('keeping an activity preserves success, switching resets it, and leaving locks its focus at zero', () => {
   const state = pupil();
   join(state, 'sports', 'soccer');
+  const unreported = copy(state);
+  assert.equal(enrollSchoolActivity(state, 'sports', 'soccer').ok, true);
+  assert.deepEqual(state, unreported, 'keeping an unreported activity preserves N/A');
   state.school.sports.success = 8.75;
+  assert.deepEqual(migrateSave(copy(state)), state, 'saved numeric success is never reset on load');
   const before = copy(state);
   assert.equal(enrollSchoolActivity(state, 'sports', 'soccer').ok, true);
   assert.deepEqual(state, before, 'keeping the current activity is a true no-op');
   offered(state, 'sports', 'tennis');
   assert.equal(enrollSchoolActivity(state, 'sports', 'tennis').ok, true);
-  assert.deepEqual(state.school.sports, { id: 'tennis', success: 5 });
+  assert.deepEqual(state.school.sports, { id: 'tennis', success: null });
   assert.equal(state.focus.sports, 1);
   assert.equal(leaveSchoolActivity(state, 'sports').ok, true);
   assert.equal(state.school.sports, null);
@@ -102,7 +106,8 @@ test('annual activity offers are fresh while enrollment, success, saved offers, 
   join(state, 'extracurricular', 'chess');
   const before = copy(state), offers = copy(state.school.offers);
   for (let read = 0; read < 3; read++) {
-    annualForecast(state);
+    const forecast = annualForecast(state);
+    assert.ok(forecast.school.activities.every(activity => activity.before === null && activity.after === 5));
     schoolChoiceImpacts(state, 'sports');
     schoolChoiceImpacts(state, 'extracurricular');
     assert.deepEqual(state, before, 'preview reads never reroll or consume RNG');
@@ -112,7 +117,8 @@ test('annual activity offers are fresh while enrollment, success, saved offers, 
   const advanced = quietYear(reloaded);
   for (const kind of ['sports', 'extracurricular']) {
     assert.equal(advanced.school[kind].id, before.school[kind].id);
-    assert.equal(advanced.school[kind].success, 5, 'neutral focus and middle performance retain success');
+    assert.equal(advanced.school[kind].success, 5, 'the first eligible year starts from five before its success change');
+    assert.equal(advanced.yearSummary.school.activities.find(activity => activity.kind === kind).before, null);
     assert.equal(advanced.school.offers[kind].length, 5);
     assert.ok(advanced.school.offers[kind].every(id => !offers[kind].includes(id) && id !== advanced.school[kind].id));
     assert.equal(new Set(advanced.school.offers[kind]).size, 5);
@@ -179,7 +185,7 @@ test('activity success uses starting weighted performance, one supplied draw, an
     const advanced = quietYear(state, () => draw);
     const expected = Math.round((5 + activitySuccessChange({ ...state, stats: effectiveStats(state) }, activity, 2, draw)) * 100) / 100;
     assert.equal(advanced.school.sports.success, expected);
-    assert.deepEqual(advanced.yearSummary.school.activities[0], { kind: 'sports', id: 'basketball', name: 'Basketball', focus: 2, before: 5, after: expected });
+    assert.deepEqual(advanced.yearSummary.school.activities[0], { kind: 'sports', id: 'basketball', name: 'Basketball', focus: 2, before: null, after: expected });
   }
   state.school.sports.success = 9.99;
   assert.equal(quietYear(state).school.sports.success, 10);
@@ -198,6 +204,41 @@ test('activity success uses starting weighted performance, one supplied draw, an
   }
   assert.equal(counts[1] - counts[0], 1);
   assert.equal(counts[2] - counts[1], 1);
+});
+
+test('unreported success stays N/A while participation is paused, then initializes only in an eligible year', () => {
+  const state = pupil();
+  state.lifestyle = 7;
+  join(state, 'sports', 'lacrosse');
+  state.lifestyle = 6;
+  state.focus.sports = 0;
+  const before = copy(state);
+  const forecast = annualForecast(state);
+  assert.deepEqual(forecast.school.activities[0], { kind: 'sports', id: 'lacrosse', name: 'Lacrosse', focus: 0, before: null, after: null });
+  assert.deepEqual(state, before);
+  assert.deepEqual(migrateSave(copy(state)), state);
+  const paused = quietYear(state);
+  assert.equal(paused.school.sports.success, null);
+  assert.equal(paused.yearSummary.school.activities[0].after, null);
+  assert.equal(validateSave(paused), true);
+  assert.deepEqual(migrateSave(copy(paused)), paused);
+  paused.lifestyle = 7;
+  assert.equal(setFocus(paused, 'sports', 1).ok, true);
+  const expected = Math.round((5 + activitySuccessChange({ ...paused, stats: effectiveStats(paused) }, schoolActivity('sports', 'lacrosse'), 1)) * 100) / 100;
+  const active = quietYear(paused);
+  assert.equal(active.school.sports.success, expected);
+  assert.equal(active.yearSummary.school.activities[0].before, null);
+  assert.equal(validateSave(active), true);
+  assert.deepEqual(migrateSave(copy(active)), active);
+  for (const invalid of [undefined, -1, 10.1, NaN]) {
+    const malformed = copy(state);
+    malformed.school.sports.success = invalid;
+    assert.equal(validateSave(malformed), false, 'only explicit null or bounded numeric success is valid');
+  }
+  const erased = copy(active);
+  erased.yearSummary.school.activities[0].before = 5;
+  erased.yearSummary.school.activities[0].after = null;
+  assert.equal(validateSave(erased), false, 'a completed numeric rating cannot become unreported within a year');
 });
 
 test('school begins with unjoined activities and the final school report survives adulthood without continuing to change', () => {

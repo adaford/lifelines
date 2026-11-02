@@ -1,7 +1,7 @@
-import { annualForecast, effectiveStats, needsEducationChoice, focusLimits, caregivers, JOBS } from './engine.js?v=gentler-height-growth';
-import { infantChoiceEffects, wellbeingResponse, toddlerActivityEffects, toddlerActivityNeutral, toddlerActivitySteps, schoolFocusEffects, schoolFocusSteps, focusChoiceEffects, focusEffectStrength, standardFocusCoefficients, TODDLER_FOCUS, TODDLER_ACTIVITY_EFFECTS, PARENT_FAMILY_STABILITY_GAIN, PARENT_FAMILY_RELATIONSHIP_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=gentler-height-growth';
-import { DEFAULT_FOCUS, focusEffect, focusNeutralFor } from './focus-rules.js?v=gentler-height-growth';
-import { changedRating } from './rating-changes.js?v=gentler-height-growth';
+import { annualForecast, effectiveStats, needsEducationChoice, focusLimits, caregivers, JOBS } from './engine.js?v=activity-participation';
+import { infantChoiceEffects, wellbeingResponse, toddlerActivityEffects, toddlerActivityNeutral, toddlerActivitySteps, schoolFocusEffects, schoolFocusSteps, focusChoiceEffects, focusEffectStrength, standardFocusCoefficients, TODDLER_FOCUS, TODDLER_ACTIVITY_EFFECTS, PARENT_FAMILY_STABILITY_GAIN, PARENT_FAMILY_RELATIONSHIP_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=activity-participation';
+import { DEFAULT_FOCUS, focusEffect, focusNeutralFor } from './focus-rules.js?v=activity-participation';
+import { changedRating } from './rating-changes.js?v=activity-participation';
 
 const nonzero = value => Math.abs(value) > .000001;
 const keyOf = entry => `${entry.parentId || 'you'}:${entry.stat}`;
@@ -162,7 +162,7 @@ function adultFocusLevel(state, entry) {
   const career = JOBS.find(job => job.id === state.jobId);
   const coefficients = standardFocusCoefficients(state, career);
   if (!career && state.education.status !== 'college' && focusEffect(state.focus.work) > 0) coefficients.work.stability -= .15;
-  const units = Object.entries(coefficients).reduce((sum, [area, effects]) => sum + Math.sign(effects[entry.stat] || 0) * focusEffectStrength(coefficients, area, entry.stat) * focusEffect(state.focus[area]), 0);
+  const units = Object.entries(coefficients).reduce((sum, [area, effects]) => sum + Math.sign(effects[entry.stat] || 0) * focusEffectStrength(coefficients, area, entry.stat) * (state.age < 18 ? schoolFocusSteps(area, entry.stat, state.focus[area]) : focusEffect(state.focus[area])), 0);
   return Math.min(6, Math.max(1, Math.abs(units)));
 }
 

@@ -2513,7 +2513,7 @@ test('school controls expose the new activities, requested effects and help thro
     work:{intelligence:'++',creativity:'+',social:'-',stability:'-'},
     social:{social:'-',stability:'-'},
     self:{attractiveness:'+',health:'+',stability:'+'},
-    sports:{strength:'+',social:'+'},
+    sports:{strength:'++',social:'++'},
   };
   for(let reload=0;reload<2;reload++) {
     assert.equal(ui.all('.focus-row').length,6);
@@ -2638,12 +2638,12 @@ test('annual enrollment offers unlock zero-to-two controls, apply lifestyle gate
     assert.equal(row.querySelector('[data-delta="-1"]').disabled,true);
     assert.equal(row.querySelector('[data-delta="1"]').disabled,true);
     assert.equal(row.querySelectorAll('.focus-scale span').length,2);
-    assert.equal(row.querySelectorAll('.choice-impact').length,0);
+    assert.deepEqual(Object.fromEntries([...row.querySelectorAll('.choice-impact')].map(entry=>[entry.dataset.stat,entry.querySelector('b').textContent])),kind==='extracurricular'?{creativity:'-',social:'-'}:{});
   }
   ui.click('[data-action="school-offers"][data-kind="sports"]');
   assert.equal(ui.all('.school-offer').length,5);
   assert.deepEqual(ui.all('.school-offer').map(card=>card.dataset.offerId),fixture.school.offers.sports);
-  assert.match(ui.query('.school-offer[data-offer-id="basketball"]').textContent,/Performance: Strength, Height.*Training: Strength, Social/);
+  assert.match(ui.query('.school-offer[data-offer-id="basketball"]').textContent,/Performance: Strength, Taller height.*Training: Strength, Social/);
   assert.doesNotMatch(ui.query('.school-offer[data-offer-id="basketball"]').textContent,/Health/);
   assert.equal(ui.query('[data-action="school-enroll"][data-id="lacrosse"]').disabled,true);
   assert.match(ui.query('.school-offer[data-offer-id="lacrosse"]').textContent,/Lifestyle 7\.0/);
@@ -2651,31 +2651,39 @@ test('annual enrollment offers unlock zero-to-two controls, apply lifestyle gate
   assert.deepEqual(ui.saved(),before,'disabled enrollment does not consume a choice or RNG');
   ui.click('[data-action="school-enroll"][data-id="basketball"]');
   assert.equal(ui.all('[role="dialog"]').length,0);
-  assert.deepEqual(ui.saved().school.sports,{id:'basketball',success:5});
+  assert.deepEqual(ui.saved().school.sports,{id:'basketball',success:null});
   assert.equal(ui.saved().focus.sports,1);
   assert.equal(ui.saved().age,before.age);
   assert.equal(ui.saved().rng,before.rng);
   assert.deepEqual(ui.saved().stats,before.stats);
-  assert.match(ui.query('.school-enrollment[data-school-kind="sports"]').textContent,/Basketball.*Success 5\.0\/10/);
+  assert.match(ui.query('.school-enrollment[data-school-kind="sports"]').textContent,/Basketball.*Success N\/A/);
+  assert.equal(ui.query('.school-enrollment[data-school-kind="sports"]').querySelectorAll('[role="meter"]').length,0);
+  assert.deepEqual(ui.all('.focus-row[data-focus-key="sports"] .choice-impact b').map(sign=>sign.textContent),['+','+']);
+  ui.click('.focus-row[data-focus-key="sports"] [data-delta="-1"]');
+  assert.equal(ui.saved().focus.sports,0);
+  assert.equal(ui.saved().school.sports.id,'basketball','zero points keep the enrollment');
+  assert.deepEqual(ui.all('.focus-row[data-focus-key="sports"] .choice-impact b').map(sign=>sign.textContent),['-','-']);
+  ui.click('.focus-row[data-focus-key="sports"] [data-delta="1"]');
   ui.click('.focus-row[data-focus-key="sports"] [data-delta="1"]');
   assert.equal(ui.saved().focus.sports,2);
   assert.equal(ui.query('.focus-row[data-focus-key="sports"] [data-delta="1"]').disabled,true);
   assert.deepEqual(ui.all('.focus-row[data-focus-key="sports"] .choice-impact').map(entry=>entry.dataset.stat).sort(),['social','strength']);
+  assert.deepEqual(ui.all('.focus-row[data-focus-key="sports"] .choice-impact b').map(sign=>sign.textContent),['++','++']);
   ui.click('.focus-row[data-focus-key="family"] [data-delta="-1"]');
   ui.click('[data-action="school-offers"][data-kind="extracurricular"]');
   assert.equal(ui.all('.school-offer').length,5);
   assert.match(ui.query('.school-offer[data-offer-id="chess"]').textContent,/Training: Intelligence\./);
   ui.click('[data-action="school-enroll"][data-id="chess"]');
-  assert.deepEqual(ui.saved().school.extracurricular,{id:'chess',success:5});
+  assert.deepEqual(ui.saved().school.extracurricular,{id:'chess',success:null});
   assert.equal(ui.saved().focus.extracurricular,1);
-  assert.equal(ui.all('.focus-row[data-focus-key="extracurricular"] .choice-impact').length,0);
+  assert.deepEqual(ui.all('.focus-row[data-focus-key="extracurricular"] .choice-impact').map(entry=>[entry.dataset.stat,entry.querySelector('b').textContent]),[['intelligence','+']]);
   const saved=ui.saved();
   ui=await mount(saved);
   assert.deepEqual(ui.saved(),saved);
   assert.match(ui.query('.school-enrollment[data-school-kind="sports"]').textContent,/Basketball/);
   assert.match(ui.query('.school-enrollment[data-school-kind="extracurricular"]').textContent,/Chess club/);
   ui.click('[data-action="school-offers"][data-kind="sports"]');
-  assert.match(ui.query('.school-current').textContent,/Current: Basketball · 5\.0\/10/);
+  assert.match(ui.query('.school-current').textContent,/Current: Basketball · N\/A/);
   ui.click('.school-current [data-action="close"]');
   assert.deepEqual(ui.saved(),saved,'keeping an activity preserves its success and selection');
   ui.click('[data-action="school-offers"][data-kind="sports"]');
@@ -2702,6 +2710,83 @@ test('school report cards render saved grades and activity success with their re
     assert.match(ui.query('.year-decisions').textContent,/School2\/4.*Sports1\/2Extracurriculars1\/2/);
     assert.deepEqual(ui.saved(),fixture,'reading a saved report preserves current choices and activity progress');
   }
+});
+
+test('new activity success stays N/A without a rating meter until the first eligible year is completed', async () => {
+  const fixture=ageTo(createGame({seed:121}),10);
+  fixture.conditions=[]; fixture.effects=[]; fixture.focus=defaultFocus(fixture);
+  fixture.school.offers.sports=['basketball','soccer','wrestling','swimming','track'];
+  let ui=await mount(fixture);
+  ui.click('[data-action="school-offers"][data-kind="sports"]');
+  ui.click('[data-action="school-enroll"][data-id="basketball"]');
+  const enrolled=ui.saved();
+  assert.equal(enrolled.school.sports.success,null);
+  for(let reload=0;reload<2;reload++) {
+    const card=ui.query('.school-enrollment[data-school-kind="sports"]');
+    assert.match(card.textContent,/Success N\/A/);
+    assert.equal(card.querySelectorAll('[role="meter"]').length,0,'unearned success is not displayed as zero or five');
+    ui.click('[data-action="school-offers"][data-kind="sports"]');
+    assert.match(ui.query('.school-current').textContent,/Current: Basketball · N\/A/);
+    ui.click('.school-current [data-action="close"]');
+    assert.deepEqual(ui.saved(),enrolled,'viewing and keeping an ungraded activity never initializes success');
+    ui=await mount(ui.saved());
+  }
+  const completed=structuredClone(enrolled);
+  assert.equal(advanceYear(completed,{mortalityRandom:()=>1,growthRandom:()=>0,parentCareerRandom:()=>1}).ok,true);
+  const result=completed.yearSummary.school.activities.find(activity=>activity.kind==='sports');
+  assert.equal(result.before,null);
+  assert.equal(typeof result.after,'number');
+  for(let reload=0;reload<2;reload++) {
+    ui=await mount(completed);
+    const card=ui.query('.school-enrollment[data-school-kind="sports"]');
+    assert.ok(card.textContent.includes(`Success ${result.after.toFixed(1)}/10`));
+    assert.equal(card.querySelector('[role="meter"]').getAttribute('aria-valuenow'),result.after.toFixed(1));
+    assert.ok(ui.query('.school-report').textContent.includes(`Basketball success N/A → ${result.after.toFixed(1)}/10`));
+    assert.deepEqual(ui.saved(),completed);
+  }
+});
+
+test('paused activities retain N/A while previously earned success remains numeric', async () => {
+  const fixture=ageTo(createGame({seed:121}),10);
+  fixture.conditions=[]; fixture.effects=[];
+  fixture.school.sports={id:'lacrosse',success:null};
+  fixture.focus={...defaultFocus(fixture),sports:0};
+  fixture.lifestyle=6;
+  fixture.parents.forEach(parent=>{parent.lifestyle=6;parent.career.progress=6;});
+  assert.equal(validateSave(fixture),true);
+  assert.equal(advanceYear(fixture,{mortalityRandom:()=>1,growthRandom:()=>0,parentCareerRandom:()=>1}).ok,true);
+  const result=fixture.yearSummary.school.activities.find(activity=>activity.kind==='sports');
+  assert.equal(result.before,null);
+  assert.equal(result.after,null);
+  let ui=await mount(fixture);
+  assert.match(ui.query('.school-report').textContent,/Lacrosse success N\/A → N\/A/);
+  assert.match(ui.query('.school-enrollment[data-school-kind="sports"]').textContent,/Success N\/A/);
+  assert.equal(ui.query('.school-enrollment[data-school-kind="sports"]').querySelectorAll('[role="meter"]').length,0);
+  const legacy=structuredClone(fixture);
+  legacy.school.sports.success=6.25;
+  const before=structuredClone(legacy);
+  ui=await mount(legacy);
+  const card=ui.query('.school-enrollment[data-school-kind="sports"]');
+  assert.match(card.textContent,/Success 6\.3\/10/);
+  assert.equal(card.querySelector('[role="meter"]').getAttribute('aria-valuenow'),'6.3');
+  assert.deepEqual(ui.saved(),before,'saved numeric success is never replaced with an ungraded value');
+});
+
+test('sport offers explain the direction of height effects and activity help explains the positive training steps', async () => {
+  const fixture=ageTo(createGame({seed:121}),10);
+  fixture.conditions=[]; fixture.effects=[]; fixture.focus=defaultFocus(fixture);
+  fixture.school.offers.sports=['wrestling','swimming','basketball','soccer','track'];
+  const ui=await mount(fixture),before=ui.saved(),writes=ui.writes();
+  ui.click('[data-action="school-offers"][data-kind="sports"]');
+  assert.match(ui.query('.school-offer[data-offer-id="wrestling"]').textContent,/Performance: Strength, Shorter height/);
+  assert.match(ui.query('.school-offer[data-offer-id="swimming"]').textContent,/Performance: Strength, Taller height/);
+  assert.match(ui.query('.school-offer[data-offer-id="basketball"]').textContent,/Performance: Strength, Taller height/);
+  ui.click('[role="dialog"] [data-action="close"]');
+  ui.click('[data-topic="focus-sports"]');
+  assert.match(ui.query('.help-popup').textContent,/Training gives - at 0 points, \+ at 1 and \+\+ at 2/);
+  ui.click('.help-popup [data-action="close"]');
+  assert.deepEqual(ui.saved(),before);
+  assert.equal(ui.writes(),writes);
 });
 
 test('previously recorded school grades retain their letter and report after the grading correction', async () => {
@@ -2875,7 +2960,7 @@ test('core focus starts neutral at two while unjoined school activities stay loc
     assert.ok(ui.all('.focus-row').every(row=>row.querySelector('output').textContent===(age>=5&&age<18&&['sports','extracurricular'].includes(row.dataset.focusKey)?'0':'2')));
     assert.equal(ui.query('.focus-panel .panel-heading .tag').textContent,`${age>=5&&age<18?8:count*2} / ${focusBudget(fixture)} POINTS`);
     assert.equal(ui.all('.focus-scale span').length,age>=5&&age<18?20:count*MAX_FOCUS);
-    assert.equal(ui.all('.focus-panel .choice-impact').length,0,'two points has no choice-driven stat or caregiver effects');
+    assert.equal(ui.all('.focus-panel .choice-impact').length,age>=5&&age<18?2:0,'core neutral choices have no effects; an unjoined extracurricular retains its two neglect effects');
     if(age>=5&&age<18) {
       assert.equal(ui.query('.focus-row[data-focus-key="work"] [data-delta="1"]').disabled,false,'unjoined school activities leave two spare points');
       assert.equal(ui.query('.focus-row[data-focus-key="sports"] [data-delta="1"]').disabled,true,'spare points do not bypass enrollment');

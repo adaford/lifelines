@@ -126,7 +126,7 @@ test('Yourself, Sports, and Extracurricular activities have distinct effects in 
         : stat === 'attractiveness' ? schoolAppearanceChange(selected) - schoolAppearanceChange(baseline)
           : childhoodWellbeing(selected)[stat] - wellbeing[stat];
       near(actual, contribution, `${area}: ${stat} is scaled once`);
-      assert.equal(rows.find(entry => entry.stat === stat).level, units);
+      assert.equal(rows.find(entry => entry.stat === stat).level, ['sports', 'extracurricular'].includes(area) ? 2 : units);
     }
     const forecast = annualForecast(selected);
     assert.deepEqual(selected, before);

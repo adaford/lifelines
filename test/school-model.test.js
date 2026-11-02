@@ -131,6 +131,33 @@ test('activity success rewards performance and focus with bounded supplied varia
   assert.deepEqual(person, before);
 });
 
+test('wrestling favors shorter age-relative height while swimming favors taller height at the same strength', () => {
+  const wrestling = schoolActivity('sports', 'wrestling'), swimming = schoolActivity('sports', 'swimming');
+  assert.deepEqual(wrestling.weights, { strength: .7, height: .3 });
+  assert.deepEqual(swimming.weights, { strength: .7, height: .3 });
+  assert.equal(wrestling.heightPreference, 'shorter');
+  for (const age of [5, 12, 17]) for (const growthSex of ['male', 'female']) {
+    const person = pupil(age), reference = heightReference(age, growthSex);
+    person.growthSex = growthSex;
+    person.maturityAge = 14;
+    person.height = reference.median / 2.54;
+    const shorter = { ...person, height: (reference.median - reference.sd) / 2.54 };
+    const taller = { ...person, height: (reference.median + reference.sd) / 2.54 };
+    const before = copy([shorter, person, taller]);
+    for (const activity of [wrestling, swimming]) {
+      near(activityPerformance(person, activity), 5);
+      near(activityPerformance({ ...person, stats: { ...person.stats, strength: 7 } }, activity) - activityPerformance(person, activity), 1.4);
+    }
+    near(activityPerformance(shorter, wrestling), 5.6);
+    near(activityPerformance(taller, wrestling), 4.4);
+    near(activityPerformance(shorter, swimming), 4.4);
+    near(activityPerformance(taller, swimming), 5.6);
+    assert.ok(activitySuccessChange(shorter, wrestling, 1) > activitySuccessChange(taller, wrestling, 1));
+    assert.ok(activitySuccessChange(taller, swimming, 1) > activitySuccessChange(shorter, swimming, 1));
+    assert.deepEqual([shorter, person, taller], before, 'performance reads preserve growth, ratings, and RNG');
+  }
+});
+
 test('lifestyle gates expensive school sports without preventing the offer from being displayed', () => {
   const person = pupil(), lacrosse = schoolActivity('sports', 'lacrosse');
   assert.equal(lacrosse.minLifestyle, 7);
