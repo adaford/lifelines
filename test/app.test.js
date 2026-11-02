@@ -6,7 +6,7 @@ import { afterEach, describe, test } from 'node:test';
 import { parseHTML } from 'linkedom';
 import { toLegacyCentimeters, stripWellbeingAptitudes, legacyRatingFloor } from './helpers/legacy-height.js';
 import { MAX_FOCUS, focusBudget, defaultFocus } from '../focus-rules.js';
-import { createSchoolRecord, gradeLetter } from '../school.js';
+import { createSchoolRecord, gradeLetter, activityGradeLetter } from '../school.js';
 import { changedRating } from '../rating-changes.js';
 import { choiceImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from '../choice-impacts.js';
 import { SKILLS, JOBS, EVENTS, resolveEventChoice, eventOdds, canTakeJob, chooseEducation, offeredJobs, needsEducationChoice, createGame, advanceYear, annualForecast, haveChild, takeJob, successionInfo, succeed, validateSave, respondToEncounter, proposeMarriage, effectiveStats, householdLifestyle, relationshipOdds, proposalChance, statPercentiles } from '../engine.js';
@@ -2714,7 +2714,8 @@ test('school report cards render saved grades and activity success with their re
     const ui=await mount(fixture);
     const card=ui.query('.school-report[aria-label="School report card"]');
     assert.match(card.textContent,new RegExp(`GPA ${gradeLetter(report.previousGpa).replace(/[+]/g,'\\+')} → ${gradeLetter(report.gpa).replace(/[+]/g,'\\+')}`));
-    for(const activity of report.activities) assert.ok(card.textContent.includes(`${activity.name} success ${activity.before.toFixed(1)} → ${activity.after.toFixed(1)}/10`));
+    for(const activity of report.activities) assert.ok(card.textContent.includes(`${activity.name} success ${activityGradeLetter(activity.before)} → ${activityGradeLetter(activity.after)}`));
+    assert.doesNotMatch(card.textContent,/\/10|\d\.\d/,'activity report results use the same letter-grade presentation as GPA');
     assert.match(ui.query('.year-decisions').textContent,/School2\/4.*Sports1\/2Extracurriculars1\/2/);
     assert.deepEqual(ui.saved(),fixture,'reading a saved report preserves current choices and activity progress');
   }
@@ -2777,7 +2778,8 @@ test('legacy five-offer saves restore three options without resetting an activit
     for(const kind of ['sports','extracurricular']) {
       ui.click(`[data-action="school-offers"][data-kind="${kind}"]`);
       assert.deepEqual(ui.all('.school-offer').map(card=>card.dataset.offerId),expected.school.offers[kind]);
-      assert.match(ui.query('.school-current').textContent,kind==='sports'?/Current: Figure skating.*6\.3\/10/:/Current: Robotics club.*4\.3\/10/);
+      assert.match(ui.query('.school-current').textContent,kind==='sports'?/Current: Figure skating · B-/:/Current: Robotics club · C-/);
+      assert.doesNotMatch(ui.query('.school-current').textContent,/\/10|\d\.\d/);
       ui.click('.school-current [data-action="close"]');
       assert.deepEqual(ui.saved(),expected);
     }
@@ -2809,7 +2811,7 @@ test('new sports display their broader performance factors while training only S
   }
 });
 
-test('new activity success stays N/A without a rating meter until the first eligible year is completed', async () => {
+test('activity success changes from N/A to a letter grade after its first eligible year without a numeric meter', async () => {
   const fixture=ageTo(createGame({seed:121}),10);
   fixture.conditions=[]; fixture.effects=[]; fixture.focus=defaultFocus(fixture);
   fixture.school.offers.sports=['basketball','soccer','wrestling'];
@@ -2836,14 +2838,15 @@ test('new activity success stays N/A without a rating meter until the first elig
   for(let reload=0;reload<2;reload++) {
     ui=await mount(completed);
     const card=ui.query('.school-enrollment[data-school-kind="sports"]');
-    assert.ok(card.textContent.includes(`Success ${result.after.toFixed(1)}/10`));
-    assert.equal(card.querySelector('[role="meter"]').getAttribute('aria-valuenow'),result.after.toFixed(1));
-    assert.ok(ui.query('.school-report').textContent.includes(`Basketball success N/A → ${result.after.toFixed(1)}/10`));
+    assert.equal(card.querySelector('.school-enrollment-title span').textContent,`Success ${activityGradeLetter(result.after)}`);
+    assert.equal(card.querySelectorAll('[role="meter"]').length,0,'earned activity results use grades rather than numeric meters');
+    assert.ok(ui.query('.school-report').textContent.includes(`Basketball success N/A → ${activityGradeLetter(result.after)}`));
+    assert.doesNotMatch(card.textContent,/\/10|\d\.\d/);
     assert.deepEqual(ui.saved(),completed);
   }
 });
 
-test('paused activities retain N/A while previously earned success remains numeric', async () => {
+test('paused activities retain N/A while saved numeric success displays its earned letter grade', async () => {
   const fixture=ageTo(createGame({seed:121}),10);
   fixture.conditions=[]; fixture.effects=[];
   fixture.school.sports={id:'lacrosse',success:null};
@@ -2864,8 +2867,9 @@ test('paused activities retain N/A while previously earned success remains numer
   const before=structuredClone(legacy);
   ui=await mount(legacy);
   const card=ui.query('.school-enrollment[data-school-kind="sports"]');
-  assert.match(card.textContent,/Success 6\.3\/10/);
-  assert.equal(card.querySelector('[role="meter"]').getAttribute('aria-valuenow'),'6.3');
+  assert.match(card.textContent,/Success B-/);
+  assert.equal(card.querySelectorAll('[role="meter"]').length,0);
+  assert.doesNotMatch(card.textContent,/\/10|6\.3/);
   assert.deepEqual(ui.saved(),before,'saved numeric success is never replaced with an ungraded value');
 });
 
@@ -2882,6 +2886,10 @@ test('sport offers explain the direction of height effects and activity help exp
   ui.click('[data-topic="focus-sports"]');
   assert.match(ui.query('.help-popup').textContent,/three annual offers/);
   assert.match(ui.query('.help-popup').textContent,/Training gives - at 0 points, \+ at 1 and \+\+ at 2/);
+  assert.match(ui.query('.help-popup').textContent,/graded F- through A\+/);
+  ui.click('.help-popup [data-action="close"]');
+  ui.click('[data-topic="focus-extracurricular"]');
+  assert.match(ui.query('.help-popup').textContent,/graded F- through A\+/);
   ui.click('.help-popup [data-action="close"]');
   assert.deepEqual(ui.saved(),before);
   assert.equal(ui.writes(),writes);

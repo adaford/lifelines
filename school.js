@@ -1,4 +1,4 @@
-import { heightReference } from './growth.js?v=playgroup-creativity';
+import { heightReference } from './growth.js?v=activity-grades';
 
 // Fictional school activities and success rules, independent of save mutation
 // and the gameplay RNG. The engine supplies effective ratings and any draw.
@@ -92,6 +92,12 @@ const GRADE_BANDS = [[97, 'A+'], [93, 'A'], [90, 'A-'], [87, 'B+'], [83, 'B'], [
 export function gradeLetter(score) {
   const bounded = clamp(finite(score, 50), 50, 100);
   return GRADE_BANDS.find(([minimum]) => bounded >= minimum)[1];
+}
+
+// Display the complete 0-10 activity range with the same 50-100 GPA bands.
+// Keep earned success numeric in saves and leave unreported results unrated.
+export function activityGradeLetter(success) {
+  return Number.isFinite(success) ? gradeLetter(50 + 5 * clamp(success, 0, 10)) : 'N/A';
 }
 
 function heightRating(person) {

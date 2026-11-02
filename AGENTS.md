@@ -1,5 +1,11 @@
 # Lifelines
 
+## Sports and extracurricular letter grades (3 November 2026)
+
+Show activity success as F- through A+ in enrolled activity rows, the activity chooser, and completed report cards, using the same letter bands as GPA. Map the saved 0-10 success range to 50-100 with `50 + 5 * success`, then use `gradeLetter`; 0 is F-, 5 is C, and 9.4-10 is A+. Keep N/A before the first eligible completed year, after switching, and while an unrated activity is paused. Remove numeric /10 labels and activity success meters.
+
+This is a display change only. Keep the stored two-decimal success values, annual progression, first-year baseline, enrollment rules, GPA, reports, RNG, and schema 20 unchanged. Render saved report endpoints as letter grades without rewriting history. The pure `activityGradeLetter` helper in `school.js` shares GPA's bands. No percentile recalibration is needed.
+
 ## Playgroup musician reward (3 November 2026)
 
 A musician at playgroup (`musical_baby`) permanently adds base +0.2 Creativity, subject to the usual directional rating response and bounds. It no longer adds Social. Preserve its ID, story, eligibility, odds, and all recorded past outcomes.
