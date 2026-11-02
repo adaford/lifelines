@@ -6,15 +6,15 @@ import {
   offeredJobs, needsEducationChoice, pendingEventSubject, focusLimits, focusLimitDetails, caregivers,
   relationshipOdds, meetingChances, proposalChance, pregnancyChance, oneNightChance,
   respondToEncounter, proposeMarriage, endRelationship, normalizeSurname, heightPercentile, statPercentiles
-} from './engine.js?v=school-grades-activities';
-import { LEGACY_EVENT_COPY } from './event-copy-history.js?v=school-grades-activities';
-import { annotateNarrative } from './narrative.js?v=school-grades-activities';
-import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome } from './display.js?v=school-grades-activities';
+} from './engine.js?v=school-grade-scaling';
+import { LEGACY_EVENT_COPY } from './event-copy-history.js?v=school-grade-scaling';
+import { annotateNarrative } from './narrative.js?v=school-grade-scaling';
+import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome } from './display.js?v=school-grade-scaling';
 
-import { MAX_FOCUS, focusBudget, focusMaxFor } from './focus-rules.js?v=school-grades-activities';
-import { schoolActivity, gradeLetter, activityEligible } from './school.js?v=school-grades-activities';
-import { getBirthConditions } from './birth-conditions.js?v=school-grades-activities';
-import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=school-grades-activities';
+import { MAX_FOCUS, focusBudget, focusMaxFor } from './focus-rules.js?v=school-grade-scaling';
+import { schoolActivity, gradeLetter, activityEligible } from './school.js?v=school-grade-scaling';
+import { getBirthConditions } from './birth-conditions.js?v=school-grade-scaling';
+import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=school-grade-scaling';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const app = document.querySelector('#app');
@@ -680,7 +680,7 @@ function topicHelpModal(topic, id) {
     'focus-social': ['Friends focus', ['Can improve social, support mental stability and create chances to meet people.']],
     'focus-family': ['Family focus', ['Strengthens relationships, helps children develop and supports parents’ mental stability.']],
     'focus-self': ['Yourself focus', [state.age<18 ? 'Personal care supports Attractiveness, mental stability and Health.' : 'Exercise, learning and self-care support strength, creativity, health and mental stability.']],
-    'school-gpa': ['School GPA', ['Your yearly grade depends on study points multiplied by Intelligence. Higher Intelligence can achieve the same grade with less study. The grade updates after each school year.', 'Good and poor grades can lead to family events. The starting grade uses your initial study allocation and Intelligence.']],
+    'school-gpa': ['School GPA', ['Study effort sets your yearly grade, with Intelligence adjusting it. Higher Intelligence can achieve the same grade with less study. The grade updates after each school year.', 'Good and poor grades can lead to family events. The starting grade uses your initial study allocation and Intelligence.']],
     'focus-sports': ['Sports focus', ['Sign up from five annual offers to unlock 0–2 points, starting at 1. Every sport trains Strength and Social; some train an extra skill. Success starts at 5.0/10 and changes yearly with relevant abilities, focus and chance. Basketball also rewards height for your age. Keep your sport or switch and start again at 5.0.']],
     'focus-extracurricular': ['Extracurriculars focus', ['Sign up from five annual offers to unlock 0–2 points, starting at 1. Each activity trains its listed stats. Success starts at 5.0/10 and changes yearly with relevant abilities, focus and chance. You can keep your activity when new offers arrive; switching starts success again at 5.0.']],
     parents: ['Parents & guardians', ['Their wellbeing and careers affect your childhood. Low mental stability and a weak relationship raise the rare chance of abandonment. The other parent takes over; if neither can care for you, an adult relative adopts you. Departures cause severe setbacks.']],

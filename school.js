@@ -1,4 +1,4 @@
-import { heightReference } from './growth.js?v=school-grades-activities';
+import { heightReference } from './growth.js?v=school-grade-scaling';
 
 // Fictional school activities and success rules, independent of save mutation
 // and the gameplay RNG. The engine supplies effective ratings and any draw.
@@ -64,8 +64,16 @@ export const EXTRACURRICULARS = Object.freeze([
 const catalog = kind => kind === 'sports' ? SPORTS : kind === 'extracurricular' ? EXTRACURRICULARS : [];
 export const schoolActivity = (kind, id) => catalog(kind).find(entry => entry.id === id) || null;
 
+const STUDY_GRADE_BASELINES = [50, 65, 80, 90, 97];
 export function gradeScore(study, intelligence) {
-  return round(clamp(50 + 2.5 * clamp(finite(study), 0, 4) * clamp(finite(intelligence), 0, 10), 50, 100), 1);
+  const points = clamp(finite(study), 0, 4);
+  const lower = Math.floor(points), upper = Math.ceil(points);
+  const baseline = STUDY_GRADE_BASELINES[lower]
+    + (STUDY_GRADE_BASELINES[upper] - STUDY_GRADE_BASELINES[lower]) * (points - lower);
+  // Effort sets the main grade; Intelligence moves it by at most ten points
+  // in either direction. Even the lowest Intelligence benefits from studying.
+  const intelligenceAdjustment = 2 * (clamp(finite(intelligence), 0, 10) - 5);
+  return round(clamp(baseline + intelligenceAdjustment, 50, 100), 1);
 }
 
 const GRADE_BANDS = [[97, 'A+'], [93, 'A'], [90, 'A-'], [87, 'B+'], [83, 'B'], [80, 'B-'],

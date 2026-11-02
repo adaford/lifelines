@@ -130,7 +130,7 @@ test('grades use study and effective Intelligence at the beginning of the comple
   state.effects = [{ id: 'old-learning-bonus', name: 'Saved bonus', years: 1, modifiers: { intelligence: 1 }, kind: 'positive' }];
   const expected = gradeScore(2, 5.5), before = copy(state);
   const forecast = annualForecast(state);
-  assert.equal(forecast.school.gpa, 77.5);
+  assert.equal(forecast.school.gpa, 81);
   assert.equal(forecast.school.study, 2);
   assert.equal(forecast.school.intelligence, 5.5);
   assert.deepEqual(state, before);
@@ -141,6 +141,32 @@ test('grades use study and effective Intelligence at the beginning of the comple
   assert.equal(advanced.effects.length, 0);
   assert.notEqual(gradeScore(advanced.focus.work, effectiveStats(advanced).intelligence), expected, 'the report is not recomputed from end-of-year ratings');
   assert.deepEqual(migrateSave(copy(advanced)), advanced);
+});
+
+test('saved grades and report cards survive grading changes and use the new scale only in future years', () => {
+  const state = pupil();
+  state.stats.intelligence = 4.5;
+  const saved = quietYear(state);
+  saved.school.gpa = 72.5;
+  saved.yearSummary.school.gpa = 72.5;
+  saved.yearSummary.school.previousGpa = 75;
+  assert.notEqual(saved.yearSummary.school.gpa, gradeScore(saved.yearSummary.school.study, saved.yearSummary.school.intelligence));
+  const before = copy(saved);
+  assert.equal(validateSave(saved), true);
+  const restored = migrateSave(copy(saved));
+  assert.deepEqual(restored, before, 'reload preserves historical grades, stats, RNG, and progress exactly');
+  const forecast = annualForecast(restored);
+  assert.equal(forecast.school.previousGpa, 72.5);
+  assert.equal(forecast.school.gpa, gradeScore(restored.focus.work, effectiveStats(restored).intelligence));
+  const next = quietYear(restored);
+  assert.equal(next.school.gpa, forecast.school.gpa);
+  assert.equal(next.yearSummary.school.previousGpa, 72.5);
+  for (const invalid of [49.9, 100.1, NaN]) {
+    const malformed = copy(before);
+    malformed.yearSummary.school.gpa = invalid;
+    assert.equal(validateSave(malformed), false, 'historical grade validation retains score bounds');
+  }
+  assert.deepEqual(saved, before);
 });
 
 test('activity success uses starting weighted performance, one supplied draw, and rating bounds', () => {
@@ -236,7 +262,7 @@ test('parent reactions use this year’s grade and grounding shares the five-eve
   const negative = ['household_school_disappointment', 'household_school_grounding'];
   const chances = candidate => familyEventChances(candidate, effectiveStats(candidate));
   state.school.gpa = 50;
-  state.stats.intelligence = 8;
+  state.stats.intelligence = 10;
   state.focus.work = 2;
   assert.ok(chances(state).filter(event => positive.includes(event.eventId)).every(event => event.chance > 0));
   assert.ok(chances(state).filter(event => negative.includes(event.eventId)).every(event => event.chance === 0));

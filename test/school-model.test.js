@@ -13,21 +13,36 @@ function pupil(age = 12) {
     focus: { work: 2, social: 2, family: 2, self: 2, sports: 1, extracurricular: 1 } };
 }
 
-test('grades balance study with Intelligence, stay on a fifty-to-one-hundred scale, and retain one decimal', () => {
-  assert.equal(gradeScore(2, 5), 75);
-  assert.equal(gradeScore(1, 10), gradeScore(2, 5), 'double Intelligence needs half the study for the same result');
-  assert.equal(gradeScore(4, 5), gradeScore(2, 10));
-  assert.equal(gradeScore(3, 6.5), 98.8);
-  assert.equal(gradeScore(0, 10), 50);
-  assert.equal(gradeScore(4, 0), 50);
-  assert.equal(gradeScore(-2, 5), 50);
-  assert.equal(gradeScore(20, 20), 100);
-  assert.equal(gradeScore(NaN, 5), 50);
+test('study sets the main grade and Intelligence adjusts it without making effort ineffective', () => {
+  assert.deepEqual([0, 1, 2, 3, 4].map(study => gradeScore(study, 5)), [50, 65, 80, 90, 97]);
+  assert.equal(gradeScore(3, 3), 86);
+  assert.equal(gradeScore(3, 3), gradeScore(2, 8), 'more study lets a lower-Intelligence pupil match a higher-Intelligence pupil');
+  assert.deepEqual([0, 1, 2, 3, 4].map(study => gradeScore(study, 0)), [50, 55, 70, 80, 87]);
+  assert.equal(gradeScore(0, 10), 60, 'high Intelligence does not replace study');
+  assert.ok(gradeScore(4, 0) > gradeScore(0, 10));
   for (const intelligence of [0, 1.2, 5, 9.9, 10]) {
     const results = [0, 1, 2, 3, 4].map(study => gradeScore(study, intelligence));
     assert.deepEqual(results, [...results].sort((a, b) => a - b));
     assert.ok(results.every(score => score >= 50 && score <= 100));
   }
+});
+
+test('Intelligence has a bounded adjustment and fractional study grades interpolate continuously', () => {
+  for (const study of [0, .25, 1, 1.5, 2, 2.5, 3, 3.75, 4]) {
+    const baseline = gradeScore(study, 5);
+    const results = [0, 1.2, 5, 9.9, 10].map(intelligence => gradeScore(study, intelligence));
+    assert.deepEqual(results, [...results].sort((a, b) => a - b));
+    assert.ok(results.every(score => Math.abs(score - baseline) <= 10));
+  }
+  assert.equal(gradeScore(.25, 5), 53.8);
+  assert.equal(gradeScore(2.5, 5), 85);
+  assert.equal(gradeScore(3.5, 5), 93.5);
+  assert.equal(gradeScore(3, 6.55), 93.1);
+  assert.equal(gradeScore(-2, 5), 50);
+  assert.equal(gradeScore(20, 20), 100);
+  assert.equal(gradeScore(NaN, 5), 50);
+  assert.equal(gradeScore(2, -100), gradeScore(2, 0));
+  assert.equal(gradeScore(2, 100), gradeScore(2, 10));
 });
 
 test('every A+ through F- band changes at its exact threshold', () => {
@@ -159,8 +174,8 @@ test('a school record computes a starting grade without inventing a completed re
   person.stats.intelligence = 8;
   const expected = copy(person);
   const record = createSchoolRecord(person);
-  assert.equal(record.gpa, 90);
-  assert.equal(gradeLetter(record.gpa), 'A-');
+  assert.equal(record.gpa, 86);
+  assert.equal(gradeLetter(record.gpa), 'B');
   assert.equal(record.reportedAge, null);
   assert.equal(record.offersAge, 5);
   assert.equal(record.sports, null);

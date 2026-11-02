@@ -1,5 +1,5 @@
-import { legacyFocusValue } from './focus-rules.js?v=school-grades-activities';
-import { gradeScore } from './school.js?v=school-grades-activities';
+import { legacyFocusValue } from './focus-rules.js?v=school-grade-scaling';
+import { gradeScore } from './school.js?v=school-grade-scaling';
 // Fictional household events. Subject changes affect the named person; player
 // changes affect you. Relationship changes affect your bond with that person.
 // Individual rolls join the ordinary event pool and share its five-event cap.

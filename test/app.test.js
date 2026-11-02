@@ -2564,7 +2564,7 @@ test('School GPA displays letter grades and help without changing the report whe
     assert.equal(ui.query('.school-grade > strong').getAttribute('aria-label'),`School GPA ${letter}`);
     assert.match(ui.query('.school-grade').textContent,/Latest report card/);
     ui.click('[data-topic="school-gpa"]');
-    assert.match(ui.query('.help-popup').textContent,/study points multiplied by Intelligence.*same grade with less study.*updates after each school year/);
+    assert.match(ui.query('.help-popup').textContent,/Study effort sets your yearly grade, with Intelligence adjusting it.*same grade with less study.*updates after each school year/);
     ui.click('.help-popup [data-action="close"]');
     assert.equal(ui.writes(),writes);
     assert.deepEqual(ui.saved(),before);
@@ -2661,6 +2661,23 @@ test('school report cards render saved grades and activity success with their re
     for(const activity of report.activities) assert.ok(card.textContent.includes(`${activity.name} success ${activity.before.toFixed(1)} → ${activity.after.toFixed(1)}/10`));
     assert.match(ui.query('.year-decisions').textContent,/School2\/4.*Sports1\/2Extracurriculars1\/2/);
     assert.deepEqual(ui.saved(),fixture,'reading a saved report preserves current choices and activity progress');
+  }
+});
+
+test('previously recorded school grades retain their letter and report after the grading correction', async () => {
+  const fixture=ageTo(createGame({seed:121}),12);
+  // The previous formula recorded 75 for study 2 and Intelligence 5; the new
+  // formula would award 80. A completed report must keep the recorded result.
+  Object.assign(fixture.yearSummary.school,{study:2,intelligence:5,previousGpa:62,gpa:75});
+  fixture.school.gpa=75;
+  fixture.yearSummary.dismissed=false;
+  assert.equal(validateSave(fixture),true,'old grade calculations remain valid historical records');
+  const before=structuredClone(fixture);
+  for(let reload=0;reload<2;reload++) {
+    const ui=await mount(fixture);
+    assert.equal(ui.query('.school-grade > strong').textContent,'C');
+    assert.match(ui.query('.school-report').textContent,/GPA D- → C/);
+    assert.deepEqual(ui.saved(),before,'reading an old report does not recompute GPA, stats, history, or RNG');
   }
 });
 
