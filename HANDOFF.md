@@ -1,5 +1,15 @@
 # Lifelines development handoff
 
+## Perk affinities and readable profiles (3 November 2026)
+
+Validation: all **462 tests** pass on Node 24.14.0 after `npm ci`, including 102 DOM checks, catalog-wide rating immutability, affinity bounds, and one-time save migration. All **24 local HTTP assets** match source. The 4,000-life reference was regenerated without fitting and reproduces exactly; the independent 1,600-life cohort passes. Browser/visual checks remain omitted by preference.
+
+Perks never directly change a stat rating. Every former positive/negative stat effect now changes that stat's affinity (stored as aptitude) by +1/-1. Sum the effects of all assigned perks, then clamp each affinity to -3 through +3. For example, Sharp memory grants +1 Intelligence affinity. Apply these changes once after generating a new person's ratings; do not rerate them. Perks may still grant or remove focus points and impose lifelong activity limits. Preserve all 100 IDs, odds, inheritance rules, exclusion groups, and existing focus effects.
+
+Each perk appears in its own bordered row, with a bold name and one effect per line underneath. Year perks span the profile's full width beneath identity/age; family, partner, dating, and heir profiles share the same presentation. Show signed affinity effects, focus-point changes, and age-specific limits directly, without perk help buttons.
+
+Schema 20 applies the new affinity effects once to existing schema 17-19 players, parents, guardians, siblings, children, partners, prospects, and saved pregnancy partner copies. Keep their current ratings (including historical birth bonuses), focus, conditions, RNG, school progress, effects, and pending decisions. History, completed reviews, and lineage snapshots remain unchanged. Schema-20 reloads and succession never reapply perks. Earlier saves still receive empty condition lists. Retain the save key `lifelines.save.v1` and the deterministic five-to-three school-offer migration. Regenerate the percentile reference without fitting.
+
 ## Sport variety and three annual offers (3 November 2026)
 
 Validation: all **454 tests** pass on Node 24.14.0 after `npm ci`, including catalog performance, three-option generation, legacy shortlist migration, and DOM checks. All **24 local HTTP assets** match source. The 4,000-life reference reproduces unchanged and the independent 1,600-life cohort passes; offer generation uses no gameplay RNG and the new performance weights do not alter calibration training. Browser/visual checks remain omitted by preference.

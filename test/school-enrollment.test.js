@@ -157,6 +157,8 @@ test('five-offer schema nineteen saves trim only their shortlists and keep selec
     saved.pendingEvents = [{ eventId: 'school_team', age: saved.age }];
     saved.lastYearEvents = ['school_team'];
     assert.equal(validateSave(saved), true);
+    saved.version = 19;
+    for (const person of [saved, ...saved.parents, ...saved.encounters]) person.conditions = [];
     saved.school.offers = {
       sports: ['soccer', 'football', 'tennis', 'basketball', 'cheerleading'],
       extracurricular: ['piano', 'violin', 'guitar', 'drums', 'chess'],
@@ -165,10 +167,11 @@ test('five-offer schema nineteen saves trim only their shortlists and keep selec
     assert.equal(saved.school.offers.extracurricular[4], saved.school.extracurricular.id);
     assert.equal(validateSave(saved), false, 'current saves require three offers');
     const before = copy(saved), expected = copy(saved);
+    expected.version = 20;
     for (const kind of ['sports', 'extracurricular']) expected.school.offers[kind] = expected.school.offers[kind].slice(0, 3);
     const migrated = migrateSave(saved);
     assert.deepEqual(migrated, expected, 'only shortlist lengths change; ratings, enrollment, success, focus, history, reports, pending decisions, and RNG remain exact');
-    assert.equal(migrated.version, 19);
+    assert.equal(migrated.version, 20);
     assert.equal(validateSave(migrated), true);
     assert.deepEqual(migrateSave(copy(migrated)), migrated, 'the migration runs once');
     assert.deepEqual(saved, before, 'migration never mutates its input');
@@ -365,6 +368,7 @@ test('school begins with unjoined activities and the final school report survive
 
 test('version eighteen migration preserves existing progress, history and pending decisions while new activity slots start empty', () => {
   const old = quietYear(pupil());
+  for (const person of [old, ...old.parents]) person.conditions = [];
   old.version = 18;
   delete old.school;
   delete old.yearSummary.school;
@@ -374,7 +378,7 @@ test('version eighteen migration preserves existing progress, history and pendin
   old.lastYearEvents = ['school_team'];
   const before = copy(old), migrated = migrateSave(old);
   assert.ok(migrated);
-  assert.equal(migrated.version, 19);
+  assert.equal(migrated.version, 20);
   assert.deepEqual(migrated.focus, { work: 3, social: 1, family: 2, self: 2, sports: 0, extracurricular: 0 });
   assert.equal(migrated.school.sports, null);
   assert.equal(migrated.school.extracurricular, null);

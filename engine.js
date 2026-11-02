@@ -1,23 +1,23 @@
 // Lifelines: deterministic, browser-independent simulation rules.
 // All public actions mutate their state and return { ok, reason? }.
-import { JOBS } from './jobs.js?v=sport-variety';
-import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=sport-variety';
-import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=sport-variety';
-import { mortalityRisk, rollMortality } from './mortality.js?v=sport-variety';
-import { heightReference, advanceGrowth } from './growth.js?v=sport-variety';
-import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=sport-variety';
-import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, standardFocusPractice, schoolAppearanceChange, DEVELOPMENT_BALANCE, BIRTH_VARIATION, SKILL_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, PARENT_FAMILY_STABILITY_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=sport-variety';
-import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=sport-variety';
-import { normalPercentile } from './percentiles.js?v=sport-variety';
-import { changedRating } from './rating-changes.js?v=sport-variety';
-import { MAX_FOCUS, DEFAULT_FOCUS, SCHOOL_FOCUS_KEYS, focusMaxFor, focusNeutralFor, isSchoolActivityFocus, focusEffect, focusKeysForAge, focusBudget, defaultFocus, legacyFocusValue } from './focus-rules.js?v=sport-variety';
-import { SCHOOL_OFFER_COUNT, schoolActivity, gradeScore, activitySuccessChange, activityEligible, annualSchoolOffers, createSchoolRecord } from './school.js?v=sport-variety';
-import { assignBirthConditions, getBirthConditions, conditionFocusPoints, conditionFocusLimits, validateBirthConditions } from './birth-conditions.js?v=sport-variety';
+import { JOBS } from './jobs.js?v=perk-affinities';
+import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=perk-affinities';
+import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=perk-affinities';
+import { mortalityRisk, rollMortality } from './mortality.js?v=perk-affinities';
+import { heightReference, advanceGrowth } from './growth.js?v=perk-affinities';
+import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=perk-affinities';
+import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, standardFocusPractice, schoolAppearanceChange, DEVELOPMENT_BALANCE, BIRTH_VARIATION, SKILL_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, PARENT_FAMILY_STABILITY_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=perk-affinities';
+import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=perk-affinities';
+import { normalPercentile } from './percentiles.js?v=perk-affinities';
+import { changedRating } from './rating-changes.js?v=perk-affinities';
+import { MAX_FOCUS, DEFAULT_FOCUS, SCHOOL_FOCUS_KEYS, focusMaxFor, focusNeutralFor, isSchoolActivityFocus, focusEffect, focusKeysForAge, focusBudget, defaultFocus, legacyFocusValue } from './focus-rules.js?v=perk-affinities';
+import { SCHOOL_OFFER_COUNT, schoolActivity, gradeScore, activitySuccessChange, activityEligible, annualSchoolOffers, createSchoolRecord } from './school.js?v=perk-affinities';
+import { assignBirthConditions, applyBirthConditions, getBirthConditions, conditionFocusPoints, conditionFocusLimits, validateBirthConditions } from './birth-conditions.js?v=perk-affinities';
 export { DEVELOPMENT_BALANCE };
-export { heightPercentile } from './growth.js?v=sport-variety';
-export { mortalityRisk } from './mortality.js?v=sport-variety';
-import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=sport-variety';
-export { JOBS, JOB_CATEGORIES } from './jobs.js?v=sport-variety';
+export { heightPercentile } from './growth.js?v=perk-affinities';
+export { mortalityRisk } from './mortality.js?v=perk-affinities';
+import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=perk-affinities';
+export { JOBS, JOB_CATEGORIES } from './jobs.js?v=perk-affinities';
 export const EVENTS = [...PERSONAL_EVENTS, ...FAMILY_EVENTS];
 
 export const SKILLS = [
@@ -184,7 +184,7 @@ function active(state) {
 
 export function createGame({ name, surname: chosenSurname, firstName, seed, gender = 'male', canGestate, attractedTo } = {}) {
   const initialSeed = Number.isFinite(seed) ? seed >>> 0 : (Date.now() ^ Math.floor(Math.random() * 0xFFFFFFFF)) >>> 0;
-  const state = { version: 19, seed: initialSeed, rng: initialSeed, nextId: 0, id: `life-${initialSeed}`, age: 0, generation: 1,
+  const state = { version: 20, seed: initialSeed, rng: initialSeed, nextId: 0, id: `life-${initialSeed}`, age: 0, generation: 1,
     name: '', stats: {}, aptitudes: {}, height: fromCentimeters(50), adultHeight: null,
     focus: defaultFocus(0), school: null, babyChoice: 'quiet', cryLevel: 1, alive: true, death: null, yearSummary: null,
     parents: [], guardian: null, children: [], siblings: [], money: 0, income: 0, expenses: 0, lifestyle: 1,
@@ -1304,7 +1304,7 @@ function validSchema(raw, version, schoolOfferCount = SCHOOL_OFFER_COUNT) {
   } catch { return false; }
 }
 
-export function validateSave(raw) { return validSchema(raw, 19); }
+export function validateSave(raw) { return validSchema(raw, 20); }
 
 // Version 10 stores every measurement in inches. Source growth tables stay in
 // centimetres; historical prose is rendered separately without rewriting it.
@@ -1343,20 +1343,32 @@ function upgradeSchoolRecord(state) {
   }
 }
 
+// Existing perks gain their affinity effects exactly once when upgrading to
+// schema 20. Retain recorded ratings, including any historical birth bonuses.
+// Lineage and completed reviews are historical snapshots, not active people.
+function upgradePerkAffinities(state) {
+  const people = [state, ...state.parents, state.guardian, ...state.children,
+    ...state.siblings, state.partner, ...state.encounters, state.pregnancy?.otherParent];
+  for (const person of people.filter(Boolean)) applyBirthConditions(person);
+}
+
 export function migrateSave(raw) {
   try {
     if (validateSave(raw)) return clone(raw);
-    if (validSchema(raw, 19, 5)) {
+    if (validSchema(raw, 19) || validSchema(raw, 19, 5)) {
       const state = clone(raw);
       // Earlier schema-19 shortlists contained five offers. Keep their order
       // and the existing enrollment, changing only the two current lists.
-      for (const kind of ['sports', 'extracurricular']) state.school.offers[kind] = state.school.offers[kind].slice(0, SCHOOL_OFFER_COUNT);
+      if (state.school) for (const kind of ['sports', 'extracurricular']) state.school.offers[kind] = state.school.offers[kind].slice(0, SCHOOL_OFFER_COUNT);
+      upgradePerkAffinities(state);
+      state.version = 20;
       return validateSave(state) ? state : null;
     }
     if ([17, 18].some(version => validSchema(raw, version))) {
       const state = clone(raw);
       upgradeSchoolRecord(state);
-      state.version = 19;
+      upgradePerkAffinities(state);
+      state.version = 20;
       return validateSave(state) ? state : null;
     }
     if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16].some(version => validSchema(raw, version))) return null;
@@ -1384,7 +1396,7 @@ export function migrateSave(raw) {
       // Existing values and the random state stay unchanged.
       upgradeFocus(state);
       upgradeSchoolRecord(state);
-      state.version = 19;
+      state.version = 20;
       return validateSave(state) ? state : null;
     }
     if (state.version === 1) {
@@ -1468,7 +1480,7 @@ export function migrateSave(raw) {
     });
     upgradeFocus(state);
     upgradeSchoolRecord(state);
-    state.version = 19;
+    state.version = 20;
     return validateSave(state) ? state : null;
   } catch { return null; }
 }

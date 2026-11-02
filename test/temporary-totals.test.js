@@ -27,7 +27,7 @@ test('v15 upgrades without changing pending choices, saved buffs, base ratings o
   state.pendingEvents = [{ eventId: 'school_play', age: state.age }];
   state.lastYearEvents = ['school_play'];
   const before = structuredClone(state);
-  const expected = { ...before, version: 19, focus: { work: 1, social: 1, family: 1, self: 1, sports: 0, extracurricular: 0 } };
+  const expected = { ...before, version: 20, focus: { work: 1, social: 1, family: 1, self: 1, sports: 0, extracurricular: 0 } };
   expected.school = createSchoolRecord(expected);
   assert.deepEqual(migrateSave(state), expected);
   assert.deepEqual(state, before);

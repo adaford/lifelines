@@ -12,7 +12,7 @@ const legacyDefaults = age => age >= 2 && age < 5
   ? { work: 3, social: 2, family: 2, self: 3, creative: 2 }
   : { work: 3, social: 3, family: 3, self: 3 };
 
-test('schema 19 defaults, action limits and budgets match the active focus count', () => {
+test('schema 20 defaults, action limits and budgets match the active focus count', () => {
   for (const age of [2, 4, 5, 17, 25]) {
     const state = createGame({ seed: 3317 });
     state.age = age;
@@ -49,7 +49,7 @@ test('schema 16 migration changes only active focus and version, preserving old 
   const before = copy(old);
   const migrated = migrateSave(old);
   assert.ok(migrated);
-  const expected = { ...before, version: 19, focus: defaultFocus(7) };
+  const expected = { ...before, version: 20, focus: defaultFocus(7) };
   expected.school = createSchoolRecord(expected);
   assert.deepEqual(migrated, expected);
   assert.deepEqual(old, before, 'loading never modifies the input');

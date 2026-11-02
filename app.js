@@ -6,15 +6,15 @@ import {
   offeredJobs, needsEducationChoice, pendingEventSubject, focusLimits, focusLimitDetails, caregivers,
   relationshipOdds, meetingChances, proposalChance, pregnancyChance, oneNightChance,
   respondToEncounter, proposeMarriage, endRelationship, normalizeSurname, heightPercentile, statPercentiles
-} from './engine.js?v=sport-variety';
-import { LEGACY_EVENT_COPY } from './event-copy-history.js?v=sport-variety';
-import { annotateNarrative } from './narrative.js?v=sport-variety';
-import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome } from './display.js?v=sport-variety';
+} from './engine.js?v=perk-affinities';
+import { LEGACY_EVENT_COPY } from './event-copy-history.js?v=perk-affinities';
+import { annotateNarrative } from './narrative.js?v=perk-affinities';
+import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome } from './display.js?v=perk-affinities';
 
-import { MAX_FOCUS, focusBudget, focusMaxFor } from './focus-rules.js?v=sport-variety';
-import { schoolActivity, gradeLetter, activityEligible } from './school.js?v=sport-variety';
-import { getBirthConditions } from './birth-conditions.js?v=sport-variety';
-import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=sport-variety';
+import { MAX_FOCUS, focusBudget, focusMaxFor } from './focus-rules.js?v=perk-affinities';
+import { schoolActivity, gradeLetter, activityEligible } from './school.js?v=perk-affinities';
+import { getBirthConditions } from './birth-conditions.js?v=perk-affinities';
+import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=perk-affinities';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const app = document.querySelector('#app');
@@ -122,8 +122,8 @@ const percentileTag = (percentiles, key) => percentiles ? `<span class="stat-per
 const helpButton = (topic, label, id = '') => `<button type="button" class="help-button" data-action="topic-help" data-topic="${esc(topic)}" ${id?`data-id="${esc(id)}"`:''} aria-label="About ${esc(label)}" aria-haspopup="dialog"><span aria-hidden="true">?</span></button>`;
 const labelWithHelp = (label, topic, id = '') => `<span class="label-with-help">${esc(label)}${statEmoji(topic)}${helpButton(topic,label,id)}</span>`;
 
-function birthConditionEffects(condition, includeBirthTiming = false) {
-  const effects = Object.entries(condition.statChanges || {}).filter(([,amount])=>amount).map(([key,amount])=>`${signedModifier(amount)} ${skillLabel(key)}${includeBirthTiming?' at birth':''}`);
+function birthConditionEffects(condition) {
+  const effects = Object.entries(condition.aptitudeChanges || {}).filter(([,amount])=>amount).map(([key,amount])=>`${amount>0?'+':''}${amount} ${skillLabel(key)} affinity`);
   if (condition.focusPoints) effects.push(`${condition.focusPoints>0?'+':''}${condition.focusPoints} focus point${Math.abs(condition.focusPoints)===1?'':'s'} each year from age 2, lifelong`);
   for (const [stage,limits] of Object.entries(condition.focusLimits || {})) {
     for (const [key,max] of Object.entries(limits)) {
@@ -138,7 +138,10 @@ function birthConditionEffects(condition, includeBirthTiming = false) {
 function birthConditionsView(person) {
   const conditions = getBirthConditions(person);
   if (!conditions.length) return '';
-  return `<div class="birth-conditions" role="list" aria-label="${esc(person.name)}: birth conditions">${conditions.map(condition=>`<span class="birth-condition" role="listitem" data-condition-id="${esc(condition.id)}" aria-label="${esc(condition.name)}: ${esc(birthConditionEffects(condition,true).join('; '))}"><span>${esc(condition.name)} (${esc(birthConditionEffects(condition).join('; '))})</span></span>`).join('')}</div>`;
+  return `<ul class="birth-conditions" role="list" aria-label="${esc(person.name)}: perks">${conditions.map(condition=>{
+    const effects=birthConditionEffects(condition);
+    return `<li class="birth-condition" data-condition-id="${esc(condition.id)}" aria-label="${esc(condition.name)}: ${esc(effects.join('; '))}"><strong class="birth-condition-name">${esc(condition.name)}</strong><div class="birth-condition-effects">${effects.map(effect=>`<span class="birth-condition-effect">${esc(effect)}</span>`).join('')}</div></li>`;
+  }).join('')}</ul>`;
 }
 
 function loadGame() {
@@ -219,7 +222,7 @@ function render() {
       <div class="top-actions"><span class="save-status">${icon(saveAvailable ? 'check' : 'download')}${saveAvailable ? 'Saved' : 'Session only'}</span><button class="icon-button" data-action="menu" aria-label="More options" aria-haspopup="dialog">${icon('menu')}</button></div>
     </header>
     ${isYear ? `
-    <section class="profile-bar" aria-label="Your life"><div class="portrait">${avatar(state)}</div><div class="profile-copy"><p class="eyebrow">GENERATION ${state.generation}</p><div class="profile-name-row"><h1 class="person-name">${esc(state.name)}</h1></div><div class="profile-identity">${genderBadge(state)}<button class="profile-height" data-stat="height" data-action="topic-help" data-topic="height" data-id="${esc(state.id)}" aria-haspopup="dialog" aria-label="Height ${heightDescription(state.height,state.age)}. Open help."><strong class="status-value">${formatHeight(state.height,state.age)}</strong>${percentiles?percentileTag(percentiles,'height'):state.age>=18?'<span class="height-percentile">Adult height</span>':''}</button></div>${profileLifestyleView()}${birthConditionsView(state)}</div><div class="profile-age"><strong>${state.age}</strong>${state.age<2?'':`<p class="profile-stage">${state.age<5?'Toddler':state.age<18?'Student':state.education.status==='college'?'College student':career()?.name || 'Finding a path'}</p>`}<span>YEARS OLD</span></div></section>
+    <section class="profile-bar" aria-label="Your life"><div class="portrait">${avatar(state)}</div><div class="profile-copy"><p class="eyebrow">GENERATION ${state.generation}</p><div class="profile-name-row"><h1 class="person-name">${esc(state.name)}</h1></div><div class="profile-identity">${genderBadge(state)}<button class="profile-height" data-stat="height" data-action="topic-help" data-topic="height" data-id="${esc(state.id)}" aria-haspopup="dialog" aria-label="Height ${heightDescription(state.height,state.age)}. Open help."><strong class="status-value">${formatHeight(state.height,state.age)}</strong>${percentiles?percentileTag(percentiles,'height'):state.age>=18?'<span class="height-percentile">Adult height</span>':''}</button></div>${profileLifestyleView()}</div><div class="profile-age"><strong>${state.age}</strong>${state.age<2?'':`<p class="profile-stage">${state.age<5?'Toddler':state.age<18?'Student':state.education.status==='college'?'College student':career()?.name || 'Finding a path'}</p>`}<span>YEARS OLD</span></div>${birthConditionsView(state)}</section>
     <div class="status-strip" aria-label="At a glance">${DISPLAY_STATS.map(skill=>[skill.key,skill.label,stats[skill.key]]).map(([key,label,value])=>`<button class="status-pill" data-stat="${key}" data-action="topic-help" data-topic="${key}" data-id="${esc(state.id)}" aria-haspopup="dialog" aria-label="${label} ${number(value)} out of 10.${Number.isInteger(state.aptitudes[key]) && state.aptitudes[key]!==0?` Natural aptitude ${aptitude(state.aptitudes[key])}.`: ''} ${esc(statEffectDescription(key))} Open help."><span class="status-label">${label}${statEmoji(key)}</span><span class="status-reading"><strong class="status-value">${number(value)}<small>/10</small></strong>${aptitudeBadge(state.aptitudes[key])}${statEffectBadge(key)}</span>${ratingBar(label,value,key)}</button>`).join('')}</div>
     ` : ''}
       <main class="main-column" id="main-content">${activeTab==='career'||isYear&&!stageNames[lifeStage]?'':`<div class="chapter-heading"><h2>${isYear ? stageNames[lifeStage] : ({family:'A life, connected'}[activeTab])}<span style="color:var(--orange)">.</span></h2></div>`}
@@ -667,7 +670,7 @@ function topicHelpModal(topic, id) {
     social: ['Social', ['Ease with people for your age; social practice can improve it.']],
     creativity: ['Creativity', ['Creative potential for your age, shaped by exploration and practice.']],
     attractiveness: ['Attractiveness', ['Starts near its adult value. During school years, Yourself focus can improve or reduce it. Small yearly variation continues, with aging losses after 30 for men and 22 for women.']],
-    affinity: ['Natural aptitude', ['This inherited −3 to +3 trait affects starting ability and responsiveness to focus; higher is stronger. Health and mental stability aptitude improve routine gains and soften losses. Rare experiences shaped by another stat can raise or lower aptitude by one.']],
+    affinity: ['Natural aptitude', ['This −3 to +3 trait is shaped by inheritance and perk affinities. It affects starting ability and responsiveness to focus; higher is stronger. Health and mental stability aptitude improve routine gains and soften losses. Rare experiences shaped by another stat can raise or lower aptitude by one.']],
     forecast: ['Expected changes', ['Signs compare increases and decreases with the other choices for that stat. Zero changes are hidden. Infant stats show crying effects; adult stats show routine changes. Background development, events and yearly variation can alter the result.']],
     health: ['Health', ['Self-care supports health; illness and aging reduce it. Poor health raises disease risk and reduces childhood height gains.']],
     stability: ['Mental stability', ['Higher means calmer; rest and relationships help. Low parental mental stability can lead to difficult childhood events.']],
@@ -704,7 +707,7 @@ function topicHelpModal(topic, id) {
     if (job) entry = [job.name,[job.description,'+3 marks a core skill; skill fit reflects your current match.']];
   }
   if (!entry) return;
-  if (id===state.id && DISPLAY_STATS.some(stat=>stat.key===topic)) entry=[entry[0],[...entry[1],'Gains slow near 10 and losses slow near 0; moving away from either limit is faster. Rare experiences shaped by other stats can change natural aptitude by one.']];
+  if (id===state.id && DISPLAY_STATS.some(stat=>stat.key===topic)) entry=[entry[0],[...entry[1],'Gains slow near 10; losses slow near 0. Perk affinities adjust natural aptitude, not current ratings. Rare experiences from other stats shift aptitude by one.']];
   if (id===state.id) entry=[entry[0],[...entry[1],...statEffects(topic).map(({effect,amount})=>`${effect.name}: ${signedModifier(amount)} ${skillLabel(topic)} (${effect.years} year${effect.years===1?'':'s'} remaining)`)]];
   openModal(esc(entry[0]),`${entry[1].map(paragraph=>`<p>${esc(paragraph)}</p>`).join('')}`);
   modalRoot.querySelector('.modal').classList.add('help-popup');

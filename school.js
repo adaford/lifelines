@@ -1,4 +1,4 @@
-import { heightReference } from './growth.js?v=sport-variety';
+import { heightReference } from './growth.js?v=perk-affinities';
 
 // Fictional school activities and success rules, independent of save mutation
 // and the gameplay RNG. The engine supplies effective ratings and any draw.

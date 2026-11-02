@@ -188,7 +188,7 @@ test('schema 13 migration preserves ratings, effects, pending choices, history a
   const before = copy(state);
   assert.equal(validateSave(state), false);
   const migrated = migrateSave(state);
-  const expected = { ...before, version: 19, focus: { work: 1, social: 1, family: 1, self: 1, sports: 0, extracurricular: 0 } };
+  const expected = { ...before, version: 20, focus: { work: 1, social: 1, family: 1, self: 1, sports: 0, extracurricular: 0 } };
   expected.school = createSchoolRecord(expected);
   assert.deepEqual(migrated, expected);
   assert.deepEqual(state, before);

@@ -9,7 +9,7 @@ import { MAX_FOCUS, focusBudget, defaultFocus } from '../focus-rules.js';
 import { createSchoolRecord, gradeLetter } from '../school.js';
 import { changedRating } from '../rating-changes.js';
 import { choiceImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from '../choice-impacts.js';
-import { SKILLS, JOBS, EVENTS, resolveEventChoice, eventOdds, canTakeJob, chooseEducation, offeredJobs, needsEducationChoice, createGame, advanceYear, annualForecast, haveChild, takeJob, successionInfo, succeed, validateSave, respondToEncounter, proposeMarriage, effectiveStats, relationshipOdds, proposalChance, statPercentiles } from '../engine.js';
+import { SKILLS, JOBS, EVENTS, resolveEventChoice, eventOdds, canTakeJob, chooseEducation, offeredJobs, needsEducationChoice, createGame, advanceYear, annualForecast, haveChild, takeJob, successionInfo, succeed, validateSave, respondToEncounter, proposeMarriage, effectiveStats, householdLifestyle, relationshipOdds, proposalChance, statPercentiles } from '../engine.js';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
@@ -1574,7 +1574,7 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     const ui = await mount(fixture);
     for (let age = 0; age < 18; age += 1) {
       const saved=ui.saved();
-      const parentLifestyle=(saved.parents.find(parent=>parent.alive!==false) || saved.parents[0]).lifestyle;
+      const parentLifestyle=householdLifestyle(saved);
       assert.equal(saved.age, age);
       assert.equal(saved.lifestyle, parentLifestyle);
       assert.equal(parseFloat(ui.query('.profile-lifestyle .status-value').textContent),Number(parentLifestyle.toFixed(1)));
@@ -1868,12 +1868,17 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     ageTo(elder, 65);
     elder.money = 100000;
     elder.lifestyle = 5;
+    elder.children[1].conditions=['sharp_memory','literal_thinker'];
     const selected = structuredClone(elder.children[1]);
     const sibling = structuredClone(elder.children[0]);
     const info = successionInfo(elder);
     const ui = await mount(elder);
     ui.click('[data-action="tab"][data-tab="family"]');
     assert.equal(ui.all('[data-action="heir"]').length, 2);
+    const heir=ui.query(`.heir-candidate[data-person-id="${selected.id}"]`);
+    assert.deepEqual([...heir.querySelectorAll('.birth-condition-name')].map(node=>node.textContent),['Sharp memory','Literal thinker']);
+    assert.deepEqual([...heir.querySelectorAll('.birth-condition-effect')].map(node=>node.textContent),['+1 Intelligence affinity','-1 Creativity affinity','+1 Intelligence affinity']);
+    assert.equal(heir.querySelector('.birth-conditions').getAttribute('aria-label'),`${selected.name}: perks`);
     ui.click(`[data-action="heir"][data-id="${selected.id}"]`);
     assert.equal(ui.saved().generation, 1, 'opening confirmation must leave the current life intact');
     assert.match(ui.query('.modal-body').textContent, /equal share/i);
@@ -2352,6 +2357,7 @@ test('departed parents remain identified and the guardian receives care previews
   delete fixture.guardian.parentRole;
   fixture.guardian.relationship=7;
   fixture.guardian.stats.stability=7;
+  fixture.guardian.conditions=['sharp_memory','literal_thinker'];
   const ui=await mount(fixture),before=ui.saved();
   assert.equal(ui.query('.parent-status[data-parent-id="relative-guardian"] h4').textContent,'Aunt:');
   assert.equal(ui.query('.parent-status[data-parent-id="relative-guardian"] .parent-status-state').textContent,'Guardian');
@@ -2370,6 +2376,8 @@ test('departed parents remain identified and the guardian receives care previews
   assert.equal(guardian.querySelector('.eyebrow').textContent,'Aunt');
   assert.match(guardian.textContent,/Guardian/);
   assert.equal(guardian.querySelectorAll('.rating-track').length,3);
+  assert.deepEqual([...guardian.querySelectorAll('.birth-condition-name')].map(node=>node.textContent),['Sharp memory','Literal thinker']);
+  assert.deepEqual([...guardian.querySelectorAll('.birth-condition-effect')].map(node=>node.textContent),['+1 Intelligence affinity','-1 Creativity affinity','+1 Intelligence affinity']);
   for(const parent of fixture.parents) {
     const card=ui.query(`.roots-panel [data-person-id="${parent.id}"]`);
     assert.match(card.textContent,/Left the family/);
@@ -2750,18 +2758,22 @@ test('school menus rotate three offers per category each year while keeping the 
 
 test('legacy five-offer saves restore three options without resetting an activity removed from the shortlist', async () => {
   const legacy=ageTo(createGame({seed:121}),10);
-  legacy.conditions=[]; legacy.effects=[];
+  const currentVersion=legacy.version;
+  legacy.version=19;
+  for(const person of [legacy,...legacy.parents,...legacy.siblings]) person.conditions=[];
+  legacy.effects=[];
   legacy.school.offers.sports=['basketball','soccer','swimming','archery','figure_skating'];
   legacy.school.offers.extracurricular=['chess','piano','modeling','drama','robotics'];
   legacy.school.sports={id:'figure_skating',success:6.35};
   legacy.school.extracurricular={id:'robotics',success:4.25};
   legacy.focus=defaultFocus(legacy);
   const original=structuredClone(legacy),expected=structuredClone(legacy);
+  expected.version=currentVersion;
   for(const kind of ['sports','extracurricular']) expected.school.offers[kind]=expected.school.offers[kind].slice(0,3);
   let ui=await mount(legacy);
   assert.deepEqual(legacy,original,'restoring does not mutate the imported object');
   for(let reload=0;reload<2;reload++) {
-    assert.deepEqual(ui.saved(),expected,'only the two offer lists change; history, reports, focus, ratings, success and RNG remain intact');
+    assert.deepEqual(ui.saved(),expected,'only schema metadata and the two offer lists change; history, reports, focus, ratings, success and RNG remain intact');
     for(const kind of ['sports','extracurricular']) {
       ui.click(`[data-action="school-offers"][data-kind="${kind}"]`);
       assert.deepEqual(ui.all('.school-offer').map(card=>card.dataset.offerId),expected.school.offers[kind]);
@@ -3143,39 +3155,62 @@ test('toddler and family effects retain their point curves and crafts Intelligen
   }
 });
 
-test('birth conditions show inline effects across Year and family profiles without changing saves', async () => {
+test('perks show separate named rows and affinity effects across Year and family profiles without changing saves', async () => {
   const fixture=partnerFixture();
   assert.equal(haveChild(fixture).ok,true);
-  fixture.conditions=['autism','high_energy','sharp_memory'];
+  fixture.conditions=['autism','high_energy','sharp_memory','literal_thinker','restless'];
   fixture.focus={...defaultFocus(fixture),work:2,social:1,family:2,self:2};
-  fixture.parents[0].conditions=['low_energy'];
-  fixture.partner.conditions=['high_energy'];
-  fixture.children[0].conditions=['autism'];
+  fixture.parents[0].conditions=['low_energy','literal_thinker'];
+  fixture.partner.conditions=['high_energy','sharp_memory'];
+  fixture.children[0].conditions=['autism','literal_thinker'];
   fixture.yearSummary=null; // The fixture changes birth traits after advancing; do not retain the previous trait budget.
   assert.equal(validateSave(fixture),true);
   let ui=await mount(fixture);
   const saved=ui.saved(),writes=ui.writes();
-  assert.deepEqual(ui.all('.profile-bar .birth-condition').map(node=>node.dataset.conditionId),['autism','high_energy','sharp_memory']);
+  assert.deepEqual(ui.all('.profile-bar .birth-condition').map(node=>node.dataset.conditionId),fixture.conditions);
+  const perkList=ui.query('.profile-bar > .birth-conditions');
+  assert.equal(perkList.tagName,'UL');
+  assert.equal(perkList.getAttribute('role'),'list');
+  assert.equal(perkList.getAttribute('aria-label'),`${fixture.name}: perks`);
+  assert.equal(perkList.previousElementSibling.className,'profile-age','perks span a separate row below the identity and age');
+  assert.equal(ui.all('.profile-copy .birth-conditions').length,0);
+  for(const row of perkList.children) {
+    assert.equal(row.tagName,'LI');
+    assert.equal(row.firstElementChild.tagName,'STRONG');
+    assert.equal(row.lastElementChild.className,'birth-condition-effects');
+    assert.ok(row.querySelectorAll('.birth-condition-effect').length);
+    assert.doesNotMatch(row.textContent,/[();]/,'effects use separate lines instead of a parenthesized paragraph');
+  }
   assert.equal(ui.all('.status-strip > button').length,7,'conditions leave the seven-stat grid intact');
   assert.doesNotMatch(ui.query('#app').textContent,/Effects are game rules/);
   const autism=ui.query('.profile-bar [data-condition-id="autism"]');
-  assert.equal(autism.textContent,'Autism (+.7 Intelligence; Friends max 1 from age 5, lifelong)');
-  assert.match(autism.getAttribute('aria-label'),/Intelligence at birth.*Friends max 1 from age 5, lifelong/);
-  assert.equal(ui.query('.profile-bar [data-condition-id="sharp_memory"]').textContent,'Sharp memory (+.5 Intelligence)');
+  assert.equal(autism.querySelector('strong').textContent,'Autism');
+  assert.deepEqual([...autism.querySelectorAll('.birth-condition-effect')].map(node=>node.textContent),['+1 Intelligence affinity','Friends max 1 from age 5, lifelong']);
+  assert.equal(autism.getAttribute('aria-label'),'Autism: +1 Intelligence affinity; Friends max 1 from age 5, lifelong');
+  assert.equal(ui.query('.profile-bar [data-condition-id="sharp_memory"] .birth-condition-effect').textContent,'+1 Intelligence affinity');
+  assert.deepEqual(ui.all('.profile-bar [data-condition-id="literal_thinker"] .birth-condition-effect').map(node=>node.textContent),['-1 Creativity affinity','+1 Intelligence affinity']);
+  assert.deepEqual(ui.all('.profile-bar [data-condition-id="restless"] .birth-condition-effect').map(node=>node.textContent),['-1 Mental stability affinity','+1 focus point each year from age 2, lifelong']);
   assert.match(ui.query('.profile-bar [data-condition-id="high_energy"]').textContent,/\+1 focus point each year from age 2, lifelong/);
-  assert.equal(ui.all('.birth-conditions button').length,0,'condition effects need no help buttons');
+  assert.equal(ui.all('.birth-conditions button').length,0,'perk effects need no help buttons');
+  assert.doesNotMatch(perkList.textContent,/at birth|\+\.5|\+\.7/,'perks describe affinity changes, not old direct rating bonuses');
+  ui.click('[data-topic="intelligence"]');
+  assert.match(ui.query('.help-popup').textContent,/Perk affinities adjust natural aptitude, not current ratings/);
+  ui.click('.help-popup [data-action="close"]');
   ui.click('.nav-list [data-tab="family"]');
   for(const [person,condition] of [[fixture.parents[0],'low_energy'],[fixture.partner,'high_energy'],[fixture.children[0],'autism']]) {
     const selector=`[data-person-id="${person.id}"] [data-condition-id="${condition}"]`;
     const conditionNode=ui.query(selector);
     assert.match(conditionNode.closest('.birth-conditions').getAttribute('aria-label'),new RegExp(person.name));
-    assert.match(conditionNode.textContent,/\(.+\)/,'every family condition shows effects beside its name');
+    assert.equal(conditionNode.tagName,'LI');
+    assert.ok(conditionNode.querySelector('.birth-condition-name'));
+    assert.ok(conditionNode.querySelector('.birth-condition-effect'));
+    assert.equal(conditionNode.closest('.birth-conditions').children.length,2,'family perks also have individual rows');
     assert.equal(conditionNode.querySelector('button'),null);
   }
   assert.deepEqual(ui.saved(),saved);
   assert.equal(ui.writes(),writes,'reading condition effects must not assign conditions, apply bonuses, or consume RNG');
   ui=await mount(saved);
-  assert.equal(ui.all('.profile-bar .birth-condition').length,3);
+  assert.equal(ui.all('.profile-bar .birth-condition').length,5);
   assert.deepEqual(ui.saved(),saved);
 });
 
@@ -3223,15 +3258,18 @@ test('lifelong condition caps and extra focus points are enforced together and s
   assert.ok(ui.all('.focus-row [data-delta="1"]').every(button=>button.disabled));
 });
 
-test('dating prospects show their own birth conditions and condition-free profiles stay compact', async () => {
+test('dating prospects show their own perk rows and perk-free profiles stay compact', async () => {
   const fixture=encounterFixture();
   fixture.conditions=[];
-  fixture.encounters[0].conditions=['autism'];
+  fixture.encounters[0].conditions=['autism','literal_thinker'];
   fixture.encounters[1].conditions=[];
   const ui=await mount(fixture),saved=ui.saved();
   assert.equal(ui.all('.profile-bar .birth-conditions').length,0);
   ui.click('.nav-list [data-tab="family"]');
-  assert.equal(ui.query('.encounter-card [data-condition-id="autism"]').textContent,'Autism (+.7 Intelligence; Friends max 1 from age 5, lifelong)');
+  assert.equal(ui.query('.encounter-card [data-condition-id="autism"] .birth-condition-name').textContent,'Autism');
+  assert.deepEqual(ui.all('.encounter-card [data-condition-id="autism"] .birth-condition-effect').map(node=>node.textContent),['+1 Intelligence affinity','Friends max 1 from age 5, lifelong']);
+  assert.deepEqual(ui.all('.encounter-card [data-condition-id="literal_thinker"] .birth-condition-effect').map(node=>node.textContent),['-1 Creativity affinity','+1 Intelligence affinity']);
+  assert.equal(ui.all('.encounter-card .birth-condition').length,2);
   assert.ok(ui.query('.encounter-card .birth-conditions').getAttribute('aria-label').includes(fixture.encounters[0].name));
   assert.equal(ui.all('.encounter-card .birth-conditions button').length,0);
   ui.click('[data-action="prospect-page"][data-delta="1"]');

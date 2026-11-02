@@ -89,7 +89,7 @@ test('all five stats exist at birth with established natural ratings and average
     const baby = createGame({ seed });
     for (const { key } of SKILLS) assert.ok(baby.stats[key] >= 0 && baby.stats[key] <= 10, `${key} at birth`);
     assert.ok(baby.stats.attractiveness >= 0 && baby.stats.attractiveness <= 10);
-    assert.equal(baby.version, 19);
+    assert.equal(baby.version, 20);
     for (const key of ['health', 'stability']) {
       assert.ok(baby.stats[key] >= 0 && baby.stats[key] <= 10);
       wellbeing[key].push(baby.stats[key]);
@@ -211,6 +211,7 @@ test('aptitude changes development speed without leaving the stat scale', () => 
 
 test('focus has four independent 0-4 values and a hard eight-point budget', () => {
   const state = adult();
+  state.conditions = []; state.effects = [];
   state.focus = { work: 2, social: 2, family: 2, self: 2 };
   assert.equal(setFocus(state, 'work', 5).ok, false);
   assert.equal(setFocus(state, 'social', 0).ok, true);
@@ -475,7 +476,7 @@ test('v2 upgrades preserve school, current careers, and adults without consuming
       const snapshot = copy(old);
       const upgraded = migrateSave(old);
       assert.equal(validateSave(upgraded), true);
-      assert.equal(upgraded.version, 19);
+      assert.equal(upgraded.version, 20);
       assert.equal(upgraded.education.status, status);
       assert.equal(upgraded.education.years, status === 'graduate' ? 4 : 0);
       assert.equal(upgraded.jobOffers.length, count);
@@ -1448,7 +1449,7 @@ test('old childless endings become valid retirement choices without resetting th
   for (const parent of previous.parents) { parent.age = Math.min(85, parent.age); if (parent.age === 85) parent.alive = false; }
   for(const person of [previous,...previous.parents,...previous.children,...previous.siblings,...previous.lineage,...previous.encounters,previous.partner,previous.pregnancy?.otherParent].filter(Boolean)) { delete person.familyName; person.appearancePeakAge = 30; }
   const migrated=migrateSave(previous);
-  assert.equal(validateSave(migrated),true); assert.equal(migrated.version,19);
+  assert.equal(validateSave(migrated),true); assert.equal(migrated.version,20);
   assert.equal(migrated.ended,false); assert.equal(migrated.needsSuccession,true);
   for(const key of ['id','name','age','rng','nextId','stats','aptitudes','history','money','education','jobOffers','effects','pendingEvents']) assert.deepEqual(migrated[key],neutralWellbeingAptitudes(copy(previous))[key]);
   const info=successionInfo(migrated);
@@ -1496,7 +1497,7 @@ test('v12 upgrades current focus while preserving wellbeing aptitudes, historica
   legacy.version = 12;
   const original = copy(legacy);
   const upgraded = migrateSave(legacy);
-  assert.deepEqual(upgraded, { ...original, version: 19, focus: { work: 1, social: 3, family: 2, self: 1, creative: 3 } });
+  assert.deepEqual(upgraded, { ...original, version: 20, focus: { work: 1, social: 3, family: 2, self: 1, creative: 3 } });
   assert.deepEqual(legacy, original, 'migration preserves its source');
   assert.equal(validateSave(upgraded), true);
   assert.deepEqual(migrateSave(JSON.parse(JSON.stringify(upgraded))), upgraded);

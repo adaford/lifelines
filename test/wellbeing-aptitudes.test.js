@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createGame, annualForecast, migrateSave, validateSave, chooseEducation, haveChild, successionInfo } from '../engine.js';
 import { stripWellbeingAptitudes, neutralWellbeingAptitudes } from './helpers/legacy-height.js';
+import { getBirthConditions } from '../birth-conditions.js';
 
 const copy = value => structuredClone(value);
 const wellbeing = ['health', 'stability'];
@@ -10,11 +11,15 @@ test('new lives inherit bounded wellbeing aptitudes and all generation routes re
   const observed = { health: new Set(), stability: new Set() };
   for (let seed = 1; seed <= 120; seed++) {
     const state = createGame({ seed });
-    assert.equal(state.version, 19);
+    assert.equal(state.version, 20);
     for (const key of wellbeing) {
       const average = (state.parents[0].aptitudes[key] + state.parents[1].aptitudes[key]) / 2;
       const inherited = Math.sign(average) * Math.round(Math.abs(average));
-      assert.ok(Math.abs(state.aptitudes[key] - inherited) <= 1);
+      const perkShift = getBirthConditions(state).reduce((sum, perk) => sum + (perk.aptitudeChanges[key] || 0), 0);
+      const bound = value => Math.max(-3, Math.min(3, value));
+      const lowest = bound(bound(inherited - 1) + perkShift), highest = bound(bound(inherited + 1) + perkShift);
+      assert.ok(state.aptitudes[key] >= lowest && state.aptitudes[key] <= highest,
+        'inherited variation stays within one step before the separate perk affinity shift');
       for (const person of [state, ...state.parents]) {
         assert.ok(Number.isInteger(person.aptitudes[key]));
         assert.ok(person.aptitudes[key] >= -3 && person.aptitudes[key] <= 3);
@@ -44,7 +49,7 @@ test('v11 migration adds neutral wellbeing aptitude without changing any saved p
   const before = copy(legacy);
   const migrated = migrateSave(legacy);
   const expected = neutralWellbeingAptitudes(copy(before));
-  expected.version = 19;
+  expected.version = 20;
   expected.focus = { work: 1, social: 3, family: 2, self: 1, creative: 3 };
   assert.deepEqual(migrated, expected);
   assert.deepEqual(legacy, before);

@@ -82,9 +82,12 @@ button svg { pointer-events: none; }
 .portrait { position: relative; margin: 0; }
 .avatar { display: block; width: 52px; height: 52px; border-radius: 50%; overflow: hidden; background: #e1e6d7; border: 2px solid #e6e8dc; }
 .profile-copy { min-width: 0; }
-.birth-conditions { display: flex; flex-wrap: wrap; gap: 2px 8px; margin-top: 5px; }
-.birth-condition { display: inline-flex; align-items: center; min-width: 0; max-width: 100%; color: var(--muted); font-size: 11px; line-height: 1.3; }
-.birth-condition > span { overflow-wrap: anywhere; }
+.birth-conditions { display: grid; gap: 6px; margin: 8px 0 0; padding: 0; list-style: none; }
+.profile-bar > .birth-conditions { grid-column: 1 / -1; margin-top: 0; }
+.birth-condition { display: grid; gap: 4px; min-width: 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.birth-condition-name { color: var(--ink); font-size: 13px; line-height: 1.3; overflow-wrap: anywhere; }
+.birth-condition-effects { display: grid; gap: 3px; }
+.birth-condition-effect { color: var(--muted); font-size: 12px; line-height: 1.4; overflow-wrap: anywhere; }
 .eyebrow { font-size: 10px; text-transform: uppercase; color: var(--muted); font-weight: 650; letter-spacing: 1.2px; line-height: 1.5; }
 .person-name { font-size: 23px; line-height: 1.13; letter-spacing: -.5px; margin: 2px 0 3px; overflow-wrap: anywhere; }
 .profile-name-row { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; }

@@ -162,6 +162,7 @@ test('school signs retain their custom units under caps and clipping, and bonuse
 
 test('version seventeen school saves gain unjoined activity slots without rewriting saved values or old reviews', () => {
   const old = quietMean(student());
+  for (const person of [old, ...old.parents]) person.conditions = [];
   old.version = 17;
   delete old.school;
   delete old.yearSummary.school;

@@ -8,6 +8,7 @@ import { createProspects } from '../relationships.js';
 
 const clone = value => structuredClone(value);
 const stats = () => Object.fromEntries(['health', 'stability', 'attractiveness', 'intelligence', 'strength', 'social', 'creativity'].map(key => [key, 5]));
+const aptitudes = () => Object.fromEntries(Object.keys(stats()).map(key => [key, 0]));
 const calm = { mortalityRandom: () => 1, growthRandom: () => 0, parentCareerRandom: () => 1 };
 function finishChoices(state) {
   while (state.pendingEvents.length) {
@@ -28,7 +29,12 @@ test('all 100 birth conditions are reachable without parents and either parent m
   assert.equal(MAX_BIRTH_CONDITIONS, 5);
   for (const [target, entry] of BIRTH_CONDITIONS.entries()) {
     assert.ok(entry.birthChance > 0 && entry.birthChance < .05);
-    assert.ok(Object.keys(entry.statChanges).length || entry.focusPoints || entry.focusLimits, entry.id);
+    assert.equal(entry.statChanges, undefined, `${entry.id} has no direct rating changes`);
+    assert.ok(Object.keys(entry.aptitudeChanges).length || entry.focusPoints || entry.focusLimits, entry.id);
+    for (const [key, amount] of Object.entries(entry.aptitudeChanges)) {
+      assert.ok(Object.hasOwn(stats(), key), `${entry.id} changes a known affinity`);
+      assert.ok(amount === -1 || amount === 1, `${entry.id} changes affinities by one integer step`);
+    }
     const roll = fraction => { let index = 0; return () => index++ === target ? entry.birthChance * fraction : .999; };
     assert.deepEqual(generateBirthConditions(roll(.5)), [entry.id], `${entry.id} can occur spontaneously`);
     assert.deepEqual(generateBirthConditions(roll(1.25)), []);
@@ -38,7 +44,7 @@ test('all 100 birth conditions are reachable without parents and either parent m
   }
 });
 
-test('birth assignment is deterministic, unique, capped at five, and never repeats stat bonuses', () => {
+test('birth assignment is deterministic, unique, capped at five, and never repeats affinity changes', () => {
   const maximum = generateBirthConditions(() => 0);
   assert.equal(maximum.length, 5);
   assert.equal(validateBirthConditions(maximum), true);
@@ -46,11 +52,12 @@ test('birth assignment is deterministic, unique, capped at five, and never repea
   assert.equal(new Set(groups).size, groups.length);
   let nonempty = 0;
   for (let seed = 1; seed <= 100; seed++) {
-    const person = { id: 'newborn', stats: stats(), rng: 123 };
+    const person = { id: 'newborn', stats: stats(), aptitudes: aptitudes(), rng: 123 };
     const same = clone(person);
     assignBirthConditions(person, seed);
     assignBirthConditions(same, seed);
     assert.deepEqual(person, same);
+    assert.deepEqual(person.stats, stats(), 'assignment preserves all generated ratings');
     assert.equal(validateBirthConditions(person.conditions), true);
     nonempty += Number(person.conditions.length > 0);
     const assigned = clone(person);
@@ -59,10 +66,41 @@ test('birth assignment is deterministic, unique, capped at five, and never repea
     assert.equal(person.rng, 123);
   }
   assert.ok(nonempty > 20 && nonempty < 100);
-  const person = { stats: { ...stats(), intelligence: 9.8 }, conditions: ['autism', 'delicate_constitution'] };
-  applyBirthConditions(person);
-  assert.equal(person.stats.intelligence, 10);
-  assert.equal(person.stats.health, 4.4);
+});
+
+test('every birth condition affects affinities without writing to ratings or other saved values', () => {
+  for (const entry of BIRTH_CONDITIONS) {
+    const person = { id: 'newborn', stats: Object.freeze({ ...stats(), intelligence: 9.8, health: .1 }),
+      aptitudes: aptitudes(), conditions: [entry.id], rng: 123, focus: { work: 2, social: 2, family: 2, self: 2 } };
+    const before = clone(person), originalStats = person.stats;
+    assert.equal(applyBirthConditions(person), person);
+    assert.equal(person.stats, originalStats, `${entry.id} does not replace the ratings object`);
+    assert.deepEqual(person, { ...before, aptitudes: { ...aptitudes(), ...entry.aptitudeChanges } }, entry.id);
+  }
+});
+
+test('affinity changes stack once, cancel before clamping, and remain within integer limits', () => {
+  const gifted = { stats: stats(), aptitudes: { ...aptitudes(), intelligence: 2 },
+    conditions: ['quick_learner', 'sharp_memory', 'curious_mind'] };
+  applyBirthConditions(gifted);
+  assert.equal(gifted.aptitudes.intelligence, 3, 'overlapping positive affinities stop at +3');
+  assert.equal(gifted.aptitudes.creativity, 1);
+  assert.deepEqual(gifted.stats, stats());
+  const vulnerable = { stats: stats(), aptitudes: { ...aptitudes(), health: -2 },
+    conditions: ['delicate_constitution', 'low_appetite', 'low_endurance'] };
+  applyBirthConditions(vulnerable);
+  assert.equal(vulnerable.aptitudes.health, -3, 'overlapping negative affinities stop at -3');
+  assert.equal(vulnerable.aptitudes.strength, -2);
+  assert.deepEqual(vulnerable.stats, stats());
+  const balanced = { stats: stats(), aptitudes: { ...aptitudes(), intelligence: 3 }, conditions: ['sharp_memory', 'forgetful'] };
+  const reversed = { ...clone(balanced), conditions: [...balanced.conditions].reverse() };
+  applyBirthConditions(balanced);
+  applyBirthConditions(reversed);
+  assert.equal(balanced.aptitudes.intelligence, 3, 'opposing affinities cancel before the upper bound is applied');
+  assert.deepEqual(balanced.aptitudes, reversed.aptitudes, 'condition ordering does not change the result');
+  const assigned = clone(gifted);
+  assignBirthConditions(gifted, 8, [{ conditions: ['autism'] }]);
+  assert.deepEqual(gifted, assigned, 'an already assigned person never receives the shifts again');
 });
 
 test('condition bonuses and lifelong limits apply to focus actions and coexist with temporary limits', () => {
@@ -91,7 +129,7 @@ test('condition bonuses and lifelong limits apply to focus actions and coexist w
   assert.deepEqual(migrateSave(clone(state)), state);
 });
 
-test('new parents, players, and dating prospects carry saved conditions with their birth stat effects', () => {
+test('new parents, players, and dating prospects carry saved conditions with their affinity effects', () => {
   const state = createGame({ seed: 80319 });
   for (const person of [state, ...state.parents]) assert.equal(validateBirthConditions(person.conditions), true);
   const expected = { id: state.id, stats: stats() };
@@ -181,7 +219,7 @@ test('older saves receive empty condition lists without changing existing rating
   const loaded = migrateSave(state);
   assert.ok(loaded);
   const expected = clone(before);
-  expected.version = 19;
+  expected.version = 20;
   expected.school = null;
   expected.focus = defaultFocus(expected.age);
   visit(expected, person => { person.conditions = []; });
