@@ -1,18 +1,19 @@
 // Fictional life-sim probabilities and consequences, not real-world risk estimates.
 // Each eligible event gets an independent yearly roll. The engine caps a year at five.
 // Low/high factors are curved so extreme traits matter much more than small changes.
-import { legacyFocusValue } from './focus-rules.js?v=study-activity-preview';
-import { APTITUDE_EVENTS } from './cross-aptitude-events.js?v=study-activity-preview';
+import { legacyFocusValue, focusMaxFor } from './focus-rules.js?v=activity-events';
+import { APTITUDE_EVENTS } from './cross-aptitude-events.js?v=activity-events';
+import { schoolActivity, activityEligible } from './school.js?v=activity-events';
 
 const low = key => [key, 'low'];
 const high = key => [key, 'high'];
 const temporary = (modifiers, years = 1, lifestyle = 0) => ({ modifiers, years, ...(lifestyle ? { lifestyle } : {}) });
 // Keep the timed-effect notation and runtime available for saved lives. New
-// catalog outcomes merge its amounts into permanent changes; only limits expire.
+// catalog outcomes merge its amounts into permanent changes; limits and point changes expire.
 const change = statChanges => ({ statChanges });
 const choice = (id, label, description, outcome) => ({ id, label, description, ...outcome });
 function permanentOutcome(outcome) {
-  const result = { ...outcome, statChanges: { ...outcome.statChanges }, modifiers: {}, years: outcome.focusLimits ? outcome.years || 1 : 0 };
+  const result = { ...outcome, statChanges: { ...outcome.statChanges }, modifiers: {}, years: outcome.focusLimits || outcome.focusPoints ? outcome.years || 1 : 0 };
   for (const [key, amount] of Object.entries(outcome.modifiers || {})) result.statChanges[key] = (result.statChanges[key] || 0) + amount;
   // Material ups and downs leave a small lasting emotional consequence instead
   // of creating a temporary lifestyle rating. No financial amounts enter UI.
@@ -302,14 +303,34 @@ export const EVENTS = [
     ] },
     { id: 'elder_heatwave', name: 'A difficult heatwave', description: 'Persistent heat limits outings and disrupts sleep.', kind: 'negative', statFactors: [low('health')], ...temporary({ stability: -.2 }), focusLimits: { standard: { social: 3 } } },
   ]),
+  ...group('School activities', { minAge: 5, maxAge: 17, conditions: ['school'], baseChance: .008, minFocus: 1, kind: 'positive' }, [
+    { id: 'school_sports_injury', name: 'An accident at practice', description: 'You hit your face during sports practice and are left with a small scar.', activityFocus: 'sports', kind: 'negative', ...change({ attractiveness: -.3 }) },
+    { id: 'sports_teammate_invite', name: 'An invitation after practice', description: 'A teammate invites you to join the group after practice, helping you get to know people beyond the sessions.', activityFocus: 'sports', ...change({ social: .2 }) },
+    { id: 'study_headache', name: 'Headaches interrupt your studies', description: 'Long study sessions leave you with recurring headaches, forcing you to clear time for recovery next year.', activityFocus: 'work', minFocus: 3, baseChance: .01, kind: 'negative', focusPoints: -1, years: 1 },
+    { id: 'teacher_study_feedback', name: 'A teacher reviews your extra work', description: 'A teacher notices your extra work and gives you a detailed explanation that makes a difficult topic click.', activityFocus: 'work', ...change({ intelligence: .2 }) },
+    { id: 'school_activity_showcase', name: 'Invited to explain your activity', description: 'Your extracurricular group asks you to introduce its work at a school open day, giving you practice speaking with visitors.', activityFocus: 'extracurricular', ...change({ social: .2 }) },
+    { id: 'club_deadline_pressure', name: 'An activity deadline moves forward', description: 'An extracurricular organizer brings a group event forward, leaving you rushed to finish your preparations.', activityFocus: 'extracurricular', kind: 'negative', ...change({ stability: -.2 }) },
+    { id: 'school_friends_outing', name: 'Friends invite you on an outing', description: 'Friends include you in a weekend outing, and shared games and conversation bring you closer.', activityFocus: 'social', ...change({ social: .2 }) },
+    { id: 'family_recipe_lesson', name: 'A relative teaches you a family recipe', description: 'A relative invites you into the kitchen to prepare a family recipe and encourages you to invent your own variation.', activityFocus: 'family', ...change({ creativity: .2 }) },
+  ]),
 ];
 
 const SPORTS_JOBS = new Set(['athlete', 'personal_trainer', 'sports_coach', 'yoga_instructor', 'lifeguard', 'dance_instructor', 'outdoor_guide']);
 const PHYSICAL_JOBS = new Set(['builder', 'electrician', 'plumber', 'carpenter', 'mechanic', 'welder', 'warehouse_associate', 'firefighter', 'park_ranger', 'athlete', 'personal_trainer', 'lifeguard', 'dance_instructor', 'outdoor_guide', 'housekeeper']);
 
+function activityFocusPoints(event, state) {
+  const points = state.focus?.[event.activityFocus];
+  return Number.isFinite(points) ? Math.max(0, Math.min(focusMaxFor(state, event.activityFocus), points)) : 0;
+}
+
 function eligible(event, state, job) {
   if (state.age < event.minAge || state.age > (event.maxAge ?? Infinity)) return false;
   if (Object.entries(event.aptitudeChanges || {}).some(([key, amount]) => amount > 0 ? (state.aptitudes?.[key] || 0) >= 3 : (state.aptitudes?.[key] || 0) <= -3)) return false;
+  if (event.activityFocus) {
+    if (activityFocusPoints(event, state) < (event.minFocus || 1)) return false;
+    if (['sports', 'extracurricular'].includes(event.activityFocus)
+        && !activityEligible(state, schoolActivity(event.activityFocus, state.school?.[event.activityFocus]?.id))) return false;
+  }
   return (event.conditions || []).every(condition => {
     if (condition === 'school') return state.age >= 5 && state.age < 18;
     // Keep old minAge metadata valid for choices already queued in saved lives.
@@ -330,6 +351,7 @@ export function eventChances(state, stats, job) {
   const focus = state.age < 2 ? { work: 0, social: 0, family: 0, self: 0 } : Object.fromEntries(Object.entries(state.focus || {}).map(([key, value]) => [key, legacyFocusValue(value, state.age < 5 && !['work', 'self'].includes(key) ? 2 : 3)]));
   return EVENTS.map(event => {
     let chance = inactive || !eligible(event, state, job) ? 0 : event.baseChance * (event.rare ? 1 : PERSONAL_EVENT_RATE_MULTIPLIER);
+    if (event.activityFocus) chance *= activityFocusPoints(event, state);
     const focusFactors = state.age < 5 && event.toddlerFocusFactors || event.focusFactors || [];
     for (const key of focusFactors) chance *= .4 + (focus[key] ?? 0) * .25;
     for (const key of event.neglectFactors || []) chance *= .25 + (5 - focus[key]) * .35;

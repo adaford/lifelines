@@ -1,5 +1,15 @@
 # Lifelines
 
+## Focus-driven school events (3 November 2026)
+
+Add eight automatic events at ages 5-17: a sports-practice accident (-.3 Attractiveness), an invitation after practice (+.2 Social), study headaches (-1 total focus point for the next complete playable year), a teacher reviewing extra work (+.2 Intelligence), introducing an extracurricular at an open day (+.2 Social), an extracurricular deadline moving forward (-.2 Mental stability), an outing with friends (+.2 Social), and a relative teaching a family recipe (+.2 Creativity). Rating amounts are permanent base changes before the shared directional response and bounds. The catalog now has 317 definitions and 73 decisions.
+
+These events use `activityFocus` and `minFocus`, with no stat factors. They require at least one point in their relevant focus; headaches require Study 3 or 4. Sports and extracurricular events additionally require eligible enrollment, so zero-focus, absent, or paused activities cannot trigger them. Chance is base rate times the existing 3x personal multiplier times selected raw focus points, capped at 18%. Most use base .008 (2.4% per point); headaches use .01 (9% at 3 points, 12% at 4). Keep all old event rates, independent rolls, and the shared five-event yearly maximum.
+
+Timed effects may now carry nonzero integer `focusPoints` from -4 to +4. Sum active point changes with the condition-adjusted base budget, floor at zero, and deterministically remove only excess allocations when the budget shrinks. A one-year loss remains active through the next routine; expiry restores the budget without refilling allocations. Repeated copies of the same effect refresh instead of stacking; distinct effects sum. Preserve legacy temporary stat effects. Active effects and event results show signed integer focus points and duration, and all actions/previews use the shared budget.
+
+Schema 20 accepts this optional field without migrating existing values. New year decisions record nonzero `focusPointModifier` so their saved budget remains valid after effects expire or new ones arrive; historical reviews without it retain their original budget rules. Keep stats, focus, RNG, history, pending decisions, and existing saves unchanged on load. Regenerate the percentile reference without fitting.
+
 ## Expected GPA and activity inactivity (3 November 2026)
 
 The School focus row shows **Expected GPA** as a letter grade, recalculated from selected study points and current effective Intelligence with the same `gradeScore`/`gradeLetter` functions as the next report. Keep the completed School GPA unchanged, including N/A at age 5. Hide this preview outside ages 5-17 and while progression is blocked. Rendering, help, and reloads do not change grades, stats, saves, or RNG.

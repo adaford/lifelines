@@ -5,13 +5,14 @@ import { EVENTS, eventChances } from '../events.js';
 import { FAMILY_EVENTS } from '../family-events.js';
 import { APTITUDE_EVENTS, APTITUDE_EVENT_STATS } from '../cross-aptitude-events.js';
 import { createGame, advanceYear, validateSave, migrateSave } from '../engine.js';
+import { changedRating } from '../rating-changes.js';
 
-test('all new event ratings are permanent and only activity limits retain durations', () => {
+test('all new event ratings are permanent and only activity limits or point changes retain durations', () => {
   for (const event of [...EVENTS, ...FAMILY_EVENTS]) {
     for (const outcome of [event, ...(event.choices || [])]) {
       assert.deepEqual(outcome.modifiers || {}, {}, event.id);
       assert.equal(outcome.lifestyle, undefined, event.id);
-      assert.equal(outcome.years > 0, Boolean(outcome.focusLimits), `${event.id}:${outcome.id}`);
+      assert.equal(outcome.years > 0, Boolean(outcome.focusLimits || outcome.focusPoints), `${event.id}:${outcome.id}`);
     }
   }
   const gossip = EVENTS.find(event => event.id === 'gossip_choice').choices.find(choice => choice.id === 'spread');
@@ -84,18 +85,34 @@ test('automatic trait-driven experiences generally affect a different stat and i
 });
 
 test('a seeded recess experience permanently raises Social and its learning ability and survives reload', () => {
-  const state = createGame({ seed: 73519 });
-  state.age = 10;
-  state.focus = { work: 2, social: 2, family: 2, self: 2, sports: 0, extracurricular: 0 };
-  for (const key of APTITUDE_EVENT_STATS) { state.stats[key] = 5; state.aptitudes[key] = 0; }
-  state.stats.strength = 10;
-  state.school = createSchoolRecord(state);
-  state.rng = 3090398293;
-  const before = { ...state.aptitudes };
-  advanceYear(state, { mortalityRandom: () => 1, growthRandom: () => 0, parentCareerRandom: () => 1 });
+  const original = createGame({ seed: 73519 });
+  original.age = 10;
+  original.focus = { work: 2, social: 2, family: 2, self: 2, sports: 0, extracurricular: 0 };
+  for (const key of APTITUDE_EVENT_STATS) { original.stats[key] = 5; original.aptitudes[key] = 0; }
+  original.stats.strength = 10;
+  original.school = createSchoolRecord(original);
+  const before = { ...original.aptitudes };
+  let state;
+  // The catalog is shuffled before independent rolls. Search a bounded set of
+  // deterministic streams so adding an unrelated event cannot invalidate the fixture.
+  for (let attempt = 0; attempt < 20000; attempt++) {
+    const candidate = structuredClone(original);
+    candidate.rng = (3090398293 + Math.imul(attempt, 2654435761)) >>> 0;
+    assert.equal(advanceYear(candidate, { mortalityRandom: () => 1, growthRandom: () => 0, parentCareerRandom: () => 1 }).ok, true);
+    if (candidate.lastYearEvents.includes('aptitude_strength_social_gain')
+        && candidate.lastYearEvents.filter(id => id.startsWith('aptitude_')).length === 1) {
+      state = candidate;
+      break;
+    }
+  }
+  assert.ok(state, 'the recess experience must roll within the deterministic sample');
   assert.ok(state.lastYearEvents.includes('aptitude_strength_social_gain'));
   assert.deepEqual(state.aptitudes, { ...before, social: 1 });
-  const story = state.history.find(entry => entry.description?.includes('recess'));
+  const event = EVENTS.find(entry => entry.id === 'aptitude_strength_social_gain');
+  const story = state.history.find(entry => entry.title === event.name);
+  const result = story.text.match(/Your social ([\d.]+) → ([\d.]+)/);
+  assert.ok(result, 'the experience records its actual Social rating change');
+  assert.equal(Number(result[2]), changedRating(Number(result[1]), .3));
   assert.match(story.text, /Your social [\d.]+ → [\d.]+/);
   assert.match(story.text, /Your social learning ability 0 → \+1/);
   assert.equal(state.effects.some(effect => effect.id.startsWith('aptitude_')), false);

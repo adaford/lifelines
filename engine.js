@@ -1,23 +1,23 @@
 // Lifelines: deterministic, browser-independent simulation rules.
 // All public actions mutate their state and return { ok, reason? }.
-import { JOBS } from './jobs.js?v=study-activity-preview';
-import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=study-activity-preview';
-import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=study-activity-preview';
-import { mortalityRisk, rollMortality } from './mortality.js?v=study-activity-preview';
-import { heightReference, advanceGrowth } from './growth.js?v=study-activity-preview';
-import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=study-activity-preview';
-import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, standardFocusPractice, schoolAppearanceChange, DEVELOPMENT_BALANCE, BIRTH_VARIATION, SKILL_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, PARENT_FAMILY_STABILITY_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=study-activity-preview';
-import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=study-activity-preview';
-import { normalPercentile } from './percentiles.js?v=study-activity-preview';
-import { changedRating } from './rating-changes.js?v=study-activity-preview';
-import { MAX_FOCUS, DEFAULT_FOCUS, SCHOOL_FOCUS_KEYS, focusMaxFor, focusNeutralFor, isSchoolActivityFocus, focusEffect, focusKeysForAge, focusBudget, defaultFocus, legacyFocusValue } from './focus-rules.js?v=study-activity-preview';
-import { SCHOOL_OFFER_COUNT, schoolActivity, gradeScore, activitySuccessChange, activityEligible, annualSchoolOffers, createSchoolRecord } from './school.js?v=study-activity-preview';
-import { assignBirthConditions, applyBirthConditions, getBirthConditions, conditionFocusPoints, conditionFocusLimits, validateBirthConditions } from './birth-conditions.js?v=study-activity-preview';
+import { JOBS } from './jobs.js?v=activity-events';
+import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=activity-events';
+import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=activity-events';
+import { mortalityRisk, rollMortality } from './mortality.js?v=activity-events';
+import { heightReference, advanceGrowth } from './growth.js?v=activity-events';
+import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=activity-events';
+import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, standardFocusPractice, schoolAppearanceChange, DEVELOPMENT_BALANCE, BIRTH_VARIATION, SKILL_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, PARENT_FAMILY_STABILITY_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=activity-events';
+import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=activity-events';
+import { normalPercentile } from './percentiles.js?v=activity-events';
+import { changedRating } from './rating-changes.js?v=activity-events';
+import { MAX_FOCUS, DEFAULT_FOCUS, SCHOOL_FOCUS_KEYS, focusMaxFor, focusNeutralFor, isSchoolActivityFocus, focusEffect, focusKeysForAge, focusBudget, temporaryFocusPoints, defaultFocus, legacyFocusValue } from './focus-rules.js?v=activity-events';
+import { SCHOOL_OFFER_COUNT, schoolActivity, gradeScore, activitySuccessChange, activityEligible, annualSchoolOffers, createSchoolRecord } from './school.js?v=activity-events';
+import { assignBirthConditions, applyBirthConditions, getBirthConditions, conditionFocusPoints, conditionFocusLimits, validateBirthConditions } from './birth-conditions.js?v=activity-events';
 export { DEVELOPMENT_BALANCE };
-export { heightPercentile } from './growth.js?v=study-activity-preview';
-export { mortalityRisk } from './mortality.js?v=study-activity-preview';
-import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=study-activity-preview';
-export { JOBS, JOB_CATEGORIES } from './jobs.js?v=study-activity-preview';
+export { heightPercentile } from './growth.js?v=activity-events';
+export { mortalityRisk } from './mortality.js?v=activity-events';
+import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=activity-events';
+export { JOBS, JOB_CATEGORIES } from './jobs.js?v=activity-events';
 export const EVENTS = [...PERSONAL_EVENTS, ...FAMILY_EVENTS];
 
 export const SKILLS = [
@@ -664,7 +664,8 @@ function applyOutcome(state, event, outcome = event, context = {}) {
   }
   const afterPermanent = effectiveStats(state);
   let temporaryYears = 0;
-  if (outcome.years > 0 && (timedStatsEnabled && (Object.keys(outcome.modifiers || {}).length || outcome.lifestyle) || outcome.focusLimits)) {
+  const focusPoints = Number.isInteger(outcome.focusPoints) && Math.abs(outcome.focusPoints) <= 4 ? outcome.focusPoints : 0;
+  if (outcome.years > 0 && (timedStatsEnabled && (Object.keys(outcome.modifiers || {}).length || outcome.lifestyle) || outcome.focusLimits || focusPoints)) {
     // A new restriction must not overwrite a still-running legacy stat bonus
     // with the same event ID.
     const legacyStatEffect = state.effects.some(effect => effect.id === key && (Object.values(effect.modifiers).some(Boolean) || effect.lifestyle));
@@ -673,8 +674,10 @@ function applyOutcome(state, event, outcome = event, context = {}) {
     const effect = { id: restrictionKey, name: `${context.subjectId ? `${subject.name}: ` : ''}${event.name}`, description, years: Math.max(old?.years || 0, outcome.years), modifiers: timedStatsEnabled ? { ...outcome.modifiers } : {}, kind: event.kind };
     if (timedStatsEnabled && outcome.lifestyle) effect.lifestyle = outcome.lifestyle;
     if (outcome.focusLimits) effect.focusLimits = clone(outcome.focusLimits);
+    if (focusPoints) effect.focusPoints = focusPoints;
     if (old) {
       delete old.focusLimits;
+      delete old.focusPoints;
       Object.assign(old, { lifestyle: 0 }, effect);
     }
     else state.effects.push(effect);
@@ -703,6 +706,7 @@ function applyOutcome(state, event, outcome = event, context = {}) {
   const duration = temporaryYears ? ` Temporary effects: ${temporaryYears} ${temporaryYears === 1 ? 'year' : 'years'}.` : '';
   const limits = activeFocusCaps(state, outcome.focusLimits?.[focusStage(state)])
     .map(([key, max]) => `${focusLabel(state, key)} max ${max}`);
+  if (temporaryYears && focusPoints) limits.push(`${focusPoints > 0 ? '+' : ''}${focusPoints} focus ${Math.abs(focusPoints) === 1 ? 'point' : 'points'}`);
   const restrictions = limits.length ? ` ${limits.join('; ')}.` : '';
   // Keep the event context separate from the concise journal outcome. The year
   // review can explain what happened without restoring flavor to saved results.
@@ -912,10 +916,12 @@ export function advanceYear(state, { mortalityRandom, growthRandom, parentCareer
   const violation = focusLimitViolation(state);
   if (violation) return fail(`${focusLabel(state, violation[0])} is limited to ${violation[1]} this year. Lower it before continuing.`);
   const before = yearSnapshot(state);
+  const focusPointModifier = temporaryFocusPoints(state);
   const decisions = state.age < 2 ? { cryLevel: state.cryLevel } : {
     focus: state.age < 5 ? { ...state.focus, creative: state.focus.creative ?? 0 } : { ...state.focus },
     workLabel: state.age < 5 ? 'Play' : state.age < 18 ? 'School' : state.education.status === 'college' ? 'College' : 'Career',
     focusMax: MAX_FOCUS, focusBudget: focusBudget(state),
+    ...(focusPointModifier ? { focusPointModifier } : {}),
     ...(state.age >= 5 && state.age < 18 ? { focusCaps: { sports: 2, extracurricular: 2 } } : {}),
   };
   const oldMemories = new Set(state.history.map(memory => memory.id));
@@ -1187,10 +1193,12 @@ function validSchema(raw, version, schoolOfferCount = SCHOOL_OFFER_COUNT) {
           const currentRules = decisions.focusMax !== undefined || decisions.focusBudget !== undefined;
           const mixedSchool = version >= 19 && expandedSchool && decisions.focusCaps !== undefined;
           if (decisions.focusCaps !== undefined && (!mixedSchool || Object.keys(decisions.focusCaps || {}).length !== 2 || decisions.focusCaps.sports !== 2 || decisions.focusCaps.extracurricular !== 2)) return false;
-          const recordedBudget = Math.max(0, (mixedSchool ? 10 : DEFAULT_FOCUS * keys.length) + conditionFocusPoints(raw));
+          const hasPointModifier = Object.hasOwn(decisions, 'focusPointModifier');
+          if (hasPointModifier && (version < 20 || !currentRules || !Number.isInteger(decisions.focusPointModifier) || !finite(decisions.focusPointModifier, -256, 256) || decisions.focusPointModifier === 0)) return false;
+          const recordedBudget = Math.max(0, (mixedSchool ? 10 : DEFAULT_FOCUS * keys.length) + conditionFocusPoints(raw) + (hasPointModifier ? decisions.focusPointModifier : 0));
           if (currentRules && (version < 17 || decisions.focusMax !== MAX_FOCUS || decisions.focusBudget !== recordedBudget)) return false;
           const recordedMaximum = mixedSchool ? Object.fromEntries(keys.map(key => [key, decisions.focusCaps[key] ?? MAX_FOCUS])) : currentRules ? MAX_FOCUS : 5;
-          if (summary.fromAge < (version >= 10 ? 2 : 3) || Object.keys(decisions).length !== (currentRules ? mixedSchool ? 5 : 4 : 2) || !(version >= 10 ? ['Play', 'School', 'College', 'Career'] : ['School', 'College', 'Career']).includes(decisions.workLabel) || !validFocus(focus, keys, recordedMaximum, currentRules ? decisions.focusBudget : 12)) return false;
+          if (summary.fromAge < (version >= 10 ? 2 : 3) || Object.keys(decisions).length !== (currentRules ? mixedSchool ? 5 : 4 : 2) + Number(hasPointModifier) || !(version >= 10 ? ['Play', 'School', 'College', 'Career'] : ['School', 'College', 'Career']).includes(decisions.workLabel) || !validFocus(focus, keys, recordedMaximum, currentRules ? decisions.focusBudget : 12)) return false;
         }
       }
       if (summary?.school !== undefined) {
@@ -1262,7 +1270,7 @@ function validSchema(raw, version, schoolOfferCount = SCHOOL_OFFER_COUNT) {
     // New restrictions can coexist with the full legacy modifier history while
     // those old effects expire. This expands capacity without changing records.
     const effectCapacity = version >= 16 ? 64 : legacy ? 10 : version >= 15 ? 27 : 25;
-    if (!Array.isArray(raw.effects) || raw.effects.length > effectCapacity || !raw.effects.every(effect => text(effect.id, 100) && text(effect.name, 100) && typeof effect.description === 'string' && Number.isInteger(effect.years) && finite(effect.years, 1, legacy ? 3 : 5) && effect.modifiers && Object.entries(effect.modifiers).every(([key, value]) => statKeys.includes(key) && finite(value, -10, 10)) && (effect.lifestyle === undefined || !legacy && Number.isInteger(effect.lifestyle) && finite(effect.lifestyle, -10, 10)) && (effect.focusLimits === undefined || version >= 14 && validLimits(effect.focusLimits)))) return false;
+    if (!Array.isArray(raw.effects) || raw.effects.length > effectCapacity || !raw.effects.every(effect => text(effect.id, 100) && text(effect.name, 100) && typeof effect.description === 'string' && Number.isInteger(effect.years) && finite(effect.years, 1, legacy ? 3 : 5) && effect.modifiers && Object.entries(effect.modifiers).every(([key, value]) => statKeys.includes(key) && finite(value, -10, 10)) && (effect.lifestyle === undefined || !legacy && Number.isInteger(effect.lifestyle) && finite(effect.lifestyle, -10, 10)) && (effect.focusLimits === undefined || version >= 14 && validLimits(effect.focusLimits)) && (effect.focusPoints === undefined || version >= 20 && Number.isInteger(effect.focusPoints) && finite(effect.focusPoints, -4, 4) && effect.focusPoints !== 0))) return false;
     if (version >= 14) {
       const stage = focusStage(raw);
       const maximum = version >= 17 ? MAX_FOCUS : 5;

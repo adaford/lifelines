@@ -1,4 +1,4 @@
-import { conditionFocusPoints } from './birth-conditions.js?v=study-activity-preview';
+import { conditionFocusPoints } from './birth-conditions.js?v=activity-events';
 
 // One shared allocation scale for all playable focus stages.
 export const MAX_FOCUS = 4;
@@ -11,11 +11,14 @@ const ageOf = ageOrPerson => ageOrPerson && typeof ageOrPerson === 'object' ? ag
 export const isSchoolActivityFocus = (ageOrPerson, key) => ageOf(ageOrPerson) >= 5 && ageOf(ageOrPerson) < 18 && ['sports', 'extracurricular'].includes(key);
 export const focusMaxFor = (ageOrPerson, key) => isSchoolActivityFocus(ageOrPerson, key) ? 2 : MAX_FOCUS;
 export const focusNeutralFor = (ageOrPerson, key) => isSchoolActivityFocus(ageOrPerson, key) ? 1 : DEFAULT_FOCUS;
+export const temporaryFocusPoints = person => (person?.effects || []).reduce((sum, effect) => sum + (
+  effect.years > 0 && Number.isInteger(effect.focusPoints) && Math.abs(effect.focusPoints) <= 4 ? effect.focusPoints : 0
+), 0);
 export function focusBudget(ageOrPerson) {
   const person = ageOrPerson && typeof ageOrPerson === 'object' ? ageOrPerson : null;
   const age = person ? person.age : ageOrPerson;
   const base = age >= 5 && age < 18 ? 10 : DEFAULT_FOCUS * focusKeysForAge(age).length;
-  return Math.max(0, base + (person ? conditionFocusPoints(person) : 0));
+  return Math.max(0, base + (person ? conditionFocusPoints(person) + temporaryFocusPoints(person) : 0));
 }
 export const defaultFocus = ageOrPerson => Object.fromEntries(focusKeysForAge(ageOf(ageOrPerson)).map(key => [key,
   isSchoolActivityFocus(ageOrPerson, key) ? ageOrPerson?.school?.[key] ? 1 : 0 : DEFAULT_FOCUS]));

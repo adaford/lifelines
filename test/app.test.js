@@ -867,6 +867,101 @@ test('a new event previews activity tradeoffs and frees points when the choice a
   assert.deepEqual(ui.saved(), saved);
 });
 
+test('a focus-only choice previews signed whole points and duration without changing the pending save', async () => {
+  const fixture=createGame({seed:78123});
+  fixture.age=3; fixture.conditions=[]; fixture.focus=defaultFocus(3); fixture.effects=[];
+  fixture.pendingEvents=[{eventId:'broken_tablet',age:3}];
+  fixture.lastYearEvents=['broken_tablet'];
+  const choice=EVENTS.find(event=>event.id==='broken_tablet').choices[0];
+  const original=structuredClone(choice);
+  try {
+    // Exercise a supported outcome shape without adding a test-only catalog event.
+    Object.assign(choice,{statChanges:{},modifiers:{},focusPoints:-1,years:1});
+    delete choice.focusLimits;
+    assert.equal(validateSave(fixture),true);
+    const ui=await mount(fixture),before=ui.saved(),writes=ui.writes();
+    assert.equal(ui.query(`[data-choice="${choice.id}"] .event-consequences`).textContent,'-1 focus point · 1 year');
+    for(const tab of ['family','career','year']) ui.click(`.nav-list [data-tab="${tab}"]`);
+    assert.deepEqual(ui.saved(),before,'consequence previews preserve stats, allocations, pending choices and RNG');
+    assert.equal(ui.writes(),writes);
+    ui.click(`[data-action="event-choice"][data-choice="${choice.id}"]`);
+    const saved=ui.saved();
+    assert.equal(saved.effects[0].focusPoints,-1);
+    assert.equal(saved.effects[0].years,1);
+    assert.equal(saved.effects[0].focusLimits,undefined);
+    assert.deepEqual(saved.stats,before.stats);
+    assert.equal(saved.rng,before.rng);
+    assert.equal(focusBudget(saved),9);
+    assert.match(ui.query('.effect-card.negative .effect-meta').textContent,/-1 focus point.*1 year remaining/);
+    assert.doesNotMatch(ui.query('.effect-meta').textContent,/-1\.0|Health|Intelligence/);
+    assert.match(ui.query('.journal-list').textContent,/-1 focus point.*Temporary effects: 1 year/);
+    assert.equal(validateSave(saved),true);
+  } finally {
+    for(const key of Object.keys(choice)) delete choice[key];
+    Object.assign(choice,original);
+  }
+});
+
+test('study headaches show a reduced budget for one full turn and preserve recorded outcomes after expiry', async () => {
+  const initial=createGame({seed:78124});
+  initial.age=10; initial.conditions=[]; initial.effects=[];
+  initial.school=createSchoolRecord(initial);
+  initial.focus={work:4,social:2,family:2,self:2,sports:0,extracurricular:0};
+  const steady={mortalityRandom:()=>1,growthRandom:()=>0,parentCareerRandom:()=>1};
+  let affected;
+  for(let rng=1;rng<=500;rng++) {
+    const candidate={...structuredClone(initial),rng};
+    assert.equal(advanceYear(candidate,steady).ok,true);
+    if(candidate.lastYearEvents.includes('study_headache') && !candidate.pendingEvents.length && candidate.effects.length===1) {
+      affected=candidate;
+      break;
+    }
+  }
+  assert.ok(affected,'a seeded completed study year produces the real headache event');
+  assert.equal(affected.effects[0].focusPoints,-1);
+  assert.equal(affected.yearSummary.decisions.focusBudget,10,'the event does not rewrite the budget of the year just completed');
+  assert.equal(validateSave(affected),true);
+  let ui=await mount(affected);
+  const before=ui.saved(),writes=ui.writes();
+  assert.match(ui.query('.effect-card.negative').textContent,/Headaches interrupt your studies.*-1 focus point.*1 year remaining/);
+  assert.equal(ui.query('.focus-panel .panel-heading .tag').textContent,'9 / 9 POINTS');
+  assert.ok(ui.all('.focus-row [data-delta="1"]').every(button=>button.disabled));
+  assert.match(ui.query('.journal-list').textContent,/-1 focus point.*Temporary effects: 1 year/);
+  assert.match(ui.query('.year-review-events').textContent,/Headaches interrupt your studies.*-1 focus point.*Temporary effects: 1 year/);
+  assert.deepEqual(ui.saved(),before,'reading the active effect and recorded review does not change the save');
+  assert.equal(ui.writes(),writes);
+  ui.click('.year-review-modal [data-action="close"]');
+  const planned=ui.saved();
+  ui.click('.focus-row[data-focus-key="work"] [data-delta="1"]');
+  assert.deepEqual(ui.saved(),planned,'the reduced total prevents an extra focus point');
+  ui.click('[data-topic="focus-work"]');
+  assert.match(ui.query('.help-popup').textContent,/More study focus can increase study event chances/);
+  ui.click('.help-popup [data-action="close"]');
+  ui.click('[data-topic="focus"]');
+  assert.match(ui.query('.help-popup').textContent,/More focus can increase related activity event chances/);
+  ui.click('.help-popup [data-action="close"]');
+  ui=await mount(planned);
+  assert.deepEqual(ui.saved(),planned);
+  assert.equal(ui.query('.focus-panel .panel-heading .tag').textContent,'9 / 9 POINTS');
+  let expiryInput,expired;
+  for(let rng=1;rng<=500;rng++) {
+    const input={...structuredClone(planned),rng},candidate=structuredClone(input);
+    assert.equal(advanceYear(candidate,steady).ok,true);
+    if(!candidate.lastYearEvents.length && !candidate.effects.length) { expiryInput=input; expired=candidate; break; }
+  }
+  assert.ok(expired,'an event-free next routine isolates the recovery');
+  assert.equal(expired.yearSummary.decisions.focusBudget,9);
+  assert.equal(expired.yearSummary.decisions.focusPointModifier,-1);
+  assert.deepEqual(expired.focus,expiryInput.focus,'the returned point stays unspent');
+  assert.equal(focusBudget(expired),10);
+  ui=await mount(expired);
+  assert.equal(ui.query('.focus-panel .panel-heading .tag').textContent,'9 / 10 POINTS');
+  assert.equal(ui.all('.active-effects').length,0);
+  assert.equal(ui.query('.focus-row[data-focus-key="work"] [data-delta="1"]').disabled,false);
+  assert.match(ui.query('.journal-list').textContent,/-1 focus point.*Temporary effects: 1 year/,'the recorded past outcome remains visible after expiry');
+  assert.deepEqual(ui.saved(),expired,'reading the expired effect history never restores old allocations or edits recorded budgets');
+});
+
 test('every displayed option applies its own lasting consequences without advancing time', async () => {
   const fixture=pendingFixture();
   const event=EVENTS.find(event=>event.id===fixture.pendingEvents[0].eventId);

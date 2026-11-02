@@ -833,12 +833,13 @@ test('event catalogue has unique authored outcomes and only supported traits', (
       assert.equal(new Set(event.choices.map(choice => choice.id)).size, event.choices.length);
     }
     for (const outcome of outcomes) {
-      assert.ok(Object.keys(outcome.statChanges || {}).length || Object.keys(outcome.subjectChanges || {}).length || Object.keys(outcome.playerChanges || {}).length || outcome.relationship || Object.keys(outcome.modifiers || {}).length || outcome.lifestyle, `${event.id} has a consequence`);
+      assert.ok(Object.keys(outcome.statChanges || {}).length || Object.keys(outcome.subjectChanges || {}).length || Object.keys(outcome.playerChanges || {}).length || outcome.relationship || Object.keys(outcome.modifiers || {}).length || outcome.lifestyle || outcome.focusLimits || outcome.focusPoints, `${event.id} has a consequence`);
       for (const changes of [outcome.statChanges, outcome.modifiers]) for (const [key, amount] of Object.entries(changes || {})) {
         assert.ok(traits.has(key), `${event.id}: ${key}`);
         assert.ok(Number.isFinite(amount) && amount !== 0 && Math.abs(amount) <= 3);
       }
-      if (Object.keys(outcome.modifiers || {}).length || outcome.lifestyle) assert.ok(Number.isInteger(outcome.years) && outcome.years >= 1 && outcome.years <= 5);
+      if (outcome.focusPoints !== undefined) assert.ok(Number.isInteger(outcome.focusPoints) && outcome.focusPoints !== 0 && Math.abs(outcome.focusPoints) <= 4, `${event.id}: supported focus-point change`);
+      if (Object.keys(outcome.modifiers || {}).length || outcome.lifestyle || outcome.focusLimits || outcome.focusPoints) assert.ok(Number.isInteger(outcome.years) && outcome.years >= 1 && outcome.years <= 5);
     }
   }
 });
