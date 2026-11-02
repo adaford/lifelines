@@ -1,23 +1,23 @@
 // Lifelines: deterministic, browser-independent simulation rules.
 // All public actions mutate their state and return { ok, reason? }.
-import { JOBS } from './jobs.js?v=school-grade-scaling';
-import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=school-grade-scaling';
-import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=school-grade-scaling';
-import { mortalityRisk, rollMortality } from './mortality.js?v=school-grade-scaling';
-import { heightReference, advanceGrowth } from './growth.js?v=school-grade-scaling';
-import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=school-grade-scaling';
-import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, standardFocusPractice, schoolAppearanceChange, DEVELOPMENT_BALANCE, BIRTH_VARIATION, SKILL_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, PARENT_FAMILY_STABILITY_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=school-grade-scaling';
-import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=school-grade-scaling';
-import { normalPercentile } from './percentiles.js?v=school-grade-scaling';
-import { changedRating } from './rating-changes.js?v=school-grade-scaling';
-import { MAX_FOCUS, DEFAULT_FOCUS, SCHOOL_FOCUS_KEYS, focusMaxFor, focusNeutralFor, isSchoolActivityFocus, focusEffect, focusKeysForAge, focusBudget, defaultFocus, legacyFocusValue } from './focus-rules.js?v=school-grade-scaling';
-import { schoolActivity, gradeScore, activitySuccessChange, activityEligible, annualSchoolOffers, createSchoolRecord } from './school.js?v=school-grade-scaling';
-import { assignBirthConditions, getBirthConditions, conditionFocusPoints, conditionFocusLimits, validateBirthConditions } from './birth-conditions.js?v=school-grade-scaling';
+import { JOBS } from './jobs.js?v=school-first-report';
+import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=school-first-report';
+import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=school-first-report';
+import { mortalityRisk, rollMortality } from './mortality.js?v=school-first-report';
+import { heightReference, advanceGrowth } from './growth.js?v=school-first-report';
+import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=school-first-report';
+import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, standardFocusPractice, schoolAppearanceChange, DEVELOPMENT_BALANCE, BIRTH_VARIATION, SKILL_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, PARENT_FAMILY_STABILITY_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=school-first-report';
+import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=school-first-report';
+import { normalPercentile } from './percentiles.js?v=school-first-report';
+import { changedRating } from './rating-changes.js?v=school-first-report';
+import { MAX_FOCUS, DEFAULT_FOCUS, SCHOOL_FOCUS_KEYS, focusMaxFor, focusNeutralFor, isSchoolActivityFocus, focusEffect, focusKeysForAge, focusBudget, defaultFocus, legacyFocusValue } from './focus-rules.js?v=school-first-report';
+import { schoolActivity, gradeScore, activitySuccessChange, activityEligible, annualSchoolOffers, createSchoolRecord } from './school.js?v=school-first-report';
+import { assignBirthConditions, getBirthConditions, conditionFocusPoints, conditionFocusLimits, validateBirthConditions } from './birth-conditions.js?v=school-first-report';
 export { DEVELOPMENT_BALANCE };
-export { heightPercentile } from './growth.js?v=school-grade-scaling';
-export { mortalityRisk } from './mortality.js?v=school-grade-scaling';
-import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=school-grade-scaling';
-export { JOBS, JOB_CATEGORIES } from './jobs.js?v=school-grade-scaling';
+export { heightPercentile } from './growth.js?v=school-first-report';
+export { mortalityRisk } from './mortality.js?v=school-first-report';
+import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=school-first-report';
+export { JOBS, JOB_CATEGORIES } from './jobs.js?v=school-first-report';
 export const EVENTS = [...PERSONAL_EVENTS, ...FAMILY_EVENTS];
 
 export const SKILLS = [
@@ -769,7 +769,7 @@ function schoolYear(state, growthRandom) {
   if (state.age < 5 || state.age >= 18 || !state.school) return null;
   const person = { ...state, stats: effectiveStats(state) };
   const gpa = gradeScore(state.focus.work, person.stats.intelligence);
-  const report = { gpa, previousGpa: state.school.gpa, study: state.focus.work, intelligence: person.stats.intelligence, activities: [] };
+  const report = { gpa, previousGpa: state.school.reportedAge === null ? null : state.school.gpa, study: state.focus.work, intelligence: person.stats.intelligence, activities: [] };
   for (const kind of ['sports', 'extracurricular']) {
     const enrollment = state.school[kind];
     const activity = schoolActivity(kind, enrollment?.id);
@@ -1197,7 +1197,7 @@ function validSchema(raw, version) {
         const report = summary.school;
         // Reports record the grading rules used that year. Balance changes
         // must not invalidate or recalculate already saved grades.
-        if (version < 19 || summary.fromAge < 5 || summary.fromAge >= 18 || !report || !finite(report.gpa, 50, 100) || !finite(report.previousGpa, 50, 100)
+        if (version < 19 || summary.fromAge < 5 || summary.fromAge >= 18 || !report || !finite(report.gpa, 50, 100) || !(report.previousGpa === null || finite(report.previousGpa, 50, 100))
           || !Number.isInteger(report.study) || !finite(report.study, 0, 4) || !finite(report.intelligence, effectiveFloor, effectiveCeiling)
           || !Array.isArray(report.activities) || report.activities.length > 2
           || new Set(report.activities.map(activity => activity.kind)).size !== report.activities.length

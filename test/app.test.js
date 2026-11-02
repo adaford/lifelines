@@ -2578,10 +2578,50 @@ test('School GPA displays letter grades and help without changing the report whe
     assert.equal(ui.all('.school-grade').length,0);
   }
   const firstYear=await mount(ageTo(createGame({seed:121}),5));
-  assert.match(firstYear.query('.school-grade').textContent,/Starting grade/);
+  assert.equal(firstYear.query('.school-grade > strong').textContent,'N/A');
+  assert.match(firstYear.query('.school-grade').textContent,/No report card yet/);
   for(const age of [4,18]) {
     const ui=await mount(ageTo(createGame({seed:121}),age));
     assert.equal(ui.all('.school-grade').length,0,'only school-age Year displays GPA');
+  }
+});
+
+test('school starts with N/A through planning and reload, then shows only the first earned grade', async () => {
+  const fixture=ageTo(createGame({seed:121}),5);
+  fixture.conditions=[]; fixture.effects=[]; fixture.focus=defaultFocus(fixture);
+  let ui=await mount(fixture);
+  assert.equal(ui.query('.school-grade > strong').textContent,'N/A');
+  assert.equal(ui.query('.school-grade > strong').getAttribute('aria-label'),'School GPA N/A');
+  assert.equal(ui.saved().school.reportedAge,null);
+  assert.equal(ui.all('.school-report').length,0);
+  const before=ui.saved(),writes=ui.writes();
+  ui.click('[data-topic="school-gpa"]');
+  assert.match(ui.query('.help-popup').textContent,/Your first grade arrives after completing your first school year/);
+  assert.doesNotMatch(ui.query('.help-popup').textContent,/starting grade/i);
+  ui.click('.help-popup [data-action="close"]');
+  assert.deepEqual(ui.saved(),before);
+  assert.equal(ui.writes(),writes);
+  ui.click('.focus-row[data-focus-key="work"] [data-delta="1"]');
+  assert.equal(ui.saved().focus.work,3);
+  assert.equal(ui.query('.school-grade > strong').textContent,'N/A','a study plan is not a completed grade');
+  assert.match(ui.query('.school-grade').textContent,/No report card yet/);
+  const planned=ui.saved();
+  ui=await mount(planned);
+  assert.equal(ui.query('.school-grade > strong').textContent,'N/A');
+  assert.deepEqual(ui.saved(),planned,'loading an ungraded student never invents a report');
+  const completed=structuredClone(planned);
+  assert.equal(advanceYear(completed,{mortalityRandom:()=>1,growthRandom:()=>0,parentCareerRandom:()=>1}).ok,true);
+  assert.equal(completed.age,6);
+  assert.equal(completed.school.reportedAge,6);
+  assert.equal(completed.yearSummary.school.previousGpa,null);
+  const earned=gradeLetter(completed.yearSummary.school.gpa);
+  for(let reload=0;reload<2;reload++) {
+    ui=await mount(completed);
+    assert.equal(ui.query('.school-grade > strong').textContent,earned);
+    assert.match(ui.query('.school-grade').textContent,/Latest report card/);
+    assert.equal(ui.query('.school-report > p').textContent,`GPA ${earned}`);
+    assert.doesNotMatch(ui.query('.school-report').textContent,/→|N\/A/,'the first report has no invented previous grade');
+    assert.deepEqual(ui.saved(),completed);
   }
 });
 

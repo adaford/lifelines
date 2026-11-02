@@ -6,15 +6,15 @@ import {
   offeredJobs, needsEducationChoice, pendingEventSubject, focusLimits, focusLimitDetails, caregivers,
   relationshipOdds, meetingChances, proposalChance, pregnancyChance, oneNightChance,
   respondToEncounter, proposeMarriage, endRelationship, normalizeSurname, heightPercentile, statPercentiles
-} from './engine.js?v=school-grade-scaling';
-import { LEGACY_EVENT_COPY } from './event-copy-history.js?v=school-grade-scaling';
-import { annotateNarrative } from './narrative.js?v=school-grade-scaling';
-import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome } from './display.js?v=school-grade-scaling';
+} from './engine.js?v=school-first-report';
+import { LEGACY_EVENT_COPY } from './event-copy-history.js?v=school-first-report';
+import { annotateNarrative } from './narrative.js?v=school-first-report';
+import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome } from './display.js?v=school-first-report';
 
-import { MAX_FOCUS, focusBudget, focusMaxFor } from './focus-rules.js?v=school-grade-scaling';
-import { schoolActivity, gradeLetter, activityEligible } from './school.js?v=school-grade-scaling';
-import { getBirthConditions } from './birth-conditions.js?v=school-grade-scaling';
-import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=school-grade-scaling';
+import { MAX_FOCUS, focusBudget, focusMaxFor } from './focus-rules.js?v=school-first-report';
+import { schoolActivity, gradeLetter, activityEligible } from './school.js?v=school-first-report';
+import { getBirthConditions } from './birth-conditions.js?v=school-first-report';
+import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=school-first-report';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const app = document.querySelector('#app');
@@ -298,8 +298,9 @@ function yearView() {
   const baby = state.age < 2;
   const toddler = !baby && state.age < 5;
   const disabled = state.ended || state.needsSuccession || state.pendingEvents.length>0;
+  const schoolGrade = state.school && (state.school.reportedAge===null?'N/A':gradeLetter(state.school.gpa));
   return `${state.education.status==='college'?collegeProgressView():''}<section class="panel focus-panel"><div class="panel-heading"><h3>${labelWithHelp(baby?'Cry level':toddler?'Toddler activities':'Focus',baby?'cry':toddler?'toddler-focus':'focus')}</h3><span class="tag">${baby ? 'AGES 0–1' : `${focusUsed()} / ${focusBudget(state)} POINTS`}</span></div>
-    ${state.age>=5 && state.age<18 && state.school?`<div class="school-grade"><span>${labelWithHelp('School GPA','school-gpa')}<small>${state.school.reportedAge===null?'Starting grade':'Latest report card'}</small></span><strong aria-label="School GPA ${esc(gradeLetter(state.school.gpa))}">${esc(gradeLetter(state.school.gpa))}</strong></div>`:''}
+    ${state.age>=5 && state.age<18 && state.school?`<div class="school-grade"><span>${labelWithHelp('School GPA','school-gpa')}<small>${state.school.reportedAge===null?'No report card yet':'Latest report card'}</small></span><strong aria-label="School GPA ${esc(schoolGrade)}">${esc(schoolGrade)}</strong></div>`:''}
     ${baby ? `<div class="cry-control" role="group" aria-label="Cry level"><div class="cry-levels">${[1,2,3,4,5].map(level=>`<button class="cry-level ${state.cryLevel===level?'selected':''}" data-action="baby" data-level="${level}" aria-label="Cry level ${level} of 5" aria-pressed="${state.cryLevel===level}" ${disabled?'disabled':''}>${level}</button>`).join('')}</div><div class="cry-scale-labels"><span>Low</span><span>High</span></div></div>` : focusView(disabled)}
     ${!baby&&(state.age<18||state.education.status==='college')?'':choiceImpactSummary()}
     </section>
@@ -680,7 +681,7 @@ function topicHelpModal(topic, id) {
     'focus-social': ['Friends focus', ['Can improve social, support mental stability and create chances to meet people.']],
     'focus-family': ['Family focus', ['Strengthens relationships, helps children develop and supports parents’ mental stability.']],
     'focus-self': ['Yourself focus', [state.age<18 ? 'Personal care supports Attractiveness, mental stability and Health.' : 'Exercise, learning and self-care support strength, creativity, health and mental stability.']],
-    'school-gpa': ['School GPA', ['Study effort sets your yearly grade, with Intelligence adjusting it. Higher Intelligence can achieve the same grade with less study. The grade updates after each school year.', 'Good and poor grades can lead to family events. The starting grade uses your initial study allocation and Intelligence.']],
+    'school-gpa': ['School GPA', ['Study effort sets your yearly grade, with Intelligence adjusting it. Higher Intelligence can achieve the same grade with less study. The grade updates after each school year.', 'Good and poor grades can lead to family events. Your first grade arrives after completing your first school year.']],
     'focus-sports': ['Sports focus', ['Sign up from five annual offers to unlock 0–2 points, starting at 1. Every sport trains Strength and Social; some train an extra skill. Success starts at 5.0/10 and changes yearly with relevant abilities, focus and chance. Basketball also rewards height for your age. Keep your sport or switch and start again at 5.0.']],
     'focus-extracurricular': ['Extracurriculars focus', ['Sign up from five annual offers to unlock 0–2 points, starting at 1. Each activity trains its listed stats. Success starts at 5.0/10 and changes yearly with relevant abilities, focus and chance. You can keep your activity when new offers arrive; switching starts success again at 5.0.']],
     parents: ['Parents & guardians', ['Their wellbeing and careers affect your childhood. Low mental stability and a weak relationship raise the rare chance of abandonment. The other parent takes over; if neither can care for you, an adult relative adopts you. Departures cause severe setbacks.']],
