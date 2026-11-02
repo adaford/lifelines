@@ -64,7 +64,7 @@ test('stronger toddler activity effects retain proportional signs and unused poi
   const coefficients = {
     work: { strength: .3, social: .165 },
     social: { intelligence: .27, social: -.165 },
-    family: { social: .165, stability: .24 },
+    family: { social: .165 },
     self: { health: .3, stability: .24 },
     creative: { creativity: .33, intelligence: .27 },
   };
@@ -72,7 +72,7 @@ test('stronger toddler activity effects retain proportional signs and unused poi
     for (const points of [0, 1, 2, 3, 4]) {
       const effects = toddlerActivityEffects({ ...state, focus: { ...state.focus, [activity]: points } })[activity];
       for (const [stat, coefficient] of Object.entries(stats)) {
-        const contributionSteps = activity === 'creative' && stat === 'intelligence'
+        const contributionSteps = activity === 'social' ? (points - 2) * (stat === 'intelligence' ? 2 : 1) : activity === 'creative' && stat === 'intelligence'
           ? [-1, 0, 0, 0, 1][points] : focusEffect(points);
         close(effects[stat], coefficient * contributionSteps * (learned.includes(stat) ? .575 : .5), `${activity} ${stat} at ${points}`);
       }
@@ -158,7 +158,7 @@ test('stronger child focus practice preserves caregiver strain and family relati
         }
         const healthPractice = (toddler ? .3 : .105) * effort;
         const stabilityPractice = toddler
-          ? .24 * effort + .24 * effort
+          ? .24 * effort
           : .6 * effort;
         assert.equal(grown.stats.health, round(5 + .06 * (DEVELOPMENT_BALANCE.wellbeingTarget.health - 5) + healthPractice * .5));
         assert.equal(grown.stats.stability, round(5 + .08 * (DEVELOPMENT_BALANCE.wellbeingTarget.stability - 5) + stabilityPractice * .5));

@@ -28,7 +28,7 @@ test('activity contributions are neutral at two and ordinary effects triple at e
           if (!['health', 'stability'].includes(stat)) assert.ok(Math.abs(amount - (skillChanges(selected)[stat] - skillChanges(state)[stat])) < 1e-12);
           if ((points === 0 || points === 4) && !(activity === 'creative' && stat === 'intelligence')) {
             const unit = toddlerActivityEffects({ ...state, focus: { ...state.focus, [activity]: points === 0 ? 1 : 3 } })[activity][stat];
-            assert.ok(Math.abs(amount - unit * 3) < 1e-12, `${activity} ${stat} endpoint triples its adjacent choice`);
+            assert.ok(Math.abs(amount - unit * (activity === 'social' ? 2 : 3)) < 1e-12, `${activity} ${stat} endpoint scales its adjacent choice`);
           }
         }
       }
@@ -55,7 +55,7 @@ test('rest uses the stronger toddler health response and crafts spend the shared
   assert.equal(setFocus(state, 'creative', 1).ok, false);
 });
 
-test('crafts intelligence changes only at zero or four points by one electronics step', () => {
+test('crafts intelligence changes only at zero or four points by half an adjacent Electronics change', () => {
   for (const age of [2, 3, 4]) for (const aptitude of [-3, 0, 3]) {
     const state = toddler();
     state.age = age;
@@ -68,8 +68,8 @@ test('crafts intelligence changes only at zero or four points by one electronics
       const intelligenceChange = crafts.intelligence - baseline.intelligence;
       if (points === 0 || points === 4) {
         const electronics = skillChanges({ ...state, focus: { ...state.focus, social: points === 0 ? 1 : 3 } });
-        assert.ok(Math.abs(intelligenceChange - (electronics.intelligence - baseline.intelligence)) < 1e-12,
-          `crafts ${points} matches one Electronics step at age ${age}, aptitude ${aptitude}`);
+        assert.ok(Math.abs(intelligenceChange * 2 - (electronics.intelligence - baseline.intelligence)) < 1e-12,
+          `crafts ${points} is half an adjacent Electronics change at age ${age}, aptitude ${aptitude}`);
         assert.equal(Math.sign(intelligenceChange), points === 0 ? -1 : 1);
       } else assert.equal(intelligenceChange, 0, `crafts ${points} does not train or neglect Intelligence`);
       assert.equal(Math.sign(crafts.creativity - baseline.creativity), Math.sign(points - 2));

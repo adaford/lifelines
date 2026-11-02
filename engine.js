@@ -1,22 +1,22 @@
 // Lifelines: deterministic, browser-independent simulation rules.
 // All public actions mutate their state and return { ok, reason? }.
-import { JOBS } from './jobs.js?v=choice-stat-rebalance';
-import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=choice-stat-rebalance';
-import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=choice-stat-rebalance';
-import { mortalityRisk, rollMortality } from './mortality.js?v=choice-stat-rebalance';
-import { heightReference, advanceGrowth } from './growth.js?v=choice-stat-rebalance';
-import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=choice-stat-rebalance';
-import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, standardFocusPractice, DEVELOPMENT_BALANCE, BIRTH_VARIATION, SKILL_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, PARENT_FAMILY_STABILITY_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=choice-stat-rebalance';
-import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=choice-stat-rebalance';
-import { normalPercentile } from './percentiles.js?v=choice-stat-rebalance';
-import { changedRating } from './rating-changes.js?v=choice-stat-rebalance';
-import { MAX_FOCUS, DEFAULT_FOCUS, focusEffect, focusKeysForAge, focusBudget, defaultFocus, legacyFocusValue } from './focus-rules.js?v=choice-stat-rebalance';
-import { assignBirthConditions, getBirthConditions, conditionFocusLimits, validateBirthConditions } from './birth-conditions.js?v=choice-stat-rebalance';
+import { JOBS } from './jobs.js?v=concrete-events-activities';
+import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=concrete-events-activities';
+import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=concrete-events-activities';
+import { mortalityRisk, rollMortality } from './mortality.js?v=concrete-events-activities';
+import { heightReference, advanceGrowth } from './growth.js?v=concrete-events-activities';
+import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=concrete-events-activities';
+import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, standardFocusPractice, DEVELOPMENT_BALANCE, BIRTH_VARIATION, SKILL_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, PARENT_FAMILY_STABILITY_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=concrete-events-activities';
+import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=concrete-events-activities';
+import { normalPercentile } from './percentiles.js?v=concrete-events-activities';
+import { changedRating } from './rating-changes.js?v=concrete-events-activities';
+import { MAX_FOCUS, DEFAULT_FOCUS, focusEffect, focusKeysForAge, focusBudget, defaultFocus, legacyFocusValue } from './focus-rules.js?v=concrete-events-activities';
+import { assignBirthConditions, getBirthConditions, conditionFocusLimits, validateBirthConditions } from './birth-conditions.js?v=concrete-events-activities';
 export { DEVELOPMENT_BALANCE };
-export { heightPercentile } from './growth.js?v=choice-stat-rebalance';
-export { mortalityRisk } from './mortality.js?v=choice-stat-rebalance';
-import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=choice-stat-rebalance';
-export { JOBS, JOB_CATEGORIES } from './jobs.js?v=choice-stat-rebalance';
+export { heightPercentile } from './growth.js?v=concrete-events-activities';
+export { mortalityRisk } from './mortality.js?v=concrete-events-activities';
+import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=concrete-events-activities';
+export { JOBS, JOB_CATEGORIES } from './jobs.js?v=concrete-events-activities';
 export const EVENTS = [...PERSONAL_EVENTS, ...FAMILY_EVENTS];
 
 export const SKILLS = [

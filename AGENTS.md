@@ -1,5 +1,16 @@
 # Lifelines
 
+## Event and toddler activity update (3 November 2026)
+
+Events describe specific encounters, incidents, setbacks, and opportunities with a clear cause for their existing effects. Routine development and vague changes in feelings are not random events. Preserve event IDs, choice IDs, eligibility, probabilities, effects, pending decisions, and stored history. The complete catalog was reviewed: 263 of 305 events were rewritten, with all 73 decisions preserved. `event-copy-history.js` retains former titles/descriptions only for rendering old reviews and removing exact old result prefixes.
+
+Perks show their actual effects inline, such as **Sharp memory (+.5 Intelligence)**, across player, family, and dating profiles. Remove condition help buttons; retain focus-point changes, age-specific caps, lifelong status, and accessible birth-only stat timing. Other stat/activity help remains unchanged.
+
+At ages 2-4, Electronics uses these signed contribution units at points 0, 1, 2, 3, 4: Intelligence **-4, -2, 0, +2, +4**; Social **+2, +1, 0, -1, -2**. Each unit keeps its shared coefficient (.27 Intelligence, .165 Social), before yearly scale, aptitude, age response, damping, and bounds. Preview signs match these units and remain stable under caps or partial clipping. Other activities retain their curves, including endpoint-only crafts Intelligence.
+
+Toddler Family time affects the player's Social, caregiver mental stability, and caregiver relationships. It has no personal mental-stability contribution at any allocation. Rest still affects personal mental stability; later-life Family focus retains its existing effects. These rules supersede previous Electronics curves and toddler Family-time personal wellbeing effects. Existing saves, allocations, ratings, RNG, and historical reviews remain unchanged on load; schema stays 17. Regenerate percentile references without fitting.
+
+
 Lifelines is a phone-first, generational life simulator. Read `HANDOFF.md` for the project and cloud setup status, and `README.md` for the current gameplay rules, save migrations, and deployment details before changing behavior.
 
 ## Setup and validation
@@ -99,7 +110,7 @@ Lifelines is a phone-first, generational life simulator. Read `HANDOFF.md` for t
 
 - Keep 100 good, bad, and mixed conditions, maximum five per person. Any condition can occur without inheritance and for any gender. Every entry has positive base chance; either biological parent gives a 1.5x chance, without compounding for both. Adoption uses independent rolls. Shuffle candidates before the cap and prevent mutually exclusive groups.
 - Apply stat changes once at creation, rounded to two decimals and bounded 0-10. Focus points/caps are lifelong. High energy adds one yearly point; Autism adds .7 Intelligence at birth and caps Friends at 1 from age 5. These effects are fictional game rules.
-- Generate/preserve conditions on players, parents, guardians, children, dating prospects, and unrelated heirs, including through relationships, aging, reload, and succession. Show compact names with adjacent ? effect help. Sum point changes with base budgets; combine condition/event caps by minimum.
+- Generate/preserve conditions on players, parents, guardians, children, dating prospects, and unrelated heirs, including through relationships, aging, reload, and succession. Show compact names with inline effects. Sum point changes with base budgets; combine condition/event caps by minimum.
 - Schema 17 validates known unique condition IDs (at most five) on every person, including pregnancy/lineage copies. Older people gain empty lists without RNG or stat changes. Never reroll or reapply birth bonuses. Preserve the lifelines.save.v1 key and existing progress.
 
 ## Releases from cloud tasks

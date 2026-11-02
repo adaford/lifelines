@@ -1,4 +1,4 @@
-import { conditionFocusPoints } from './birth-conditions.js?v=choice-stat-rebalance';
+import { conditionFocusPoints } from './birth-conditions.js?v=concrete-events-activities';
 
 // One shared allocation scale for all playable focus stages.
 export const MAX_FOCUS = 4;

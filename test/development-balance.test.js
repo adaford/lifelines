@@ -222,7 +222,7 @@ test('toddler play, electronics and crafts have distinct development effects', (
     assert.deepEqual(childhoodWellbeing(option('work')), childhoodWellbeing(option('social')), 'play has no school-work stress penalty');
     const family = { ...toddler, focus: { work: 3, social: 1, family: 5, self: 3 } };
     const exploring = { ...toddler, focus: { work: 3, social: 5, family: 1, self: 3 } };
-    assert.ok(childhoodWellbeing(family).stability > childhoodWellbeing(exploring).stability);
+    assert.equal(childhoodWellbeing(family).stability, childhoodWellbeing(exploring).stability, 'Family time does not affect personal mental stability');
     assert.deepEqual(skillChanges({ ...toddler, cryLevel: 1 }), skillChanges({ ...toddler, cryLevel: 5 }));
     assert.deepEqual(childhoodWellbeing({ ...toddler, cryLevel: 1 }), childhoodWellbeing({ ...toddler, cryLevel: 5 }));
   }

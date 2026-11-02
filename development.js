@@ -1,4 +1,4 @@
-import { MAX_FOCUS, DEFAULT_FOCUS, focusEffect, defaultFocus } from './focus-rules.js?v=choice-stat-rebalance';
+import { MAX_FOCUS, DEFAULT_FOCUS, focusEffect, defaultFocus } from './focus-rules.js?v=concrete-events-activities';
 // Ratings use the same scale throughout life. Balanced toddler activities use
 // TODDLER_FOCUS; every stage uses 2 per area. Keep the historical calibration
 // offsets, with childhood deductions reduced to the requested tenth strength.
@@ -51,7 +51,7 @@ export const PARENT_FAMILY_STABILITY_GAIN = .025;
 export const TODDLER_ACTIVITY_EFFECTS = choiceCoefficients({
   work: { strength: .05, social: .0275 },
   social: { intelligence: .045, social: -.0275 },
-  family: { social: .0275, stability: .04 },
+  family: { social: .0275 },
   self: { health: .05, stability: .04 },
   creative: { creativity: .055, intelligence: .045 },
 });
@@ -62,7 +62,7 @@ export const STANDARD_FOCUS_EFFECTS = choiceCoefficients({
   self: { intelligence: .0375, strength: .05, creativity: .04, health: .0175, stability: .05 },
 });
 // One sign has one raw magnitude for the same stat across player choices.
-// Every affected stat uses one unit at 1/3 points and three at 0/4 points.
+// Selected-point curves are shared by simulation and previews below.
 export function focusEffectStrength(coefficients, area, stat) {
   return coefficients[area]?.[stat] ? 1 : 0;
 }
@@ -91,8 +91,13 @@ export function standardFocusPractice(person, career = null) {
 }
 // Every activity is neutral at two. Crafts Intelligence only changes at the
 // endpoints, by one unit; its Creativity keeps the normal triple endpoints.
+// Electronics uses linear Intelligence (-4..4) and Social (-2..2) units.
 export const toddlerActivityNeutral = () => DEFAULT_FOCUS;
 export function toddlerActivitySteps(activity, stat, points) {
+  if (activity === 'social') {
+    const offset = clamp(Math.round(number(points, DEFAULT_FOCUS)), 0, MAX_FOCUS) - DEFAULT_FOCUS;
+    return offset * (stat === 'intelligence' ? 2 : 1);
+  }
   const effort = focusEffect(points);
   return activity === 'creative' && stat === 'intelligence'
     ? Math.abs(effort) === 3 ? Math.sign(effort) : 0
@@ -116,7 +121,7 @@ export function wellbeingResponse(person, key, amount) {
 function toddlerWellbeingPractice(focus) {
   return {
     health: TODDLER_ACTIVITY_EFFECTS.self.health * focusEffect(focus.self),
-    stability: TODDLER_ACTIVITY_EFFECTS.self.stability * focusEffect(focus.self) + TODDLER_ACTIVITY_EFFECTS.family.stability * focusEffect(focus.family),
+    stability: TODDLER_ACTIVITY_EFFECTS.self.stability * focusEffect(focus.self),
   };
 }
 

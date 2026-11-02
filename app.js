@@ -5,13 +5,14 @@ import {
   offeredJobs, needsEducationChoice, pendingEventSubject, focusLimits, focusLimitDetails, caregivers,
   relationshipOdds, meetingChances, proposalChance, pregnancyChance, oneNightChance,
   respondToEncounter, proposeMarriage, endRelationship, normalizeSurname, heightPercentile, statPercentiles
-} from './engine.js?v=choice-stat-rebalance';
-import { annotateNarrative } from './narrative.js?v=choice-stat-rebalance';
-import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome } from './display.js?v=choice-stat-rebalance';
+} from './engine.js?v=concrete-events-activities';
+import { LEGACY_EVENT_COPY } from './event-copy-history.js?v=concrete-events-activities';
+import { annotateNarrative } from './narrative.js?v=concrete-events-activities';
+import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome } from './display.js?v=concrete-events-activities';
 
-import { MAX_FOCUS, focusBudget } from './focus-rules.js?v=choice-stat-rebalance';
-import { getBirthConditions } from './birth-conditions.js?v=choice-stat-rebalance';
-import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=choice-stat-rebalance';
+import { MAX_FOCUS, focusBudget } from './focus-rules.js?v=concrete-events-activities';
+import { getBirthConditions } from './birth-conditions.js?v=concrete-events-activities';
+import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=concrete-events-activities';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const app = document.querySelector('#app');
@@ -117,8 +118,8 @@ const percentileTag = (percentiles, key) => percentiles ? `<span class="stat-per
 const helpButton = (topic, label, id = '') => `<button type="button" class="help-button" data-action="topic-help" data-topic="${esc(topic)}" ${id?`data-id="${esc(id)}"`:''} aria-label="About ${esc(label)}" aria-haspopup="dialog"><span aria-hidden="true">?</span></button>`;
 const labelWithHelp = (label, topic, id = '') => `<span class="label-with-help">${esc(label)}${statEmoji(topic)}${helpButton(topic,label,id)}</span>`;
 
-function birthConditionEffects(condition) {
-  const effects = Object.entries(condition.statChanges || {}).filter(([,amount])=>amount).map(([key,amount])=>`${signedModifier(amount)} ${skillLabel(key)} at birth`);
+function birthConditionEffects(condition, includeBirthTiming = false) {
+  const effects = Object.entries(condition.statChanges || {}).filter(([,amount])=>amount).map(([key,amount])=>`${signedModifier(amount)} ${skillLabel(key)}${includeBirthTiming?' at birth':''}`);
   if (condition.focusPoints) effects.push(`${condition.focusPoints>0?'+':''}${condition.focusPoints} focus point${Math.abs(condition.focusPoints)===1?'':'s'} each year from age 2, lifelong`);
   for (const [stage,limits] of Object.entries(condition.focusLimits || {})) {
     for (const [key,max] of Object.entries(limits)) {
@@ -132,7 +133,7 @@ function birthConditionEffects(condition) {
 function birthConditionsView(person) {
   const conditions = getBirthConditions(person);
   if (!conditions.length) return '';
-  return `<div class="birth-conditions" aria-label="${esc(person.name)}: birth conditions">${conditions.map(condition=>`<span class="birth-condition" data-condition-id="${esc(condition.id)}"><span>${esc(condition.name)}</span><button type="button" class="help-button" data-action="topic-help" data-topic="condition-${esc(condition.id)}" data-id="${esc(person.id)}" aria-label="About ${esc(person.name)}: ${esc(condition.name)}. ${esc(birthConditionEffects(condition).join('. '))}." aria-haspopup="dialog"><span aria-hidden="true">?</span></button></span>`).join('')}</div>`;
+  return `<div class="birth-conditions" role="list" aria-label="${esc(person.name)}: birth conditions">${conditions.map(condition=>`<span class="birth-condition" role="listitem" data-condition-id="${esc(condition.id)}" aria-label="${esc(condition.name)}: ${esc(birthConditionEffects(condition,true).join('; '))}"><span>${esc(condition.name)} (${esc(birthConditionEffects(condition).join('; '))})</span></span>`).join('')}</div>`;
 }
 
 function loadGame() {
@@ -328,6 +329,8 @@ function yearDecisionsView(decisions) {
   return `<section class="year-decisions" aria-label="Choices used this year"><h3>Your choices</h3><dl>${entries.map(([label,value])=>`<div><dt>${label}</dt><dd>${value}</dd></div>`).join('')}</dl></section>`;
 }
 
+// Historical copy is render-only: old titles and exact prefixes keep their context.
+const eventCopiesFor = entry => [...LEGACY_EVENT_COPY, ...EVENTS].filter(event => entry.title===event.name || entry.title.endsWith(`: ${event.name}`));
 const isNoEventEntry = entry => entry.title === 'A quiet year' || entry.kind === 'quiet' && entry.title === 'Events' && entry.text === 'None';
 function completedEventCopy(entry) {
   if (isNoEventEntry(entry)) return { title: 'Events', text: 'None' };
@@ -342,15 +345,16 @@ function completedEventCopy(entry) {
     const [title,text] = milestones[entry.title];
     return {title,text};
   }
-  const event = EVENTS.find(event=>entry.title===event.name || entry.title.endsWith(`: ${event.name}`));
-  if (!event) return entry;
-  const subject = entry.title===event.name?'Your family member':entry.title.slice(0,-event.name.length-2);
-  const choice = event.choices?.find(choice=>entry.text.startsWith(`${choice.label}: `));
-  const description = (choice?.description || event.description).replaceAll('{name}',subject);
-  const prefix = choice?`${choice.label}: ${description}`:description;
-  if (!entry.text.startsWith(prefix)) return entry;
-  const changes = entry.text.slice(prefix.length).trim();
-  return {title:entry.title,text:`${choice?`${choice.label}. `:''}${changes || 'No stat changes.'}`};
+  for (const event of eventCopiesFor(entry)) {
+    const subject = entry.title===event.name?'Your family member':entry.title.slice(0,-event.name.length-2);
+    const choice = event.choices?.find(choice=>entry.text.startsWith(`${choice.label}: `));
+    const description = (choice?.description || event.description).replaceAll('{name}',subject);
+    const prefix = choice?`${choice.label}: ${description}`:description;
+    if (!entry.text.startsWith(prefix)) continue;
+    const changes = entry.text.slice(prefix.length).trim();
+    return {title:entry.title,text:`${choice?`${choice.label}. `:''}${changes || 'No stat changes.'}`};
+  }
+  return entry;
 }
 function yearEventsView(summary) {
   const events = (summary.events || []).filter(event => !isNoEventEntry(event));
@@ -363,7 +367,13 @@ function yearEventsView(summary) {
 }
 
 function reviewEventDescription(entry) {
-  const event = EVENTS.find(event=>entry.title===event.name || entry.title.endsWith(`: ${event.name}`));
+  const copies = eventCopiesFor(entry);
+  const event = copies.find(copy => {
+    const subject = entry.title===copy.name ? 'Your family member' : entry.title.slice(0,-copy.name.length-2);
+    const choice = copy.choices?.find(choice=>entry.text.startsWith(`${choice.label}: `));
+    const prefix = choice ? `${choice.label}: ${choice.description}` : copy.description;
+    return entry.text.startsWith(prefix.replaceAll('{name}',subject));
+  }) || copies[0];
   const subject = event && entry.title!==event.name ? entry.title.slice(0,-event.name.length-2) : 'Your family member';
   const source = entry.description || event?.description?.replaceAll('{name}',subject) || '';
   // Saved context also covers events created during play, such as adoption.
@@ -626,7 +636,7 @@ function topicHelpModal(topic, id) {
     height: ['Height', ['Final height emerges from yearly growth shaped by age, inheritance, health and chance, ending at 14–18. Poor health reduces new growth, never existing height.']],
     cry: ['Cry level', ['Less crying lowers your intelligence and mental stability; more crying raises them. Strength is unaffected. Parent relationships tend to fall at levels 1–2, stay steady at 3, and rise at 4–5, with yearly variation. Harder crying strains their mental stability more.']],
     focus: ['Your focus', [`Share ${focusBudget(state)} points across ${Object.keys(state.focus).length} focuses, up to ${MAX_FOCUS} each. The default 2 in each adds no focus-driven stat changes. Conditions and events can change your limits.`, 'Points 1 and 3 show one sign per effect; 0 and 4 are three times as strong and show three. Combined effects can reach six signs. Aptitude, current ratings, development and events affect the final result. Zero effects are hidden.']],
-    'toddler-focus': ['Toddler activities', [`Share ${focusBudget(state)} points among five activities, up to 4 each. The default 2 in each adds no activity-driven stat changes. Conditions and events can change your limits.`, 'Most effects show one sign at 1 or 3 points and three at 0 or 4. Arts & crafts Intelligence shows one minus at 0, no effect at 1–3, and one plus at 4. Less Electronics supports Social; more reduces it. Aptitude, current ratings, development and events affect the final result. Zero effects are hidden.']],
+    'toddler-focus': ['Toddler activities', [`Share ${focusBudget(state)} points among five activities, up to 4 each. The default 2 in each adds no activity-driven stat changes. Conditions and events can change your limits.`, 'Most effects show one sign at 1 or 3 points and three at 0 or 4. Arts & crafts Intelligence shows one minus at 0, no effect at 1–3, and one plus at 4. Electronics Intelligence uses ----, --, none, ++, ++++ at 0 to 4 points; Social uses ++, +, none, -, --. Aptitude, current ratings, development and events affect the final result. Zero effects are hidden.']],
     ...Object.fromEntries(toddlerFocusRows.map(([key,label]) => [`toddler-${key}`, [label,
       toddlerActivityImpacts(key).map(({stat,change,level,target}) => `${(change>0?'+':'-').repeat(level)}${target==='parents'?(caregivers(state).some(person=>person.guardianRole)?'Guardian relationship':'Parent relationships'):skillLabel(stat)}`)
     ]])),
@@ -646,11 +656,6 @@ function topicHelpModal(topic, id) {
     inheritance: ['Retirement & inheritance', ['Succession opens at 65 or on death and is required at 85; choose a child, sibling or unrelated child, in that order. Eligible children share inheritance equally; otherwise the chosen heir receives it.']]
   };
   let entry = help[topic];
-  if (topic.startsWith('condition-')) {
-    const person = [state,...familyCareProfiles(),...state.children,...state.siblings,state.partner,...state.encounters].find(person=>person?.id===id) || successionInfo(state).candidates.find(person=>person.id===id);
-    const condition = getBirthConditions(person).find(condition=>condition.id===topic.slice('condition-'.length));
-    if (condition) entry = [condition.name,[`${person.name}: ${condition.description}`,...birthConditionEffects(condition),'Effects are game rules.']];
-  }
   if(topic==='height' && id===state.id && state.age<18) entry=[entry[0],[...entry[1],'Percentile compares simulated heights at your age.']];
   if (topic==='job') {
     const job = JOBS.find(candidate=>candidate.id===id);

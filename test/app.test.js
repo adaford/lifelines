@@ -246,7 +246,7 @@ test('Mom helping with the load keeps each actual stat change on a separate revi
     for (let reload = 0; reload < 2; reload++) {
       const card = ui.all('.year-review-events li').find(item => item.querySelector('strong').textContent.includes(event.name));
       assert.ok(card);
-      assert.equal(card.querySelector('.year-event-description').textContent, `${mom.name} (Mom) accepts help with everyday responsibilities.`);
+      assert.equal(card.querySelector('.year-event-description').textContent, event.description.replaceAll('{name}', `${mom.name} (Mom)`));
       const results = card.querySelector('.year-event-results');
       const lines = results.innerHTML.split('<br>');
       assert.equal(results.querySelectorAll('br').length, 3, 'four changes need three actual HTML line breaks');
@@ -298,6 +298,30 @@ test('older catalog events gain review context without restoring journal flavor 
     if (choice) assert.equal(ui.query('.year-event-results').textContent, 'Choice offered.');
     else assert.match(ui.query('.year-event-results').textContent, /Your health 5\.0 → 4\.4.*1 year/);
     assert.deepEqual(ui.saved(), fixture);
+  }
+});
+
+test('rewritten events preserve old review context and strip only exact legacy result prefixes', async () => {
+  const fixture = ageTo(createGame({ seed: 78123 }), 1);
+  const description = 'A familiar sound becomes a word, and your family celebrates the discovery.';
+  const entries = [
+    { title: 'Words find their way', text: `${description} Your social 5 → 5.2.`, kind: 'positive' },
+    { title: 'Words find their way', text: 'A custom family memory. Your social 5 → 5.2.', kind: 'positive' },
+    { title: 'A broken bone', text: 'An unknown custom event stays intact.', kind: 'negative' },
+  ];
+  fixture.history = entries.map(entry=>({ ...fixture.history[0], ...entry }));
+  fixture.yearSummary.events = entries;
+  fixture.yearSummary.dismissed = false;
+  let ui = await mount(fixture);
+  for (let reload=0; reload<2; reload++) {
+    const rows = ui.all('.year-review-events li');
+    assert.equal(rows[0].querySelector('strong').textContent, 'Words find their way');
+    assert.equal(rows[0].querySelector('.year-event-description').textContent, description);
+    assert.match(rows[0].querySelector('.year-event-results').textContent, /^Your social 5\.0 → 5\.2\.$/);
+    assert.match(rows[1].querySelector('.year-event-results').textContent, /^A custom family memory\./);
+    assert.equal(rows[2].querySelector('.year-event-results').textContent, entries[2].text);
+    assert.deepEqual(ui.saved(), fixture, 'rendering old events never rewrites saved history');
+    ui = await mount(ui.saved());
   }
 });
 
@@ -1662,7 +1686,7 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     ui.click('[data-action="menu"]');
     ui.click('[data-action="odds"]');
     assert.match(ui.query('.modal-body').textContent, /No events/);
-    assert.match(ui.query('.modal-body').textContent, /Under the weather/);
+    assert.ok(ui.query('.modal-body').textContent.includes(EVENTS.find(event=>event.id==='illness').name));
   });
 
   test('starting over stores the chosen name as escaped text', async () => {
@@ -2523,8 +2547,8 @@ test('Electronics and crafts show the expected signs at every allocation', async
   ui.click('[data-topic="toddler-focus"]');
   assert.match(ui.query('.help-popup').textContent,/Arts & crafts Intelligence shows one minus at 0, no effect at 1–3, and one plus at 4/);
   ui.click('.help-popup [data-action="close"]');
-  const social=['+++','+',null,'-','---'];
-  const intelligence=['---','-',null,'+','+++'];
+  const social=['++','+',null,'-','--'];
+  const intelligence=['----','--',null,'++','++++'];
   const signs=stat=>ui.document.querySelector(`.focus-row[data-focus-key="social"] .choice-impact[data-stat="${stat}"] b`)?.textContent ?? null;
   for(let points=0;points<=4;points++) {
     assert.equal(ui.query('.focus-row[data-focus-key="social"] output').textContent,String(points));
@@ -2658,12 +2682,12 @@ test('toddler and family effects retain their point curves and crafts Intelligen
   const effects={
     work:[['you','strength'],['you','social']],
     social:[['you','intelligence'],['you','social',true]],
-    family:[['you','social'],['you','stability'],['family','stability'],['family','relationship']],
+    family:[['you','social'],['family','stability'],['family','relationship']],
     self:[['you','health'],['you','stability']],
     creative:[['you','creativity'],['you','intelligence']],
   };
   for(const [area,expectedEffects] of Object.entries(effects)) {
-    const signsFor=(stat,reversed,points)=>(area==='creative' && stat==='intelligence'
+    const signsFor=(stat,reversed,points)=>(area==='social' ? (stat==='intelligence'?['----','--',null,'++','++++']:['++','+',null,'-','--']) : area==='creative' && stat==='intelligence'
       ? ['-',null,null,null,'+']
       : reversed?['+++','+',null,'-','---']:['---','-',null,'+','+++'])[points];
     const fixture=createGame({seed:121});
@@ -2709,10 +2733,10 @@ test('toddler and family effects retain their point curves and crafts Intelligen
   }
 });
 
-test('birth conditions show subject-specific help across Year and family profiles without changing saves', async () => {
+test('birth conditions show inline effects across Year and family profiles without changing saves', async () => {
   const fixture=partnerFixture();
   assert.equal(haveChild(fixture).ok,true);
-  fixture.conditions=['autism','high_energy'];
+  fixture.conditions=['autism','high_energy','sharp_memory'];
   fixture.focus={work:2,social:1,family:2,self:2};
   fixture.parents[0].conditions=['low_energy'];
   fixture.partner.conditions=['high_energy'];
@@ -2721,31 +2745,27 @@ test('birth conditions show subject-specific help across Year and family profile
   assert.equal(validateSave(fixture),true);
   let ui=await mount(fixture);
   const saved=ui.saved(),writes=ui.writes();
-  assert.deepEqual(ui.all('.profile-bar .birth-condition').map(node=>node.dataset.conditionId),['autism','high_energy']);
+  assert.deepEqual(ui.all('.profile-bar .birth-condition').map(node=>node.dataset.conditionId),['autism','high_energy','sharp_memory']);
   assert.equal(ui.all('.status-strip > button').length,7,'conditions leave the seven-stat grid intact');
   assert.doesNotMatch(ui.query('#app').textContent,/Effects are game rules/);
-  const trigger=ui.query('.profile-bar [data-topic="condition-autism"]');
-  assert.match(trigger.getAttribute('aria-label'),new RegExp(`About ${fixture.name}: Autism.*Intelligence at birth.*Friends max 1`));
-  trigger.focus();
-  ui.click('.profile-bar [data-topic="condition-autism"]');
-  assert.match(ui.query('.help-popup').textContent,/\+\.7 Intelligence at birth.*Friends max 1 from age 5, lifelong.*Effects are game rules/);
-  ui.key('.help-popup [data-action="close"]','Escape');
-  assert.equal(ui.document.activeElement,trigger);
-  ui.click('.profile-bar [data-topic="condition-high_energy"]');
-  assert.match(ui.query('.help-popup').textContent,/\+1 focus point each year from age 2, lifelong/);
-  ui.click('.help-popup [data-action="close"]');
+  const autism=ui.query('.profile-bar [data-condition-id="autism"]');
+  assert.equal(autism.textContent,'Autism (+.7 Intelligence; Friends max 1 from age 5, lifelong)');
+  assert.match(autism.getAttribute('aria-label'),/Intelligence at birth.*Friends max 1 from age 5, lifelong/);
+  assert.equal(ui.query('.profile-bar [data-condition-id="sharp_memory"]').textContent,'Sharp memory (+.5 Intelligence)');
+  assert.match(ui.query('.profile-bar [data-condition-id="high_energy"]').textContent,/\+1 focus point each year from age 2, lifelong/);
+  assert.equal(ui.all('.birth-conditions button').length,0,'condition effects need no help buttons');
   ui.click('.nav-list [data-tab="family"]');
   for(const [person,condition] of [[fixture.parents[0],'low_energy'],[fixture.partner,'high_energy'],[fixture.children[0],'autism']]) {
-    const selector=`[data-person-id="${person.id}"] [data-topic="condition-${condition}"]`;
-    assert.match(ui.query(selector).getAttribute('aria-label'),new RegExp(person.name));
-    ui.click(selector);
-    assert.ok(ui.query('.help-popup').textContent.includes(person.name));
-    ui.click('.help-popup [data-action="close"]');
+    const selector=`[data-person-id="${person.id}"] [data-condition-id="${condition}"]`;
+    const conditionNode=ui.query(selector);
+    assert.match(conditionNode.closest('.birth-conditions').getAttribute('aria-label'),new RegExp(person.name));
+    assert.match(conditionNode.textContent,/\(.+\)/,'every family condition shows effects beside its name');
+    assert.equal(conditionNode.querySelector('button'),null);
   }
   assert.deepEqual(ui.saved(),saved);
-  assert.equal(ui.writes(),writes,'condition help must not assign conditions, apply bonuses, or consume RNG');
+  assert.equal(ui.writes(),writes,'reading condition effects must not assign conditions, apply bonuses, or consume RNG');
   ui=await mount(saved);
-  assert.equal(ui.all('.profile-bar .birth-condition').length,2);
+  assert.equal(ui.all('.profile-bar .birth-condition').length,3);
   assert.deepEqual(ui.saved(),saved);
 });
 
@@ -2798,9 +2818,9 @@ test('dating prospects show their own birth conditions and condition-free profil
   const ui=await mount(fixture),saved=ui.saved();
   assert.equal(ui.all('.profile-bar .birth-conditions').length,0);
   ui.click('.nav-list [data-tab="family"]');
-  ui.click('.encounter-card [data-topic="condition-autism"]');
-  assert.ok(ui.query('.help-popup').textContent.includes(fixture.encounters[0].name));
-  ui.click('.help-popup [data-action="close"]');
+  assert.equal(ui.query('.encounter-card [data-condition-id="autism"]').textContent,'Autism (+.7 Intelligence; Friends max 1 from age 5, lifelong)');
+  assert.ok(ui.query('.encounter-card .birth-conditions').getAttribute('aria-label').includes(fixture.encounters[0].name));
+  assert.equal(ui.all('.encounter-card .birth-conditions button').length,0);
   ui.click('[data-action="prospect-page"][data-delta="1"]');
   assert.equal(ui.all('.encounter-card .birth-conditions').length,0);
   assert.deepEqual(ui.saved(),saved,'reading condition profiles preserves stats and RNG');

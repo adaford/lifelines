@@ -62,8 +62,8 @@ test('raw choice effects use triple endpoints with the single-unit crafts Intell
             near(unit[stat], 0, 'crafts Intelligence is unchanged at one or three points');
             const electronicsPoints = endpoint === 0 ? 1 : 3;
             const electronics = toddlerActivityEffects({ ...state, focus: { ...state.focus, social: electronicsPoints } }).social.intelligence;
-            near(extreme[stat], electronics, 'crafts endpoints have one Intelligence unit');
-          } else near(extreme[stat], 3 * unit[stat], `${age} ${area} ${stat}, aptitude ${aptitude}`);
+            near(extreme[stat], electronics / 2, 'crafts endpoints have one Intelligence unit');
+          } else near(extreme[stat], (age < 5 && area === 'social' ? 2 : 3) * unit[stat], `${age} ${area} ${stat}, aptitude ${aptitude}`);
         }
       }
     }
@@ -83,7 +83,7 @@ test('individual effects retain their point curves, including endpoint-only craf
       else {
         assert.ok(entries.length, `${age} ${area} at ${points} points has effects`);
         for (const entry of entries) {
-          const expected = age < 5 && area === 'creative' && entry.stat === 'intelligence' ? [1, 0, 0, 0, 1][points] : level;
+          const expected = age < 5 && area === 'social' ? Math.abs(points - 2) * (entry.stat === 'intelligence' ? 2 : 1) : age < 5 && area === 'creative' && entry.stat === 'intelligence' ? [1, 0, 0, 0, 1][points] : level;
           assert.equal(entry.level, expected, `${age} ${area} ${entry.parentId || 'you'} ${entry.stat}`);
         }
         if (age < 5 && area === 'creative') assert.equal(entries.some(entry => entry.stat === 'intelligence'), points === 0 || points === 4);
