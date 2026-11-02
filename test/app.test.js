@@ -3189,8 +3189,8 @@ test('perks show separate named rows and affinity effects across Year and family
   assert.equal(autism.getAttribute('aria-label'),'Autism: +1 Intelligence affinity; Friends max 1 from age 5, lifelong');
   assert.equal(ui.query('.profile-bar [data-condition-id="sharp_memory"] .birth-condition-effect').textContent,'+1 Intelligence affinity');
   assert.deepEqual(ui.all('.profile-bar [data-condition-id="literal_thinker"] .birth-condition-effect').map(node=>node.textContent),['-1 Creativity affinity','+1 Intelligence affinity']);
-  assert.deepEqual(ui.all('.profile-bar [data-condition-id="restless"] .birth-condition-effect').map(node=>node.textContent),['-1 Mental stability affinity','+1 focus point each year from age 2, lifelong']);
-  assert.match(ui.query('.profile-bar [data-condition-id="high_energy"]').textContent,/\+1 focus point each year from age 2, lifelong/);
+  assert.deepEqual(ui.all('.profile-bar [data-condition-id="restless"] .birth-condition-effect').map(node=>node.textContent),['-1 Mental stability affinity','+1 focus point']);
+  assert.match(ui.query('.profile-bar [data-condition-id="high_energy"]').textContent,/\+1 focus point/);
   assert.equal(ui.all('.birth-conditions button').length,0,'perk effects need no help buttons');
   assert.doesNotMatch(perkList.textContent,/at birth|\+\.5|\+\.7/,'perks describe affinity changes, not old direct rating bonuses');
   ui.click('[data-topic="intelligence"]');

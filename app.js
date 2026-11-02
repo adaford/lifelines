@@ -124,7 +124,7 @@ const labelWithHelp = (label, topic, id = '') => `<span class="label-with-help">
 
 function birthConditionEffects(condition) {
   const effects = Object.entries(condition.aptitudeChanges || {}).filter(([,amount])=>amount).map(([key,amount])=>`${amount>0?'+':''}${amount} ${skillLabel(key)} affinity`);
-  if (condition.focusPoints) effects.push(`${condition.focusPoints>0?'+':''}${condition.focusPoints} focus point${Math.abs(condition.focusPoints)===1?'':'s'} each year from age 2, lifelong`);
+  if (condition.focusPoints) effects.push(`${condition.focusPoints>0?'+':''}${condition.focusPoints} focus point${Math.abs(condition.focusPoints)===1?'':'s'}`);
   for (const [stage,limits] of Object.entries(condition.focusLimits || {})) {
     for (const [key,max] of Object.entries(limits)) {
       const label = stage==='toddler'?toddlerFocusRows.find(([area])=>area===key)?.[1]:({work:'School / College / Career',social:'Friends',family:'Family',self:'Yourself',sports:'Sports',extracurricular:'Extracurriculars'})[key];
