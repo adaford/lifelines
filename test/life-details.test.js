@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { defaultFocus } from '../focus-rules.js';
 import { toLegacyCentimeters, neutralWellbeingAptitudes } from './helpers/legacy-height.js';
 import {
   createGame, advanceYear, annualForecast, householdLifestyle,
@@ -66,7 +67,7 @@ test('v8 migration adds career and growth state without rerolling existing lives
   const before = copy(legacy);
   const migrated = migrateSave(legacy);
   assert.ok(migrated);
-  assert.equal(migrated.version, 17);
+  assert.equal(migrated.version, 18);
   assert.equal(validateSave(migrated), true);
   assert.deepEqual(legacy, before, 'migration does not mutate the imported object');
   for (const key of ['rng', 'seed', 'nextId', 'age', 'maturityAge', 'stats', 'pendingEvents', 'history', 'yearSummary', 'lifestyle']) {
@@ -250,6 +251,7 @@ test('injected parent job losses reduce household support and appear in the year
 test('household career support ends when the player becomes financially independent at 18', () => {
   const state = createGame({ seed: 671 });
   state.age = 17;
+  state.focus = defaultFocus(state.age);
   state.maturityAge = 18;
   state.height = 67.52;
   state.growthAnchor = { age: 17, height: state.height };

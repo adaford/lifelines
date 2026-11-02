@@ -1,7 +1,7 @@
-import { annualForecast, effectiveStats, needsEducationChoice, focusLimits, caregivers, JOBS } from './engine.js?v=concrete-events-activities';
-import { infantChoiceEffects, wellbeingResponse, toddlerActivityEffects, toddlerActivityNeutral, toddlerActivitySteps, schoolFocusEffects, focusChoiceEffects, focusEffectStrength, standardFocusCoefficients, TODDLER_FOCUS, TODDLER_ACTIVITY_EFFECTS, PARENT_FAMILY_STABILITY_GAIN, PARENT_FAMILY_RELATIONSHIP_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=concrete-events-activities';
-import { DEFAULT_FOCUS, focusEffect } from './focus-rules.js?v=concrete-events-activities';
-import { changedRating } from './rating-changes.js?v=concrete-events-activities';
+import { annualForecast, effectiveStats, needsEducationChoice, focusLimits, caregivers, JOBS } from './engine.js?v=school-focus-expansion';
+import { infantChoiceEffects, wellbeingResponse, toddlerActivityEffects, toddlerActivityNeutral, toddlerActivitySteps, schoolFocusEffects, schoolFocusSteps, focusChoiceEffects, focusEffectStrength, standardFocusCoefficients, TODDLER_FOCUS, TODDLER_ACTIVITY_EFFECTS, PARENT_FAMILY_STABILITY_GAIN, PARENT_FAMILY_RELATIONSHIP_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=school-focus-expansion';
+import { DEFAULT_FOCUS, focusEffect } from './focus-rules.js?v=school-focus-expansion';
+import { changedRating } from './rating-changes.js?v=school-focus-expansion';
 
 const nonzero = value => Math.abs(value) > .000001;
 const keyOf = entry => `${entry.parentId || 'you'}:${entry.stat}`;
@@ -85,11 +85,11 @@ function schoolChoiceEntries(state, area, points, clip) {
 // the same complete 0–4 reference as toddler rows when an event limits a choice.
 export function schoolChoiceImpacts(state, area) {
   if (state.age < 5 || state.age >= 18 && state.education.status !== 'college'
-      || !['work', 'social', 'family', 'self'].includes(area) || state.ended
+      || !Object.hasOwn(standardFocusCoefficients(state), area) || state.ended
       || state.alive === false || state.needsSuccession || state.pendingEvents.length || needsEducationChoice(state)) return [];
   const points = Math.max(0, Math.min(focusLimits(state)[area], state.focus[area] ?? 0));
   const entries = schoolChoiceEntries(state, area, points, true);
-  return proportionalChoiceEntries(entries, points);
+  return proportionalChoiceEntries(entries, points, entry => state.age < 18 ? schoolFocusSteps(area, entry.stat, points) : focusEffect(points));
 }
 
 function forecastEntries(state, forecast) {

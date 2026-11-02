@@ -69,10 +69,10 @@ test('condition bonuses and lifelong limits apply to focus actions and coexist w
   state.age = 6;
   state.conditions = ['autism', 'high_energy'];
   state.focus = { ...defaultFocus(6), social: 1 };
-  assert.equal(focusBudget(state), 9);
+  assert.equal(focusBudget(state), 13);
   assert.equal(focusBudget({ ...state, age: 3 }), 11);
-  assert.equal(focusBudget({ ...state, conditions: ['low_energy'] }), 7);
-  assert.deepEqual(fitFocusBudget({ ...state, conditions: ['low_energy'] }, defaultFocus(6)), { work: 1, social: 2, family: 2, self: 2 });
+  assert.equal(focusBudget({ ...state, conditions: ['low_energy'] }), 11);
+  assert.deepEqual(fitFocusBudget({ ...state, conditions: ['low_energy'] }, defaultFocus(6)), { work: 1, social: 2, family: 2, self: 2, sports: 2, extracurricular: 2 });
   assert.equal(setFocus(state, 'social', 2).ok, false);
   assert.equal(setFocus(state, 'work', 4).ok, true);
   assert.equal(focusLimitDetails(state)[0].permanent, true);
@@ -84,7 +84,7 @@ test('condition bonuses and lifelong limits apply to focus actions and coexist w
   assert.equal(state.effects.some(effect => effect.id === 'temporary'), false);
   assert.equal(focusLimits(state).social, 1);
   assert.deepEqual(state.conditions, ['autism', 'high_energy']);
-  assert.equal(state.yearSummary.decisions.focusBudget, 9);
+  assert.equal(state.yearSummary.decisions.focusBudget, 13);
   assert.equal(validateSave(state), true);
   assert.deepEqual(migrateSave(clone(state)), state);
 });
@@ -150,7 +150,7 @@ test('succession keeps the chosen childs conditions and applies their budget wit
   assert.equal(succeed(state, heir.id).ok, true);
   assert.deepEqual(state.conditions, ['autism', 'high_energy']);
   assert.deepEqual(state.stats, before);
-  assert.equal(focusBudget(state), 9);
+  assert.equal(focusBudget(state), 13);
   assert.equal(state.focus.social, 1);
   assert.equal(validateSave(state), true);
   const noChildren = adult();
@@ -178,7 +178,7 @@ test('older saves receive empty condition lists without changing existing rating
   const loaded = migrateSave(state);
   assert.ok(loaded);
   const expected = clone(before);
-  expected.version = 17;
+  expected.version = 18;
   expected.focus = defaultFocus(expected.age);
   visit(expected, person => { person.conditions = []; });
   assert.deepEqual(loaded, expected);

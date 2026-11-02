@@ -98,7 +98,7 @@ test('school, career, and later-life practice have stronger gains and losses wit
     close(baseline.intelligence, -.036 * flexibility + (age < 18 ? DEVELOPMENT_BALANCE.childhoodBias.intelligence * CHILDHOOD_DEDUCTION_SCALE : 0), 'innate tendency and reduced childhood deduction');
     for (const [focus, sign] of [[focused, 1], [neglected, -1]]) {
       const changed = skillChanges({ ...state, focus });
-      for (const key of learned) close(changed[key] - baseline[key], practice[key] * flexibility * sign, `${age} ${key}`);
+      for (const key of learned) close(changed[key] - baseline[key], (age < 18 ? { intelligence: .3375, strength: 0, social: -1.08, creativity: .24 } : practice)[key] * flexibility * sign, `${age} ${key}`);
     }
     if (age >= 18) {
       const working = { ...state, focus: focused };
@@ -150,7 +150,7 @@ test('stronger child focus practice preserves caregiver strain and family relati
         const toddler = child.age < 5;
         const skillPractice = toddler
           ? { intelligence: 0, strength: 0, social: .165 * effort, creativity: 0 }
-          : { intelligence: .225 * effort, strength: .3 * effort, social: .24 * effort, creativity: .24 * effort };
+          : { intelligence: 0, strength: 0, social: .24 * effort, creativity: 0 };
         for (const key of learned) {
           const bias = DEVELOPMENT_BALANCE.childhoodBias[key];
           const background = bias < 0 ? bias * CHILDHOOD_DEDUCTION_SCALE : bias;

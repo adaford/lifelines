@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { legacyRatingFloor } from './helpers/legacy-height.js';
+import { defaultFocus } from '../focus-rules.js';
 import {
   EVENTS, createGame, setFocus, focusLimits, focusLimitDetails, advanceYear,
   annualForecast, resolveEventChoice, validateSave, migrateSave,
@@ -12,7 +13,7 @@ const effect = (id, focusLimits, years = 1) => ({ id, name: id, description: '',
 function child(age = 3) {
   const state = createGame({ seed: 7301 });
   state.age = age;
-  state.focus = age < 5 ? { work: 2, social: 2, family: 2, self: 2, creative: 2 } : { work: 2, social: 2, family: 2, self: 2 };
+  state.focus = defaultFocus(age);
   return state;
 }
 function quietAdvance(state) {
@@ -58,7 +59,7 @@ test('active limits use the strictest current-stage cap without changing a save 
 
 test('resolving an event clamps only over-limit allocations and records restrictions and duration', () => {
   const state = child(6);
-  state.focus = { work: 4, social: 2, family: 1, self: 1 };
+  state.focus = { work: 4, social: 2, family: 1, self: 1, sports: 2, extracurricular: 2 };
   queuedTeam(state);
   const event = EVENTS.find(event => event.id === 'school_team');
   const original = event.choices;
@@ -66,7 +67,7 @@ test('resolving an event clamps only over-limit allocations and records restrict
   try {
     const rng = state.rng;
     assert.equal(resolveEventChoice(state, 'test_limits', event.id).ok, true);
-    assert.deepEqual(state.focus, { work: 2, social: 1, family: 1, self: 1 });
+    assert.deepEqual(state.focus, { work: 2, social: 1, family: 1, self: 1, sports: 2, extracurricular: 2 });
     assert.equal(state.rng, rng);
     assert.equal(state.effects.at(-1).years, 1);
     assert.match(state.history[0].text, /School max 2; Friends max 1\. Temporary effects: 1 year\./);
@@ -146,8 +147,8 @@ test('stage changes apply only the matching caps and transfer creative points wi
   quietAdvance(state);
   assert.equal(state.age, 5);
   assert.equal(state.effects[0].years, 1);
-  assert.deepEqual(focusLimits(state), { work: 4, social: 0, family: 4, self: 1 });
-  assert.deepEqual(state.focus, { work: 4, social: 0, family: 3, self: 1 });
+  assert.deepEqual(focusLimits(state), { work: 4, social: 0, family: 4, self: 1, sports: 1, extracurricular: 4 });
+  assert.deepEqual(state.focus, { work: 2, social: 0, family: 2, self: 1, sports: 1, extracurricular: 4 });
   assert.equal(state.yearSummary.decisions.focus.creative, 4);
   assert.equal(validateSave(state), true);
   assert.match(setFocus(state, 'social', 1).reason, /Friends is limited to 0/);
@@ -176,13 +177,15 @@ test('over-limit states cannot advance or import and malformed limit maps are re
 test('schema 13 migration preserves ratings, effects, pending choices, history and RNG exactly', () => {
   const state = legacyRatingFloor(child(6));
   state.version = 13;
+  delete state.focus.sports;
+  delete state.focus.extracurricular;
   state.lifestyle = 5.37;
   state.effects = [{ id: 'old', name: 'Existing effect', description: 'Saved text', years: 2, modifiers: { stability: .3 }, kind: 'positive' }];
   queuedTeam(state);
   const before = copy(state);
   assert.equal(validateSave(state), false);
   const migrated = migrateSave(state);
-  assert.deepEqual(migrated, { ...before, version: 17, focus: { work: 1, social: 1, family: 1, self: 1 } });
+  assert.deepEqual(migrated, { ...before, version: 18, focus: { work: 1, social: 1, family: 1, self: 1, sports: 2, extracurricular: 2 } });
   assert.deepEqual(state, before);
   assert.equal(validateSave(migrated), true);
 });

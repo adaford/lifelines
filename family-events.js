@@ -1,4 +1,4 @@
-import { legacyFocusValue } from './focus-rules.js?v=concrete-events-activities';
+import { legacyFocusValue } from './focus-rules.js?v=school-focus-expansion';
 // Fictional household events. Subject changes affect the named person; player
 // changes affect you. Relationship changes affect your bond with that person.
 // Individual rolls join the ordinary event pool and share its five-event cap.

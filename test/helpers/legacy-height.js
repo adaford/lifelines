@@ -1,5 +1,7 @@
 function legacyFocusFixture(value) {
-  if (value.version !== 17 || !value.focus) return;
+  if (!(value.version >= 17) || !value.focus) return;
+  delete value.focus.sports;
+  delete value.focus.extracurricular;
   const toddler = value.age >= 2 && value.age < 5;
   for (const key of Object.keys(value.focus)) {
     const neutral = toddler && !['work', 'self'].includes(key) ? [0, 1, 2, 3, 5] : [0, 1, 3, 4, 5];
@@ -7,6 +9,9 @@ function legacyFocusFixture(value) {
   }
 }
 function removeNewFocusMetadata(value) {
+  // Explicit downgrade helpers also restore the four-area school format in
+  // recorded decisions. Production migrations must preserve those old reviews.
+  if (value.focus) { delete value.focus.sports; delete value.focus.extracurricular; }
   if (value.focus && value.workLabel) { delete value.focusMax; delete value.focusBudget; }
 }
 

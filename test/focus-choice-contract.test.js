@@ -2,13 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createGame, chooseEducation } from '../engine.js';
 import { MAX_FOCUS, DEFAULT_FOCUS, defaultFocus, focusBudget, focusEffect } from '../focus-rules.js';
-import { focusChoiceEffects, schoolFocusEffects, toddlerActivityEffects, TODDLER_ACTIVITY_EFFECTS, STANDARD_FOCUS_EFFECTS } from '../development.js';
+import { focusChoiceEffects, schoolFocusEffects, schoolFocusSteps, toddlerActivityEffects, TODDLER_ACTIVITY_EFFECTS, SCHOOL_FOCUS_EFFECTS } from '../development.js';
 import { choiceImpacts, schoolChoiceImpacts, toddlerChoiceImpacts } from '../choice-impacts.js';
 
 const near = (actual, expected, context) => assert.ok(Math.abs(actual - expected) < 1e-10, `${context}: ${actual} vs ${expected}`);
 function life(age) {
   const state = createGame({ seed: 61263 });
   state.age = age;
+  state.conditions = [];
   if (age >= 18) chooseEducation(state, 'work');
   state.focus = defaultFocus(age);
   for (const person of [state, ...state.parents]) {
@@ -25,7 +26,7 @@ test('the shared focus scale gives every stage its exact neutral allocation and 
   for (const age of [2, 4, 5, 17, 18, 30, 70]) {
     const focus = defaultFocus(age);
     assert.ok(Object.values(focus).every(points => points === 2));
-    assert.equal(focusBudget(age), age < 5 ? 10 : 8);
+    assert.equal(focusBudget(age), age < 5 ? 10 : age < 18 ? 12 : 8);
     assert.equal(Object.values(focus).reduce((total, points) => total + points, 0), focusBudget(age));
   }
 });
@@ -43,7 +44,7 @@ test('all default choices have no personal or caregiver effect previews, includi
   }
 });
 
-test('raw choice effects use triple endpoints with the single-unit crafts Intelligence exception', () => {
+test('raw choice effects retain ordinary endpoints and the custom toddler and School curves', () => {
   for (const age of [2, 12, 19, 35, 70]) for (const aptitude of [-3, 0, 3]) {
     const state = life(age);
     for (const stat of Object.keys(state.aptitudes)) state.aptitudes[stat] = aptitude;
@@ -63,7 +64,11 @@ test('raw choice effects use triple endpoints with the single-unit crafts Intell
             const electronicsPoints = endpoint === 0 ? 1 : 3;
             const electronics = toddlerActivityEffects({ ...state, focus: { ...state.focus, social: electronicsPoints } }).social.intelligence;
             near(extreme[stat], electronics / 2, 'crafts endpoints have one Intelligence unit');
-          } else near(extreme[stat], (age < 5 && area === 'social' ? 2 : 3) * unit[stat], `${age} ${area} ${stat}, aptitude ${aptitude}`);
+          } else {
+            const ratio = age < 5 && area === 'social' ? 2 : age >= 5 && age < 18
+              ? schoolFocusSteps(area, stat, endpoint) / schoolFocusSteps(area, stat, adjacent) : 3;
+            near(extreme[stat], ratio * unit[stat], `${age} ${area} ${stat}, aptitude ${aptitude}`);
+          }
         }
       }
     }
@@ -83,7 +88,7 @@ test('individual effects retain their point curves, including endpoint-only craf
       else {
         assert.ok(entries.length, `${age} ${area} at ${points} points has effects`);
         for (const entry of entries) {
-          const expected = age < 5 && area === 'social' ? Math.abs(points - 2) * (entry.stat === 'intelligence' ? 2 : 1) : age < 5 && area === 'creative' && entry.stat === 'intelligence' ? [1, 0, 0, 0, 1][points] : level;
+          const expected = age < 5 && area === 'social' ? Math.abs(points - 2) * (entry.stat === 'intelligence' ? 2 : 1) : age < 5 && area === 'creative' && entry.stat === 'intelligence' ? [1, 0, 0, 0, 1][points] : age >= 5 && age < 18 ? Math.abs(schoolFocusSteps(area, entry.stat, points)) : level;
           assert.equal(entry.level, expected, `${age} ${area} ${entry.parentId || 'you'} ${entry.stat}`);
         }
         if (age < 5 && area === 'creative') assert.equal(entries.some(entry => entry.stat === 'intelligence'), points === 0 || points === 4);
@@ -93,7 +98,7 @@ test('individual effects retain their point curves, including endpoint-only craf
 });
 
 test('each sign has the same raw stat magnitude across toddler and school activities', () => {
-  for (const [age, coefficients, preview] of [[3, TODDLER_ACTIVITY_EFFECTS, toddlerChoiceImpacts], [12, STANDARD_FOCUS_EFFECTS, schoolChoiceImpacts]]) {
+  for (const [age, coefficients, preview] of [[3, TODDLER_ACTIVITY_EFFECTS, toddlerChoiceImpacts], [12, SCHOOL_FOCUS_EFFECTS, schoolChoiceImpacts]]) {
     const state = life(age);
     state.conditions = [];
     const perSign = new Map();

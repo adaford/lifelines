@@ -1,15 +1,16 @@
-import { focusEffect, focusBudget } from '../focus-rules.js';
+import { focusEffect, focusBudget, defaultFocus } from '../focus-rules.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createGame, migrateSave } from '../engine.js';
-import { schoolFocusEffects, STANDARD_FOCUS_EFFECTS } from '../development.js';
+import { schoolFocusEffects, schoolFocusSteps } from '../development.js';
 import { schoolChoiceImpacts } from '../choice-impacts.js';
 
 function student(age = 12) {
   const state = createGame({ seed: 71321 });
   state.age = age;
   state.education = { status: age < 18 ? 'school' : 'college', years: 0 };
-  state.focus = { work: 2, social: 2, family: 2, self: 2 };
+  state.conditions = [];
+  state.focus = defaultFocus(age);
   for (const key of Object.keys(state.stats)) {
     state.stats[key] = 5;
     state.aptitudes[key] = 0;
@@ -35,25 +36,33 @@ function selected(state, area, points) {
   return candidate;
 }
 
-const ownStats = {
+const collegeStats = {
   work: { intelligence: 1, stability: -1 },
   social: { social: 1, creativity: 1, stability: 1 },
   family: { social: 1, stability: 1 },
   self: { intelligence: 1, strength: 1, creativity: 1, health: 1, stability: 1 },
+};
+const schoolStats = {
+  work: { intelligence: 1, creativity: 1, social: -1, stability: -1 },
+  social: { social: 1, stability: 1 },
+  family: { social: 1, stability: 1 },
+  self: { attractiveness: 1, health: 1, stability: 1 },
+  sports: { strength: 1, health: 1, social: 1 },
+  extracurricular: { creativity: 1, social: 1 },
 };
 
 test('school and college show each choice contribution with toddler-style relative signs', () => {
   for (const age of [5, 12, 17, 19]) for (const aptitude of [-3, 0, 3]) {
     const state = student(age);
     for (const stat of Object.keys(state.aptitudes)) state.aptitudes[stat] = aptitude;
-    for (const [area, affected] of Object.entries(ownStats)) for (let points = 0; points <= 4; points++) {
+    for (const [area, affected] of Object.entries(age < 18 ? schoolStats : collegeStats)) for (let points = 0; points <= 4; points++) {
       const candidate = selected(state, area, points), before = structuredClone(candidate);
       const entries = schoolChoiceImpacts(candidate, area).filter(entry => !entry.parentId);
       assert.deepEqual(entries.map(entry => entry.stat).sort(), points === 2 ? [] : Object.keys(affected).sort(), `${age} ${area} ${points} includes only the choice's stats`);
       for (const entry of entries) {
         assert.equal(Math.sign(entry.change), Math.sign(focusEffect(points)) * affected[entry.stat]);
-        const strength = 1;
-        assert.equal(entry.level, Math.abs(focusEffect(points)) * strength, `${age} ${area} ${points} ${entry.stat}`);
+        const steps = age < 18 ? schoolFocusSteps(area, entry.stat, points) : focusEffect(points);
+        assert.equal(entry.level, Math.abs(steps), `${age} ${area} ${points} ${entry.stat}`);
       }
       assert.deepEqual(candidate, before, 'comparison does not mutate choices, saves, or RNG');
     }
@@ -69,7 +78,7 @@ test('school contribution magnitudes include stronger practice and stress withou
   assert.equal(effects.health, 0);
   const high = selected(state, 'self', 4);
   effects = schoolFocusEffects(high, 'self');
-  for (const [stat, amount] of Object.entries({ intelligence: .388125, strength: .5175, creativity: .414, health: .1575, stability: .45 })) {
+  for (const [stat, amount] of Object.entries({ attractiveness: .388125, intelligence: 0, strength: 0, creativity: 0, health: .1575, stability: .45 })) {
     assert.ok(Math.abs(effects[stat] - amount) < 1e-10, `${stat} uses rebalanced self-focus`);
   }
   const initial = schoolChoiceImpacts(low, 'work');
@@ -119,7 +128,7 @@ test('school rows respect active caps and rating limits without reranking signs'
   state.effects = [{ id: 'limited-school', name: 'Recovery', years: 1, modifiers: {}, focusLimits: { standard: { work: 1 } } }];
   const before = structuredClone(state);
   const capped = schoolChoiceImpacts(state, 'work');
-  assert.equal(capped.find(entry => entry.stat === 'intelligence').level, 1);
+  assert.equal(capped.find(entry => entry.stat === 'intelligence').level, 2);
   assert.ok(capped.find(entry => entry.stat === 'intelligence').change < 0);
   assert.deepEqual(state, before, 'reading the cap never reallocates saved points');
   state.effects = [];

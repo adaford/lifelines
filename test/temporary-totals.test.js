@@ -1,6 +1,7 @@
 import { changedRating } from '../rating-changes.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { defaultFocus } from '../focus-rules.js';
 import { createGame, effectiveStats, annualForecast, advanceYear, EVENTS, resolveEventChoice, migrateSave, validateSave, haveChild, succeed } from '../engine.js';
 
 const effect = (id, modifiers, years = 2) => ({ id, name: id, description: '', years, modifiers, kind: 'positive' });
@@ -25,7 +26,7 @@ test('v15 upgrades without changing pending choices, saved buffs, base ratings o
   state.pendingEvents = [{ eventId: 'school_play', age: state.age }];
   state.lastYearEvents = ['school_play'];
   const before = structuredClone(state);
-  assert.deepEqual(migrateSave(state), { ...before, version: 17, focus: { work: 1, social: 1, family: 1, self: 1 } });
+  assert.deepEqual(migrateSave(state), { ...before, version: 18, focus: { work: 1, social: 1, family: 1, self: 1, sports: 2, extracurricular: 2 } });
   assert.deepEqual(state, before);
 });
 
@@ -45,6 +46,7 @@ test('out-of-range effective reviews survive expiration and a save round trip', 
 test('new event results merge permanent gains and preserve existing temporary amounts', () => {
   const state = createGame({ seed: 8404 });
   state.age = 8;
+  state.focus = defaultFocus(state.age);
   state.stats.intelligence = 8.4;
   state.effects = [effect('school_play', { intelligence: .5 })];
   state.pendingEvents = [{ eventId: 'school_play', age: 8 }];

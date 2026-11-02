@@ -1,11 +1,12 @@
-import { conditionFocusPoints } from './birth-conditions.js?v=concrete-events-activities';
+import { conditionFocusPoints } from './birth-conditions.js?v=school-focus-expansion';
 
 // One shared allocation scale for all playable focus stages.
 export const MAX_FOCUS = 4;
 export const DEFAULT_FOCUS = 2;
 export const STANDARD_FOCUS_KEYS = ['work', 'social', 'family', 'self'];
 export const TODDLER_FOCUS_KEYS = [...STANDARD_FOCUS_KEYS, 'creative'];
-export const focusKeysForAge = age => age >= 2 && age < 5 ? [...TODDLER_FOCUS_KEYS] : [...STANDARD_FOCUS_KEYS];
+export const SCHOOL_FOCUS_KEYS = [...STANDARD_FOCUS_KEYS, 'sports', 'extracurricular'];
+export const focusKeysForAge = age => age >= 2 && age < 5 ? [...TODDLER_FOCUS_KEYS] : age >= 5 && age < 18 ? [...SCHOOL_FOCUS_KEYS] : [...STANDARD_FOCUS_KEYS];
 export function focusBudget(ageOrPerson) {
   const person = ageOrPerson && typeof ageOrPerson === 'object' ? ageOrPerson : null;
   const age = person ? person.age : ageOrPerson;

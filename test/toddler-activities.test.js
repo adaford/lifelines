@@ -127,7 +127,7 @@ test('age two unlocks five activities and the school transition preserves the co
   assert.equal(advanceYear(state, survives).ok, true);
   assert.equal(state.age, 5);
   assert.deepEqual(state.yearSummary.decisions, { focus: decisions, workLabel: 'Play', focusMax: 4, focusBudget: 10 });
-  assert.deepEqual(state.focus, { work: 3, social: 0, family: 2, self: 3 });
+  assert.deepEqual(state.focus, { work: 3, social: 0, family: 2, self: 1, sports: 2, extracurricular: 4 });
   assert.equal(validateSave(state), true);
   assert.deepEqual(migrateSave(state), state);
 });
@@ -145,7 +145,7 @@ test('v10 toddler saves gain an empty crafts allocation without rewriting progre
   const migrated = migrateSave(state);
   assert.deepEqual(state, before);
   assert.ok(migrated);
-  const expected = { ...copy(before), version: 17, focus: { work: 2, social: 2, family: 2, self: 2, creative: 0 } };
+  const expected = { ...copy(before), version: 18, focus: { work: 2, social: 2, family: 2, self: 2, creative: 0 } };
   neutralWellbeingAptitudes(expected);
   assert.deepEqual(migrated, expected);
   assert.equal(Object.hasOwn(migrated.yearSummary.decisions.focus, 'creative'), false);

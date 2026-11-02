@@ -1,5 +1,18 @@
 # Lifelines development handoff
 
+## School focuses (3 November 2026)
+
+Validation: all **407 tests** pass on Node 24.14.0 after `npm ci`; the final activity-limit DOM checks also pass. All **23 local HTTP assets** return 200 and match source. The 4,000-life percentile reference was regenerated without fitting and reproduces byte-for-byte; the independent 1,600-life cohort passes. Browser/visual checks remain omitted by preference.
+
+School years (ages 5-17) have six categories: School, Friends, Family, Yourself, Sports, and Extracurriculars. Each uses 0-4 points, neutral/default 2, with a base budget of 12 plus condition adjustments. Toddler rules and the four-focus, eight-point college/adult system are unchanged.
+
+School Intelligence uses -3,-2,0,+2,+3 contribution units at points 0-4; School Creativity uses -2,-1,0,+1,+2. School reduces Social and retains its mental-stability cost using the ordinary curve. Friends affects Social and mental stability, without Creativity. Yourself affects Attractiveness, Health, and mental stability only. Sports affects Strength, Health, and Social. Extracurriculars affects Creativity and Social. Family keeps its existing effects. Other school effects use -3,-1,0,+1,+3 around neutral 2; signs match simulation units. Per-unit coefficients are Intelligence/Attractiveness .225, Creativity/Social .24, Strength .3, Health .105, mental stability .3, before yearly scale, aptitude, age response, rating damping and bounds. School Yourself is the explicit exception to the earlier no-appearance-practice rule; background appearance and adult aging remain intact.
+
+Schema 18 preserves existing ratings, RNG, effects, pending choices, original focus allocations, and history. Valid v17 school saves gain Sports and Extracurriculars at neutral 2, lowered only by applicable limits. Historical four-choice School reviews retain their recorded budget and choices. At age 5, Arts & crafts transfers to Extracurriculars and Sports starts at 2, within limits/budget. At 18, the two school-only categories disappear and the retained four allocations fit the adult budget. School Sports also respects existing standard Yourself activity restrictions, preserving physical limitations. New school-specific caps are supported. Parent autonomous focus stays unchanged. The browser save key is still lifelines.save.v1.
+
+GPA, report cards, and selective college admissions remain unimplemented pending a separate design decision.
+
+
 ## Event and toddler activity update (3 November 2026)
 
 Validation: all **398 tests** pass on Node 24.14.0 after `npm ci`. All **23 local HTTP assets** return 200 and match source. The 4,000-life reference was regenerated without fitting and reproduced exactly; the independent 1,600-life cohort passes. Browser/visual checks remain omitted by preference.
@@ -92,7 +105,7 @@ The earlier gameplay baseline was commit **4da3288**; **6e56897** added portable
 | Local checkout used so far | C:/Users/forda/OneDrive/Desktop/Lifelines |
 | Cloud environment | lifelines, published privately in the owner's ChatGPT account |
 | Runtime | Node.js 24 for development and tests; static browser files in production |
-| Save schema | Version 17; browser key remains lifelines.save.v1 |
+| Save schema | Version 18; browser key remains lifelines.save.v1 |
 | Automated checks | All 394 tests pass; all 22 local HTTP assets match source. The 4,000-life reference reproduces exactly, and the independent 1,600-life cohort passes. Visual checks omitted as requested. |
 
 Read [AGENTS.md](AGENTS.md) before changing the project and [README.md](README.md) for the detailed current rules. Game progress lives in the player's browser, not in GitHub or the coding environment.

@@ -54,7 +54,7 @@ test('schema 14 migration adapts focus and keeps its original rating-floor contr
   delete previous.guardian;
   for (const parent of previous.parents) { parent.stats.stability = 1.25; parent.relationship = 1.5; }
   const snapshot = copy(previous);
-  assert.deepEqual(migrateSave(previous), { ...snapshot, version: 17, focus: { work: 1, social: 2, family: 2, self: 1, creative: 2 } });
+  assert.deepEqual(migrateSave(previous), { ...snapshot, version: 18, focus: { work: 1, social: 2, family: 2, self: 1, creative: 2 } });
   assert.deepEqual(previous, snapshot);
   previous.stats.health = 0;
   assert.equal(migrateSave(previous), null);

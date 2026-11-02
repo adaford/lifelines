@@ -1,3 +1,4 @@
+import { defaultFocus } from '../focus-rules.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { FAMILY_EVENTS, familyEventChances } from '../family-events.js';
@@ -30,7 +31,7 @@ function fixture(event) {
   if (event.subjectType === 'parent') {
     const state = createGame({ seed: 87102 });
     state.age = event.minPlayerAge;
-    if (state.age >= 2 && state.age < 5) state.focus = { work: 2, social: 2, family: 2, self: 2, creative: 2 };
+    state.focus = defaultFocus(state.age);
     return { state, subject: state.parents[0] };
   }
   const state = adult();

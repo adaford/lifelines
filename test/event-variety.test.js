@@ -1,3 +1,4 @@
+import { defaultFocus } from '../focus-rules.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EVENTS as PERSONAL_EVENTS, eventChances } from '../events.js';
@@ -38,7 +39,7 @@ function lifeAt(age, college = false) {
     if (needsEducationChoice(state)) assert.equal(chooseEducation(state, college ? 'college' : 'work').ok, true);
     state.effects = [];
     for (const key of Object.keys(state.stats)) state.stats[key] = 5;
-    state.focus = age >= 2 && age < 5 ? { work: 2, social: 2, family: 2, self: 2, creative: 2 } : { work: 2, social: 2, family: 2, self: 2 };
+    state.focus = defaultFocus(age);
     assert.equal(validateSave(state), true);
     cache.set(key, state);
   }
