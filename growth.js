@@ -81,9 +81,12 @@ export function populationMedianAt(age, maturityAge = 17, growthSex = 'male') {
 // Annual residual SDs are gameplay variation, not measured velocity estimates.
 // Poor nutrition and repeated/chronic illness can impair linear growth:
 // https://www.who.int/news/item/19-11-2015-stunting-in-a-nutshell
-// Health 5+ leaves the reference curve unchanged. Below that, up to 15% of a
-// year's potential gain is lost at health 1. That mapping is game calibration,
-// not a medical estimate. Recovery changes future gains, never repays missed
+// Health 5+ leaves the reference curve unchanged. Below that, a small deduction
+// scales with the next age's population spread rather than growth velocity.
+// Health 3-4 costs about one percentile point near the middle of the height
+// distribution, without disproportionate losses during rapid infant growth.
+// This mapping is game calibration, not a medical estimate.
+// Recovery changes future gains, never repays missed
 // growth. Actual adult height emerges from all the yearly gains and freezes at
 // individual maturity; there is no personal endpoint or maturity catch-up.
 // Saved measurements are inches. Only the annual centimeter gain crosses the
@@ -97,8 +100,12 @@ export function advanceGrowth(person, normalDraw = 0) {
   const annualSD = Math.min(1.6, Math.max(.2, expectedGain * .08));
   const residual = clamp(Number.isFinite(normalDraw) ? normalDraw : 0, -3, 3) * annualSD;
   const health = Number.isFinite(person.stats?.health) ? person.stats.health : 5;
-  const healthMultiplier = 1 - .15 * clamp((5 - health) / 4, 0, 1);
-  const gain = Math.max(0, expectedGain + residual) * healthMultiplier;
+  const healthDeficit = clamp(5 - health, 0, 5);
+  const healthSeverity = .8 * Math.min(healthDeficit, 1) + .4 * Math.max(healthDeficit - 1, 0);
+  // Near the median, .025 standard deviations is about one percentile point.
+  // Use only age/reference sex, never current height or a personal target.
+  const healthLoss = heightReference(person.age + 1, person.growthSex).sd * .025 * healthSeverity;
+  const gain = Math.max(0, expectedGain + residual - healthLoss);
   return { height: round(person.height + gain / CM_PER_INCH) };
 }
 

@@ -1,4 +1,4 @@
-import { conditionFocusPoints } from './birth-conditions.js?v=school-first-report';
+import { conditionFocusPoints } from './birth-conditions.js?v=gentler-height-growth';
 
 // One shared allocation scale for all playable focus stages.
 export const MAX_FOCUS = 4;

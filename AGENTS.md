@@ -1,5 +1,13 @@
 # Lifelines
 
+## Gentler health effects on height (3 November 2026)
+
+Health 3-4 now reduces each growing year's height gain by roughly one percentile point near the middle of the same-age height distribution, compared with an otherwise identical Health-5 life. This is the health contribution, not a fixed total change in the displayed percentile: inherited growth, maturation timing, yearly variation, and location within the distribution still matter. Health 5+ remains neutral.
+
+Replace the old percentage-of-growth penalty with a small age-scaled deduction. In centimeters, `loss = heightReference(age + 1, growthSex).sd * .025 * severity`, where `deficit = clamp(5 - health, 0, 5)` and `severity = .8 * min(deficit, 1) + .4 * max(deficit - 1, 0)`. Health 3, 3.5, and 4 give severities 1.2, 1, and .8; lower Health has a stronger effect. Subtract the loss from the existing genetic age increment plus the same seeded residual, floor the gain at zero, then convert to stored inches and round as before. This removes the disproportionate infant penalty without using current height or percentile as a growth target. Extremely small potential gains can reach zero, and mature/deceased people do not grow.
+
+Only future growth changes. Preserve saved heights, growth genetics, adultHeight, ratings, history, RNG, and schema 19. Recovery does not repay missed growth; there is no adult-height target or catch-up. Regenerate the simulated percentile reference without fitting; percentile reads remain pure and never control growth.
+
 ## School grades and enrollment (3 November 2026)
 
 These rules supersede the earlier generic Sports/Extracurricular focuses and school budget.

@@ -194,13 +194,31 @@ test('health recovery improves future annual growth without repaying missed heig
   quietYear(healthy);
   quietYear(recovering);
   const originalGap = healthy.height - recovering.height;
-  assert.ok(originalGap > 1);
+  assert.ok(originalGap > .02 && originalGap < .1, 'a low-health infant loses a small amount of that year’s growth');
   for (let year = 0; year < 4; year++) {
     healthy.stats.health = 9;
     recovering.stats.health = 9;
     quietYear(healthy);
     quietYear(recovering);
     assert.ok(Math.abs((healthy.height - recovering.height) - originalGap) < .03, 'recovery does not trigger convergence to a target');
+  }
+});
+
+test('moderately low-health forecasts and reloads preserve height, growth genetics, and RNG through childhood', () => {
+  const state = createGame({ seed: 598 });
+  for (const age of [0, 5, 13]) {
+    while (state.age < age) quietYear(state);
+    state.stats.health = 3.5;
+    const before = copy(state);
+    const forecast = annualForecast(state);
+    assert.deepEqual(annualForecast(state), forecast);
+    assert.deepEqual(state, before, 'preview leaves the complete saved life unchanged');
+    assert.deepEqual(migrateSave(JSON.parse(JSON.stringify(state))), before);
+    assert.equal(state.adultHeight, null, 'growing children still have no predetermined endpoint');
+    quietYear(state);
+    assert.deepEqual(state.yearSummary.height, forecast.height, 'the mean actual growth matches the pure forecast');
+    assert.equal(state.growthFactor, before.growthFactor);
+    assert.ok(state.height >= before.height);
   }
 });
 

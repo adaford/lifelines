@@ -1,23 +1,23 @@
 // Lifelines: deterministic, browser-independent simulation rules.
 // All public actions mutate their state and return { ok, reason? }.
-import { JOBS } from './jobs.js?v=school-first-report';
-import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=school-first-report';
-import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=school-first-report';
-import { mortalityRisk, rollMortality } from './mortality.js?v=school-first-report';
-import { heightReference, advanceGrowth } from './growth.js?v=school-first-report';
-import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=school-first-report';
-import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, standardFocusPractice, schoolAppearanceChange, DEVELOPMENT_BALANCE, BIRTH_VARIATION, SKILL_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, PARENT_FAMILY_STABILITY_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=school-first-report';
-import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=school-first-report';
-import { normalPercentile } from './percentiles.js?v=school-first-report';
-import { changedRating } from './rating-changes.js?v=school-first-report';
-import { MAX_FOCUS, DEFAULT_FOCUS, SCHOOL_FOCUS_KEYS, focusMaxFor, focusNeutralFor, isSchoolActivityFocus, focusEffect, focusKeysForAge, focusBudget, defaultFocus, legacyFocusValue } from './focus-rules.js?v=school-first-report';
-import { schoolActivity, gradeScore, activitySuccessChange, activityEligible, annualSchoolOffers, createSchoolRecord } from './school.js?v=school-first-report';
-import { assignBirthConditions, getBirthConditions, conditionFocusPoints, conditionFocusLimits, validateBirthConditions } from './birth-conditions.js?v=school-first-report';
+import { JOBS } from './jobs.js?v=gentler-height-growth';
+import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=gentler-height-growth';
+import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=gentler-height-growth';
+import { mortalityRisk, rollMortality } from './mortality.js?v=gentler-height-growth';
+import { heightReference, advanceGrowth } from './growth.js?v=gentler-height-growth';
+import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=gentler-height-growth';
+import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, standardFocusPractice, schoolAppearanceChange, DEVELOPMENT_BALANCE, BIRTH_VARIATION, SKILL_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, PARENT_FAMILY_STABILITY_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=gentler-height-growth';
+import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=gentler-height-growth';
+import { normalPercentile } from './percentiles.js?v=gentler-height-growth';
+import { changedRating } from './rating-changes.js?v=gentler-height-growth';
+import { MAX_FOCUS, DEFAULT_FOCUS, SCHOOL_FOCUS_KEYS, focusMaxFor, focusNeutralFor, isSchoolActivityFocus, focusEffect, focusKeysForAge, focusBudget, defaultFocus, legacyFocusValue } from './focus-rules.js?v=gentler-height-growth';
+import { schoolActivity, gradeScore, activitySuccessChange, activityEligible, annualSchoolOffers, createSchoolRecord } from './school.js?v=gentler-height-growth';
+import { assignBirthConditions, getBirthConditions, conditionFocusPoints, conditionFocusLimits, validateBirthConditions } from './birth-conditions.js?v=gentler-height-growth';
 export { DEVELOPMENT_BALANCE };
-export { heightPercentile } from './growth.js?v=school-first-report';
-export { mortalityRisk } from './mortality.js?v=school-first-report';
-import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=school-first-report';
-export { JOBS, JOB_CATEGORIES } from './jobs.js?v=school-first-report';
+export { heightPercentile } from './growth.js?v=gentler-height-growth';
+export { mortalityRisk } from './mortality.js?v=gentler-height-growth';
+import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=gentler-height-growth';
+export { JOBS, JOB_CATEGORIES } from './jobs.js?v=gentler-height-growth';
 export const EVENTS = [...PERSONAL_EVENTS, ...FAMILY_EVENTS];
 
 export const SKILLS = [

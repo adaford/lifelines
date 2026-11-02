@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { heightReference, populationMedianAt, advanceGrowth, advanceHeight, heightPercentile } from '../growth.js';
+import { normalPercentile } from '../percentiles.js';
+import { PERCENTILE_REFERENCE } from '../percentile-reference.js';
 const inches = cm => Math.round(cm / 2.54 * 100) / 100;
 const centimeters = value => value * 2.54;
 
@@ -124,7 +126,8 @@ test('health and inherited growth factor influence each year without removing ra
     const moderate = advanceGrowth({ ...person, stats: { health: 4 } }, draw);
     const poor = advanceGrowth({ ...person, stats: { health: 1 } }, draw);
     assert.ok(poor.height < moderate.height && moderate.height < reference.height);
-    assert.ok(Math.abs((poor.height - person.height) / (reference.height - person.height) - .85) < .002);
+    const missedCm = centimeters(reference.height - poor.height);
+    assert.ok(missedCm > .07 && missedCm < .17, 'low health has a small absolute infant penalty rather than removing a fixed fraction of rapid growth');
     assert.equal(advanceHeight({ ...person, stats: { health: 1 } }, draw), poor.height);
     assert.ok(advanceHeight({ ...person, growthFactor: .9 }, draw) < advanceHeight({ ...person, growthFactor: 1.1 }, draw));
   }
@@ -148,14 +151,15 @@ test('health affects the final growing year and attained height freezes at every
         gains.push(next.height - person.height);
         Object.assign(person, next); person.age++;
       }
-      assert.ok(gains[0] > gains[1] && gains[1] > gains[2], "health changes this year's gain, including the last year");
+      assert.ok(gains[0] + 1e-10 >= gains[1] && gains[1] + 1e-10 >= gains[2], 'health reduces potential growth but zero gains may tie near maturity');
       assert.ok(poor.height < moderate.height && moderate.height < healthy.height);
     }
     for (const person of [healthy, moderate, poor]) {
       assert.deepEqual(advanceGrowth(person, 3), { height: person.height });
       assert.equal(heightPercentile(person), null);
     }
-    assert.ok(centimeters(healthy.height - poor.height) > 10);
+    const missedCm = centimeters(healthy.height - poor.height);
+    assert.ok(missedCm > 3 && missedCm < 7, 'small yearly losses accumulate without the former large height penalty');
   }
   assert.deepEqual(advanceGrowth({ age: 10, height: inches(130), maturityAge: 17, alive: false }, 3), { height: inches(130) });
 });
@@ -176,6 +180,56 @@ test('recovered health and old targets never repay missed growth or alter saved 
   const short = { ...migrated, height: inches(120), adultHeight: inches(150) };
   assert.ok(Math.abs((advanceHeight(migrated) - migrated.height) - (advanceHeight(short) - short.height)) < .001);
   assert.equal(migrated.height, inches(145));
+});
+
+test('health three to four costs roughly one percentile point per growing year near the cohort median', () => {
+  for (const growthSex of ['male', 'female']) for (const age of [0, 1, 5, 10, 13, 16]) {
+    const reference = PERCENTILE_REFERENCE.height[growthSex].ages[age + 1];
+    for (const health of [3, 3.5, 4]) {
+      const penalties = [];
+      // Average a few identical paired residuals to avoid hundredth-inch
+      // quantization dominating the very small infant health difference.
+      for (const draw of [-1.1, -.3, 0, .3, 1.1]) {
+        const healthy = { age, height: 0, growthSex, maturityAge: 18, growthFactor: 1, stats: { health: 5 } };
+        healthy.height = Math.round((reference.mean - advanceHeight(healthy, draw)) * 100) / 100;
+        const impaired = { ...healthy, stats: { health } };
+        const percentile = height => normalPercentile(height, reference.mean, reference.sd);
+        penalties.push(percentile(advanceHeight(healthy, draw)) - percentile(advanceHeight(impaired, draw)));
+      }
+      const mean = penalties.reduce((sum, value) => sum + value, 0) / penalties.length;
+      const label = `${growthSex}, age ${age}, health ${health}: ${mean} percentile points`;
+      assert.ok(mean >= .55 && mean <= 1.5, label);
+      if (health === 3.5) assert.ok(mean >= .7 && mean <= 1.2, label);
+    }
+  }
+});
+
+test('the low-health deduction does not scale with inherited growth, current height, or the yearly draw', () => {
+  for (const growthSex of ['male', 'female']) for (const age of [0, 5, 10, 13]) {
+    const losses = [];
+    for (const growthFactor of [.8, 1, 1.2]) for (const draw of [-1, 0, 1]) for (const height of [20, 50]) {
+      const person = { age, height, growthSex, maturityAge: 18, growthFactor, stats: { health: 3.5 }, rng: 1729, adultHeight: null };
+      const before = structuredClone(person);
+      const healthy = advanceHeight({ ...person, stats: { health: 5 } }, draw);
+      const impaired = advanceHeight(person, draw);
+      assert.ok(impaired > height, 'these cases have enough potential growth to isolate the deduction');
+      losses.push(centimeters(healthy - impaired));
+      assert.deepEqual(person, before, 'growth reads never mutate measurements, genetics, endpoints, or RNG');
+      assert.equal(advanceHeight({ ...person, adultHeight: inches(210), growthAnchor: { age, height: inches(200) } }, draw), impaired);
+    }
+    assert.ok(Math.max(...losses) - Math.min(...losses) <= .025401, 'only hundredth-inch rounding can vary the fixed health deduction');
+  }
+});
+
+test('a health deduction larger than remaining potential growth floors the gain without shrinking or extending maturity', () => {
+  const person = { age: 17, height: 64, growthSex: 'female', maturityAge: 18, growthFactor: .8, stats: { health: 0 }, rng: 801 };
+  const before = structuredClone(person);
+  assert.equal(advanceHeight(person, -3), person.height, 'a low final-year draw cannot make height decrease');
+  assert.ok(advanceHeight(person, 3) > person.height, 'positive remaining growth is still available before maturity');
+  for (const health of [0, 3, 3.5, 4, 5, 10]) for (const draw of [-3, 0, 3]) {
+    assert.equal(advanceHeight({ ...person, age: 18, stats: { health } }, draw), person.height);
+  }
+  assert.deepEqual(person, before);
 });
 
 test('yearly stochastic growth produces approximately reference adult medians and dispersion', () => {

@@ -1,5 +1,5 @@
-import { legacyFocusValue } from './focus-rules.js?v=school-first-report';
-import { gradeScore } from './school.js?v=school-first-report';
+import { legacyFocusValue } from './focus-rules.js?v=gentler-height-growth';
+import { gradeScore } from './school.js?v=gentler-height-growth';
 // Fictional household events. Subject changes affect the named person; player
 // changes affect you. Relationship changes affect your bond with that person.
 // Individual rolls join the ordinary event pool and share its five-event cap.

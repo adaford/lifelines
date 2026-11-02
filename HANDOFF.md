@@ -1,5 +1,15 @@
 # Lifelines development handoff
 
+## Gentler health effects on height (3 November 2026)
+
+Validation: all **440 tests** pass on Node 24.14.0 after `npm ci`. All **24 local HTTP assets** match source. The 4,000-life percentile reference was regenerated without fitting and reproduces byte-for-byte; the independent 1,600-life cohort passes. A separate 480-case paired check across growth profiles, maturity ages, and growing years measured mean health-only percentile penalties of **1.26 at Health 3**, **1.05 at Health 3.5**, and **0.83 at Health 4** near the median, including stored-height rounding. Browser/visual checks remain omitted by preference.
+
+Health 3-4 now reduces each growing year's height gain by roughly one percentile point near the middle of the same-age height distribution, compared with an otherwise identical Health-5 life. This is the health contribution, not a fixed total change in the displayed percentile: inherited growth, maturation timing, yearly variation, and location within the distribution still matter. Health 5+ remains neutral.
+
+Replace the old percentage-of-growth penalty with a small age-scaled deduction. In centimeters, `loss = heightReference(age + 1, growthSex).sd * .025 * severity`, where `deficit = clamp(5 - health, 0, 5)` and `severity = .8 * min(deficit, 1) + .4 * max(deficit - 1, 0)`. Health 3, 3.5, and 4 give severities 1.2, 1, and .8; lower Health has a stronger effect. Subtract the loss from the existing genetic age increment plus the same seeded residual, floor the gain at zero, then convert to stored inches and round as before. This removes the disproportionate infant penalty without using current height or percentile as a growth target. Extremely small potential gains can reach zero, and mature/deceased people do not grow.
+
+Only future growth changes. Preserve saved heights, growth genetics, adultHeight, ratings, history, RNG, and schema 19. Recovery does not repay missed growth; there is no adult-height target or catch-up. Regenerate the simulated percentile reference without fitting; percentile reads remain pure and never control growth.
+
 ## School grades and enrollment (3 November 2026)
 
 Validation: all **436 tests** pass on Node 24.14.0 after `npm ci`, including simulation, migration, and DOM integration checks. All **24 local HTTP assets** return 200 and match source. The 4,000-life percentile reference was regenerated without fitting and reproduces byte-for-byte; the independent 1,600-life cohort passes. Browser/visual checks remain omitted by preference.
@@ -199,7 +209,7 @@ Each person persists `growthSex`, `maturityAge`, `birthHeight`, and `growthFacto
 
 Each annual baseline comes from the difference between adjacent birthdays on the population median curve, with rapid infant growth and shifted pubertal timing after age 8. The individual's growth factor scales that increment. Source references and annual-gain calculations remain in centimetres; the gain divides by 2.54 before adding to stored inches. Fresh annual variation has SD `min(1.6, max(0.2, expectedGain * 0.08))` centimetres, with normal draws bounded to three standard deviations; gains cannot be negative. Existing height, old targets, and growth anchors do not change the increment. NPC LMS comparisons convert measured inches back to centimetres without changing the save.
 
-`advanceGrowth(person, normalDraw)` returns `{ height }` without mutation or RNG use. Health 5 or higher leaves growth unchanged; below 5, the gain multiplier is `1 - 0.15 * clamp((5 - health) / 4, 0, 1)`, reaching a 15% reduction at health 1. This affects the final growing year too. Recovery does not restore missed growth; mature/deceased people do not grow. Percentile comparisons never control actual gains. [WHO describes nutrition and illness as causes of impaired growth](https://www.who.int/news/item/19-11-2015-stunting-in-a-nutshell); numerical growth rules remain game calibration, not clinical predictions.
+`advanceGrowth(person, normalDraw)` returns `{ height }` without mutation or RNG use. Health 5 or higher leaves growth unchanged; below 5, the age-scaled deduction uses the gentler rule above, with Health 3-4 costing roughly one percentile point near average height compared with Health 5. This affects the final growing year too. Recovery does not restore missed growth; mature/deceased people do not grow. Percentile comparisons never control actual gains. [WHO describes nutrition and illness as causes of impaired growth](https://www.who.int/news/item/19-11-2015-stunting-in-a-nutshell); numerical growth rules remain game calibration, not clinical predictions.
 
 ## Simulated percentiles and calibration
 
