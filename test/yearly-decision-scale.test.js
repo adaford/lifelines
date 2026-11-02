@@ -97,7 +97,9 @@ test('school, career, and later-life practice have stronger gains and losses wit
     const state = stateAt(age);
     state.stats.intelligence = 8;
     const baseline = skillChanges(state);
-    close(baseline.intelligence, -.036 * flexibility + (age < 18 ? DEVELOPMENT_BALANCE.childhoodBias.intelligence * CHILDHOOD_DEDUCTION_SCALE : 0), 'innate tendency and reduced childhood deduction');
+    const background = skillChanges(state, null, 0);
+    close(background.intelligence, -.036 * flexibility + (age < 18 ? DEVELOPMENT_BALANCE.childhoodBias.intelligence * CHILDHOOD_DEDUCTION_SCALE : 0), 'innate tendency and reduced childhood deduction remain independent of practice scaling');
+    close(baseline.intelligence - background.intelligence, age < 18 ? -.225 * .5 * flexibility : 0, 'unjoined extracurricular Intelligence loss receives the yearly factor once');
     for (const [focus, sign] of [[focused, 1], [neglected, -1]]) {
       const changed = skillChanges({ ...state, focus });
       for (const key of learned) close(changed[key] - baseline[key], (age < 18 ? { intelligence: .3375, strength: 0, social: -1.08, creativity: .24 } : practice)[key] * flexibility * sign, `${age} ${key}`);

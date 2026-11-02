@@ -1,5 +1,15 @@
 # Lifelines development handoff
 
+## Expected GPA and activity inactivity (3 November 2026)
+
+Validation: all **469 tests** pass on Node 24.14.0 after `npm ci`, including 105 DOM checks, preview/report agreement at every study level, fixed inactivity effects, and unchanged saves. All **24 local HTTP assets** match source. The 4,000-life reference was regenerated without fitting and reproduces exactly; the independent 1,600-life cohort passes. Browser/visual checks remain omitted by preference.
+
+The School focus row shows **Expected GPA** as a letter grade, recalculated from selected study points and current effective Intelligence with the same `gradeScore`/`gradeLetter` functions as the next report. Keep the completed School GPA unchanged, including N/A at age 5. Hide this preview outside ages 5-17 and while progression is blocked. Rendering, help, and reloads do not change grades, stats, saves, or RNG.
+
+School players with no sport, zero sports focus, or paused participation receive one negative unit of Strength and Social only (.30 and .24 raw coefficients). No extracurricular or zero extracurricular focus gives one negative unit of Creativity and Intelligence only (.24 and .225). These fixed category effects replace the selected activity's losses: zero-focus Fencing does not lower Intelligence, Gymnastics does not lower Creativity, and Modeling does not lower Attractiveness. Positive focus 1/2 keeps the enrolled activity's own training, with one/two positive units.
+
+Use the same maps and effort in practice and previews, including capped/paused activities and rating-limit clipping. School-age NPCs without player school records retain their existing automatic practice. Keep budgets, caps, enrollment, success, grades, yearly scaling, aptitude/directional response, and schema 20 unchanged. Only future development changes; preserve existing ratings, reports, history, and RNG on load. Regenerate the reference without fitting and do not tune away the new inactivity losses.
+
 ## Sports and extracurricular letter grades (3 November 2026)
 
 Validation: all **462 tests** pass, including 102 DOM checks for enrollment, chooser, reports, N/A, and preserved saved success. All 15 grade boundaries were checked; all **24 local HTTP assets** match source. Browser/visual checks remain omitted by preference.

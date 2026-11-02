@@ -1,5 +1,5 @@
-import { MAX_FOCUS, DEFAULT_FOCUS, focusEffect, defaultFocus, focusMaxFor, focusNeutralFor } from './focus-rules.js?v=activity-grades';
-import { schoolActivity, activityEligible } from './school.js?v=activity-grades';
+import { MAX_FOCUS, DEFAULT_FOCUS, focusEffect, defaultFocus, focusMaxFor, focusNeutralFor } from './focus-rules.js?v=study-activity-preview';
+import { schoolActivity, activityEligible } from './school.js?v=study-activity-preview';
 // Ratings use the same scale throughout life. Balanced toddler activities use
 // TODDLER_FOCUS; core areas use 2, enrolled school activities use 1. Keep the historical calibration
 // offsets, with childhood deductions reduced to the requested tenth strength.
@@ -71,7 +71,18 @@ export const SCHOOL_FOCUS_EFFECTS = choiceCoefficients({
   sports: {},
   extracurricular: {},
 });
+// Inactivity affects these general abilities, independent of the selected
+// activity's positive training. These per-unit inputs already include scaling.
+export const SCHOOL_INACTIVITY_EFFECTS = {
+  sports: { strength: .3, social: .24 },
+  extracurricular: { creativity: .24, intelligence: .225 },
+};
 const hasSchoolFocus = person => person.age >= 5 && person.age < 18 && !person.autonomousFocus;
+function schoolActivityPoints(person, kind) {
+  const activity = schoolActivity(kind, person.school?.[kind]?.id);
+  return activity && activityEligible(person, activity)
+    ? clamp(Math.round(number(person.focus?.[kind], 1)), 0, 2) : 0;
+}
 // Schoolwork has its own learning curves. Activity training uses -1,+1,+2
 // units at 0,1,2 points; the four core areas remain neutral at two.
 export function schoolFocusSteps(area, stat, points) {
@@ -98,8 +109,9 @@ export function standardFocusCoefficients(person, career = null) {
   const coefficients = Object.fromEntries(Object.entries(source).map(([area, effects]) => [area, { ...effects }]));
   if (hasSchoolFocus(person)) for (const kind of ['sports', 'extracurricular']) {
     const activity = schoolActivity(kind, person.school?.[kind]?.id);
-    coefficients[kind] = activity ? activityEligible(person, activity) ? { ...activity.training } : {}
-      : kind === 'extracurricular' && person.school ? { creativity: .24, social: .24 } : {};
+    coefficients[kind] = person.school && schoolActivityPoints(person, kind) === 0
+      ? { ...SCHOOL_INACTIVITY_EFFECTS[kind] }
+      : activity && activityEligible(person, activity) ? { ...activity.training } : {};
   }
   if (person.age >= 18) for (const key of skills) {
     const extra = .035 * (person.autonomousFocus ? 1 : CHOICE_STAT_MULTIPLIER) * clamp(number(career?.weights?.[key], 0), 0, 1);
@@ -112,7 +124,8 @@ export function standardFocusPractice(person, career = null, excludedArea = null
   for (const [area, effects] of Object.entries(standardFocusCoefficients(person, career))) {
     if (area === excludedArea) continue;
     for (const [stat, coefficient] of Object.entries(effects)) {
-      const points = hasSchoolFocus(person) && ['sports', 'extracurricular'].includes(area) && !person.school?.[area] ? 0 : person.focus?.[area];
+      const points = hasSchoolFocus(person) && ['sports', 'extracurricular'].includes(area)
+        ? schoolActivityPoints(person, area) : person.focus?.[area];
       const effort = person.autonomousFocus ? clamp(number(person.focus?.[area], 3), 0, 5) - 3
         : hasSchoolFocus(person) ? schoolFocusSteps(area, stat, points) : focusEffect(points);
       result[stat] = (result[stat] || 0) + coefficient * effort;

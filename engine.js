@@ -1,23 +1,23 @@
 // Lifelines: deterministic, browser-independent simulation rules.
 // All public actions mutate their state and return { ok, reason? }.
-import { JOBS } from './jobs.js?v=activity-grades';
-import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=activity-grades';
-import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=activity-grades';
-import { mortalityRisk, rollMortality } from './mortality.js?v=activity-grades';
-import { heightReference, advanceGrowth } from './growth.js?v=activity-grades';
-import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=activity-grades';
-import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, standardFocusPractice, schoolAppearanceChange, DEVELOPMENT_BALANCE, BIRTH_VARIATION, SKILL_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, PARENT_FAMILY_STABILITY_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=activity-grades';
-import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=activity-grades';
-import { normalPercentile } from './percentiles.js?v=activity-grades';
-import { changedRating } from './rating-changes.js?v=activity-grades';
-import { MAX_FOCUS, DEFAULT_FOCUS, SCHOOL_FOCUS_KEYS, focusMaxFor, focusNeutralFor, isSchoolActivityFocus, focusEffect, focusKeysForAge, focusBudget, defaultFocus, legacyFocusValue } from './focus-rules.js?v=activity-grades';
-import { SCHOOL_OFFER_COUNT, schoolActivity, gradeScore, activitySuccessChange, activityEligible, annualSchoolOffers, createSchoolRecord } from './school.js?v=activity-grades';
-import { assignBirthConditions, applyBirthConditions, getBirthConditions, conditionFocusPoints, conditionFocusLimits, validateBirthConditions } from './birth-conditions.js?v=activity-grades';
+import { JOBS } from './jobs.js?v=study-activity-preview';
+import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=study-activity-preview';
+import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=study-activity-preview';
+import { mortalityRisk, rollMortality } from './mortality.js?v=study-activity-preview';
+import { heightReference, advanceGrowth } from './growth.js?v=study-activity-preview';
+import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=study-activity-preview';
+import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, standardFocusPractice, schoolAppearanceChange, DEVELOPMENT_BALANCE, BIRTH_VARIATION, SKILL_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, PARENT_FAMILY_STABILITY_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=study-activity-preview';
+import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=study-activity-preview';
+import { normalPercentile } from './percentiles.js?v=study-activity-preview';
+import { changedRating } from './rating-changes.js?v=study-activity-preview';
+import { MAX_FOCUS, DEFAULT_FOCUS, SCHOOL_FOCUS_KEYS, focusMaxFor, focusNeutralFor, isSchoolActivityFocus, focusEffect, focusKeysForAge, focusBudget, defaultFocus, legacyFocusValue } from './focus-rules.js?v=study-activity-preview';
+import { SCHOOL_OFFER_COUNT, schoolActivity, gradeScore, activitySuccessChange, activityEligible, annualSchoolOffers, createSchoolRecord } from './school.js?v=study-activity-preview';
+import { assignBirthConditions, applyBirthConditions, getBirthConditions, conditionFocusPoints, conditionFocusLimits, validateBirthConditions } from './birth-conditions.js?v=study-activity-preview';
 export { DEVELOPMENT_BALANCE };
-export { heightPercentile } from './growth.js?v=activity-grades';
-export { mortalityRisk } from './mortality.js?v=activity-grades';
-import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=activity-grades';
-export { JOBS, JOB_CATEGORIES } from './jobs.js?v=activity-grades';
+export { heightPercentile } from './growth.js?v=study-activity-preview';
+export { mortalityRisk } from './mortality.js?v=study-activity-preview';
+import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=study-activity-preview';
+export { JOBS, JOB_CATEGORIES } from './jobs.js?v=study-activity-preview';
 export const EVENTS = [...PERSONAL_EVENTS, ...FAMILY_EVENTS];
 
 export const SKILLS = [

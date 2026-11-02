@@ -7,6 +7,9 @@ import { schoolChoiceImpacts } from '../choice-impacts.js';
 import { SCHOOL_OFFER_COUNT, SPORTS, EXTRACURRICULARS, schoolActivity, createSchoolRecord, gradeScore, activitySuccessChange } from '../school.js';
 import { familyEventChances } from '../family-events.js';
 import { heightReference } from '../growth.js';
+import { standardFocusCoefficients, standardFocusPractice, schoolFocusEffects, schoolAppearanceChange,
+  DEVELOPMENT_BALANCE, CHILDHOOD_DEDUCTION_SCALE } from '../development.js';
+import { changedRating } from '../rating-changes.js';
 
 const copy = value => structuredClone(value);
 const steady = { mortalityRandom: () => 1, growthRandom: () => 0, parentCareerRandom: () => 1 };
@@ -44,6 +47,89 @@ function quietYear(state, growthRandom = () => 0) {
   }
   assert.fail('No event-free school year found');
 }
+
+test('school inactivity uses category losses while positive points retain each enrolled activity training map', () => {
+  const losses = {
+    sports: { strength: .3, social: .24 },
+    extracurricular: { creativity: .24, intelligence: .225 },
+  };
+  const near = (actual, expected) => assert.ok(Math.abs(actual - expected) < 1e-10, `${actual} versus ${expected}`);
+  const cases = [
+    ['sports', null], ['sports', 'fencing'], ['sports', 'gymnastics'],
+    ['extracurricular', null], ['extracurricular', 'chess'], ['extracurricular', 'modeling'],
+  ];
+  for (const [kind, id] of cases) for (const points of id ? [0, 1, 2] : [0]) {
+    const state = pupil();
+    if (id) join(state, kind, id);
+    state.focus[kind] = points;
+    const expected = points === 0 ? losses[kind] : schoolActivity(kind, id).training;
+    const units = points === 0 ? -1 : points;
+    const before = copy(state), raw = standardFocusPractice(state), without = standardFocusPractice(state, null, kind);
+    assert.deepEqual(standardFocusCoefficients(state)[kind], expected, `${kind} ${id} at ${points}`);
+    for (const key of Object.keys(state.stats)) near((raw[key] || 0) - (without[key] || 0), (expected[key] || 0) * units);
+    const effects = schoolFocusEffects(state, kind), rows = schoolChoiceImpacts(state, kind);
+    assert.deepEqual(rows.map(row => row.stat).sort(), Object.keys(expected).sort(), `${id} at ${points} affects only the selected map`);
+    for (const row of rows) {
+      near(effects[row.stat], expected[row.stat] * units * .5 * 1.15);
+      near(row.change, changedRating(5, effects[row.stat]) - 5);
+      assert.equal(row.level, Math.abs(units));
+      assert.equal(Math.sign(row.change), Math.sign(units));
+    }
+    if (id === 'modeling' && points === 0) assert.equal(schoolAppearanceChange(state), 0, 'skipping modeling has no appearance penalty');
+    assert.deepEqual(state, before, 'reading maps and previews preserves saved selections, success, and RNG');
+    const forecast = annualForecast(state);
+    assert.deepEqual(quietYear(state).yearSummary.stats, forecast.stats, `${kind} ${id} at ${points}: actual mean year follows the same map`);
+  }
+});
+
+test('unjoined and paused school activities apply one general loss unit without special-sport or Social club penalties', () => {
+  const state = pupil(), before = copy(state), forecast = annualForecast(state);
+  const inputs = { strength: -.3, social: -.24, creativity: -.24, intelligence: -.225 };
+  for (const [stat, amount] of Object.entries(inputs)) {
+    const bias = DEVELOPMENT_BALANCE.childhoodBias[stat];
+    const expected = changedRating(5, amount * .5 * 1.15 + bias * (bias < 0 ? CHILDHOOD_DEDUCTION_SCALE : 1));
+    assert.equal(forecast.stats[stat].after, expected, `${stat} includes exactly one category inactivity contribution`);
+  }
+  assert.deepEqual(state, before);
+  assert.deepEqual(quietYear(state).yearSummary.stats, forecast.stats);
+  const paused = pupil();
+  paused.lifestyle = 7;
+  join(paused, 'sports', 'lacrosse');
+  paused.lifestyle = 6;
+  for (const points of [0, 1, 2]) {
+    paused.focus.sports = points;
+    const snapshot = copy(paused);
+    assert.equal(focusLimits(paused).sports, 0);
+    assert.deepEqual(standardFocusCoefficients(paused).sports, { strength: .3, social: .24 });
+    assert.equal(standardFocusPractice(paused).strength, -.3, 'ineligibility overrides a stale positive allocation');
+    const rows = schoolChoiceImpacts(paused, 'sports');
+    assert.deepEqual(rows.map(row => row.stat).sort(), ['social', 'strength']);
+    assert.ok(rows.every(row => row.change < 0 && row.level === 1));
+    assert.deepEqual(paused, snapshot);
+  }
+  paused.focus.sports = 0;
+  const pausedForecast = annualForecast(paused), advanced = quietYear(paused);
+  assert.deepEqual(advanced.yearSummary.stats, pausedForecast.stats);
+  assert.equal(advanced.school.sports.success, null, 'inactivity losses do not fabricate participation or success');
+});
+
+test('inactivity previews clip at rating limits and school family members without records keep their prior practice', () => {
+  const state = pupil();
+  for (const stat of ['strength', 'social', 'intelligence', 'creativity']) state.stats[stat] = 0;
+  assert.deepEqual(schoolChoiceImpacts(state, 'sports'), []);
+  assert.deepEqual(schoolChoiceImpacts(state, 'extracurricular'), []);
+  state.stats.intelligence = .01;
+  const rows = schoolChoiceImpacts(state, 'extracurricular');
+  assert.deepEqual(rows.map(row => [row.stat, row.change, row.level]), [['intelligence', -.01, 1]]);
+  for (const school of [null, undefined]) {
+    const relative = { ...pupil(), school };
+    assert.deepEqual(standardFocusCoefficients(relative).sports, {});
+    assert.deepEqual(standardFocusCoefficients(relative).extracurricular, {});
+    assert.ok(Object.values(standardFocusPractice(relative)).every(amount => amount === 0), 'missing school records do not impose optional activity losses on family members');
+    const autonomous = { ...relative, autonomousFocus: true, focus: { work: 3, social: 3, family: 3, self: 3 } };
+    assert.ok(Object.values(standardFocusPractice(autonomous)).every(amount => amount === 0));
+  }
+});
 
 test('new school records have exactly three distinct known offers per activity category', () => {
   assert.equal(SCHOOL_OFFER_COUNT, 3);
@@ -110,7 +196,9 @@ test('keeping an activity preserves success, switching resets it, and leaving lo
   assert.equal(leaveSchoolActivity(state, 'sports').ok, true);
   assert.equal(state.school.sports, null);
   assert.equal(state.focus.sports, 0);
-  assert.deepEqual(schoolChoiceImpacts(state, 'sports'), []);
+  const inactivity = schoolChoiceImpacts(state, 'sports');
+  assert.deepEqual(inactivity.map(row => row.stat).sort(), ['social', 'strength']);
+  assert.ok(inactivity.every(row => row.change < 0 && row.level === 1));
   assert.equal(setFocus(state, 'sports', 1).ok, false);
   state.pendingEvents = [{ eventId: 'school_team', age: state.age }];
   const pending = copy(state);

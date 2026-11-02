@@ -33,7 +33,7 @@ test('the shared focus scale gives every stage its default allocation and endpoi
   }
 });
 
-test('default choices omit background effects and show only the unjoined extracurricular penalty', () => {
+test('default choices omit background effects and show the two unjoined activity penalties', () => {
   for (const age of [2, 4, 5, 17, 19, 30, 70]) {
     const state = life(age);
     state.stats.health = 1;
@@ -42,8 +42,8 @@ test('default choices omit background effects and show only the unjoined extracu
     if (age < 5) for (const key of Object.keys(state.focus)) assert.deepEqual(toddlerChoiceImpacts(state, key), []);
     else if (age < 18) for (const key of Object.keys(state.focus)) {
       const entries = schoolChoiceImpacts(state, key);
-      if (key === 'extracurricular') {
-        assert.deepEqual(entries.map(entry => entry.stat).sort(), ['creativity', 'social']);
+      if (key === 'extracurricular' || key === 'sports') {
+        assert.deepEqual(entries.map(entry => entry.stat).sort(), key === 'sports' ? ['social', 'strength'] : ['creativity', 'intelligence']);
         assert.ok(entries.every(entry => entry.change < 0 && entry.level === 1 && !entry.parentId));
       } else assert.deepEqual(entries, []);
     }
