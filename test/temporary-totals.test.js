@@ -2,6 +2,7 @@ import { changedRating } from '../rating-changes.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { defaultFocus } from '../focus-rules.js';
+import { createSchoolRecord } from '../school.js';
 import { createGame, effectiveStats, annualForecast, advanceYear, EVENTS, resolveEventChoice, migrateSave, validateSave, haveChild, succeed } from '../engine.js';
 
 const effect = (id, modifiers, years = 2) => ({ id, name: id, description: '', years, modifiers, kind: 'positive' });
@@ -26,7 +27,9 @@ test('v15 upgrades without changing pending choices, saved buffs, base ratings o
   state.pendingEvents = [{ eventId: 'school_play', age: state.age }];
   state.lastYearEvents = ['school_play'];
   const before = structuredClone(state);
-  assert.deepEqual(migrateSave(state), { ...before, version: 18, focus: { work: 1, social: 1, family: 1, self: 1, sports: 2, extracurricular: 2 } });
+  const expected = { ...before, version: 19, focus: { work: 1, social: 1, family: 1, self: 1, sports: 0, extracurricular: 0 } };
+  expected.school = createSchoolRecord(expected);
+  assert.deepEqual(migrateSave(state), expected);
   assert.deepEqual(state, before);
 });
 

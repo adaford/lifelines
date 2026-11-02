@@ -1,7 +1,7 @@
-import { annualForecast, effectiveStats, needsEducationChoice, focusLimits, caregivers, JOBS } from './engine.js?v=school-focus-expansion';
-import { infantChoiceEffects, wellbeingResponse, toddlerActivityEffects, toddlerActivityNeutral, toddlerActivitySteps, schoolFocusEffects, schoolFocusSteps, focusChoiceEffects, focusEffectStrength, standardFocusCoefficients, TODDLER_FOCUS, TODDLER_ACTIVITY_EFFECTS, PARENT_FAMILY_STABILITY_GAIN, PARENT_FAMILY_RELATIONSHIP_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=school-focus-expansion';
-import { DEFAULT_FOCUS, focusEffect } from './focus-rules.js?v=school-focus-expansion';
-import { changedRating } from './rating-changes.js?v=school-focus-expansion';
+import { annualForecast, effectiveStats, needsEducationChoice, focusLimits, caregivers, JOBS } from './engine.js?v=school-grades-activities';
+import { infantChoiceEffects, wellbeingResponse, toddlerActivityEffects, toddlerActivityNeutral, toddlerActivitySteps, schoolFocusEffects, schoolFocusSteps, focusChoiceEffects, focusEffectStrength, standardFocusCoefficients, TODDLER_FOCUS, TODDLER_ACTIVITY_EFFECTS, PARENT_FAMILY_STABILITY_GAIN, PARENT_FAMILY_RELATIONSHIP_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=school-grades-activities';
+import { DEFAULT_FOCUS, focusEffect, focusNeutralFor } from './focus-rules.js?v=school-grades-activities';
+import { changedRating } from './rating-changes.js?v=school-grades-activities';
 
 const nonzero = value => Math.abs(value) > .000001;
 const keyOf = entry => `${entry.parentId || 'you'}:${entry.stat}`;
@@ -81,13 +81,13 @@ function schoolChoiceEntries(state, area, points, clip) {
   return entries;
 }
 
-// School and college show only each choice's own decision contribution. Keep
-// the same complete 0–4 reference as toddler rows when an event limits a choice.
+// School and college isolate each choice. Enrolled activities keep their 0–2
+// scale, and core choices retain the full 0–4 reference under temporary caps.
 export function schoolChoiceImpacts(state, area) {
   if (state.age < 5 || state.age >= 18 && state.education.status !== 'college'
       || !Object.hasOwn(standardFocusCoefficients(state), area) || state.ended
       || state.alive === false || state.needsSuccession || state.pendingEvents.length || needsEducationChoice(state)) return [];
-  const points = Math.max(0, Math.min(focusLimits(state)[area], state.focus[area] ?? 0));
+  const points = Math.max(0, Math.min(focusLimits(state)[area], state.focus[area] ?? focusNeutralFor(state, area)));
   const entries = schoolChoiceEntries(state, area, points, true);
   return proportionalChoiceEntries(entries, points, entry => state.age < 18 ? schoolFocusSteps(area, entry.stat, points) : focusEffect(points));
 }

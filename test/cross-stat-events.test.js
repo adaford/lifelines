@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { createSchoolRecord } from '../school.js';
 import assert from 'node:assert/strict';
 import { EVENTS, eventChances } from '../events.js';
 import { FAMILY_EVENTS } from '../family-events.js';
@@ -85,10 +86,11 @@ test('automatic trait-driven experiences generally affect a different stat and i
 test('a seeded recess experience permanently raises Social and its learning ability and survives reload', () => {
   const state = createGame({ seed: 73519 });
   state.age = 10;
-  state.focus = { work: 2, social: 2, family: 2, self: 2, sports: 2, extracurricular: 2 };
+  state.focus = { work: 2, social: 2, family: 2, self: 2, sports: 0, extracurricular: 0 };
   for (const key of APTITUDE_EVENT_STATS) { state.stats[key] = 5; state.aptitudes[key] = 0; }
   state.stats.strength = 10;
-  state.rng = 3090397524;
+  state.school = createSchoolRecord(state);
+  state.rng = 3090398293;
   const before = { ...state.aptitudes };
   advanceYear(state, { mortalityRandom: () => 1, growthRandom: () => 0, parentCareerRandom: () => 1 });
   assert.ok(state.lastYearEvents.includes('aptitude_strength_social_gain'));

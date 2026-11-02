@@ -1,6 +1,7 @@
-import { MAX_FOCUS, DEFAULT_FOCUS, focusEffect, defaultFocus } from './focus-rules.js?v=school-focus-expansion';
+import { MAX_FOCUS, DEFAULT_FOCUS, focusEffect, defaultFocus, focusMaxFor, focusNeutralFor } from './focus-rules.js?v=school-grades-activities';
+import { schoolActivity, activityEligible } from './school.js?v=school-grades-activities';
 // Ratings use the same scale throughout life. Balanced toddler activities use
-// TODDLER_FOCUS; every stage uses 2 per area. Keep the historical calibration
+// TODDLER_FOCUS; core areas use 2, enrolled school activities use 1. Keep the historical calibration
 // offsets, with childhood deductions reduced to the requested tenth strength.
 export const BIRTH_VARIATION = {
   skill: 2,
@@ -66,13 +67,14 @@ export const SCHOOL_FOCUS_EFFECTS = choiceCoefficients({
   social: { social: .04, stability: .05 },
   family: { social: .04, stability: .05 },
   self: { attractiveness: .0375, health: .0175, stability: .05 },
-  sports: { strength: .05, health: .0175, social: .04 },
-  extracurricular: { creativity: .04, social: .04 },
+  sports: {},
+  extracurricular: {},
 });
 const hasSchoolFocus = person => person.age >= 5 && person.age < 18 && !person.autonomousFocus;
-// Schoolwork has its own learning curves; all other school effects keep the
-// ordinary neutral-two curve. A negative coefficient reverses its direction.
+// Schoolwork has its own learning curves. Enrolled activities use one unit
+// either side of neutral one; the four core areas remain neutral at two.
 export function schoolFocusSteps(area, stat, points) {
+  if (area === 'sports' || area === 'extracurricular') return clamp(Math.round(number(points, 1)), 0, 2) - 1;
   const index = clamp(Math.round(number(points, DEFAULT_FOCUS)), 0, MAX_FOCUS);
   if (area === 'work' && stat === 'intelligence') return [-3, -2, 0, 2, 3][index];
   if (area === 'work' && stat === 'creativity') return [-2, -1, 0, 1, 2][index];
@@ -93,6 +95,10 @@ const AUTONOMOUS_FOCUS_EFFECTS = {
 export function standardFocusCoefficients(person, career = null) {
   const source = person.autonomousFocus ? AUTONOMOUS_FOCUS_EFFECTS : hasSchoolFocus(person) ? SCHOOL_FOCUS_EFFECTS : STANDARD_FOCUS_EFFECTS;
   const coefficients = Object.fromEntries(Object.entries(source).map(([area, effects]) => [area, { ...effects }]));
+  if (hasSchoolFocus(person)) for (const kind of ['sports', 'extracurricular']) {
+    const activity = schoolActivity(kind, person.school?.[kind]?.id);
+    coefficients[kind] = activity && activityEligible(person, activity) ? { ...activity.training } : {};
+  }
   if (person.age >= 18) for (const key of skills) {
     const extra = .035 * (person.autonomousFocus ? 1 : CHOICE_STAT_MULTIPLIER) * clamp(number(career?.weights?.[key], 0), 0, 1);
     if (extra) coefficients.work[key] = (coefficients.work[key] || 0) + extra;
@@ -137,7 +143,7 @@ function practiceResponse(effort, aptitude) {
 export function schoolAppearanceChange(person) {
   if (!hasSchoolFocus(person) || person.alive === false) return 0;
   const aptitude = clamp(number(person.aptitudes?.attractiveness, 0), -3, 3);
-  const effort = SCHOOL_FOCUS_EFFECTS.self.attractiveness * schoolFocusSteps('self', 'attractiveness', person.focus?.self);
+  const effort = standardFocusPractice(person).attractiveness || 0;
   return YEARLY_DECISION_SCALE * 1.15 * practiceResponse(effort, aptitude);
 }
 
@@ -231,8 +237,8 @@ export function skillChanges(person, career = null, practiceScale = YEARLY_DECIS
 export function schoolFocusEffects(person, area, career = null) {
   const areas = Object.keys(standardFocusCoefficients(person, career));
   if (person.alive === false || person.age < 5 || !areas.includes(area)) return {};
-  const focus = Object.fromEntries(areas.map(key => [key, clamp(number(person.focus?.[key], DEFAULT_FOCUS), 0, MAX_FOCUS)]));
-  const baseline = { ...focus, [area]: DEFAULT_FOCUS };
+  const focus = Object.fromEntries(areas.map(key => [key, clamp(number(person.focus?.[key], focusNeutralFor(person, key)), 0, focusMaxFor(person, key))]));
+  const baseline = { ...focus, [area]: focusNeutralFor(person, area) };
   const chosenSkills = skillChanges({ ...person, focus }, career);
   const baselineSkills = skillChanges({ ...person, focus: baseline }, career);
   const wellbeing = f => standardFocusPractice({ ...person, focus: f }, career);
@@ -247,7 +253,7 @@ export function schoolFocusEffects(person, area, career = null) {
 // Complete focus contribution against all-neutral choices, without aging,
 // natural development, unused-point rest, finances, or expiring effects.
 export function focusChoiceEffects(person, career = null) {
-  const neutral = { ...person, focus: defaultFocus(person.age) };
+  const neutral = { ...person, focus: defaultFocus(person) };
   const chosen = skillChanges(person, career), baseline = skillChanges(neutral, career);
   const practice = standardFocusPractice(person, career);
   return {

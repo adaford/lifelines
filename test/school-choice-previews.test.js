@@ -3,6 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createGame, migrateSave } from '../engine.js';
 import { schoolFocusEffects, schoolFocusSteps } from '../development.js';
+import { createSchoolRecord } from '../school.js';
 import { schoolChoiceImpacts } from '../choice-impacts.js';
 
 function student(age = 12) {
@@ -10,7 +11,8 @@ function student(age = 12) {
   state.age = age;
   state.education = { status: age < 18 ? 'school' : 'college', years: 0 };
   state.conditions = [];
-  state.focus = defaultFocus(age);
+  state.school = age >= 5 && age < 18 ? createSchoolRecord(state) : null;
+  state.focus = defaultFocus(state);
   for (const key of Object.keys(state.stats)) {
     state.stats[key] = 5;
     state.aptitudes[key] = 0;
@@ -47,8 +49,6 @@ const schoolStats = {
   social: { social: 1, stability: 1 },
   family: { social: 1, stability: 1 },
   self: { attractiveness: 1, health: 1, stability: 1 },
-  sports: { strength: 1, health: 1, social: 1 },
-  extracurricular: { creativity: 1, social: 1 },
 };
 
 test('school and college show each choice contribution with toddler-style relative signs', () => {

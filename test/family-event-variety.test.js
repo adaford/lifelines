@@ -1,4 +1,5 @@
 import { defaultFocus } from '../focus-rules.js';
+import { createSchoolRecord } from '../school.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { FAMILY_EVENTS, familyEventChances } from '../family-events.js';
@@ -32,6 +33,7 @@ function fixture(event) {
     const state = createGame({ seed: 87102 });
     state.age = event.minPlayerAge;
     state.focus = defaultFocus(state.age);
+    if (state.age >= 5 && state.age < 18) state.school = createSchoolRecord(state);
     return { state, subject: state.parents[0] };
   }
   const state = adult();

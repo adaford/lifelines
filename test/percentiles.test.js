@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { normalPercentile } from '../percentiles.js';
 import { createGame, statPercentiles, annualForecast, setCryLevel, effectiveStats, migrateSave } from '../engine.js';
 import { PERCENTILE_REFERENCE } from '../percentile-reference.js';
+import { createSchoolRecord } from '../school.js';
 
 test('normal percentiles center exactly on five and follow standard deviations', () => {
   assert.equal(normalPercentile(5, 5, 1.2), 50);
@@ -51,9 +52,11 @@ test('a strong baby ranks above same-age peers and changing focus only changes t
   assert.notEqual(annualForecast(louder).stats.intelligence.change, annualForecast(state).stats.intelligence.change);
   assert.equal(annualForecast(louder).stats.strength.change, annualForecast(state).stats.strength.change);
   state.age = 8;
+  state.school = createSchoolRecord(state);
+  state.school.sports = { id: 'soccer', success: 5 };
   const active = structuredClone(state), inactive = structuredClone(state);
-  active.focus = { work: 2, self: 2, social: 1, family: 1, sports: 4, extracurricular: 2 };
-  inactive.focus = { work: 3, self: 2, social: 2, family: 3, sports: 0, extracurricular: 2 };
+  active.focus = { work: 2, self: 2, social: 1, family: 1, sports: 2, extracurricular: 0 };
+  inactive.focus = { work: 3, self: 2, social: 2, family: 3, sports: 0, extracurricular: 0 };
   assert.deepEqual(statPercentiles(active), statPercentiles(inactive));
   assert.ok(annualForecast(active).stats.strength.change > 0);
   assert.ok(annualForecast(inactive).stats.strength.change < 0);

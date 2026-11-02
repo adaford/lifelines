@@ -67,7 +67,7 @@ test('v8 migration adds career and growth state without rerolling existing lives
   const before = copy(legacy);
   const migrated = migrateSave(legacy);
   assert.ok(migrated);
-  assert.equal(migrated.version, 18);
+  assert.equal(migrated.version, 19);
   assert.equal(validateSave(migrated), true);
   assert.deepEqual(legacy, before, 'migration does not mutate the imported object');
   for (const key of ['rng', 'seed', 'nextId', 'age', 'maturityAge', 'stats', 'pendingEvents', 'history', 'yearSummary', 'lifestyle']) {

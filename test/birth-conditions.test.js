@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { BIRTH_CONDITIONS, MAX_BIRTH_CONDITIONS, generateBirthConditions, assignBirthConditions, applyBirthConditions, validateBirthConditions } from '../birth-conditions.js';
 import { createGame, advanceYear, chooseEducation, resolveEventChoice, EVENTS, haveChild, focusLimits, focusLimitDetails, setFocus, validateSave, migrateSave, successionInfo, succeed } from '../engine.js';
 import { defaultFocus, focusBudget, fitFocusBudget } from '../focus-rules.js';
+import { createSchoolRecord } from '../school.js';
 import { createProspects } from '../relationships.js';
 
 const clone = value => structuredClone(value);
@@ -69,10 +70,11 @@ test('condition bonuses and lifelong limits apply to focus actions and coexist w
   state.age = 6;
   state.conditions = ['autism', 'high_energy'];
   state.focus = { ...defaultFocus(6), social: 1 };
-  assert.equal(focusBudget(state), 13);
+  state.school = createSchoolRecord(state);
+  assert.equal(focusBudget(state), 11);
   assert.equal(focusBudget({ ...state, age: 3 }), 11);
-  assert.equal(focusBudget({ ...state, conditions: ['low_energy'] }), 11);
-  assert.deepEqual(fitFocusBudget({ ...state, conditions: ['low_energy'] }, defaultFocus(6)), { work: 1, social: 2, family: 2, self: 2, sports: 2, extracurricular: 2 });
+  assert.equal(focusBudget({ ...state, conditions: ['low_energy'] }), 9);
+  assert.deepEqual(fitFocusBudget({ ...state, conditions: ['low_energy'] }, { ...defaultFocus(6), work: 4 }), { work: 3, social: 2, family: 2, self: 2, sports: 0, extracurricular: 0 });
   assert.equal(setFocus(state, 'social', 2).ok, false);
   assert.equal(setFocus(state, 'work', 4).ok, true);
   assert.equal(focusLimitDetails(state)[0].permanent, true);
@@ -84,7 +86,7 @@ test('condition bonuses and lifelong limits apply to focus actions and coexist w
   assert.equal(state.effects.some(effect => effect.id === 'temporary'), false);
   assert.equal(focusLimits(state).social, 1);
   assert.deepEqual(state.conditions, ['autism', 'high_energy']);
-  assert.equal(state.yearSummary.decisions.focusBudget, 13);
+  assert.equal(state.yearSummary.decisions.focusBudget, 11);
   assert.equal(validateSave(state), true);
   assert.deepEqual(migrateSave(clone(state)), state);
 });
@@ -150,7 +152,7 @@ test('succession keeps the chosen childs conditions and applies their budget wit
   assert.equal(succeed(state, heir.id).ok, true);
   assert.deepEqual(state.conditions, ['autism', 'high_energy']);
   assert.deepEqual(state.stats, before);
-  assert.equal(focusBudget(state), 13);
+  assert.equal(focusBudget(state), 11);
   assert.equal(state.focus.social, 1);
   assert.equal(validateSave(state), true);
   const noChildren = adult();
@@ -166,6 +168,7 @@ test('older saves receive empty condition lists without changing existing rating
   const state = adult();
   assert.equal(haveChild(state).ok, true);
   state.version = 16;
+  delete state.school;
   state.focus = { work: 3, social: 3, family: 3, self: 3 };
   state.yearSummary = null;
   const visit = (value, action) => {
@@ -178,7 +181,8 @@ test('older saves receive empty condition lists without changing existing rating
   const loaded = migrateSave(state);
   assert.ok(loaded);
   const expected = clone(before);
-  expected.version = 18;
+  expected.version = 19;
+  expected.school = null;
   expected.focus = defaultFocus(expected.age);
   visit(expected, person => { person.conditions = []; });
   assert.deepEqual(loaded, expected);

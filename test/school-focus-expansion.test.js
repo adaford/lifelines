@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createGame, advanceYear, annualForecast, setFocus, migrateSave, validateSave, focusLimits } from '../engine.js';
+import { createGame, advanceYear, annualForecast, setFocus, migrateSave, validateSave, focusLimits, enrollSchoolActivity } from '../engine.js';
 import { defaultFocus, focusBudget } from '../focus-rules.js';
+import { createSchoolRecord } from '../school.js';
 import { skillChanges, childhoodWellbeing, schoolAppearanceChange, schoolFocusEffects } from '../development.js';
 import { schoolChoiceImpacts } from '../choice-impacts.js';
 import { changedRating } from '../rating-changes.js';
@@ -17,7 +18,8 @@ function student(age = 12) {
   const state = createGame({ seed: 57402 });
   state.age = age;
   state.conditions = [];
-  state.focus = defaultFocus(age);
+  state.school = age >= 5 && age < 18 ? createSchoolRecord(state) : null;
+  state.focus = defaultFocus(state);
   state.effects = [];
   state.education = { status: age >= 18 ? 'college' : 'school', years: 0 };
   for (const person of [state, ...state.parents]) {
@@ -30,6 +32,11 @@ function student(age = 12) {
   return state;
 }
 
+function enroll(state, kind, id) {
+  state.school.offers[kind] = [id, ...state.school.offers[kind].filter(value => value !== id)].slice(0, 5);
+  assert.equal(enrollSchoolActivity(state, kind, id).ok, true);
+}
+
 function quietMean(state) {
   for (let attempt = 0; attempt < 500; attempt++) {
     const candidate = copy(state);
@@ -40,18 +47,21 @@ function quietMean(state) {
   assert.fail('No event-free mean routine found');
 }
 
-test('six school choices spend twelve points only from age five through seventeen', () => {
+test('school has ten points and two locked activities until enrollment from ages five through seventeen', () => {
   for (const age of [2, 4, 5, 17, 18, 19, 65]) {
     const state = student(age);
     const expectedKeys = age < 5 ? [...adultKeys, 'creative'] : age < 18 ? schoolKeys : adultKeys;
     assert.deepEqual(Object.keys(state.focus), expectedKeys);
-    assert.ok(Object.values(state.focus).every(value => value === 2));
-    assert.equal(focusBudget(state), age < 5 ? 10 : age < 18 ? 12 : 8);
+    assert.ok(Object.entries(state.focus).every(([key, value]) => value === (age >= 5 && age < 18 && ['sports', 'extracurricular'].includes(key) ? 0 : 2)));
+    assert.equal(focusBudget(state), age < 18 ? 10 : 8);
     if (age >= 5 && age < 18) {
-      assert.equal(setFocus(state, 'sports', 3).ok, false, 'the neutral schedule spends the whole budget');
-      assert.equal(setFocus(state, 'family', 0).ok, true);
-      assert.equal(setFocus(state, 'sports', 4).ok, true);
-      assert.equal(setFocus(state, 'sports', 5).ok, false);
+      assert.equal(setFocus(state, 'sports', 1).ok, false, 'unenrolled activities stay locked at zero');
+      enroll(state, 'sports', 'basketball');
+      enroll(state, 'extracurricular', 'chess');
+      assert.equal(setFocus(state, 'sports', 2).ok, false, 'two neutral enrollments use the spare points');
+      assert.equal(setFocus(state, 'family', 1).ok, true);
+      assert.equal(setFocus(state, 'sports', 2).ok, true);
+      assert.equal(setFocus(state, 'sports', 3).ok, false);
       assert.equal(setFocus(state, 'extracurricular', 3).ok, false);
     } else {
       assert.equal(setFocus(state, 'sports', 1).ok, false);
@@ -94,33 +104,36 @@ test('School uses its specified Intelligence, Creativity, and Social curves in p
 test('Yourself, Sports, and Extracurricular activities have distinct effects in completed school years', () => {
   const effects = {
     self: { attractiveness: .225, stability: .3, health: .105 },
-    sports: { strength: .3, health: .105, social: .24 },
+    sports: { strength: .3, social: .24 },
     extracurricular: { creativity: .24, social: .24 },
     social: { social: .24, stability: .3 },
   };
   for (const age of [5, 17]) for (const [area, coefficients] of Object.entries(effects)) {
     const baseline = student(age);
+    if (area === 'sports') enroll(baseline, area, 'basketball');
+    if (area === 'extracurricular') enroll(baseline, area, 'drama');
     baseline.focus.work = 0;
     const means = skillChanges(baseline), wellbeing = childhoodWellbeing(baseline);
     const selected = copy(baseline);
-    selected.focus[area] = 4;
+    const units = ['sports', 'extracurricular'].includes(area) ? 1 : 3;
+    selected.focus[area] = units === 1 ? 2 : 4;
     const before = copy(selected);
     const rows = schoolChoiceImpacts(selected, area).filter(entry => !entry.parentId);
     assert.deepEqual(rows.map(entry => entry.stat).sort(), Object.keys(coefficients).sort(), `${area} only affects its own listed stats`);
     for (const [stat, coefficient] of Object.entries(coefficients)) {
-      const contribution = coefficient * 3 * .5 * (learned.includes(stat) || stat === 'attractiveness' ? 1.15 : 1);
+      const contribution = coefficient * units * .5 * (learned.includes(stat) || stat === 'attractiveness' ? 1.15 : 1);
       const actual = learned.includes(stat) ? skillChanges(selected)[stat] - means[stat]
         : stat === 'attractiveness' ? schoolAppearanceChange(selected) - schoolAppearanceChange(baseline)
           : childhoodWellbeing(selected)[stat] - wellbeing[stat];
       near(actual, contribution, `${area}: ${stat} is scaled once`);
-      assert.equal(rows.find(entry => entry.stat === stat).level, 3);
+      assert.equal(rows.find(entry => entry.stat === stat).level, units);
     }
     const forecast = annualForecast(selected);
     assert.deepEqual(selected, before);
     const advanced = quietMean(selected);
     assert.deepEqual(advanced.yearSummary.stats, forecast.stats, `${area} mean routine matches its forecast at age ${age}`);
-    assert.equal(advanced.yearSummary.decisions.focus[area], 4);
-    assert.equal(advanced.yearSummary.decisions.focusBudget, 12);
+    assert.equal(advanced.yearSummary.decisions.focus[area], selected.focus[area]);
+    assert.equal(advanced.yearSummary.decisions.focusBudget, 10);
   }
 });
 
@@ -147,9 +160,11 @@ test('school signs retain their custom units under caps and clipping, and bonuse
   for (const age of [4, 18, 19, 30]) assert.equal(schoolAppearanceChange({ ...student(age), focus: { ...defaultFocus(age), self: 4 } }), 0);
 });
 
-test('version seventeen school saves gain neutral new choices without rewriting saved values or old reviews', () => {
+test('version seventeen school saves gain unjoined activity slots without rewriting saved values or old reviews', () => {
   const old = quietMean(student());
   old.version = 17;
+  delete old.school;
+  delete old.yearSummary.school;
   old.focus = { work: 3, social: 1, family: 2, self: 2 };
   old.yearSummary.decisions = { focus: { work: 4, social: 0, family: 2, self: 2 }, workLabel: 'School', focusMax: 4, focusBudget: 8 };
   old.pendingEvents = [{ eventId: 'school_team', age: old.age }];
@@ -157,7 +172,13 @@ test('version seventeen school saves gain neutral new choices without rewriting 
   const before = copy(old);
   const migrated = migrateSave(old);
   assert.ok(migrated);
-  assert.deepEqual(migrated, { ...before, version: 18, focus: { ...before.focus, sports: 2, extracurricular: 2 } });
+  const { version, focus, school, ...retained } = migrated;
+  const { version: oldVersion, focus: oldFocus, ...oldRetained } = before;
+  assert.equal(version, createGame({ seed: 1 }).version);
+  assert.deepEqual(focus, { ...oldFocus, sports: 0, extracurricular: 0 });
+  assert.deepEqual(retained, oldRetained);
+  assert.equal(school.sports, null);
+  assert.equal(school.extracurricular, null);
   assert.equal(validateSave(migrated), true);
   assert.deepEqual(old, before, 'migration is pure');
   assert.deepEqual(migrateSave(copy(migrated)), migrated, 'reload does not add bonuses or reallocate twice');
@@ -166,28 +187,31 @@ test('version seventeen school saves gain neutral new choices without rewriting 
   assert.equal(validateSave(malformed), false, 'current school saves require all six keys');
 });
 
-test('school entry carries crafts into extracurricular activities and adulthood drops only the school-only areas', () => {
+test('school entry opens unjoined activities and adulthood drops only school focus areas', () => {
   const toddler = student(4);
   toddler.focus = { work: 0, social: 2, family: 2, self: 2, creative: 4 };
   const school = quietMean(toddler);
   assert.equal(school.age, 5);
-  assert.deepEqual(school.focus, { work: 0, social: 2, family: 2, self: 2, sports: 2, extracurricular: 4 });
+  assert.deepEqual(school.focus, { work: 0, social: 2, family: 2, self: 2, sports: 0, extracurricular: 0 });
   assert.deepEqual(school.yearSummary.decisions, { focus: toddler.focus, workLabel: 'Play', focusMax: 4, focusBudget: 10 });
   assert.equal(validateSave(school), true);
   const teen = student(17);
-  teen.focus = { work: 0, social: 0, family: 2, self: 2, sports: 4, extracurricular: 4 };
+  enroll(teen, 'sports', 'basketball');
+  enroll(teen, 'extracurricular', 'chess');
+  teen.focus = { work: 0, social: 0, family: 2, self: 2, sports: 2, extracurricular: 2 };
   const adult = quietMean(teen);
   assert.equal(adult.age, 18);
   assert.deepEqual(adult.focus, { work: 0, social: 0, family: 2, self: 2 }, 'freed school points stay unspent');
-  assert.deepEqual(adult.yearSummary.decisions, { focus: teen.focus, workLabel: 'School', focusMax: 4, focusBudget: 12 });
+  assert.deepEqual(adult.yearSummary.decisions, { focus: teen.focus, workLabel: 'School', focusMax: 4, focusBudget: 10, focusCaps: { sports: 2, extracurricular: 2 } });
   assert.equal(validateSave(adult), true);
 });
 
 test('school Sports respects physical restrictions while college retains its four familiar choices', () => {
   const state = student();
+  enroll(state, 'sports', 'basketball');
   state.focus.self = 1;
   state.focus.sports = 1;
-  state.effects = [{ id: 'physical-limit', name: 'Recovery', years: 1, modifiers: {}, focusLimits: { standard: { self: 1 } } }];
+  state.effects = [{ id: 'physical-limit', name: 'Recovery', years: 1, modifiers: {}, focusLimits: { standard: { self: 2 } } }];
   assert.equal(focusLimits(state).sports, 1);
   assert.equal(setFocus(state, 'sports', 2).ok, false);
   const college = student(19);

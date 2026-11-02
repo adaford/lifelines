@@ -6,6 +6,7 @@ import { afterEach, describe, test } from 'node:test';
 import { parseHTML } from 'linkedom';
 import { toLegacyCentimeters, stripWellbeingAptitudes, legacyRatingFloor } from './helpers/legacy-height.js';
 import { MAX_FOCUS, focusBudget, defaultFocus } from '../focus-rules.js';
+import { createSchoolRecord, gradeLetter } from '../school.js';
 import { changedRating } from '../rating-changes.js';
 import { choiceImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from '../choice-impacts.js';
 import { SKILLS, JOBS, EVENTS, resolveEventChoice, eventOdds, canTakeJob, chooseEducation, offeredJobs, needsEducationChoice, createGame, advanceYear, annualForecast, haveChild, takeJob, successionInfo, succeed, validateSave, respondToEncounter, proposeMarriage, effectiveStats, relationshipOdds, proposalChance, statPercentiles } from '../engine.js';
@@ -591,7 +592,7 @@ test('new-year review shows actual changes, survives reload, and dismisses persi
   assert.equal(advanceYear(child,{mortalityRandom:()=>1,growthRandom:()=>0}).ok,true);
   child.focus={...defaultFocus(child.age),work:2,social:1,family:2,self:2};
   ui=await mount(child);
-  assert.match(ui.query('.year-decisions').textContent,/School4\/4Friends1\/4Family1\/4Yourself1\/4Sports2\/4Extracurriculars2\/4Unused1 point/);
+  assert.match(ui.query('.year-decisions').textContent,/School4\/4Friends1\/4Family1\/4Yourself1\/4Sports0\/2Extracurriculars0\/2Unused3 points/);
   assert.doesNotMatch(ui.query('.year-decisions').textContent,/Cry level/);
   assert.deepEqual(ui.saved(),child,'reading past decisions must preserve current controls');
   const historicalCry=ageTo(createGame({seed:123}),3);
@@ -821,6 +822,20 @@ test('temporary activity limits show their cause, enforce the cap, and survive r
   assert.equal(ui.query(`${row} [data-delta="1"]`).disabled, false);
   ui.click(`${row} [data-delta="1"]`);
   assert.equal(ui.saved().focus.work, 3);
+
+  const school=ageTo(createGame({seed:121}),10);
+  school.conditions=['movement_sensitive'];
+  school.school.sports={id:'basketball',success:5};
+  school.focus=defaultFocus(school);
+  school.effects=[{id:'sports-recovery',name:'Recovery',description:'',years:1,modifiers:{},kind:'negative',focusLimits:{standard:{self:2}}}];
+  ui=await mount(school);
+  const sport='.focus-row[data-focus-key="sports"]';
+  assert.match(ui.query('.effect-list').textContent,/Yourself max 2.*Sports max 1/);
+  assert.doesNotMatch(ui.query('.effect-list').textContent,/Sports max 2/);
+  assert.match(ui.query(`${sport} .focus-limit`).textContent,/Max 1.*Movement sensitive.*Recovery/);
+  assert.equal(ui.query(`${sport} [data-delta="1"]`).disabled,true);
+  assert.match(ui.query('.profile-bar [data-condition-id="movement_sensitive"]').textContent,/Yourself max 2 from age 5, lifelong.*Sports max 1 at ages 5–17, lifelong/);
+  assert.deepEqual(ui.saved(),school,'displaying translated sports caps does not alter saved restrictions');
 });
 
 test('a new event previews activity tradeoffs and frees points when the choice applies', async () => {
@@ -1678,7 +1693,8 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     assert.ok(ui.query('.menu-list [data-action="export"]'));
     ui.click('.menu-list [data-action="help"]');
     assert.equal(ui.all('[role="dialog"]').length, 1);
-    assert.equal(ui.all('.help-item').filter(item => item.closest('.modal')).length, 6);
+    assert.deepEqual(ui.all('.help-item h4').map(heading=>heading.textContent), ['Babies','Each year','School','Stats','Events','Work','Family']);
+    assert.match(ui.query('.help-grid').textContent,/Share 10 points as a toddler or school student, and 8 as an adult.*both use 0–2 points, starting at 1/);
     assert.equal(ui.document.body.style.overflow, 'hidden');
     ui.click('.modal [data-action="close"]');
     assert.equal(ui.all('[role="dialog"]').length, 0);
@@ -2488,14 +2504,16 @@ test('school and college decisions show signed effects inside each choice and up
 test('school controls expose the new activities, requested effects and help through reload', async () => {
   const fixture=ageTo(createGame({seed:121}),10);
   fixture.conditions=[]; fixture.effects=[];
-  fixture.focus={work:3,social:1,family:0,self:3,sports:3,extracurricular:2};
+  fixture.school.sports={id:'basketball',success:5};
+  fixture.school.extracurricular={id:'drama',success:5};
+  fixture.focus={work:3,social:1,family:0,self:3,sports:2,extracurricular:1};
   for(const key of Object.keys(fixture.stats)) { fixture.stats[key]=5; fixture.aptitudes[key]=0; }
   let ui=await mount(fixture);
   const expected={
     work:{intelligence:'++',creativity:'+',social:'-',stability:'-'},
     social:{social:'-',stability:'-'},
     self:{attractiveness:'+',health:'+',stability:'+'},
-    sports:{strength:'+',health:'+',social:'+'},
+    sports:{strength:'+',social:'+'},
   };
   for(let reload=0;reload<2;reload++) {
     assert.equal(ui.all('.focus-row').length,6);
@@ -2511,7 +2529,7 @@ test('school controls expose the new activities, requested effects and help thro
   ui.click('[data-action="focus"][data-key="extracurricular"][data-delta="1"]');
   assert.deepEqual(ui.all('.focus-row[data-focus-key="extracurricular"] .choice-impact').map(entry=>entry.dataset.stat).sort(),['creativity','social']);
   ui.click('[data-topic="focus-sports"]');
-  assert.match(ui.query('.help-popup').textContent,/Sports develop Strength, Health and Social/);
+  assert.match(ui.query('.help-popup').textContent,/Every sport trains Strength and Social/);
   ui.click('.help-popup [data-action="close"]');
   ui.click('[data-topic="focus-self"]');
   assert.match(ui.query('.help-popup').textContent,/Attractiveness, mental stability and Health/);
@@ -2520,18 +2538,130 @@ test('school controls expose the new activities, requested effects and help thro
 test('old school reviews retain four recorded choices while current controls gain six', async () => {
   const old=ageTo(createGame({seed:121}),10);
   old.version=17; old.conditions=[]; old.effects=[];
+  delete old.school; delete old.yearSummary.school;
   old.focus={work:3,social:1,family:2,self:2};
   old.yearSummary.decisions={focus:{work:2,social:2,family:2,self:2},workLabel:'School',focusMax:4,focusBudget:8};
   old.yearSummary.dismissed=false;
   const before=structuredClone(old);
   const ui=await mount(old);
-  assert.equal(ui.saved().version,18);
+  assert.equal(ui.saved().version,createGame({seed:1}).version);
   assert.deepEqual(ui.saved().yearSummary,before.yearSummary);
   assert.deepEqual(ui.saved().stats,before.stats);
   assert.equal(ui.saved().rng,before.rng);
   assert.equal(ui.all('.focus-row').length,6);
-  assert.deepEqual(ui.saved().focus,{...old.focus,sports:2,extracurricular:2});
+  assert.deepEqual(ui.saved().focus,{...old.focus,sports:0,extracurricular:0});
   assert.equal(ui.query('.year-decisions').textContent,'Your choicesSchool2/4Friends2/4Family2/4Yourself2/4');
+});
+
+test('School GPA displays letter grades and help without changing the report when focus changes', async () => {
+  const base=ageTo(createGame({seed:121}),10);
+  base.conditions=[]; base.effects=[]; base.focus=defaultFocus(base);
+  for(const [score,letter] of [[98,'A+'],[80,'B-'],[50,'F-']]) {
+    const fixture=structuredClone(base);
+    fixture.school.gpa=score;
+    const ui=await mount(fixture),before=ui.saved(),writes=ui.writes();
+    assert.equal(ui.query('.school-grade > strong').textContent,letter);
+    assert.equal(ui.query('.school-grade > strong').getAttribute('aria-label'),`School GPA ${letter}`);
+    assert.match(ui.query('.school-grade').textContent,/Latest report card/);
+    ui.click('[data-topic="school-gpa"]');
+    assert.match(ui.query('.help-popup').textContent,/study points multiplied by Intelligence.*same grade with less study.*updates after each school year/);
+    ui.click('.help-popup [data-action="close"]');
+    assert.equal(ui.writes(),writes);
+    assert.deepEqual(ui.saved(),before);
+    ui.click('.focus-row[data-focus-key="work"] [data-delta="1"]');
+    assert.equal(ui.query('.school-grade > strong').textContent,letter,'changing plans does not rewrite the completed grade');
+    assert.equal(ui.saved().school.gpa,score);
+    assert.equal(ui.saved().rng,before.rng);
+    ui.click('.nav-list [data-tab="family"]');
+    assert.equal(ui.all('.school-grade').length,0);
+    ui.click('.nav-list [data-tab="career"]');
+    assert.equal(ui.all('.school-grade').length,0);
+  }
+  const firstYear=await mount(ageTo(createGame({seed:121}),5));
+  assert.match(firstYear.query('.school-grade').textContent,/Starting grade/);
+  for(const age of [4,18]) {
+    const ui=await mount(ageTo(createGame({seed:121}),age));
+    assert.equal(ui.all('.school-grade').length,0,'only school-age Year displays GPA');
+  }
+});
+
+test('annual enrollment offers unlock zero-to-two controls, apply lifestyle gates, and persist selections', async () => {
+  const fixture=ageTo(createGame({seed:121}),10);
+  fixture.conditions=[]; fixture.effects=[]; fixture.focus=defaultFocus(fixture); fixture.lifestyle=6;
+  fixture.school.offers.sports=['basketball','soccer','lacrosse','fencing','gymnastics'];
+  fixture.school.offers.extracurricular=['chess','piano','modeling','drama','robotics'];
+  let ui=await mount(fixture);
+  const before=ui.saved();
+  for(const kind of ['sports','extracurricular']) {
+    const row=ui.query(`.focus-row[data-focus-key="${kind}"]`);
+    assert.equal(row.querySelector('output').textContent,'0');
+    assert.equal(row.querySelector('[data-delta="-1"]').disabled,true);
+    assert.equal(row.querySelector('[data-delta="1"]').disabled,true);
+    assert.equal(row.querySelectorAll('.focus-scale span').length,2);
+    assert.equal(row.querySelectorAll('.choice-impact').length,0);
+  }
+  ui.click('[data-action="school-offers"][data-kind="sports"]');
+  assert.equal(ui.all('.school-offer').length,5);
+  assert.deepEqual(ui.all('.school-offer').map(card=>card.dataset.offerId),fixture.school.offers.sports);
+  assert.match(ui.query('.school-offer[data-offer-id="basketball"]').textContent,/Performance: Strength, Height.*Training: Strength, Social/);
+  assert.doesNotMatch(ui.query('.school-offer[data-offer-id="basketball"]').textContent,/Health/);
+  assert.equal(ui.query('[data-action="school-enroll"][data-id="lacrosse"]').disabled,true);
+  assert.match(ui.query('.school-offer[data-offer-id="lacrosse"]').textContent,/Lifestyle 7\.0/);
+  ui.click('[data-action="school-enroll"][data-id="lacrosse"]');
+  assert.deepEqual(ui.saved(),before,'disabled enrollment does not consume a choice or RNG');
+  ui.click('[data-action="school-enroll"][data-id="basketball"]');
+  assert.equal(ui.all('[role="dialog"]').length,0);
+  assert.deepEqual(ui.saved().school.sports,{id:'basketball',success:5});
+  assert.equal(ui.saved().focus.sports,1);
+  assert.equal(ui.saved().age,before.age);
+  assert.equal(ui.saved().rng,before.rng);
+  assert.deepEqual(ui.saved().stats,before.stats);
+  assert.match(ui.query('.school-enrollment[data-school-kind="sports"]').textContent,/Basketball.*Success 5\.0\/10/);
+  ui.click('.focus-row[data-focus-key="sports"] [data-delta="1"]');
+  assert.equal(ui.saved().focus.sports,2);
+  assert.equal(ui.query('.focus-row[data-focus-key="sports"] [data-delta="1"]').disabled,true);
+  assert.deepEqual(ui.all('.focus-row[data-focus-key="sports"] .choice-impact').map(entry=>entry.dataset.stat).sort(),['social','strength']);
+  ui.click('.focus-row[data-focus-key="family"] [data-delta="-1"]');
+  ui.click('[data-action="school-offers"][data-kind="extracurricular"]');
+  assert.equal(ui.all('.school-offer').length,5);
+  assert.match(ui.query('.school-offer[data-offer-id="chess"]').textContent,/Training: Intelligence\./);
+  ui.click('[data-action="school-enroll"][data-id="chess"]');
+  assert.deepEqual(ui.saved().school.extracurricular,{id:'chess',success:5});
+  assert.equal(ui.saved().focus.extracurricular,1);
+  assert.equal(ui.all('.focus-row[data-focus-key="extracurricular"] .choice-impact').length,0);
+  const saved=ui.saved();
+  ui=await mount(saved);
+  assert.deepEqual(ui.saved(),saved);
+  assert.match(ui.query('.school-enrollment[data-school-kind="sports"]').textContent,/Basketball/);
+  assert.match(ui.query('.school-enrollment[data-school-kind="extracurricular"]').textContent,/Chess club/);
+  ui.click('[data-action="school-offers"][data-kind="sports"]');
+  assert.match(ui.query('.school-current').textContent,/Current: Basketball · 5\.0\/10/);
+  ui.click('.school-current [data-action="close"]');
+  assert.deepEqual(ui.saved(),saved,'keeping an activity preserves its success and selection');
+  ui.click('[data-action="school-offers"][data-kind="sports"]');
+  ui.click('[data-action="school-leave"][data-kind="sports"]');
+  assert.equal(ui.saved().school.sports,null);
+  assert.equal(ui.saved().focus.sports,0);
+  assert.equal(ui.query('.focus-row[data-focus-key="sports"] [data-delta="1"]').disabled,true);
+});
+
+test('school report cards render saved grades and activity success with their recorded focus caps', async () => {
+  const fixture=ageTo(createGame({seed:121}),12);
+  fixture.conditions=[]; fixture.effects=[];
+  fixture.school.sports={id:'basketball',success:6.25};
+  fixture.school.extracurricular={id:'chess',success:4.2};
+  fixture.focus=defaultFocus(fixture);
+  assert.equal(advanceYear(fixture,{mortalityRandom:()=>1,growthRandom:()=>0,parentCareerRandom:()=>1}).ok,true);
+  const report=structuredClone(fixture.yearSummary.school);
+  fixture.focus.work=0;
+  for(let reload=0;reload<2;reload++) {
+    const ui=await mount(fixture);
+    const card=ui.query('.school-report[aria-label="School report card"]');
+    assert.match(card.textContent,new RegExp(`GPA ${gradeLetter(report.previousGpa).replace(/[+]/g,'\\+')} → ${gradeLetter(report.gpa).replace(/[+]/g,'\\+')}`));
+    for(const activity of report.activities) assert.ok(card.textContent.includes(`${activity.name} success ${activity.before.toFixed(1)} → ${activity.after.toFixed(1)}/10`));
+    assert.match(ui.query('.year-decisions').textContent,/School2\/4.*Sports1\/2Extracurriculars1\/2/);
+    assert.deepEqual(ui.saved(),fixture,'reading a saved report preserves current choices and activity progress');
+  }
 });
 
 test('toddler family effects combine parents without sections and omit neutral or blocked changes', async () => {
@@ -2675,7 +2805,7 @@ test('Year keeps parents above decisions and shows unbounded totals with separat
 });
 
 
-test('every focus stage starts neutral at two with its stage budget and a hard four-point cap', async () => {
+test('core focus starts neutral at two while unjoined school activities stay locked at zero', async () => {
   for (const [age, college] of [[3,false],[5,false],[18,true],[30,false]]) {
     const fixture=ageTo(createGame({seed:125}),age);
     if(college) assert.equal(chooseEducation(fixture,'college').ok,true);
@@ -2685,11 +2815,14 @@ test('every focus stage starts neutral at two with its stage budget and a hard f
     const ui=await mount(fixture);
     const count=age<5?5:age<18?6:4;
     assert.equal(ui.all('.focus-row').length,count);
-    assert.ok(ui.all('.focus-row output').every(output=>output.textContent==='2'));
-    assert.equal(ui.query('.focus-panel .panel-heading .tag').textContent,`${count*2} / ${count*2} POINTS`);
-    assert.equal(ui.all('.focus-scale span').length,count*MAX_FOCUS);
+    assert.ok(ui.all('.focus-row').every(row=>row.querySelector('output').textContent===(age>=5&&age<18&&['sports','extracurricular'].includes(row.dataset.focusKey)?'0':'2')));
+    assert.equal(ui.query('.focus-panel .panel-heading .tag').textContent,`${age>=5&&age<18?8:count*2} / ${focusBudget(fixture)} POINTS`);
+    assert.equal(ui.all('.focus-scale span').length,age>=5&&age<18?20:count*MAX_FOCUS);
     assert.equal(ui.all('.focus-panel .choice-impact').length,0,'two points has no choice-driven stat or caregiver effects');
-    assert.ok(ui.all('.focus-row [data-delta="1"]').every(button=>button.disabled),'default allocation uses the exact stage budget');
+    if(age>=5&&age<18) {
+      assert.equal(ui.query('.focus-row[data-focus-key="work"] [data-delta="1"]').disabled,false,'unjoined school activities leave two spare points');
+      assert.equal(ui.query('.focus-row[data-focus-key="sports"] [data-delta="1"]').disabled,true,'spare points do not bypass enrollment');
+    } else assert.ok(ui.all('.focus-row [data-delta="1"]').every(button=>button.disabled),'default allocation uses the exact stage budget');
     assert.deepEqual(ui.saved(),before,'reading neutral previews does not mutate saves or RNG');
     ui.click('.focus-row[data-focus-key="social"] [data-delta="-1"]');
     ui.click('.focus-row[data-focus-key="social"] [data-delta="-1"]');
@@ -2786,7 +2919,7 @@ test('birth conditions show inline effects across Year and family profiles witho
   const fixture=partnerFixture();
   assert.equal(haveChild(fixture).ok,true);
   fixture.conditions=['autism','high_energy','sharp_memory'];
-  fixture.focus={...defaultFocus(fixture.age),work:2,social:1,family:2,self:2};
+  fixture.focus={...defaultFocus(fixture),work:2,social:1,family:2,self:2};
   fixture.parents[0].conditions=['low_energy'];
   fixture.partner.conditions=['high_energy'];
   fixture.children[0].conditions=['autism'];
@@ -2822,30 +2955,33 @@ test('lifelong condition caps and extra focus points are enforced together and s
   const fixture=createGame({name:'Jamie Reed',seed:89101});
   fixture.age=10;
   fixture.conditions=['autism','high_energy'];
-  fixture.focus={...defaultFocus(fixture.age),work:2,social:1,family:2,self:2};
+  fixture.school=createSchoolRecord(fixture);
+  fixture.school.sports={id:'basketball',success:5};
+  fixture.school.extracurricular={id:'chess',success:5};
+  fixture.focus={...defaultFocus(fixture),work:2,social:1,family:2,self:2};
   fixture.effects=[];
   assert.equal(validateSave(fixture),true);
   let ui=await mount(fixture);
   const social='.focus-row[data-focus-key="social"]';
-  assert.match(ui.query('.focus-panel .tag').textContent,/11 \/ 13 POINTS/);
+  assert.match(ui.query('.focus-panel .tag').textContent,/9 \/ 11 POINTS/);
   assert.match(ui.query(`${social} .focus-limit`).textContent,/Max 1.*Autism.*lifelong/);
   assert.doesNotMatch(ui.query(`${social} .focus-limit`).textContent,/null|years left/);
   assert.equal(ui.query(`${social} [data-delta="1"]`).disabled,true);
   assert.equal(ui.query(`${social} .stepper`).getAttribute('aria-describedby'),'focus-limit-social');
   assert.equal(ui.all(`${social} .focus-scale .limited`).length,3);
   ui.click('[data-topic="focus"]');
-  assert.match(ui.query('.help-popup').textContent,/Share 13 points across 6 focuses/);
+  assert.match(ui.query('.help-popup').textContent,/Share 11 points.*Sports and Extracurriculars.*0?2/);
   ui.click('.help-popup [data-action="close"]');
   ui.click('.focus-row[data-focus-key="work"] [data-delta="1"]');
   ui.click('.focus-row[data-focus-key="work"] [data-delta="1"]');
   assert.equal(ui.saved().focus.work,4);
-  assert.match(ui.query('.focus-panel .tag').textContent,/13 \/ 13 POINTS/);
+  assert.match(ui.query('.focus-panel .tag').textContent,/11 \/ 11 POINTS/);
   assert.ok(ui.all('.focus-row [data-delta="1"]').every(button=>button.disabled));
   const saved=ui.saved();
   ui=await mount(saved);
   assert.deepEqual(ui.saved(),saved);
   assert.match(ui.query(`${social} .focus-limit`).textContent,/lifelong/);
-  assert.match(ui.query('.focus-panel .tag').textContent,/13 \/ 13 POINTS/);
+  assert.match(ui.query('.focus-panel .tag').textContent,/11 \/ 11 POINTS/);
 
   const toddler=createGame({seed:89102});
   toddler.age=3;toddler.conditions=['high_energy'];toddler.focus=defaultFocus(3);toddler.effects=[];

@@ -1,18 +1,20 @@
 import {
   SKILLS, JOBS, EVENTS, resolveEventChoice, createGame, advanceYear, setFocus, setCryLevel, dismissYearSummary, jobFit,
+  enrollSchoolActivity, leaveSchoolActivity,
   canTakeJob, takeJob, quitJob, haveChild, successionInfo, succeed,
   effectiveStats, eventOdds, mortalityOdds, stage, migrateSave, chooseEducation,
   offeredJobs, needsEducationChoice, pendingEventSubject, focusLimits, focusLimitDetails, caregivers,
   relationshipOdds, meetingChances, proposalChance, pregnancyChance, oneNightChance,
   respondToEncounter, proposeMarriage, endRelationship, normalizeSurname, heightPercentile, statPercentiles
-} from './engine.js?v=school-focus-expansion';
-import { LEGACY_EVENT_COPY } from './event-copy-history.js?v=school-focus-expansion';
-import { annotateNarrative } from './narrative.js?v=school-focus-expansion';
-import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome } from './display.js?v=school-focus-expansion';
+} from './engine.js?v=school-grades-activities';
+import { LEGACY_EVENT_COPY } from './event-copy-history.js?v=school-grades-activities';
+import { annotateNarrative } from './narrative.js?v=school-grades-activities';
+import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome } from './display.js?v=school-grades-activities';
 
-import { MAX_FOCUS, focusBudget } from './focus-rules.js?v=school-focus-expansion';
-import { getBirthConditions } from './birth-conditions.js?v=school-focus-expansion';
-import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=school-focus-expansion';
+import { MAX_FOCUS, focusBudget, focusMaxFor } from './focus-rules.js?v=school-grades-activities';
+import { schoolActivity, gradeLetter, activityEligible } from './school.js?v=school-grades-activities';
+import { getBirthConditions } from './birth-conditions.js?v=school-grades-activities';
+import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=school-grades-activities';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const app = document.querySelector('#app');
@@ -125,8 +127,9 @@ function birthConditionEffects(condition, includeBirthTiming = false) {
   if (condition.focusPoints) effects.push(`${condition.focusPoints>0?'+':''}${condition.focusPoints} focus point${Math.abs(condition.focusPoints)===1?'':'s'} each year from age 2, lifelong`);
   for (const [stage,limits] of Object.entries(condition.focusLimits || {})) {
     for (const [key,max] of Object.entries(limits)) {
-      const label = stage==='toddler'?toddlerFocusRows.find(([area])=>area===key)?.[1]:({work:'School / College / Career',social:'Friends',family:'Family',self:'Yourself / school Sports',sports:'Sports',extracurricular:'Extracurriculars'})[key];
+      const label = stage==='toddler'?toddlerFocusRows.find(([area])=>area===key)?.[1]:({work:'School / College / Career',social:'Friends',family:'Family',self:'Yourself',sports:'Sports',extracurricular:'Extracurriculars'})[key];
       effects.push(`${label || key} max ${max} ${stage==='toddler'?'at ages 2–4':'from age 5'}, lifelong`);
+      if (stage==='standard' && key==='self' && max<MAX_FOCUS) effects.push(`Sports max ${Math.floor(max/2)} at ages 5–17, lifelong`);
     }
   }
   return effects;
@@ -241,9 +244,9 @@ function focusLabel(key) {
 
 function outcomeLimits(outcome) {
   const limits = { ...(state.age<2?{}:outcome.focusLimits?.[state.age<5?'toddler':'standard'] || {}) };
-  if (state.age>=5 && state.age<18 && limits.self!==undefined) limits.sports=Math.min(limits.sports ?? MAX_FOCUS,limits.self);
+  if (state.age>=5 && state.age<18 && limits.self!==undefined) limits.sports=Math.min(limits.sports ?? 2,Math.floor(Math.min(MAX_FOCUS,limits.self)/2));
   const active = focusLimits(state);
-  return Object.entries(limits).filter(([key,max])=>Object.hasOwn(active,key) && max<MAX_FOCUS).map(([key,max])=>`${focusLabel(key)} max ${max}`);
+  return Object.entries(limits).filter(([key,max])=>Object.hasOwn(active,key) && max<focusMaxFor(state,key)).map(([key,max])=>`${focusLabel(key)} max ${max}`);
 }
 
 function outcomeSummary(outcome, subject, pending) {
@@ -296,6 +299,7 @@ function yearView() {
   const toddler = !baby && state.age < 5;
   const disabled = state.ended || state.needsSuccession || state.pendingEvents.length>0;
   return `${state.education.status==='college'?collegeProgressView():''}<section class="panel focus-panel"><div class="panel-heading"><h3>${labelWithHelp(baby?'Cry level':toddler?'Toddler activities':'Focus',baby?'cry':toddler?'toddler-focus':'focus')}</h3><span class="tag">${baby ? 'AGES 0–1' : `${focusUsed()} / ${focusBudget(state)} POINTS`}</span></div>
+    ${state.age>=5 && state.age<18 && state.school?`<div class="school-grade"><span>${labelWithHelp('School GPA','school-gpa')}<small>${state.school.reportedAge===null?'Starting grade':'Latest report card'}</small></span><strong aria-label="School GPA ${esc(gradeLetter(state.school.gpa))}">${esc(gradeLetter(state.school.gpa))}</strong></div>`:''}
     ${baby ? `<div class="cry-control" role="group" aria-label="Cry level"><div class="cry-levels">${[1,2,3,4,5].map(level=>`<button class="cry-level ${state.cryLevel===level?'selected':''}" data-action="baby" data-level="${level}" aria-label="Cry level ${level} of 5" aria-pressed="${state.cryLevel===level}" ${disabled?'disabled':''}>${level}</button>`).join('')}</div><div class="cry-scale-labels"><span>Low</span><span>High</span></div></div>` : focusView(disabled)}
     ${!baby&&(state.age<18||state.education.status==='college')?'':choiceImpactSummary()}
     </section>
@@ -327,7 +331,7 @@ function yearDecisionsView(decisions) {
   if (!decisions) return '';
   const entries=decisions.cryLevel!==undefined
     ? [['Cry level',`${decisions.cryLevel}/5`]]
-    : (decisions.workLabel==='Play'?(Object.hasOwn(decisions.focus,'creative')?toddlerFocusRows:legacyToddlerFocusRows).map(([key,label])=>[label,key]):decisions.workLabel==='School'?schoolFocusRows.filter(([key])=>Object.hasOwn(decisions.focus,key)).map(([key,label])=>[label,key]):[[decisions.workLabel || 'School/career','work'],['Friends','social'],['Family','family'],['Yourself','self']]).map(([label,key])=>[label,`${decisions.focus[key]}/${decisions.focusMax ?? 5}`]);
+    : (decisions.workLabel==='Play'?(Object.hasOwn(decisions.focus,'creative')?toddlerFocusRows:legacyToddlerFocusRows).map(([key,label])=>[label,key]):decisions.workLabel==='School'?schoolFocusRows.filter(([key])=>Object.hasOwn(decisions.focus,key)).map(([key,label])=>[label,key]):[[decisions.workLabel || 'School/career','work'],['Friends','social'],['Family','family'],['Yourself','self']]).map(([label,key])=>[label,`${decisions.focus[key]}/${decisions.focusCaps?.[key] ?? decisions.focusMax ?? 5}`]);
   const rest=decisions.focus?(decisions.focusBudget ?? 12)-Object.values(decisions.focus).reduce((sum,value)=>sum+value,0):0;
   if(rest) entries.push([decisions.focusMax===MAX_FOCUS||decisions.workLabel==='Play'?'Unused':'Rest',`${rest} point${rest===1?'':'s'}`]);
   return `<section class="year-decisions" aria-label="Choices used this year"><h3>Your choices</h3><dl>${entries.map(([label,value])=>`<div><dt>${label}</dt><dd>${value}</dd></div>`).join('')}</dl></section>`;
@@ -391,10 +395,15 @@ function eventOutcomeText(text, age) {
   return splitEventOutcome(text).map(line=>journalText(line,age)).join('<br>');
 }
 
+function schoolReportView(report) {
+  if (!report) return '';
+  return `<section class="school-report" aria-label="School report card"><h3>Report card</h3><p>GPA <strong>${report.previousGpa==null?'':`${esc(gradeLetter(report.previousGpa))} → `}${esc(gradeLetter(report.gpa))}</strong></p>${(report.activities || []).map(activity=>`<p>${esc(activity.name)} success <strong>${number(activity.before)} → ${number(activity.after)}<small>/10</small></strong></p>`).join('')}</section>`;
+}
+
 function yearSummaryModal() {
   const summary=state.yearSummary;
   if (!summary || summary.dismissed) return;
-  openModal(`Age ${summary.fromAge} → ${summary.toAge}`, `${yearDecisionsView(summary.decisions)}${changesView(summary.stats,summary.lifestyle,summary.height,summary.fromAge,summary.toAge)}${summary.parents?.length?`<details class="forecast-parents" open><summary>Parents & guardians</summary>${summary.parents.map(parent=>`<p><strong>${narrativeText(parent.name)}</strong><span>Mental stability${statEmoji('stability')} ${beforeAfter(parent.stability)}<br>Relationship${statEmoji('relationship')} ${beforeAfter(parent.relationship)}${parent.lifestyle?`<span class="parent-review-lifestyle">Lifestyle${statEmoji('lifestyle')} ${beforeAfter(parent.lifestyle)}</span>`:''}</span></p>`).join('')}</details>`:''}${yearEventsView(summary)}${state.pendingEvents.length?'<p class="form-note">Decisions waiting.</p>':''}`, '<button class="button primary" data-action="close">Continue '+icon('arrow')+'</button>');
+  openModal(`Age ${summary.fromAge} → ${summary.toAge}`, `${schoolReportView(summary.school)}${yearDecisionsView(summary.decisions)}${changesView(summary.stats,summary.lifestyle,summary.height,summary.fromAge,summary.toAge)}${summary.parents?.length?`<details class="forecast-parents" open><summary>Parents & guardians</summary>${summary.parents.map(parent=>`<p><strong>${narrativeText(parent.name)}</strong><span>Mental stability${statEmoji('stability')} ${beforeAfter(parent.stability)}<br>Relationship${statEmoji('relationship')} ${beforeAfter(parent.relationship)}${parent.lifestyle?`<span class="parent-review-lifestyle">Lifestyle${statEmoji('lifestyle')} ${beforeAfter(parent.lifestyle)}</span>`:''}</span></p>`).join('')}</details>`:''}${yearEventsView(summary)}${state.pendingEvents.length?'<p class="form-note">Decisions waiting.</p>':''}`, '<button class="button primary" data-action="close">Continue '+icon('arrow')+'</button>');
   showingYearSummary=true;
   modalRoot.querySelector('.modal').classList.add('year-review-modal');
   modalRoot.querySelector('.modal-backdrop').classList.add('year-review-backdrop');
@@ -452,6 +461,28 @@ function activityEffectsView(activity, label) {
   }).join('')}</ul></div>`;
 }
 
+function schoolEnrollmentView(kind, disabled) {
+  const enrolled=state.school?.[kind];
+  const activity=schoolActivity(kind,enrolled?.id);
+  const eligible=activity && activityEligible(state,activity);
+  return `<div class="school-enrollment" data-school-kind="${kind}">${activity?`<div class="school-enrollment-title"><strong>${esc(activity.name)}</strong><span>Success ${number(enrolled.success)}<small>/10</small></span></div>${ratingBar(`${activity.name} success`,enrolled.success)}${!eligible?`<p class="form-note">Requires Lifestyle ${number(activity.minLifestyle)}+. Participation is paused.</p>`:''}`:'<p class="form-note">Sign up to spend focus points here.</p>'}<button class="button ghost small" data-action="school-offers" data-kind="${kind}" ${disabled?'disabled':''}>${activity?'View this year’s options':kind==='sports'?'Join a sport':'Join an extracurricular'}</button></div>`;
+}
+
+function schoolOffersModal(kind) {
+  if (state.age<5 || state.age>=18 || !state.school || !['sports','extracurricular'].includes(kind)) return;
+  const enrolled=state.school[kind];
+  const current=schoolActivity(kind,enrolled?.id);
+  const blocked=state.ended || state.needsSuccession || state.pendingEvents.length>0;
+  const freePoints=focusBudget(state)-focusUsed()+(state.focus[kind] || 0);
+  const cards=state.school.offers[kind].map(id=>{
+    const activity=schoolActivity(kind,id);
+    const eligible=activityEligible(state,activity);
+    const reason=!eligible?`Requires Lifestyle ${number(activity.minLifestyle)}+.`:freePoints<1?'Free one focus point to sign up.':'';
+    return `<article class="school-offer" data-offer-id="${esc(id)}"><h3>${esc(activity.name)}</h3><p>Performance: ${Object.keys(activity.weights).map(skillLabel).map(esc).join(', ')}.</p><p>Training: ${Object.keys(activity.training).map(skillLabel).map(esc).join(', ')}.</p>${activity.minLifestyle?`<p>Minimum Lifestyle ${number(activity.minLifestyle)}</p>`:''}${reason?`<p class="form-note">${esc(reason)}</p>`:''}<button class="button secondary small" data-action="school-enroll" data-kind="${kind}" data-id="${esc(id)}" ${blocked || !eligible || freePoints<1?'disabled':''}>Join ${esc(activity.name)}</button></article>`;
+  }).join('');
+  openModal(kind==='sports'?'Choose a sport':'Choose an extracurricular', `<p class="form-note">Five new options each year. Joining starts success at 5.0/10 and assigns 1 point. Switching starts a new success rating.</p>${current?`<div class="school-current"><strong>Current: ${esc(current.name)} · ${number(enrolled.success)}/10</strong><button class="button secondary small" data-action="close">Keep ${esc(current.name)}</button><button class="button ghost small" data-action="school-leave" data-kind="${kind}" ${blocked?'disabled':''}>Leave ${esc(current.name)}</button></div>`:''}<div class="school-offers">${cards}</div>`);
+}
+
 function focusView(disabled) {
   const toddler = state.age < 5;
   const studying = state.age<18 || state.education.status==='college';
@@ -459,9 +490,10 @@ function focusView(disabled) {
   const mode = toddler?'activity':'focus';
   const limits = focusLimits(state), details = focusLimitDetails(state);
   return `<div class="focus-list">${rows.map(([key,label,ico]) => {
+    const maximum=focusMaxFor(state,key);
     const restrictions = details.filter(limit=>limit.key===key);
     const limitText = restrictions.length?'Max '+limits[key]+' · '+restrictions.map(limit=>limit.name+' ('+(limit.years===null?'lifelong':limit.years===1?'this year':limit.years+' years left')+')').join('; '):'';
-    return `<div class="focus-row" data-focus-key="${key}"><span class="focus-icon">${icon(ico)}</span><div class="focus-copy"><h4>${labelWithHelp(label,`${toddler?'toddler':'focus'}-${key}`)}</h4><div class="focus-scale" aria-hidden="true">${Array.from({length:MAX_FOCUS},(_,i)=>`<span class="${i<(state.focus[key] ?? 0)?'filled':i>=limits[key]?'limited':''}"></span>`).join('')}</div>${limitText?`<div class="focus-limit" id="focus-limit-${key}">${esc(limitText)}</div>`:''}</div><div class="stepper" role="group" aria-label="${esc(label)} ${mode}" ${limitText?`aria-describedby="focus-limit-${key}"`:''}><button data-action="focus" data-key="${key}" data-delta="-1" aria-label="Decrease ${esc(label.toLowerCase())} ${mode}" ${(state.focus[key] ?? 0)<=0||disabled?'disabled':''}>${icon('minus')}</button><output aria-label="${esc(label)} ${mode} level">${state.focus[key] ?? 0}</output><button data-action="focus" data-key="${key}" data-delta="1" aria-label="Increase ${esc(label.toLowerCase())} ${mode}" ${(state.focus[key] ?? 0)>=limits[key]||focusUsed()>=focusBudget(state)||disabled?'disabled':''}>${icon('plus')}</button></div>${(toddler||studying)&&!disabled?activityEffectsView(key,label):''}</div>`;
+    return `<div class="focus-row" data-focus-key="${key}"><span class="focus-icon">${icon(ico)}</span><div class="focus-copy"><h4>${labelWithHelp(label,`${toddler?'toddler':'focus'}-${key}`)}</h4><div class="focus-scale" aria-hidden="true">${Array.from({length:maximum},(_,i)=>`<span class="${i<(state.focus[key] ?? 0)?'filled':i>=limits[key]?'limited':''}"></span>`).join('')}</div>${limitText?`<div class="focus-limit" id="focus-limit-${key}">${esc(limitText)}</div>`:''}</div><div class="stepper" role="group" aria-label="${esc(label)} ${mode}" ${limitText?`aria-describedby="focus-limit-${key}"`:''}><button data-action="focus" data-key="${key}" data-delta="-1" aria-label="Decrease ${esc(label.toLowerCase())} ${mode}" ${(state.focus[key] ?? 0)<=0||disabled?'disabled':''}>${icon('minus')}</button><output aria-label="${esc(label)} ${mode} level">${state.focus[key] ?? 0}</output><button data-action="focus" data-key="${key}" data-delta="1" aria-label="Increase ${esc(label.toLowerCase())} ${mode}" ${(state.focus[key] ?? 0)>=limits[key]||focusUsed()>=focusBudget(state)||disabled?'disabled':''}>${icon('plus')}</button></div>${(toddler||studying)&&!disabled?activityEffectsView(key,label):''}${state.age>=5 && state.age<18 && ['sports','extracurricular'].includes(key)?schoolEnrollmentView(key,disabled):''}</div>`;
   }).join('')}</div>`;
 }
 
@@ -639,7 +671,7 @@ function topicHelpModal(topic, id) {
     lifestyle: ['Lifestyle', ['Until 18, you share your parents’ or guardian’s changing household lifestyle. As an adult, work, family and inheritance shape it.']],
     height: ['Height', ['Final height emerges from yearly growth shaped by age, inheritance, health and chance, ending at 14–18. Poor health reduces new growth, never existing height.']],
     cry: ['Cry level', ['Less crying lowers your intelligence and mental stability; more crying raises them. Strength is unaffected. Parent relationships tend to fall at levels 1–2, stay steady at 3, and rise at 4–5, with yearly variation. Harder crying strains their mental stability more.']],
-    focus: ['Your focus', [`Share ${focusBudget(state)} points across ${Object.keys(state.focus).length} focuses, up to ${MAX_FOCUS} each. The default 2 in each adds no focus-driven stat changes. Conditions and events can change your limits.`, state.age>=5 && state.age<18 ? 'Most effects show one sign at 1 or 3 points and three at 0 or 4. School Intelligence shows two signs at 1/3 and three at 0/4; School Creativity shows one and two. Low focus reverses gains and costs. Aptitude, current ratings and events affect the final result.' : 'Points 1 and 3 show one sign per effect; 0 and 4 are three times as strong and show three. Combined effects can reach six signs. Aptitude, current ratings, development and events affect the final result. Zero effects are hidden.']],
+    focus: ['Your focus', [state.age>=5 && state.age<18 ? `Share ${focusBudget(state)} points. School, Friends, Family and Yourself use 0–4, neutral at 2. Sports and Extracurriculars unlock after signup and use 0–2, neutral at 1. Conditions and events can lower limits.` : `Share ${focusBudget(state)} points across ${Object.keys(state.focus).length} focuses, up to ${MAX_FOCUS} each. The default 2 in each adds no focus-driven stat changes. Conditions and events can change your limits.`, state.age>=5 && state.age<18 ? 'Most core effects show one sign at 1 or 3 points and three at 0 or 4. School Intelligence shows two signs at 1/3 and three at 0/4; School Creativity shows one and two. Enrolled activities show one minus at 0 and one plus at 2 for the stats they train. Aptitude, current ratings and events affect the final result.' : 'Points 1 and 3 show one sign per effect; 0 and 4 are three times as strong and show three. Combined effects can reach six signs. Aptitude, current ratings, development and events affect the final result. Zero effects are hidden.']],
     'toddler-focus': ['Toddler activities', [`Share ${focusBudget(state)} points among five activities, up to 4 each. The default 2 in each adds no activity-driven stat changes. Conditions and events can change your limits.`, 'Most effects show one sign at 1 or 3 points and three at 0 or 4. Arts & crafts Intelligence shows one minus at 0, no effect at 1–3, and one plus at 4. Electronics Intelligence uses ----, --, none, ++, ++++ at 0 to 4 points; Social uses ++, +, none, -, --. Aptitude, current ratings, development and events affect the final result. Zero effects are hidden.']],
     ...Object.fromEntries(toddlerFocusRows.map(([key,label]) => [`toddler-${key}`, [label,
       toddlerActivityImpacts(key).map(({stat,change,level,target}) => `${(change>0?'+':'-').repeat(level)}${target==='parents'?(caregivers(state).some(person=>person.guardianRole)?'Guardian relationship':'Parent relationships'):skillLabel(stat)}`)
@@ -648,8 +680,9 @@ function topicHelpModal(topic, id) {
     'focus-social': ['Friends focus', ['Can improve social, support mental stability and create chances to meet people.']],
     'focus-family': ['Family focus', ['Strengthens relationships, helps children develop and supports parents’ mental stability.']],
     'focus-self': ['Yourself focus', [state.age<18 ? 'Personal care supports Attractiveness, mental stability and Health.' : 'Exercise, learning and self-care support strength, creativity, health and mental stability.']],
-    'focus-sports': ['Sports focus', ['Sports develop Strength, Health and Social.']],
-    'focus-extracurricular': ['Extracurriculars focus', ['Clubs and creative activities develop Creativity and Social.']],
+    'school-gpa': ['School GPA', ['Your yearly grade depends on study points multiplied by Intelligence. Higher Intelligence can achieve the same grade with less study. The grade updates after each school year.', 'Good and poor grades can lead to family events. The starting grade uses your initial study allocation and Intelligence.']],
+    'focus-sports': ['Sports focus', ['Sign up from five annual offers to unlock 0–2 points, starting at 1. Every sport trains Strength and Social; some train an extra skill. Success starts at 5.0/10 and changes yearly with relevant abilities, focus and chance. Basketball also rewards height for your age. Keep your sport or switch and start again at 5.0.']],
+    'focus-extracurricular': ['Extracurriculars focus', ['Sign up from five annual offers to unlock 0–2 points, starting at 1. Each activity trains its listed stats. Success starts at 5.0/10 and changes yearly with relevant abilities, focus and chance. You can keep your activity when new offers arrive; switching starts success again at 5.0.']],
     parents: ['Parents & guardians', ['Their wellbeing and careers affect your childhood. Low mental stability and a weak relationship raise the rare chance of abandonment. The other parent takes over; if neither can care for you, an adult relative adopts you. Departures cause severe setbacks.']],
     'parent-career': ['Parents’ careers', ['Higher career focus and experience tend to improve lifestyle; job loss can set it back.']],
     relationship: ['Relationship', ['Higher means closer; family time and shared events change this rating. Partners support social and mental stability, but lower lifestyle.']],
@@ -678,7 +711,7 @@ function topicHelpModal(topic, id) {
 }
 
 function helpModal() {
-  openModal('How to play', `<div class="help-grid"><div class="help-item"><h4>Babies</h4><p>At ages 0–1, choose a cry level from 1–5.</p></div><div class="help-item"><h4>Each year</h4><p>Each focus starts at 2 and can range from 0 to 4. Share 10 points as a toddler and 8 from school age. Most effects at the extremes are three times those at 1 or 3.</p></div><div class="help-item"><h4>Stats</h4><p>Natural aptitude and focus shape abilities; tap ? for details.</p></div><div class="help-item"><h4>Events</h4><p>Age, focus and stats affect random events; some require a choice.</p></div><div class="help-item"><h4>Work</h4><p>At 18, choose work or four years of college.</p></div><div class="help-item"><h4>Family</h4><p>Build relationships, raise children and choose an heir when your chapter ends.</p></div></div>`, '<button class="button primary" data-action="close">Got it</button>');
+  openModal('How to play', `<div class="help-grid"><div class="help-item"><h4>Babies</h4><p>At ages 0–1, choose a cry level from 1–5.</p></div><div class="help-item"><h4>Each year</h4><p>Share 10 points as a toddler or school student, and 8 as an adult. Core focuses use 0–4 points, starting at 2. Conditions can change your budget.</p></div><div class="help-item"><h4>School</h4><p>Study and Intelligence determine your yearly GPA. Join a sport and an extracurricular from five annual offers each; both use 0–2 points, starting at 1.</p></div><div class="help-item"><h4>Stats</h4><p>Natural aptitude and focus shape abilities; tap ? for details.</p></div><div class="help-item"><h4>Events</h4><p>Age, focus, grades and stats affect random events; some require a choice.</p></div><div class="help-item"><h4>Work</h4><p>At 18, choose work or four years of college.</p></div><div class="help-item"><h4>Family</h4><p>Build relationships, raise children and choose an heir when your chapter ends.</p></div></div>`, '<button class="button primary" data-action="close">Got it</button>');
 }
 
 function oddsModal() {
@@ -725,6 +758,15 @@ document.addEventListener('click', event => {
     const {key,delta} = button.dataset;
     update(()=>setFocus(state,key,(state.focus[key] ?? 0)+Number(delta)));
     app.querySelector(`[data-action="focus"][data-key="${key}"][data-delta="${delta}"]`)?.focus({preventScroll:true});
+  }
+  if (action==='school-offers') schoolOffersModal(button.dataset.kind);
+  if (action==='school-enroll') {
+    const result=update(()=>enrollSchoolActivity(state,button.dataset.kind,button.dataset.id));
+    if (result?.ok) { closeModal(); toast('Activity joined.'); }
+  }
+  if (action==='school-leave') {
+    const result=update(()=>leaveSchoolActivity(state,button.dataset.kind));
+    if (result?.ok) { closeModal(); toast('Activity left.'); }
   }
   if (action==='advance') {
     encounterIndex=0;

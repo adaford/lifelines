@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createGame as createGameWithConditions, advanceYear, setFocus, focusLimits, validateSave, migrateSave, annualForecast } from '../engine.js';
 import { defaultFocus, focusBudget } from '../focus-rules.js';
+import { createSchoolRecord } from '../school.js';
 
 // These focus-only fixtures explicitly exclude optional birth constraints.
 const createGame = options => { const state = createGameWithConditions(options); state.conditions = []; state.focus = defaultFocus(state.age); return state; };
@@ -11,17 +12,20 @@ const legacyDefaults = age => age >= 2 && age < 5
   ? { work: 3, social: 2, family: 2, self: 3, creative: 2 }
   : { work: 3, social: 3, family: 3, self: 3 };
 
-test('schema 18 defaults, action limits and budgets match the active focus count', () => {
+test('schema 19 defaults, action limits and budgets match the active focus count', () => {
   for (const age of [2, 4, 5, 17, 25]) {
     const state = createGame({ seed: 3317 });
     state.age = age;
     state.focus = defaultFocus(age);
-    assert.ok(Object.values(state.focus).every(points => points === 2));
-    assert.equal(Object.values(state.focus).reduce((sum, points) => sum + points, 0), focusBudget(age));
-    assert.ok(Object.values(focusLimits(state)).every(max => max === 4));
+    const school = age >= 5 && age < 18;
+    if (school) state.school = createSchoolRecord(state);
+    assert.ok(Object.entries(state.focus).every(([key, points]) => points === (school && ['sports', 'extracurricular'].includes(key) ? 0 : 2)));
+    assert.equal(Object.values(state.focus).reduce((sum, points) => sum + points, 0), school ? 8 : focusBudget(age));
+    assert.ok(Object.entries(focusLimits(state)).every(([key, max]) => max === (school && ['sports', 'extracurricular'].includes(key) ? 0 : 4)));
     const before = copy(state);
     assert.equal(setFocus(state, 'work', 5).ok, false);
-    assert.equal(setFocus(state, 'work', 3).ok, false, 'default allocations spend the exact budget');
+    assert.equal(setFocus(state, 'work', 3).ok, school, 'school leaves two points available until activities are joined');
+    if (school) assert.equal(setFocus(state, 'work', 2).ok, true);
     assert.deepEqual(state, before);
     assert.equal(setFocus(state, 'social', 0).ok, true);
     assert.equal(setFocus(state, 'work', 4).ok, true);
@@ -32,8 +36,11 @@ test('schema 16 migration changes only active focus and version, preserving old 
   const old = createGame({ seed: 3317 });
   old.age = 6;
   old.focus = defaultFocus(old.age);
+  old.school = createSchoolRecord(old);
   assert.equal(advanceYear(old, calmYear).ok, true);
   old.version = 16;
+  delete old.school;
+  delete old.yearSummary.school;
   old.focus = legacyDefaults(old.age);
   old.effects = [{ id: 'legacy-cap', name: 'Saved limit', description: '', years: 2, modifiers: { health: .2 }, focusLimits: { standard: { social: 3, self: 5 } }, kind: 'positive' }];
   old.yearSummary.decisions = { focus: { work: 5, social: 3, family: 2, self: 2 }, workLabel: 'School' };
@@ -42,7 +49,9 @@ test('schema 16 migration changes only active focus and version, preserving old 
   const before = copy(old);
   const migrated = migrateSave(old);
   assert.ok(migrated);
-  assert.deepEqual(migrated, { ...before, version: 18, focus: defaultFocus(7) });
+  const expected = { ...before, version: 19, focus: defaultFocus(7) };
+  expected.school = createSchoolRecord(expected);
+  assert.deepEqual(migrated, expected);
   assert.deepEqual(old, before, 'loading never modifies the input');
   assert.deepEqual(migrateSave(copy(migrated)), migrated, 'a second load never converts allocation again');
   assert.equal(validateSave(migrated), true);
@@ -80,7 +89,7 @@ test('current toddlers require all five focus keys and current reviews record th
   const before = copy(state.focus);
   assert.equal(advanceYear(state, calmYear).ok, true);
   assert.deepEqual(state.yearSummary.decisions, { focus: before, workLabel: 'Play', focusMax: 4, focusBudget: 10 });
-  assert.deepEqual(state.focus, defaultFocus(5), 'default birthday-five allocations fit the twelve-point school budget');
+  assert.deepEqual(state.focus, defaultFocus(5), 'birthday five leaves optional activities unjoined');
   assert.equal(validateSave(state), true);
   const malformed = copy(state);
   delete malformed.yearSummary.decisions.focus.creative;
@@ -90,12 +99,13 @@ test('current toddlers require all five focus keys and current reviews record th
 test('direct over-budget allocations cannot advance and forecast reads do not mutate legal allocations', () => {
   const state = createGame({ seed: 3317 });
   state.age = 6;
-  state.focus = { work: 4, social: 4, family: 1, self: 0, sports: 2, extracurricular: 2 };
+  state.focus = { work: 4, social: 4, family: 3, self: 0, sports: 0, extracurricular: 0 };
+  state.school = createSchoolRecord(state);
   const before = copy(state);
   assert.equal(validateSave(state), false);
-  assert.match(advanceYear(state).reason, /12 focus points/);
+  assert.match(advanceYear(state).reason, /10 focus points/);
   assert.deepEqual(state, before);
-  state.focus.family = 0;
+  state.focus.family = 2;
   const legal = copy(state);
   annualForecast(state);
   assert.deepEqual(state, legal);

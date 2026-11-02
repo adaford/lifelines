@@ -1,4 +1,5 @@
 import { focusEffect, defaultFocus } from '../focus-rules.js';
+import { createSchoolRecord } from '../school.js';
 import { changedRating } from '../rating-changes.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -23,7 +24,8 @@ function stateAt(age) {
   const state = createGame({ seed: 84721 });
   state.age = age;
   if (age >= 18) chooseEducation(state, 'work');
-  state.focus = defaultFocus(age);
+  state.school = age >= 5 && age < 18 ? createSchoolRecord(state) : null;
+  state.focus = defaultFocus(state);
   for (const person of [state, ...state.parents]) neutral(person);
   return state;
 }

@@ -188,7 +188,7 @@ test('year reviews retain the completed year decisions across age and education 
   const student = survivorAt(17, 406);
   const schoolFocus = clone(student.focus);
   advanceYear(student, survives);
-  assert.deepEqual(student.yearSummary.decisions, { focus: schoolFocus, workLabel: 'School', focusMax: 4, focusBudget: 12 });
+  assert.deepEqual(student.yearSummary.decisions, { focus: schoolFocus, workLabel: 'School', focusMax: 4, focusBudget: 10, focusCaps: { sports: 2, extracurricular: 2 } });
   finishChoices(student);
   assert.equal(chooseEducation(student, 'college').ok, true);
   while (student.age < 22) { advanceYear(student, survives); finishChoices(student); }
@@ -232,7 +232,7 @@ test('v6 saves gain cry level and parent bonds without rerolling progress or que
   const before = clone(legacy);
   const migrated = migrateSave(legacy);
   assert.ok(migrated);
-  assert.equal(migrated.version, 18);
+  assert.equal(migrated.version, 19);
   assert.equal(migrated.cryLevel, 5);
   assert.equal(migrated.alive, true);
   assert.equal(migrated.yearSummary, null);

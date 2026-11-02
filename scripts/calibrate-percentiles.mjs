@@ -104,7 +104,7 @@ const reference = {
   calibration: {
     samplesPerSex: samples, seedStart, survivors: result.survivors,
     cryLevel: 3, cryThroughAge: 1, focus, toddlerFocus: TODDLER_FOCUS, choices: 'uniform, independent seeded draws',
-    focusPolicy: 'two-point targets fitted to birth-condition budgets and active condition/event caps; spare points left unused',
+    focusPolicy: 'core two-point targets with optional school activities unenrolled; fitted to birth-condition budgets and active condition/event caps; spare points left unused',
     heightUnit: 'inches',
     conditionedOn: 'alive at the observed age',
     observationsByAge: [...result.ageStats.map(stats => stats.health.count), result.stats.health.count],

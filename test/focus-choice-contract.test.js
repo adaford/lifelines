@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createGame, chooseEducation } from '../engine.js';
 import { MAX_FOCUS, DEFAULT_FOCUS, defaultFocus, focusBudget, focusEffect } from '../focus-rules.js';
 import { focusChoiceEffects, schoolFocusEffects, schoolFocusSteps, toddlerActivityEffects, TODDLER_ACTIVITY_EFFECTS, SCHOOL_FOCUS_EFFECTS } from '../development.js';
+import { createSchoolRecord } from '../school.js';
 import { choiceImpacts, schoolChoiceImpacts, toddlerChoiceImpacts } from '../choice-impacts.js';
 
 const near = (actual, expected, context) => assert.ok(Math.abs(actual - expected) < 1e-10, `${context}: ${actual} vs ${expected}`);
@@ -11,7 +12,8 @@ function life(age) {
   state.age = age;
   state.conditions = [];
   if (age >= 18) chooseEducation(state, 'work');
-  state.focus = defaultFocus(age);
+  state.school = age >= 5 && age < 18 ? createSchoolRecord(state) : null;
+  state.focus = defaultFocus(state);
   for (const person of [state, ...state.parents]) {
     for (const stat of Object.keys(person.stats)) { person.stats[stat] = 5; person.aptitudes[stat] = 0; }
     if ('relationship' in person) person.relationship = 5;
@@ -25,9 +27,9 @@ test('the shared focus scale gives every stage its exact neutral allocation and 
   assert.deepEqual([0, 1, 2, 3, 4].map(focusEffect), [-3, -1, 0, 1, 3]);
   for (const age of [2, 4, 5, 17, 18, 30, 70]) {
     const focus = defaultFocus(age);
-    assert.ok(Object.values(focus).every(points => points === 2));
-    assert.equal(focusBudget(age), age < 5 ? 10 : age < 18 ? 12 : 8);
-    assert.equal(Object.values(focus).reduce((total, points) => total + points, 0), focusBudget(age));
+    assert.ok(Object.entries(focus).every(([key, points]) => points === (age >= 5 && age < 18 && ['sports', 'extracurricular'].includes(key) ? 0 : 2)));
+    assert.equal(focusBudget(age), age < 18 ? 10 : 8);
+    assert.equal(Object.values(focus).reduce((total, points) => total + points, 0), age >= 5 && age < 18 ? 8 : focusBudget(age));
   }
 });
 
@@ -48,7 +50,7 @@ test('raw choice effects retain ordinary endpoints and the custom toddler and Sc
   for (const age of [2, 12, 19, 35, 70]) for (const aptitude of [-3, 0, 3]) {
     const state = life(age);
     for (const stat of Object.keys(state.aptitudes)) state.aptitudes[stat] = aptitude;
-    for (const area of Object.keys(state.focus)) {
+    for (const area of Object.keys(state.focus).filter(key => !['sports', 'extracurricular'].includes(key))) {
       const effects = points => {
         const selected = { ...state, focus: { ...state.focus, [area]: points } };
         return age < 5 ? toddlerActivityEffects(selected)[area]
@@ -81,7 +83,7 @@ test('individual effects retain their point curves, including endpoint-only craf
     state.conditions = [];
     if (age === 19) state.education = { status: 'college', years: 1 };
     const preview = age < 5 ? toddlerChoiceImpacts : schoolChoiceImpacts;
-    for (const area of Object.keys(state.focus)) for (const [points, level] of [[0, 3], [1, 1], [2, 0], [3, 1], [4, 3]]) {
+    for (const area of Object.keys(state.focus).filter(key => !['sports', 'extracurricular'].includes(key))) for (const [points, level] of [[0, 3], [1, 1], [2, 0], [3, 1], [4, 3]]) {
       const selected = { ...state, focus: { ...defaultFocus(age), [area]: points } };
       const entries = preview(selected, area);
       if (level === 0) assert.deepEqual(entries, []);

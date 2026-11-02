@@ -12,7 +12,9 @@ function removeNewFocusMetadata(value) {
   // Explicit downgrade helpers also restore the four-area school format in
   // recorded decisions. Production migrations must preserve those old reviews.
   if (value.focus) { delete value.focus.sports; delete value.focus.extracurricular; }
-  if (value.focus && value.workLabel) { delete value.focusMax; delete value.focusBudget; }
+  if (value.focus && value.workLabel) { delete value.focusMax; delete value.focusBudget; delete value.focusCaps; }
+  if (value.fromAge !== undefined) delete value.school;
+  else if (value.school !== undefined) value.school = null;
 }
 
 const legacyRating = number => Math.max(1, number);

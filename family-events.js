@@ -1,4 +1,5 @@
-import { legacyFocusValue } from './focus-rules.js?v=school-focus-expansion';
+import { legacyFocusValue } from './focus-rules.js?v=school-grades-activities';
+import { gradeScore } from './school.js?v=school-grades-activities';
 // Fictional household events. Subject changes affect the named person; player
 // changes affect you. Relationship changes affect your bond with that person.
 // Individual rolls join the ordinary event pool and share its five-event cap.
@@ -22,6 +23,12 @@ const group = (subjectType, defaults, entries) => entries.map(event => permanent
 }));
 
 export const FAMILY_EVENTS = [
+  ...group('parent', { minAge: 18, maxAge: 200, minPlayerAge: 5, maxPlayerAge: 17, baseChance: .009 }, [
+    { id: 'household_school_proud_parent', name: 'Your report goes on the fridge', description: '{name} pins up your excellent school report and tells relatives about your work, giving you both a lift.', conditions: ['excellentSchoolGrade'], subjectChanges: { stability: .25 }, playerChanges: { stability: .2, social: .15 }, relationship: .25 },
+    { id: 'household_school_celebration', name: 'A report-card celebration', description: '{name} celebrates your excellent report with a homemade meal and an afternoon at the park together.', conditions: ['excellentSchoolGrade'], subjectChanges: { stability: .2 }, playerChanges: { health: .15, stability: .15 }, relationship: .2 },
+    { id: 'household_school_disappointment', name: 'A difficult report-card conversation', description: '{name} reacts angrily to your poor report, and an evening of criticism leaves you both upset.', conditions: ['poorSchoolGrade'], kind: 'negative', subjectChanges: { stability: -.2 }, playerChanges: { stability: -.25, health: -.1 }, relationship: -.25 },
+    { id: 'household_school_grounding', name: 'Grounded after a poor report', description: '{name} grounds you after a poor school report, cutting back your time with friends for the coming year.', conditions: ['poorSchoolGrade'], kind: 'negative', subjectChanges: { stability: -.1 }, playerChanges: { stability: -.2, social: -.15 }, relationship: -.2, years: 1, focusLimits: { standard: { social: 1 } } },
+  ]),
   ...group('parent', { minAge: 18, maxAge: 200, minPlayerAge: 0, maxPlayerAge: 17, baseChance: .00005 }, [
     { id: 'household_parent_abandonment', name: 'Abandons you', description: '{name} leaves the family. Your remaining parent takes over; otherwise an adult relative adopts you.', kind: 'negative', years: 3, modifiers: { stability: -3, social: -1.5, health: -1 }, relationship: -10 },
   ]),
@@ -156,7 +163,7 @@ function traitFactor(value, direction) {
   const scaled = direction === 'low' ? (10 - clamp(value, 0, 10)) / 9 : Math.max(0, (clamp(value, 0, 10) - 1) / 9);
   return direction === 'low' ? .08 + 3.68 * scaled ** 2 : .12 + 3.52 * scaled ** 2;
 }
-function eligible(event, state, subject) {
+function eligible(event, state, subject, playerStats = state.stats) {
   if (subject.alive === false || subject.age < event.minAge || subject.age > event.maxAge) return false;
   if (event.subjectType === 'parent' && subject.abandonedAt !== undefined) return false;
   if (event.id === 'household_parent_abandonment' && !(state.parents || []).includes(subject)) return false;
@@ -166,6 +173,8 @@ function eligible(event, state, subject) {
     if (condition === 'married') return subject.married === true;
     if (condition === 'dating') return subject.married === false;
     if (condition === 'togetherYear') return subject.yearsTogether >= 1;
+    if (condition === 'excellentSchoolGrade') return Boolean(state.school) && gradeScore(state.focus.work, playerStats.intelligence) >= 90;
+    if (condition === 'poorSchoolGrade') return Boolean(state.school) && gradeScore(state.focus.work, playerStats.intelligence) < 70;
     return false;
   });
 }
@@ -179,7 +188,7 @@ export function abandonmentChance(state, parent) {
   return .00005 + .01995 * strain ** 2 * distance ** 2;
 }
 
-export function familyEventChances(state) {
+export function familyEventChances(state, playerStats = state.stats) {
   if (state.ended || state.needsSuccession) return [];
   const actors = [
     ...(state.parents || []).map(person => ({ subjectType: 'parent', person })),
@@ -191,7 +200,7 @@ export function familyEventChances(state) {
   const result = [];
   for (const { subjectType, person } of actors) {
     for (const event of FAMILY_EVENTS.filter(event => event.subjectType === subjectType)) {
-      let chance = eligible(event, state, person) ? event.id === 'household_parent_abandonment' ? abandonmentChance(state, person) : event.baseChance * FAMILY_EVENT_RATE_MULTIPLIER : 0;
+      let chance = eligible(event, state, person, playerStats) ? event.id === 'household_parent_abandonment' ? abandonmentChance(state, person) : event.baseChance * FAMILY_EVENT_RATE_MULTIPLIER : 0;
       for (const [key, direction] of event.statFactors || []) chance *= traitFactor(person.stats[key], direction);
       for (const key of event.focusFactors || []) chance *= .4 + focus[key] * .25;
       for (const key of event.neglectFactors || []) chance *= .25 + (5 - focus[key]) * .35;
