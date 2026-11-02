@@ -1,23 +1,23 @@
 // Lifelines: deterministic, browser-independent simulation rules.
 // All public actions mutate their state and return { ok, reason? }.
-import { JOBS } from './jobs.js?v=activity-participation';
-import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=activity-participation';
-import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=activity-participation';
-import { mortalityRisk, rollMortality } from './mortality.js?v=activity-participation';
-import { heightReference, advanceGrowth } from './growth.js?v=activity-participation';
-import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=activity-participation';
-import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, standardFocusPractice, schoolAppearanceChange, DEVELOPMENT_BALANCE, BIRTH_VARIATION, SKILL_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, PARENT_FAMILY_STABILITY_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=activity-participation';
-import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=activity-participation';
-import { normalPercentile } from './percentiles.js?v=activity-participation';
-import { changedRating } from './rating-changes.js?v=activity-participation';
-import { MAX_FOCUS, DEFAULT_FOCUS, SCHOOL_FOCUS_KEYS, focusMaxFor, focusNeutralFor, isSchoolActivityFocus, focusEffect, focusKeysForAge, focusBudget, defaultFocus, legacyFocusValue } from './focus-rules.js?v=activity-participation';
-import { schoolActivity, gradeScore, activitySuccessChange, activityEligible, annualSchoolOffers, createSchoolRecord } from './school.js?v=activity-participation';
-import { assignBirthConditions, getBirthConditions, conditionFocusPoints, conditionFocusLimits, validateBirthConditions } from './birth-conditions.js?v=activity-participation';
+import { JOBS } from './jobs.js?v=sport-variety';
+import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=sport-variety';
+import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=sport-variety';
+import { mortalityRisk, rollMortality } from './mortality.js?v=sport-variety';
+import { heightReference, advanceGrowth } from './growth.js?v=sport-variety';
+import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=sport-variety';
+import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, standardFocusPractice, schoolAppearanceChange, DEVELOPMENT_BALANCE, BIRTH_VARIATION, SKILL_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, PARENT_FAMILY_STABILITY_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=sport-variety';
+import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=sport-variety';
+import { normalPercentile } from './percentiles.js?v=sport-variety';
+import { changedRating } from './rating-changes.js?v=sport-variety';
+import { MAX_FOCUS, DEFAULT_FOCUS, SCHOOL_FOCUS_KEYS, focusMaxFor, focusNeutralFor, isSchoolActivityFocus, focusEffect, focusKeysForAge, focusBudget, defaultFocus, legacyFocusValue } from './focus-rules.js?v=sport-variety';
+import { SCHOOL_OFFER_COUNT, schoolActivity, gradeScore, activitySuccessChange, activityEligible, annualSchoolOffers, createSchoolRecord } from './school.js?v=sport-variety';
+import { assignBirthConditions, getBirthConditions, conditionFocusPoints, conditionFocusLimits, validateBirthConditions } from './birth-conditions.js?v=sport-variety';
 export { DEVELOPMENT_BALANCE };
-export { heightPercentile } from './growth.js?v=activity-participation';
-export { mortalityRisk } from './mortality.js?v=activity-participation';
-import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=activity-participation';
-export { JOBS, JOB_CATEGORIES } from './jobs.js?v=activity-participation';
+export { heightPercentile } from './growth.js?v=sport-variety';
+export { mortalityRisk } from './mortality.js?v=sport-variety';
+import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=sport-variety';
+export { JOBS, JOB_CATEGORIES } from './jobs.js?v=sport-variety';
 export const EVENTS = [...PERSONAL_EVENTS, ...FAMILY_EVENTS];
 
 export const SKILLS = [
@@ -1119,7 +1119,7 @@ export function succeed(state, heirId) {
   return ok();
 }
 
-function validSchema(raw, version) {
+function validSchema(raw, version, schoolOfferCount = SCHOOL_OFFER_COUNT) {
   try {
     if (!raw || typeof raw !== 'object' || raw.version !== version) return false;
     const finite = (n, min, max) => typeof n === 'number' && Number.isFinite(n) && n >= min && n <= max;
@@ -1154,7 +1154,7 @@ function validSchema(raw, version) {
     if (version >= 19) {
       const school = raw.school;
       const validEnrollment = (entry, kind) => entry === null || entry && Object.keys(entry).length === 2 && Boolean(schoolActivity(kind, entry.id)) && (entry.success === null || finite(entry.success, 0, 10));
-      const validOffers = (ids, kind) => Array.isArray(ids) && ids.length === 5 && new Set(ids).size === 5 && ids.every(id => Boolean(schoolActivity(kind, id)));
+      const validOffers = (ids, kind) => Array.isArray(ids) && ids.length === schoolOfferCount && new Set(ids).size === schoolOfferCount && ids.every(id => Boolean(schoolActivity(kind, id)));
       if (school === null) { if (raw.age >= 5 && raw.age < 18) return false; }
       else if (raw.age < 5 || !school || Object.keys(school).length !== 6 || !finite(school.gpa, 50, 100)
         || !(school.reportedAge === null || Number.isInteger(school.reportedAge) && finite(school.reportedAge, 6, Math.min(18, raw.age)))
@@ -1346,6 +1346,13 @@ function upgradeSchoolRecord(state) {
 export function migrateSave(raw) {
   try {
     if (validateSave(raw)) return clone(raw);
+    if (validSchema(raw, 19, 5)) {
+      const state = clone(raw);
+      // Earlier schema-19 shortlists contained five offers. Keep their order
+      // and the existing enrollment, changing only the two current lists.
+      for (const kind of ['sports', 'extracurricular']) state.school.offers[kind] = state.school.offers[kind].slice(0, SCHOOL_OFFER_COUNT);
+      return validateSave(state) ? state : null;
+    }
     if ([17, 18].some(version => validSchema(raw, version))) {
       const state = clone(raw);
       upgradeSchoolRecord(state);

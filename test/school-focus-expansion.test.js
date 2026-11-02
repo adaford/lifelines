@@ -33,7 +33,7 @@ function student(age = 12) {
 }
 
 function enroll(state, kind, id) {
-  state.school.offers[kind] = [id, ...state.school.offers[kind].filter(value => value !== id)].slice(0, 5);
+  state.school.offers[kind] = [id, ...state.school.offers[kind].filter(value => value !== id)].slice(0, 3);
   assert.equal(enrollSchoolActivity(state, kind, id).ok, true);
 }
 

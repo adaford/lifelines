@@ -6,15 +6,15 @@ import {
   offeredJobs, needsEducationChoice, pendingEventSubject, focusLimits, focusLimitDetails, caregivers,
   relationshipOdds, meetingChances, proposalChance, pregnancyChance, oneNightChance,
   respondToEncounter, proposeMarriage, endRelationship, normalizeSurname, heightPercentile, statPercentiles
-} from './engine.js?v=activity-participation';
-import { LEGACY_EVENT_COPY } from './event-copy-history.js?v=activity-participation';
-import { annotateNarrative } from './narrative.js?v=activity-participation';
-import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome } from './display.js?v=activity-participation';
+} from './engine.js?v=sport-variety';
+import { LEGACY_EVENT_COPY } from './event-copy-history.js?v=sport-variety';
+import { annotateNarrative } from './narrative.js?v=sport-variety';
+import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome } from './display.js?v=sport-variety';
 
-import { MAX_FOCUS, focusBudget, focusMaxFor } from './focus-rules.js?v=activity-participation';
-import { schoolActivity, gradeLetter, activityEligible } from './school.js?v=activity-participation';
-import { getBirthConditions } from './birth-conditions.js?v=activity-participation';
-import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=activity-participation';
+import { MAX_FOCUS, focusBudget, focusMaxFor } from './focus-rules.js?v=sport-variety';
+import { schoolActivity, gradeLetter, activityEligible } from './school.js?v=sport-variety';
+import { getBirthConditions } from './birth-conditions.js?v=sport-variety';
+import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=sport-variety';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const app = document.querySelector('#app');
@@ -483,7 +483,7 @@ function schoolOffersModal(kind) {
     const reason=!eligible?`Requires Lifestyle ${number(activity.minLifestyle)}+.`:freePoints<1?'Free one focus point to sign up.':'';
     return `<article class="school-offer" data-offer-id="${esc(id)}"><h3>${esc(activity.name)}</h3><p>Performance: ${Object.keys(activity.weights).map(key=>key==='height'?(activity.heightPreference==='shorter'?'Shorter height':'Taller height'):skillLabel(key)).map(esc).join(', ')}.</p><p>Training: ${Object.keys(activity.training).map(skillLabel).map(esc).join(', ')}.</p>${activity.minLifestyle?`<p>Minimum Lifestyle ${number(activity.minLifestyle)}</p>`:''}${reason?`<p class="form-note">${esc(reason)}</p>`:''}<button class="button secondary small" data-action="school-enroll" data-kind="${kind}" data-id="${esc(id)}" ${blocked || !eligible || freePoints<1?'disabled':''}>Join ${esc(activity.name)}</button></article>`;
   }).join('');
-  openModal(kind==='sports'?'Choose a sport':'Choose an extracurricular', `<p class="form-note">Five new options each year. Joining assigns 1 point. Success is N/A until your first completed year of participation. Switching starts a new unrated activity.</p>${current?`<div class="school-current"><strong>Current: ${esc(current.name)} · ${activitySuccessLabel(enrolled.success)}${Number.isFinite(enrolled.success)?'/10':''}</strong><button class="button secondary small" data-action="close">Keep ${esc(current.name)}</button><button class="button ghost small" data-action="school-leave" data-kind="${kind}" ${blocked?'disabled':''}>Leave ${esc(current.name)}</button></div>`:''}<div class="school-offers">${cards}</div>`);
+  openModal(kind==='sports'?'Choose a sport':'Choose an extracurricular', `<p class="form-note">Three new options each year. Joining assigns 1 point. Success is N/A until your first completed year of participation. Switching starts a new unrated activity.</p>${current?`<div class="school-current"><strong>Current: ${esc(current.name)} · ${activitySuccessLabel(enrolled.success)}${Number.isFinite(enrolled.success)?'/10':''}</strong><button class="button secondary small" data-action="close">Keep ${esc(current.name)}</button><button class="button ghost small" data-action="school-leave" data-kind="${kind}" ${blocked?'disabled':''}>Leave ${esc(current.name)}</button></div>`:''}<div class="school-offers">${cards}</div>`);
 }
 
 function focusView(disabled) {
@@ -684,8 +684,8 @@ function topicHelpModal(topic, id) {
     'focus-family': ['Family focus', ['Strengthens relationships, helps children develop and supports parents’ mental stability.']],
     'focus-self': ['Yourself focus', [state.age<18 ? 'Personal care supports Attractiveness, mental stability and Health.' : 'Exercise, learning and self-care support strength, creativity, health and mental stability.']],
     'school-gpa': ['School GPA', ['Study effort sets your yearly grade, with Intelligence adjusting it. Higher Intelligence can achieve the same grade with less study. The grade updates after each school year.', 'Good and poor grades can lead to family events. Your first grade arrives after completing your first school year.']],
-    'focus-sports': ['Sports focus', ['Sign up from five annual offers to unlock 0–2 points, starting at 1. Every sport trains Strength and Social; some train an extra skill. Training gives - at 0 points, + at 1 and ++ at 2. Success is N/A until your first year of participation, then changes with abilities, focus and chance. Wrestling rewards shorter height; swimming and basketball reward taller height for your age. Switching returns success to N/A.']],
-    'focus-extracurricular': ['Extracurriculars focus', ['Sign up from five annual offers to unlock 0–2 points, starting at 1. Each activity trains its listed stats. Training gives - at 0 points, + at 1 and ++ at 2. No extracurricular gives - Creativity and - Social. Success is N/A until your first year of participation, then changes with abilities, focus and chance. Keep your activity or switch and return success to N/A.']],
+    'focus-sports': ['Sports focus', ['Sign up from three annual offers to unlock 0–2 points, starting at 1. Every sport trains Strength and Social; some train an extra skill. Training gives - at 0 points, + at 1 and ++ at 2. Success is N/A until your first year of participation, then changes with abilities, focus and chance. Performance varies by sport: endurance sports reward Health, archery rewards Mental stability, orienteering rewards Intelligence, and figure skating rewards Creativity. Wrestling rewards shorter height; swimming and basketball reward taller height for your age. Switching returns success to N/A.']],
+    'focus-extracurricular': ['Extracurriculars focus', ['Sign up from three annual offers to unlock 0–2 points, starting at 1. Each activity trains its listed stats. Training gives - at 0 points, + at 1 and ++ at 2. No extracurricular gives - Creativity and - Social. Success is N/A until your first year of participation, then changes with abilities, focus and chance. Keep your activity or switch and return success to N/A.']],
     parents: ['Parents & guardians', ['Their wellbeing and careers affect your childhood. Low mental stability and a weak relationship raise the rare chance of abandonment. The other parent takes over; if neither can care for you, an adult relative adopts you. Departures cause severe setbacks.']],
     'parent-career': ['Parents’ careers', ['Higher career focus and experience tend to improve lifestyle; job loss can set it back.']],
     relationship: ['Relationship', ['Higher means closer; family time and shared events change this rating. Partners support social and mental stability, but lower lifestyle.']],
@@ -714,7 +714,7 @@ function topicHelpModal(topic, id) {
 }
 
 function helpModal() {
-  openModal('How to play', `<div class="help-grid"><div class="help-item"><h4>Babies</h4><p>At ages 0–1, choose a cry level from 1–5.</p></div><div class="help-item"><h4>Each year</h4><p>Share 10 points as a toddler or school student, and 8 as an adult. Core focuses use 0–4 points, starting at 2. Conditions can change your budget.</p></div><div class="help-item"><h4>School</h4><p>Study and Intelligence determine your yearly GPA. Join a sport and an extracurricular from five annual offers each; both use 0–2 points, starting at 1.</p></div><div class="help-item"><h4>Stats</h4><p>Natural aptitude and focus shape abilities; tap ? for details.</p></div><div class="help-item"><h4>Events</h4><p>Age, focus, grades and stats affect random events; some require a choice.</p></div><div class="help-item"><h4>Work</h4><p>At 18, choose work or four years of college.</p></div><div class="help-item"><h4>Family</h4><p>Build relationships, raise children and choose an heir when your chapter ends.</p></div></div>`, '<button class="button primary" data-action="close">Got it</button>');
+  openModal('How to play', `<div class="help-grid"><div class="help-item"><h4>Babies</h4><p>At ages 0–1, choose a cry level from 1–5.</p></div><div class="help-item"><h4>Each year</h4><p>Share 10 points as a toddler or school student, and 8 as an adult. Core focuses use 0–4 points, starting at 2. Conditions can change your budget.</p></div><div class="help-item"><h4>School</h4><p>Study and Intelligence determine your yearly GPA. Join a sport and an extracurricular from three annual offers each; both use 0–2 points, starting at 1.</p></div><div class="help-item"><h4>Stats</h4><p>Natural aptitude and focus shape abilities; tap ? for details.</p></div><div class="help-item"><h4>Events</h4><p>Age, focus, grades and stats affect random events; some require a choice.</p></div><div class="help-item"><h4>Work</h4><p>At 18, choose work or four years of college.</p></div><div class="help-item"><h4>Family</h4><p>Build relationships, raise children and choose an heir when your chapter ends.</p></div></div>`, '<button class="button primary" data-action="close">Got it</button>');
 }
 
 function oddsModal() {

@@ -26,7 +26,7 @@ function student() {
 }
 
 function join(state, kind, id) {
-  state.school.offers[kind] = [id, ...state.school.offers[kind].filter(other => other !== id)].slice(0, 5);
+  state.school.offers[kind] = [id, ...state.school.offers[kind].filter(other => other !== id)].slice(0, 3);
   assert.equal(enrollSchoolActivity(state, kind, id).ok, true);
   return state;
 }

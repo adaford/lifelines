@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SPORTS, EXTRACURRICULARS, schoolActivity, gradeScore, gradeLetter,
+import { SPORTS, EXTRACURRICULARS, SCHOOL_OFFER_COUNT, schoolActivity, gradeScore, gradeLetter,
   activityPerformance, activitySuccessChange, activityEligible, annualSchoolOffers, createSchoolRecord } from '../school.js';
 import { heightReference } from '../growth.js';
 
@@ -59,6 +59,8 @@ test('every A+ through F- band changes at its exact threshold', () => {
 });
 
 test('activity catalogs support fresh annual offers and keep training specific to the activity', () => {
+  assert.equal(SPORTS.length, 28);
+  assert.equal(EXTRACURRICULARS.length, 22);
   for (const [kind, entries] of [['sports', SPORTS], ['extracurricular', EXTRACURRICULARS]]) {
     assert.ok(entries.length >= 16);
     assert.equal(new Set(entries.map(entry => entry.id)).size, entries.length);
@@ -71,8 +73,11 @@ test('activity catalogs support fresh annual offers and keep training specific t
     }
   }
   for (const sport of SPORTS) {
+    assert.ok(sport.weights.strength > 0, `${sport.id} retains Strength in performance`);
     assert.equal(sport.training.strength, .3);
     assert.equal(sport.training.social, .24);
+    assert.equal(sport.training.health, undefined);
+    assert.equal(sport.training.stability, undefined);
   }
   for (const id of ['soccer', 'football', 'tennis']) assert.deepEqual(schoolActivity('sports', id).weights, { strength: 1 });
   assert.deepEqual(schoolActivity('extracurricular', 'chess').training, { intelligence: .225 });
@@ -110,6 +115,40 @@ test('performance uses relevant stats and compares basketball height with same-a
   person.stats.strength = 100;
   assert.equal(activityPerformance(person, soccer), 10, 'effective ratings above ten cannot overflow performance');
   assert.equal(activityPerformance(person, null), 0);
+});
+
+test('endurance, precision, tactical, and artistic sports reward their performance stats without adding training effects', () => {
+  const cases = [
+    ['cross_country', { strength: .6, health: .4 }],
+    ['rowing', { strength: .65, health: .35 }],
+    ['golf', { strength: .55, stability: .45 }],
+    ['cycling', { strength: .6, health: .4 }],
+    ['triathlon', { strength: .55, health: .45 }],
+    ['archery', { strength: .55, stability: .45 }],
+    ['diving', { strength: .6, stability: .4 }],
+    ['orienteering', { strength: .5, intelligence: .3, health: .2 }],
+    ['sport_climbing', { strength: .55, intelligence: .3, stability: .15 }],
+    ['figure_skating', { strength: .5, creativity: .35, stability: .15 }],
+    ['artistic_swimming', { strength: .5, creativity: .3, health: .2 }],
+  ];
+  for (const [id, weights] of cases) {
+    const selected = schoolActivity('sports', id), person = pupil(), before = copy(person);
+    assert.deepEqual(selected.weights, weights);
+    assert.deepEqual(selected.training, { strength: .3, social: .24 }, `${id} performance factors do not become training bonuses`);
+    near(activityPerformance(person, selected), 5);
+    for (const stat of Object.keys(person.stats)) {
+      const lower = { ...person, stats: { ...person.stats, [stat]: 2 } };
+      const higher = { ...person, stats: { ...person.stats, [stat]: 8 } };
+      const difference = activityPerformance(higher, selected) - activityPerformance(lower, selected);
+      near(difference, 6 * (weights[stat] || 0));
+      if (weights[stat]) {
+        assert.ok(activitySuccessChange(higher, selected, 1) > activitySuccessChange(lower, selected, 1), `${id}: ${stat} improves success with equal effort`);
+      } else {
+        assert.equal(activitySuccessChange(higher, selected, 1), activitySuccessChange(lower, selected, 1), `${id}: unrelated ${stat} does not affect success`);
+      }
+    }
+    assert.deepEqual(person, before, 'performance and success reads preserve ratings and RNG');
+  }
 });
 
 test('activity success rewards performance and focus with bounded supplied variation and no internal RNG', () => {
@@ -169,7 +208,8 @@ test('lifestyle gates expensive school sports without preventing the offer from 
   assert.deepEqual(annualSchoolOffers({ ...person, lifestyle: 0 }, 'sports'), annualSchoolOffers({ ...person, lifestyle: 10 }, 'sports'), 'eligibility does not secretly reroll offers');
 });
 
-test('annual offers are five distinct fresh choices, reproducible without mutating saves or using Math.random', () => {
+test('annual offers are three distinct fresh choices, reproducible without mutating saves or using Math.random', () => {
+  assert.equal(SCHOOL_OFFER_COUNT, 3);
   const person = pupil(5);
   const random = Math.random;
   Math.random = () => { throw new Error('School offers must not draw from ambient RNG'); };
@@ -183,8 +223,8 @@ test('annual offers are five distinct fresh choices, reproducible without mutati
         person.school = { [kind]: { id: enrolled, success: 4 } };
         const before = copy(person), oldOffers = [...previous];
         const offers = annualSchoolOffers(person, kind, previous);
-        assert.equal(offers.length, 5);
-        assert.equal(new Set(offers).size, 5);
+        assert.equal(offers.length, 3);
+        assert.equal(new Set(offers).size, 3);
         assert.ok(offers.every(id => schoolActivity(kind, id) && !previous.includes(id) && id !== enrolled));
         assert.deepEqual(annualSchoolOffers(copy(person), kind, [...previous]), offers);
         assert.deepEqual(person, before);

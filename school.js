@@ -1,4 +1,4 @@
-import { heightReference } from './growth.js?v=activity-participation';
+import { heightReference } from './growth.js?v=sport-variety';
 
 // Fictional school activities and success rules, independent of save mutation
 // and the gameplay RNG. The engine supplies effective ratings and any draw.
@@ -13,6 +13,7 @@ const activity = (id, name, weights, training, minLifestyle, heightPreference) =
 const sport = (id, name, weights = { strength: 1 }, extraTraining = {}, minLifestyle, heightPreference) =>
   activity(id, name, weights, { strength: .3, social: .24, ...extraTraining }, minLifestyle, heightPreference);
 const instrument = (id, name) => activity(id, name, { creativity: 1 }, { creativity: .24 });
+export const SCHOOL_OFFER_COUNT = 3;
 
 export const SPORTS = Object.freeze([
   sport('basketball', 'Basketball', { strength: .7, height: .3 }),
@@ -25,7 +26,7 @@ export const SPORTS = Object.freeze([
   sport('gymnastics', 'Gymnastics', { strength: .7, creativity: .3 }, { creativity: .24 }),
   sport('swimming', 'Swimming', { strength: .7, height: .3 }),
   sport('track', 'Track and field'),
-  sport('cross_country', 'Cross-country running'),
+  sport('cross_country', 'Cross-country running', { strength: .6, health: .4 }),
   sport('volleyball', 'Volleyball', { strength: .7, height: .3 }),
   sport('wrestling', 'Wrestling', { strength: .7, height: .3 }, {}, undefined, 'shorter'),
   sport('martial_arts', 'Martial arts'),
@@ -33,8 +34,16 @@ export const SPORTS = Object.freeze([
   sport('table_tennis', 'Table tennis'),
   sport('baseball', 'Baseball'),
   sport('softball', 'Softball'),
-  sport('rowing', 'Rowing'),
-  sport('golf', 'Golf'),
+  sport('rowing', 'Rowing', { strength: .65, health: .35 }),
+  sport('golf', 'Golf', { strength: .55, stability: .45 }),
+  sport('cycling', 'Cycling', { strength: .6, health: .4 }),
+  sport('triathlon', 'Triathlon', { strength: .55, health: .45 }),
+  sport('archery', 'Archery', { strength: .55, stability: .45 }),
+  sport('diving', 'Diving', { strength: .6, stability: .4 }),
+  sport('orienteering', 'Orienteering', { strength: .5, intelligence: .3, health: .2 }),
+  sport('sport_climbing', 'Sport climbing', { strength: .55, intelligence: .3, stability: .15 }),
+  sport('figure_skating', 'Figure skating', { strength: .5, creativity: .35, stability: .15 }),
+  sport('artistic_swimming', 'Artistic swimming', { strength: .5, creativity: .3, health: .2 }),
 ]);
 
 export const EXTRACURRICULARS = Object.freeze([
@@ -135,7 +144,7 @@ export function annualSchoolOffers(person, kind, previousIds = []) {
     const other = Math.floor(seed / 4294967296 * (index + 1));
     [candidates[index], candidates[other]] = [candidates[other], candidates[index]];
   }
-  return candidates.slice(0, 5).map(entry => entry.id);
+  return candidates.slice(0, SCHOOL_OFFER_COUNT).map(entry => entry.id);
 }
 
 export function createSchoolRecord(person) {

@@ -1,5 +1,13 @@
 # Lifelines
 
+## Sport variety and three annual offers (3 November 2026)
+
+Each school year offers **three sports and three extracurriculars**, drawn from 28 sports and 22 extracurriculars. Keep the current activity independently of the shortlist. New lists exclude the previous list and current enrollment; opening menus or reloading never rerolls them. `SCHOOL_OFFER_COUNT = 3` is shared by generation and validation. Existing schema-19 five-option saves keep the first three saved choices in each category deterministically. Preserve enrollment even if it was the fourth/fifth offer, along with success, focus, ratings, history, pending decisions, and RNG. Malformed/duplicate/unknown offer lists remain invalid; new saves use exactly three per category. Other legacy migrations create three-option records without changing the schema number.
+
+Eight new sports broaden performance beyond Strength: Cycling (60% Strength, 40% Health), Triathlon (55% Strength, 45% Health), Archery (55% Strength, 45% Mental stability), Diving (60% Strength, 40% Mental stability), Orienteering (50% Strength, 30% Intelligence, 20% Health), Sport climbing (55% Strength, 30% Intelligence, 15% Mental stability), Figure skating (50% Strength, 35% Creativity, 15% Mental stability), and Artistic swimming (50% Strength, 30% Creativity, 20% Health). Existing Cross-country running now uses 60% Strength/40% Health, Rowing 65% Strength/35% Health, and Golf 55% Strength/45% Mental stability. Higher ratings improve performance. These are fictional gameplay weights.
+
+The new/updated sports still train Strength and Social only; performance requirements and trained stats are separate. Existing Fencing and Gymnastics retain their extra Intelligence/Creativity training. Soccer, Football, and Tennis remain Strength-only for performance. Basketball/Swimming/Volleyball retain taller-height advantages, Wrestling shorter-height advantage, Cheerleading its appearance factor, and Lacrosse its Lifestyle 7.0 requirement. Success, training units, enrollment budgets, GPA, and saved numeric ratings keep their prior rules.
+
 ## Activity participation and height advantages (3 November 2026)
 
 These rules supersede neutral-at-one activity training and initially displayed 5.0 success. The school budget remains 10, activity maxima remain 2, and joining still assigns 1 point.

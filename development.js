@@ -1,5 +1,5 @@
-import { MAX_FOCUS, DEFAULT_FOCUS, focusEffect, defaultFocus, focusMaxFor, focusNeutralFor } from './focus-rules.js?v=activity-participation';
-import { schoolActivity, activityEligible } from './school.js?v=activity-participation';
+import { MAX_FOCUS, DEFAULT_FOCUS, focusEffect, defaultFocus, focusMaxFor, focusNeutralFor } from './focus-rules.js?v=sport-variety';
+import { schoolActivity, activityEligible } from './school.js?v=sport-variety';
 // Ratings use the same scale throughout life. Balanced toddler activities use
 // TODDLER_FOCUS; core areas use 2, enrolled school activities use 1. Keep the historical calibration
 // offsets, with childhood deductions reduced to the requested tenth strength.
