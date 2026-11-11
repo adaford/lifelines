@@ -1,7 +1,7 @@
-import { annualForecast, effectiveStats, needsEducationChoice, focusLimits, caregivers, JOBS } from './engine.js?v=small-refactor';
-import { infantChoiceEffects, wellbeingResponse, caregiverCryEffects, unemploymentFocusCoefficient, unemploymentStabilityChange, toddlerActivityEffects, toddlerActivityNeutral, toddlerActivitySteps, schoolFocusEffects, schoolFocusSteps, focusChoiceEffects, focusEffectStrength, standardFocusCoefficients, TODDLER_FOCUS, TODDLER_ACTIVITY_EFFECTS, PARENT_FAMILY_STABILITY_GAIN, PARENT_FAMILY_RELATIONSHIP_GAIN } from './development.js?v=small-refactor';
-import { DEFAULT_FOCUS, focusEffect, focusNeutralFor } from './focus-rules.js?v=small-refactor';
-import { changedRating } from './rating-changes.js?v=small-refactor';
+import { annualForecast, effectiveStats, needsEducationChoice, focusLimits, caregivers, JOBS } from './engine.js?v=chronological-events';
+import { infantChoiceEffects, wellbeingResponse, caregiverCryEffects, unemploymentFocusCoefficient, unemploymentStabilityChange, toddlerActivityEffects, toddlerActivityNeutral, toddlerActivitySteps, schoolFocusEffects, schoolFocusSteps, focusChoiceEffects, focusEffectStrength, standardFocusCoefficients, TODDLER_FOCUS, TODDLER_ACTIVITY_EFFECTS, PARENT_FAMILY_STABILITY_GAIN, PARENT_FAMILY_RELATIONSHIP_GAIN } from './development.js?v=chronological-events';
+import { DEFAULT_FOCUS, focusEffect, focusNeutralFor } from './focus-rules.js?v=chronological-events';
+import { changedRating } from './rating-changes.js?v=chronological-events';
 
 const nonzero = value => Math.abs(value) > .000001;
 const keyOf = entry => `${entry.parentId || 'you'}:${entry.stat}`;

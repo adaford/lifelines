@@ -6,17 +6,17 @@ import {
   offeredJobs, needsEducationChoice, pendingEventSubject, focusLimits, focusLimitDetails, caregivers,
   relationshipOdds, meetingChances, proposalChance, pregnancyChance, oneNightChance,
   respondToEncounter, proposeMarriage, endRelationship, normalizeSurname, heightPercentile, statPercentiles
-} from './engine.js?v=small-refactor';
-import { LEGACY_EVENT_COPY } from './event-copy-history.js?v=small-refactor';
-import { formatEventCause } from './event-causes.js?v=small-refactor';
-import { annotateNarrative } from './narrative.js?v=small-refactor';
-import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome, escapeHTML as esc } from './display.js?v=small-refactor';
-import { avatar, genderBadge, parentLabel } from './profile-view.js?v=small-refactor';
+} from './engine.js?v=chronological-events';
+import { LEGACY_EVENT_COPY } from './event-copy-history.js?v=chronological-events';
+import { formatEventCause } from './event-causes.js?v=chronological-events';
+import { annotateNarrative } from './narrative.js?v=chronological-events';
+import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome, escapeHTML as esc } from './display.js?v=chronological-events';
+import { avatar, genderBadge, parentLabel } from './profile-view.js?v=chronological-events';
 
-import { MAX_FOCUS, focusBudget, focusMaxFor } from './focus-rules.js?v=small-refactor';
-import { schoolActivity, gradeScore, gradeLetter, activityGradeLetter, activityEligible } from './school.js?v=small-refactor';
-import { getBirthConditions } from './birth-conditions.js?v=small-refactor';
-import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=small-refactor';
+import { MAX_FOCUS, focusBudget, focusMaxFor } from './focus-rules.js?v=chronological-events';
+import { schoolActivity, gradeScore, gradeLetter, activityGradeLetter, activityEligible } from './school.js?v=chronological-events';
+import { getBirthConditions } from './birth-conditions.js?v=chronological-events';
+import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=chronological-events';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const app = document.querySelector('#app');
@@ -364,7 +364,8 @@ function completedEventCopy(entry) {
   return entry;
 }
 function yearEventsView(summary) {
-  const events = (summary.events || []).filter(event => !isNoEventEntry(event));
+  // Saved reviews follow the newest-first journal; show the year in occurrence order.
+  const events = (summary.events || []).filter(event => !isNoEventEntry(event)).reverse();
   return `<details class="year-review-events" open><summary>Events</summary>${events.length?`<ul>${events.map(event=>{
     const copy = completedEventCopy(event);
     const description = reviewEventDescription(event);

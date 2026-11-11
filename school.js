@@ -1,4 +1,4 @@
-import { heightReference } from './growth.js?v=small-refactor';
+import { heightReference } from './growth.js?v=chronological-events';
 
 // Fictional school activities and success rules, independent of save mutation
 // and the gameplay RNG. The engine supplies effective ratings and any draw.

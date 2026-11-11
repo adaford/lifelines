@@ -1,5 +1,11 @@
 # Lifelines
 
+## Chronological year reviews (12 November 2026)
+
+Show year-review events in occurrence order, earliest at the top and latest at the bottom. Reverse a filtered copy at render time so both new and existing saved reviews use this order, preserving saved event/history arrays, journal order, pending decisions, RNG and schema 20. Cache token: `chronological-events`. Browser/visual checks remain omitted by preference.
+
+Validation: all 568 workspace tests pass (119 DOM checks), including chronological display across reloads with saved history unchanged. All 28 local HTTP assets match source. No simulation or percentile-reference changes.
+
 ## Small structural refactor (12 November 2026)
 
 Move save validation into save-schema.js with explicit references to existing engine-owned helpers. Keep the validator body and migration behavior unchanged, retain validateSave/migrateSave exports from engine.js, and avoid circular imports. Extract pure avatar and family/gender label rendering into profile-view.js; share the unchanged HTML escape helper from display.js. Consolidate caregiver crying contributions and unemployment focus strain in development.js so simulation and previews use the same rules, preserving bounds, rounding order and all existing values.

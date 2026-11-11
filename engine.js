@@ -1,25 +1,25 @@
 // Lifelines: deterministic, browser-independent simulation rules.
 // All public actions mutate their state and return { ok, reason? }.
-import { createSaveValidator } from './save-schema.js?v=small-refactor';
-import { JOBS } from './jobs.js?v=small-refactor';
-import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=small-refactor';
-import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=small-refactor';
-import { eventStatCause } from './event-causes.js?v=small-refactor';
-import { mortalityRisk, rollMortality } from './mortality.js?v=small-refactor';
-import { heightReference, advanceGrowth } from './growth.js?v=small-refactor';
-import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=small-refactor';
-import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, caregiverCryEffects, unemploymentStabilityChange, standardFocusPractice, schoolAppearanceChange, DEVELOPMENT_BALANCE, BIRTH_VARIATION, SKILL_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, PARENT_FAMILY_STABILITY_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=small-refactor';
-import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=small-refactor';
-import { normalPercentile } from './percentiles.js?v=small-refactor';
-import { changedRating } from './rating-changes.js?v=small-refactor';
-import { MAX_FOCUS, DEFAULT_FOCUS, focusMaxFor, focusNeutralFor, isSchoolActivityFocus, focusEffect, focusKeysForAge, focusBudget, temporaryFocusPoints, defaultFocus, legacyFocusValue } from './focus-rules.js?v=small-refactor';
-import { SCHOOL_OFFER_COUNT, schoolActivity, gradeScore, activitySuccessChange, activityEligible, annualSchoolOffers, createSchoolRecord } from './school.js?v=small-refactor';
-import { assignBirthConditions, applyBirthConditions, getBirthConditions, conditionFocusLimits } from './birth-conditions.js?v=small-refactor';
+import { createSaveValidator } from './save-schema.js?v=chronological-events';
+import { JOBS } from './jobs.js?v=chronological-events';
+import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=chronological-events';
+import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=chronological-events';
+import { eventStatCause } from './event-causes.js?v=chronological-events';
+import { mortalityRisk, rollMortality } from './mortality.js?v=chronological-events';
+import { heightReference, advanceGrowth } from './growth.js?v=chronological-events';
+import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=chronological-events';
+import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, caregiverCryEffects, unemploymentStabilityChange, standardFocusPractice, schoolAppearanceChange, DEVELOPMENT_BALANCE, BIRTH_VARIATION, SKILL_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, PARENT_FAMILY_STABILITY_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=chronological-events';
+import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=chronological-events';
+import { normalPercentile } from './percentiles.js?v=chronological-events';
+import { changedRating } from './rating-changes.js?v=chronological-events';
+import { MAX_FOCUS, DEFAULT_FOCUS, focusMaxFor, focusNeutralFor, isSchoolActivityFocus, focusEffect, focusKeysForAge, focusBudget, temporaryFocusPoints, defaultFocus, legacyFocusValue } from './focus-rules.js?v=chronological-events';
+import { SCHOOL_OFFER_COUNT, schoolActivity, gradeScore, activitySuccessChange, activityEligible, annualSchoolOffers, createSchoolRecord } from './school.js?v=chronological-events';
+import { assignBirthConditions, applyBirthConditions, getBirthConditions, conditionFocusLimits } from './birth-conditions.js?v=chronological-events';
 export { DEVELOPMENT_BALANCE };
-export { heightPercentile } from './growth.js?v=small-refactor';
-export { mortalityRisk } from './mortality.js?v=small-refactor';
-import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=small-refactor';
-export { JOBS, JOB_CATEGORIES } from './jobs.js?v=small-refactor';
+export { heightPercentile } from './growth.js?v=chronological-events';
+export { mortalityRisk } from './mortality.js?v=chronological-events';
+import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=chronological-events';
+export { JOBS, JOB_CATEGORIES } from './jobs.js?v=chronological-events';
 export const EVENTS = [...PERSONAL_EVENTS, ...FAMILY_EVENTS];
 
 export const SKILLS = [

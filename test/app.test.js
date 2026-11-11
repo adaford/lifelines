@@ -452,7 +452,7 @@ test('older catalog events gain review context without restoring journal flavor 
   }
 });
 
-test('rewritten events preserve old review context and strip only exact legacy result prefixes', async () => {
+test('saved reviews show events earliest first while preserving legacy context and stored order', async () => {
   const fixture = ageTo(createGame({ seed: 78123 }), 1);
   const description = 'A familiar sound becomes a word, and your family celebrates the discovery.';
   const entries = [
@@ -466,11 +466,12 @@ test('rewritten events preserve old review context and strip only exact legacy r
   let ui = await mount(fixture);
   for (let reload=0; reload<2; reload++) {
     const rows = ui.all('.year-review-events li');
-    assert.equal(rows[0].querySelector('strong').textContent, 'Words find their way');
-    assert.equal(rows[0].querySelector('.year-event-description').textContent, description);
-    assert.match(rows[0].querySelector('.year-event-results').textContent, /^Your social 5\.0 → 5\.2\.$/);
+    assert.equal(rows[0].querySelector('strong').textContent, 'A broken bone');
+    assert.equal(rows[0].querySelector('.year-event-results').textContent, entries[2].text);
     assert.match(rows[1].querySelector('.year-event-results').textContent, /^A custom family memory\./);
-    assert.equal(rows[2].querySelector('.year-event-results').textContent, entries[2].text);
+    assert.equal(rows[2].querySelector('strong').textContent, 'Words find their way');
+    assert.equal(rows[2].querySelector('.year-event-description').textContent, description);
+    assert.match(rows[2].querySelector('.year-event-results').textContent, /^Your social 5\.0 → 5\.2\.$/);
     assert.deepEqual(ui.saved(), fixture, 'rendering old events never rewrites saved history');
     ui = await mount(ui.saved());
   }
