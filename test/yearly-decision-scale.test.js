@@ -189,7 +189,7 @@ test('autonomous family practice and event outcomes retain their full effects', 
   const rng = event.rng;
   assert.equal(resolveEventChoice(event, 'study', 'extra_lessons').ok, true);
   assert.equal(event.stats.intelligence, 5.5, 'direct event gain remains full strength');
-  assert.equal(effectiveStats(event).stability, 4.8, 'temporary event penalty remains full strength');
+  assert.equal(effectiveStats(event).stability, 5, 'ordinary extra lessons have no automatic mental penalty');
   assert.equal(event.effects[0].focusLimits.standard.social, 2);
   assert.equal(event.rng, rng);
 });

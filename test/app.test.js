@@ -1455,7 +1455,7 @@ describe('Dating and family DOM integration', {concurrency:false},()=>{
     assert.deepEqual(ui.saved(),branch.after);
     assert.equal(ui.saved().partner,null);
     assert.equal(ui.saved().stats.social,5.25);
-    assert.equal(ui.saved().stats.stability,4.9);
+    assert.equal(ui.saved().stats.stability,branch.before.stats.stability,'a consensual encounter has no automatic mental-stability penalty');
     assert.equal(ui.saved().encounters.length,fixture.encounters.length-1);
     assert.equal(ui.saved().age,fixture.age);
   });
@@ -1510,7 +1510,7 @@ describe('Dating and family DOM integration', {concurrency:false},()=>{
     assert.equal(validateSave(ui.saved()),true);
   });
 
-  test('child decisions name the correct child and change that child, their bond, and the player',async()=>{
+  test('homework decisions name and help the correct child without changing the parent ratings',async()=>{
     const fixture=ageTo(createGame({seed:1500}),25);
     haveChild(fixture);ageTo(fixture,26);haveChild(fixture);ageTo(fixture,33);
     fixture.stats.stability=5;
@@ -1532,7 +1532,7 @@ describe('Dating and family DOM integration', {concurrency:false},()=>{
       ui.click('[data-action="event-choice"][data-choice="home"]');
       assert.equal(ui.saved().children[index].stats.intelligence,5.4);
       assert.equal(ui.saved().children[index].relationship,5.4);
-      assert.equal(ui.saved().stats.stability,Math.round((5-.1*(index+1))*100)/100);
+      assert.deepEqual(ui.saved().stats,fixture.stats,'ordinary homework help preserves the parent ratings');
       if(index===0) {
         assert.equal(ui.saved().children[1].stats.intelligence,5);
         const persisted=ui.saved();ui=await mount(persisted);assert.deepEqual(ui.saved(),persisted);

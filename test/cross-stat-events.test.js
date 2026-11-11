@@ -18,7 +18,7 @@ test('all new event ratings are permanent and only activity limits or point chan
   const gossip = EVENTS.find(event => event.id === 'gossip_choice').choices.find(choice => choice.id === 'spread');
   assert.ok(Math.abs(gossip.statChanges.social - (-.4)) < 1e-10, 'lasting and formerly timed effects merge before applying');
   const lesson = EVENTS.find(event => event.id === 'extra_lessons').choices.find(choice => choice.id === 'study');
-  assert.deepEqual(lesson.statChanges, { intelligence: .5, stability: -.2 });
+  assert.deepEqual(lesson.statChanges, { intelligence: .5 });
   assert.deepEqual(lesson.focusLimits, { standard: { social: 2 } });
 });
 
@@ -78,9 +78,10 @@ test('automatic trait-driven experiences generally affect a different stat and i
   for (const id of ['broken_bone', 'playground_fall', 'injury', 'sports_sprain', 'unsafe_lift', 'minor_strain', 'elder_fall']) {
     const event = EVENTS.find(event => event.id === id);
     assert.ok(event.focusLimits, id);
-    assert.ok(event.statChanges.attractiveness < 0 || event.statChanges.stability < 0, id);
-    assert.equal(event.statChanges.strength, undefined, id);
-    assert.equal(event.statChanges.health, undefined, id);
+    if (id === 'minor_strain') assert.equal(event.statChanges, undefined, 'minor soreness restricts activity without a permanent mental penalty');
+    else assert.ok(event.statChanges.attractiveness < 0 || event.statChanges.stability < 0, id);
+    assert.equal(event.statChanges?.strength, undefined, id);
+    assert.equal(event.statChanges?.health, undefined, id);
   }
 });
 

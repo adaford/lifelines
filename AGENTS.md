@@ -1,5 +1,15 @@
 # Lifelines
 
+## Selective mental-stability event effects (12 November 2026)
+
+Mental stability represents lasting wellbeing and coping. Review every personal, family and rare event, including each choice and each affected person. Remove incidental permanent stability gains/losses from routine lessons, prizes, grades, outings, small inconveniences and ordinary social interactions. Keep consequences supported by serious loss or fear, sustained illness/sleep disruption or caregiving strain, treatment, dependable support and explicitly formative rare experiences. Some events now have no rating change; their other skills, relationships and focus restrictions still apply. Existing descriptions remain unchanged. This supersedes older incidental mental-stability amounts in the event rules.
+
+Remove automatic Lifestyle-to-stability conversion from both catalog normalizers and the outcome engine; a material cost or benefit alone no longer alters mental stability. Justified emotional effects are explicit. Ordinary dating rejection, a consensual casual encounter and a partner not being ready for marriage no longer impose lasting mental penalties. Breakup, bereavement, abandonment and care-disruption consequences remain. Preserve IDs, choice IDs, rates, eligibility, causes, non-stability outcomes, saved history, existing temporary modifiers, RNG on load and schema 20. Regenerate the observed percentile reference without fitting or compensating for the changed consequences. Cache token: `mental-event-effects`. Browser/visual checks remain omitted by preference.
+
+Audit: all 352 workspace definitions and all 317 published definitions were reviewed exactly once. Events with any player or relative mental-stability outcome fall from 203 to 62 in the workspace and from 179 to 47 in the release. All 84 rare definitions, every story, event/choice ID, rate, eligibility rule and non-stability effect compare unchanged against their respective baselines.
+
+Validation: all 576 workspace tests pass (121 DOM checks) and all 536 release tests pass (117 DOM checks), including five new outcome/save regressions. All 28 workspace and 27 release HTTP assets match source. Both 4,000-life percentile references were regenerated without fitting and their independent 1,600-life cohorts pass. Saved ratings, historical mental outcomes, legacy temporary effects and RNG remain unchanged on reload.
+
 ## Expected activity success (12 November 2026)
 
 Sports and Extracurriculars focus rows now show Expected success as a letter grade for the next report, recalculated when points change. Use current effective abilities, age-relative height where relevant, saved success (or the first-year internal baseline of 5), and selected 0-2 focus points with zero random noise. Share the pure activitySuccessAfterYear endpoint with completed reports, preserving the existing annual draw, double rounding and bounds. Help explains that chance can change the actual result.

@@ -240,7 +240,8 @@ test('event chances are absolute, leave quiet years and respond to choices and s
 test('stability effects and self care follow the higher-is-calmer scale', () => {
   assert.ok(EVENTS.find(event => event.id === 'crisis').statChanges.social < 0);
   assert.ok(EVENTS.find(event => event.id === 'burnout').statChanges.health < 0);
-  assert.ok(EVENTS.find(event => event.id === 'friendship').statChanges.stability > 0);
+  assert.ok(EVENTS.find(event => event.id === 'soothing_routine').statChanges.stability > 0);
+  assert.equal(EVENTS.find(event => event.id === 'friendship').statChanges.stability, undefined);
   const resting = adult(88); resting.effects = [];
   for (const person of [resting, ...resting.parents]) for (const key of Object.keys(person.stats)) person.stats[key] = 5;
   const pressured = copy(resting);
@@ -388,6 +389,7 @@ test('choosing an offered career starts work directly and restricts changes to t
 
 test('college lasts four years, develops skills, and then offers fifteen careers with degree options', () => {
   const state = decision(503);
+  state.effects = []; state.conditions = [];
   state.focus = { work: 4, social: 0, family: 2, self: 2 };
   const intelligence = state.stats.intelligence;
   assert.equal(chooseEducation(state, 'college').ok, true);
@@ -839,7 +841,7 @@ test('event catalogue has unique authored outcomes and only supported traits', (
       assert.equal(new Set(event.choices.map(choice => choice.id)).size, event.choices.length);
     }
     for (const outcome of outcomes) {
-      assert.ok(Object.keys(outcome.statChanges || {}).length || Object.keys(outcome.subjectChanges || {}).length || Object.keys(outcome.playerChanges || {}).length || outcome.relationship || Object.keys(outcome.modifiers || {}).length || outcome.lifestyle || outcome.focusLimits || outcome.focusPoints, `${event.id} has a consequence`);
+      assert.ok(outcome.description?.trim().length, `${event.id} has authored context even when no rating changes`);
       for (const changes of [outcome.statChanges, outcome.modifiers]) for (const [key, amount] of Object.entries(changes || {})) {
         assert.ok(traits.has(key), `${event.id}: ${key}`);
         assert.ok(Number.isFinite(amount) && amount !== 0 && Math.abs(amount) <= 3);
@@ -1006,7 +1008,7 @@ test('both peer-pressure choices have different visible stat consequences and pe
   assert.equal(state.stats.health, changedRating(6, -.3));
   assert.equal(state.history[0].text, `Go along with it. Your social 6 → ${state.stats.social}; Your intelligence 6 → ${state.stats.intelligence}; Your health 6 → ${state.stats.health}.`);
   assert.equal(resolveEventChoice(declined, 'decline', 'peer_drinking').ok, true);
-  assert.equal(declined.stats.stability, changedRating(6, .5));
+  assert.equal(declined.stats.stability, 6, 'declining a drink does not automatically improve mental stability');
   assert.equal(declined.stats.social, changedRating(6, -.2));
   assert.equal(declined.stats.intelligence, 6);
   assert.deepEqual(migrateSave(state), state);
@@ -1145,7 +1147,10 @@ test('pursuit can succeed or be declined once, with partner bonuses and lifestyl
       assert.equal(endRelationship(after).ok,true);
       assert.equal(after.partner,null);
       assert.equal(after.lifestyle,lifestyle);
-    } else assert.equal(state.partner,null);
+    } else {
+      assert.equal(state.partner,null);
+      assert.equal(effectiveStats(state).stability,stats.stability,'ordinary rejection has no lasting mental-stability penalty');
+    }
     assert.equal(validateSave(state),true);
   }
   assert.deepEqual(outcomes,new Set([true,false]));
@@ -1165,6 +1170,7 @@ test('marriage proposals depend strongly on years together and are limited to on
     const result=proposeMarriage(state);
     outcomes.add(result.accepted);
     assert.equal(result.ok,true);
+    assert.equal(state.stats.stability,base.stats.stability,'a proposal response does not automatically change mental stability');
     assert.equal(state.partner.lastProposalAge,state.age);
     const snapshot=copy(state);
     assert.equal(proposeMarriage(state).ok,false);
@@ -1184,12 +1190,14 @@ test('casual encounters are consensual rolls, consumed once, and never create a 
   const outcomes=new Set();
   for(let seed=1;seed<=100&&outcomes.size<2;seed++) {
     const state=copy(base); state.rng=seed;
-    const before=state.stats.social;
+    const before=state.stats.social, stability=state.stats.stability;
     const result=respondToEncounter(state,target.id,'casual');
     assert.equal(result.ok,true); outcomes.add(result.accepted);
     assert.equal(state.partner,null);
     assert.equal(respondToEncounter(state,target.id,'casual').ok,false);
     assert.equal(state.stats.social,result.accepted?changedRating(before,.25):before);
+    assert.equal(state.stats.stability,stability,'consensual casual encounters and ordinary rejection have no automatic mental cost');
+    if(result.accepted) assert.doesNotMatch(state.history.find(entry=>entry.title==='A brief connection').text,/mental stability/i);
     assert.equal(validateSave(state),true);
   }
   assert.equal(outcomes.size,2);

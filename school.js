@@ -1,4 +1,4 @@
-import { heightReference } from './growth.js?v=activity-projection';
+import { heightReference } from './growth.js?v=mental-event-effects';
 
 // Fictional school activities and success rules, independent of save mutation
 // and the gameplay RNG. The engine supplies effective ratings and any draw.

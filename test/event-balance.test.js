@@ -7,13 +7,14 @@ import { changedRating } from '../rating-changes.js';
 
 const event = id => EVENTS.find(entry => entry.id === id);
 
-test('ordinary discoveries and connections give modest lasting gains across life stages', () => {
+test('ordinary discoveries and connections preserve skill gains without automatic mental rewards', () => {
   assert.deepEqual(event('treehouse').statChanges, { intelligence: .2, creativity: .2 });
   for (const id of ['bedtime_stories', 'gentle_playgroup', 'treehouse', 'child_kindness', 'good_grades',
     'reading_award', 'school_music', 'study_buddy', 'teen_club', 'college_honors', 'college_exhibition',
     'work_friend', 'work_idea', 'family_tradition', 'friendship', 'inspiration', 'mentor', 'elder_mentor']) {
     const outcome = event(id);
-    assert.ok(Object.values(outcome.statChanges).every(amount => amount > 0 && amount <= .25), id);
+    assert.ok(Object.values(outcome.statChanges || {}).every(amount => amount > 0 && amount <= .25), id);
+    assert.equal(outcome.statChanges?.stability, undefined, `${id} has no automatic mental reward`);
     assert.deepEqual(outcome.modifiers, {}, `${id} no longer creates a timed stat boost`);
   }
   const timedPositiveStats = EVENTS.flatMap(entry => entry.choices || [entry])
@@ -23,7 +24,7 @@ test('ordinary discoveries and connections give modest lasting gains across life
 
 test('new wellbeing and material events are permanent while injuries retain activity limits', () => {
   assert.deepEqual(event('soothing_routine').statChanges, { stability: .3 });
-  assert.deepEqual(event('healthy_stretch').statChanges, { strength: .2, stability: .2 });
+  assert.deepEqual(event('healthy_stretch').statChanges, { strength: .2 });
   assert.equal(event('work_idea').lifestyle, undefined);
   assert.equal(event('work_idea').years, 0);
   assert.equal(event('broken_bone').focusLimits.toddler.work, 2);

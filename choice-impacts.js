@@ -1,7 +1,7 @@
-import { annualForecast, effectiveStats, needsEducationChoice, focusLimits, caregivers, JOBS } from './engine.js?v=activity-projection';
-import { infantChoiceEffects, wellbeingResponse, caregiverCryEffects, unemploymentFocusCoefficient, unemploymentStabilityChange, toddlerActivityEffects, toddlerActivityNeutral, toddlerActivitySteps, schoolFocusEffects, schoolFocusSteps, focusChoiceEffects, focusEffectStrength, standardFocusCoefficients, TODDLER_FOCUS, TODDLER_ACTIVITY_EFFECTS, PARENT_FAMILY_STABILITY_GAIN, PARENT_FAMILY_RELATIONSHIP_GAIN } from './development.js?v=activity-projection';
-import { DEFAULT_FOCUS, focusEffect, focusNeutralFor } from './focus-rules.js?v=activity-projection';
-import { changedRating } from './rating-changes.js?v=activity-projection';
+import { annualForecast, effectiveStats, needsEducationChoice, focusLimits, caregivers, JOBS } from './engine.js?v=mental-event-effects';
+import { infantChoiceEffects, wellbeingResponse, caregiverCryEffects, unemploymentFocusCoefficient, unemploymentStabilityChange, toddlerActivityEffects, toddlerActivityNeutral, toddlerActivitySteps, schoolFocusEffects, schoolFocusSteps, focusChoiceEffects, focusEffectStrength, standardFocusCoefficients, TODDLER_FOCUS, TODDLER_ACTIVITY_EFFECTS, PARENT_FAMILY_STABILITY_GAIN, PARENT_FAMILY_RELATIONSHIP_GAIN } from './development.js?v=mental-event-effects';
+import { DEFAULT_FOCUS, focusEffect, focusNeutralFor } from './focus-rules.js?v=mental-event-effects';
+import { changedRating } from './rating-changes.js?v=mental-event-effects';
 
 const nonzero = value => Math.abs(value) > .000001;
 const keyOf = entry => `${entry.parentId || 'you'}:${entry.stat}`;

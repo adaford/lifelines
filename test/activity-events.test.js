@@ -33,7 +33,7 @@ function pupil(age = 12) {
 }
 const chanceOf = (state, id) => eventChances(state, state.stats).find(event => event.id === id).chance;
 
-test('eight concrete school activity events have modest permanent outcomes or a one-year point restriction', () => {
+test('eight concrete school activity events keep concrete outcomes without penalizing ordinary deadline pressure', () => {
   assert.equal(additions.length, 8);
   assert.ok(additions.every(Boolean));
   assert.equal(new Set(EVENTS.map(event => event.id)).size, EVENTS.length);
@@ -54,7 +54,8 @@ test('eight concrete school activity events have modest permanent outcomes or a 
     } else {
       assert.equal(event.years, 0);
       assert.equal(event.minFocus, 1);
-      assert.ok(Object.values(event.statChanges).every(amount => Math.abs(amount) <= .3 && amount !== 0));
+      if (event.id === 'club_deadline_pressure') assert.equal(event.statChanges, undefined, 'a rushed preparation is not a lasting mental change');
+      else assert.ok(Object.values(event.statChanges).every(amount => Math.abs(amount) <= .3 && amount !== 0));
     }
   }
 });

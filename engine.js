@@ -1,25 +1,25 @@
 // Lifelines: deterministic, browser-independent simulation rules.
 // All public actions mutate their state and return { ok, reason? }.
-import { createSaveValidator } from './save-schema.js?v=activity-projection';
-import { JOBS } from './jobs.js?v=activity-projection';
-import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=activity-projection';
-import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=activity-projection';
-import { eventStatCause } from './event-causes.js?v=activity-projection';
-import { mortalityRisk, rollMortality } from './mortality.js?v=activity-projection';
-import { heightReference, advanceGrowth } from './growth.js?v=activity-projection';
-import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=activity-projection';
-import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, caregiverCryEffects, unemploymentStabilityChange, standardFocusPractice, schoolAppearanceChange, DEVELOPMENT_BALANCE, BIRTH_VARIATION, SKILL_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, PARENT_FAMILY_STABILITY_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=activity-projection';
-import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=activity-projection';
-import { normalPercentile } from './percentiles.js?v=activity-projection';
-import { changedRating } from './rating-changes.js?v=activity-projection';
-import { MAX_FOCUS, DEFAULT_FOCUS, focusMaxFor, focusNeutralFor, isSchoolActivityFocus, focusEffect, focusKeysForAge, focusBudget, temporaryFocusPoints, defaultFocus, legacyFocusValue } from './focus-rules.js?v=activity-projection';
-import { SCHOOL_OFFER_COUNT, schoolActivity, gradeScore, activitySuccessAfterYear, activityEligible, annualSchoolOffers, createSchoolRecord } from './school.js?v=activity-projection';
-import { assignBirthConditions, applyBirthConditions, getBirthConditions, conditionFocusLimits } from './birth-conditions.js?v=activity-projection';
+import { createSaveValidator } from './save-schema.js?v=mental-event-effects';
+import { JOBS } from './jobs.js?v=mental-event-effects';
+import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=mental-event-effects';
+import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=mental-event-effects';
+import { eventStatCause } from './event-causes.js?v=mental-event-effects';
+import { mortalityRisk, rollMortality } from './mortality.js?v=mental-event-effects';
+import { heightReference, advanceGrowth } from './growth.js?v=mental-event-effects';
+import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=mental-event-effects';
+import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, caregiverCryEffects, unemploymentStabilityChange, standardFocusPractice, schoolAppearanceChange, DEVELOPMENT_BALANCE, BIRTH_VARIATION, SKILL_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, PARENT_FAMILY_STABILITY_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=mental-event-effects';
+import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=mental-event-effects';
+import { normalPercentile } from './percentiles.js?v=mental-event-effects';
+import { changedRating } from './rating-changes.js?v=mental-event-effects';
+import { MAX_FOCUS, DEFAULT_FOCUS, focusMaxFor, focusNeutralFor, isSchoolActivityFocus, focusEffect, focusKeysForAge, focusBudget, temporaryFocusPoints, defaultFocus, legacyFocusValue } from './focus-rules.js?v=mental-event-effects';
+import { SCHOOL_OFFER_COUNT, schoolActivity, gradeScore, activitySuccessAfterYear, activityEligible, annualSchoolOffers, createSchoolRecord } from './school.js?v=mental-event-effects';
+import { assignBirthConditions, applyBirthConditions, getBirthConditions, conditionFocusLimits } from './birth-conditions.js?v=mental-event-effects';
 export { DEVELOPMENT_BALANCE };
-export { heightPercentile } from './growth.js?v=activity-projection';
-export { mortalityRisk } from './mortality.js?v=activity-projection';
-import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=activity-projection';
-export { JOBS, JOB_CATEGORIES } from './jobs.js?v=activity-projection';
+export { heightPercentile } from './growth.js?v=mental-event-effects';
+export { mortalityRisk } from './mortality.js?v=mental-event-effects';
+import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=mental-event-effects';
+export { JOBS, JOB_CATEGORIES } from './jobs.js?v=mental-event-effects';
 export const EVENTS = [...PERSONAL_EVENTS, ...FAMILY_EVENTS];
 
 export const SKILLS = [
@@ -442,7 +442,6 @@ export function respondToEncounter(state, personId, decision) {
   const chance = decision === 'relationship' ? relationshipOdds(state, person) : oneNightChance(state, person);
   const accepted = random(state) < chance;
   if (!accepted) {
-    addStat(state, 'stability', -.1);
     log(state, 'Not the same spark', `${person.name} isn't interested.`, 'relationship');
     return { ok: true, accepted: false, chance };
   }
@@ -453,9 +452,9 @@ export function respondToEncounter(state, personId, decision) {
     log(state, 'A connection becomes a relationship', `You and ${person.name} begin dating.`, 'relationship');
   } else {
     const before = effectiveStats(state);
-    addStat(state, 'social', .25); addStat(state, 'stability', -.1);
+    addStat(state, 'social', .25);
     const after = effectiveStats(state);
-    log(state, 'A brief connection', `You spend a night with ${person.name}. Social ${before.social} → ${after.social}; mental stability ${before.stability} → ${after.stability}.`, 'relationship');
+    log(state, 'A brief connection', `You spend a night with ${person.name}. Social ${before.social} → ${after.social}.`, 'relationship');
     if (random(state) < pregnancyChance(state, person, { casual: true })) startPregnancy(state, person, true);
   }
   return { ok: true, accepted: true, chance };
@@ -475,7 +474,6 @@ export function proposeMarriage(state) {
     log(state, 'A life together', `You marry ${partner.name}.`, 'relationship');
   } else {
     partner.relationship = round(clamp(partner.relationship - .3, 0, 10));
-    addStat(state, 'stability', -.2);
     log(state, 'Not ready yet', `${partner.name} isn't ready for marriage.`, 'relationship');
   }
   syncFamilyLifestyles(state);
@@ -654,7 +652,6 @@ function applyOutcome(state, event, outcome = event, context = {}) {
   for (const source of [outcome.statChanges, outcome.playerChanges, timedStatsEnabled ? null : outcome.modifiers]) {
     for (const [key, amount] of Object.entries(source || {})) permanent[key] = (permanent[key] || 0) + amount;
   }
-  if (!timedStatsEnabled && outcome.lifestyle) permanent.stability = (permanent.stability || 0) + .2 * outcome.lifestyle;
   for (const [key, amount] of Object.entries(permanent)) addStat(state, key, amount);
   for (const [key, amount] of Object.entries(outcome.aptitudeChanges || {})) {
     if (STAT_KEYS.includes(key) && Number.isInteger(amount)) state.aptitudes[key] = clamp(state.aptitudes[key] + amount, -3, 3);

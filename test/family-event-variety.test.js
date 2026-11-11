@@ -99,7 +99,7 @@ test('every new household choice applies to its named relative and preserves a v
   }
 });
 
-test('care, repairs, and driving trade time for lasting stress without temporary ratings', () => {
+test('ongoing caregiving retains strain while repairs and lessons keep only their practical time costs', () => {
   for (const [id,timeChoice,paidChoice,key,max] of [
     ['household_child_care_closure','home','replace','work',2],
     ['household_partner_roof_leak','repair','hire','social',1],
@@ -122,7 +122,13 @@ test('care, repairs, and driving trade time for lasting stress without temporary
     assert.equal(branches[0].lifestyle,branches[1].lifestyle,'help has no temporary lifestyle modifier');
     assert.ok(branches[0].effects.some(effect=>effect.years===1 && effect.focusLimits));
     assert.equal(branches[1].effects.length,0);
-    assert.ok(branches[1].stats.stability < original.state.stats.stability,'arranging help leaves lasting stress');
+    assert.equal(branches[0].stats.stability,rounded(original.state.stats.stability+(id==='household_child_care_closure'?-.15:0)),
+      'only taking over ongoing childcare retains a player stability cost');
+    assert.equal(branches[1].stats.stability,original.state.stats.stability,'arranging ordinary help does not create a hidden Lifestyle-based stability loss');
+    for(const state of branches) {
+      const subject=event.subjectType==='partner'?state.partner:state.children.find(person=>person.id===original.subject.id);
+      assert.equal(subject.stats.stability,original.subject.stats.stability,'ordinary care, repairs and lessons do not give the relative incidental mental effects');
+    }
     assert.ok(branches.every(validateSave));
   }
 });

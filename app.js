@@ -6,17 +6,17 @@ import {
   offeredJobs, needsEducationChoice, pendingEventSubject, focusLimits, focusLimitDetails, caregivers,
   relationshipOdds, meetingChances, proposalChance, pregnancyChance, oneNightChance,
   respondToEncounter, proposeMarriage, endRelationship, normalizeSurname, heightPercentile, statPercentiles
-} from './engine.js?v=activity-projection';
-import { LEGACY_EVENT_COPY } from './event-copy-history.js?v=activity-projection';
-import { formatEventCause } from './event-causes.js?v=activity-projection';
-import { annotateNarrative } from './narrative.js?v=activity-projection';
-import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome, escapeHTML as esc } from './display.js?v=activity-projection';
-import { avatar, genderBadge, parentLabel } from './profile-view.js?v=activity-projection';
+} from './engine.js?v=mental-event-effects';
+import { LEGACY_EVENT_COPY } from './event-copy-history.js?v=mental-event-effects';
+import { formatEventCause } from './event-causes.js?v=mental-event-effects';
+import { annotateNarrative } from './narrative.js?v=mental-event-effects';
+import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome, escapeHTML as esc } from './display.js?v=mental-event-effects';
+import { avatar, genderBadge, parentLabel } from './profile-view.js?v=mental-event-effects';
 
-import { MAX_FOCUS, focusBudget, focusMaxFor } from './focus-rules.js?v=activity-projection';
-import { schoolActivity, gradeScore, gradeLetter, activityGradeLetter, activitySuccessAfterYear, activityEligible } from './school.js?v=activity-projection';
-import { getBirthConditions } from './birth-conditions.js?v=activity-projection';
-import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=activity-projection';
+import { MAX_FOCUS, focusBudget, focusMaxFor } from './focus-rules.js?v=mental-event-effects';
+import { schoolActivity, gradeScore, gradeLetter, activityGradeLetter, activitySuccessAfterYear, activityEligible } from './school.js?v=mental-event-effects';
+import { getBirthConditions } from './birth-conditions.js?v=mental-event-effects';
+import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=mental-event-effects';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const app = document.querySelector('#app');

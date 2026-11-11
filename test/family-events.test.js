@@ -12,12 +12,13 @@ function household(childAge = 10) {
 }
 const chanceFor = (state, eventId, subjectId) => familyEventChances(state).find(event => event.eventId === eventId && (!subjectId || event.subjectId === subjectId))?.chance || 0;
 
-test('household catalog provides distinct, consequential choices for partners and children', () => {
+test('household catalog keeps distinct choices without inventing consequences for ordinary repair help', () => {
   assert.ok(FAMILY_EVENTS.length >= 32);
   assert.equal(new Set(FAMILY_EVENTS.map(event => event.id)).size, FAMILY_EVENTS.length);
   for (const subjectType of ['partner', 'child']) {
     assert.ok(FAMILY_EVENTS.filter(event => event.subjectType === subjectType && event.choices?.length).length >= 4);
   }
+  const outcomesWithoutChanges = [];
   for (const event of FAMILY_EVENTS) {
     assert.ok(event.minAge >= 0 && event.maxAge >= event.minAge);
     assert.ok(event.baseChance > 0 && event.baseChance < .02);
@@ -29,7 +30,7 @@ test('household catalog provides distinct, consequential choices for partners an
     }
     for (const outcome of event.choices || [event]) {
       const changes = [...Object.entries(outcome.subjectChanges || {}), ...Object.entries(outcome.playerChanges || {})];
-      assert.ok(changes.length || outcome.relationship || outcome.lifestyle, `${event.id} must have consequences`);
+      if (!(changes.length || outcome.relationship || outcome.lifestyle)) outcomesWithoutChanges.push(`${event.id}:${outcome.id || 'automatic'}`);
       for (const [key, value] of changes) {
         assert.ok(traits.includes(key), `unknown trait ${key}`);
         assert.ok(Number.isFinite(value) && value !== 0);
@@ -37,6 +38,7 @@ test('household catalog provides distinct, consequential choices for partners an
       if (outcome.lifestyle) assert.ok(Number.isInteger(outcome.years) && outcome.years >= 1 && outcome.years <= 3);
     }
   }
+  assert.deepEqual(outcomesWithoutChanges, ['household_partner_roof_leak:hire'], 'hiring repair help has no invented lasting rating effect; other authored consequences remain present');
 });
 
 test('age and relationship context keep household events appropriate', () => {
