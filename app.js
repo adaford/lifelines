@@ -6,16 +6,16 @@ import {
   offeredJobs, needsEducationChoice, pendingEventSubject, focusLimits, focusLimitDetails, caregivers,
   relationshipOdds, meetingChances, proposalChance, pregnancyChance, oneNightChance,
   respondToEncounter, proposeMarriage, endRelationship, normalizeSurname, heightPercentile, statPercentiles
-} from './engine.js?v=short-causes';
-import { LEGACY_EVENT_COPY } from './event-copy-history.js?v=short-causes';
-import { formatEventCause } from './event-causes.js?v=short-causes';
-import { annotateNarrative } from './narrative.js?v=short-causes';
-import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome } from './display.js?v=short-causes';
+} from './engine.js?v=perk-wording';
+import { LEGACY_EVENT_COPY } from './event-copy-history.js?v=perk-wording';
+import { formatEventCause } from './event-causes.js?v=perk-wording';
+import { annotateNarrative } from './narrative.js?v=perk-wording';
+import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome } from './display.js?v=perk-wording';
 
-import { MAX_FOCUS, focusBudget, focusMaxFor } from './focus-rules.js?v=short-causes';
-import { schoolActivity, gradeScore, gradeLetter, activityGradeLetter, activityEligible } from './school.js?v=short-causes';
-import { getBirthConditions } from './birth-conditions.js?v=short-causes';
-import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=short-causes';
+import { MAX_FOCUS, focusBudget, focusMaxFor } from './focus-rules.js?v=perk-wording';
+import { schoolActivity, gradeScore, gradeLetter, activityGradeLetter, activityEligible } from './school.js?v=perk-wording';
+import { getBirthConditions } from './birth-conditions.js?v=perk-wording';
+import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=perk-wording';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const app = document.querySelector('#app');
@@ -130,8 +130,8 @@ function birthConditionEffects(condition) {
   for (const [stage,limits] of Object.entries(condition.focusLimits || {})) {
     for (const [key,max] of Object.entries(limits)) {
       const label = stage==='toddler'?toddlerFocusRows.find(([area])=>area===key)?.[1]:({work:'School / College / Career',social:'Friends',family:'Family',self:'Yourself',sports:'Sports',extracurricular:'Extracurriculars'})[key];
-      effects.push(`${label || key} max ${max} ${stage==='toddler'?'at ages 2–4':'from age 5'}, lifelong`);
-      if (stage==='standard' && key==='self' && max<MAX_FOCUS) effects.push(`Sports max ${Math.floor(max/2)} at ages 5–17, lifelong`);
+      effects.push(`Focus ${label || key} max ${max} ${stage==='toddler'?'at ages 2–4':'from age 5'}, lifelong`);
+      if (stage==='standard' && key==='self' && max<MAX_FOCUS) effects.push(`Focus Sports max ${Math.floor(max/2)} at ages 5–17, lifelong`);
     }
   }
   return effects;

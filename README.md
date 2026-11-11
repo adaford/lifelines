@@ -1,5 +1,11 @@
 # Lifelines
 
+## Clearer perk names and focus limits (12 November 2026)
+
+Rename Movement sensitive to Uncoordinated, Social hesitancy to Shy, Screen sensitive to Screen fatigue, and Needs recovery to Needs more rest. Clarify Uncoordinated as physical activities taking extra care while quiet learning comes more easily. Prefix every perk activity limit with Focus, such as Focus Yourself max 2, retaining its ages and lifelong status. Keep all perk IDs, affinities, probabilities, focus mechanics, saves and history unchanged. Cache token: `perk-wording`. Browser/visual checks remain omitted by preference.
+
+Validation: all 519 tests pass on Node 24.14.0. All 25 local HTTP assets match source. Perk mechanics, saved state and percentile references are unchanged.
+
 ## Concise event cause notes (12 November 2026)
 
 Display cause notes as short sentences, such as Low intelligence contributed to this event. Remove the numeric rating, start-of-year wording and Contributing stats prefix. Family notes retain the person's name. Shorten the known previously saved format at render time, preserving custom prose, escaping and stored history. Simulation, cause capture, saves, RNG and event probabilities are unchanged. Cache token: `short-causes`. Browser/visual checks remain omitted by preference.

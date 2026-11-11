@@ -1,24 +1,24 @@
 // Lifelines: deterministic, browser-independent simulation rules.
 // All public actions mutate their state and return { ok, reason? }.
-import { JOBS } from './jobs.js?v=short-causes';
-import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=short-causes';
-import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=short-causes';
-import { eventStatCause } from './event-causes.js?v=short-causes';
-import { mortalityRisk, rollMortality } from './mortality.js?v=short-causes';
-import { heightReference, advanceGrowth } from './growth.js?v=short-causes';
-import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=short-causes';
-import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, standardFocusPractice, schoolAppearanceChange, DEVELOPMENT_BALANCE, BIRTH_VARIATION, SKILL_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, PARENT_FAMILY_STABILITY_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=short-causes';
-import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=short-causes';
-import { normalPercentile } from './percentiles.js?v=short-causes';
-import { changedRating } from './rating-changes.js?v=short-causes';
-import { MAX_FOCUS, DEFAULT_FOCUS, SCHOOL_FOCUS_KEYS, focusMaxFor, focusNeutralFor, isSchoolActivityFocus, focusEffect, focusKeysForAge, focusBudget, temporaryFocusPoints, defaultFocus, legacyFocusValue } from './focus-rules.js?v=short-causes';
-import { SCHOOL_OFFER_COUNT, MAX_SCHOOL_OFFERS, schoolActivity, gradeScore, activitySuccessChange, activityEligible, annualSchoolOffers, createSchoolRecord } from './school.js?v=short-causes';
-import { assignBirthConditions, applyBirthConditions, getBirthConditions, conditionFocusPoints, conditionFocusLimits, validateBirthConditions } from './birth-conditions.js?v=short-causes';
+import { JOBS } from './jobs.js?v=perk-wording';
+import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=perk-wording';
+import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=perk-wording';
+import { eventStatCause } from './event-causes.js?v=perk-wording';
+import { mortalityRisk, rollMortality } from './mortality.js?v=perk-wording';
+import { heightReference, advanceGrowth } from './growth.js?v=perk-wording';
+import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=perk-wording';
+import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, standardFocusPractice, schoolAppearanceChange, DEVELOPMENT_BALANCE, BIRTH_VARIATION, SKILL_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, PARENT_FAMILY_STABILITY_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=perk-wording';
+import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=perk-wording';
+import { normalPercentile } from './percentiles.js?v=perk-wording';
+import { changedRating } from './rating-changes.js?v=perk-wording';
+import { MAX_FOCUS, DEFAULT_FOCUS, SCHOOL_FOCUS_KEYS, focusMaxFor, focusNeutralFor, isSchoolActivityFocus, focusEffect, focusKeysForAge, focusBudget, temporaryFocusPoints, defaultFocus, legacyFocusValue } from './focus-rules.js?v=perk-wording';
+import { SCHOOL_OFFER_COUNT, MAX_SCHOOL_OFFERS, schoolActivity, gradeScore, activitySuccessChange, activityEligible, annualSchoolOffers, createSchoolRecord } from './school.js?v=perk-wording';
+import { assignBirthConditions, applyBirthConditions, getBirthConditions, conditionFocusPoints, conditionFocusLimits, validateBirthConditions } from './birth-conditions.js?v=perk-wording';
 export { DEVELOPMENT_BALANCE };
-export { heightPercentile } from './growth.js?v=short-causes';
-export { mortalityRisk } from './mortality.js?v=short-causes';
-import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=short-causes';
-export { JOBS, JOB_CATEGORIES } from './jobs.js?v=short-causes';
+export { heightPercentile } from './growth.js?v=perk-wording';
+export { mortalityRisk } from './mortality.js?v=perk-wording';
+import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=perk-wording';
+export { JOBS, JOB_CATEGORIES } from './jobs.js?v=perk-wording';
 export const EVENTS = [...PERSONAL_EVENTS, ...FAMILY_EVENTS];
 
 export const SKILLS = [

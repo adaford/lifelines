@@ -921,7 +921,7 @@ test('temporary activity limits show their cause, enforce the cap, and survive r
   const sport='.focus-row[data-focus-key="sports"]';
   assert.match(ui.query('.effect-list').textContent,/Yourself max 2.*Sports max 1/);
   assert.doesNotMatch(ui.query('.effect-list').textContent,/Sports max 2/);
-  assert.match(ui.query(`${sport} .focus-limit`).textContent,/Max 1.*Movement sensitive.*Recovery/);
+  assert.match(ui.query(`${sport} .focus-limit`).textContent,/Max 1.*Uncoordinated.*Recovery/);
   assert.equal(ui.query(`${sport} [data-delta="1"]`).disabled,true);
   assert.match(ui.query('.profile-bar [data-condition-id="movement_sensitive"]').textContent,/Yourself max 2 from age 5, lifelong.*Sports max 1 at ages 5–17, lifelong/);
   assert.deepEqual(ui.saved(),school,'displaying translated sports caps does not alter saved restrictions');
@@ -3544,8 +3544,8 @@ test('perks show separate named rows and affinity effects across Year and family
   assert.doesNotMatch(ui.query('#app').textContent,/Effects are game rules/);
   const autism=ui.query('.profile-bar [data-condition-id="autism"]');
   assert.equal(autism.querySelector('strong').textContent,'Autism');
-  assert.deepEqual([...autism.querySelectorAll('.birth-condition-effect')].map(node=>node.textContent),['+1 Intelligence affinity','Friends max 1 from age 5, lifelong']);
-  assert.equal(autism.getAttribute('aria-label'),'Autism: +1 Intelligence affinity; Friends max 1 from age 5, lifelong');
+  assert.deepEqual([...autism.querySelectorAll('.birth-condition-effect')].map(node=>node.textContent),['+1 Intelligence affinity','Focus Friends max 1 from age 5, lifelong']);
+  assert.equal(autism.getAttribute('aria-label'),'Autism: +1 Intelligence affinity; Focus Friends max 1 from age 5, lifelong');
   assert.equal(ui.query('.profile-bar [data-condition-id="sharp_memory"] .birth-condition-effect').textContent,'+1 Intelligence affinity');
   assert.deepEqual(ui.all('.profile-bar [data-condition-id="literal_thinker"] .birth-condition-effect').map(node=>node.textContent),['-1 Creativity affinity','+1 Intelligence affinity']);
   assert.deepEqual(ui.all('.profile-bar [data-condition-id="restless"] .birth-condition-effect').map(node=>node.textContent),['-1 Mental stability affinity','+1 focus point']);
@@ -3626,7 +3626,7 @@ test('dating prospects show their own perk rows and perk-free profiles stay comp
   assert.equal(ui.all('.profile-bar .birth-conditions').length,0);
   ui.click('.nav-list [data-tab="family"]');
   assert.equal(ui.query('.encounter-card [data-condition-id="autism"] .birth-condition-name').textContent,'Autism');
-  assert.deepEqual(ui.all('.encounter-card [data-condition-id="autism"] .birth-condition-effect').map(node=>node.textContent),['+1 Intelligence affinity','Friends max 1 from age 5, lifelong']);
+  assert.deepEqual(ui.all('.encounter-card [data-condition-id="autism"] .birth-condition-effect').map(node=>node.textContent),['+1 Intelligence affinity','Focus Friends max 1 from age 5, lifelong']);
   assert.deepEqual(ui.all('.encounter-card [data-condition-id="literal_thinker"] .birth-condition-effect').map(node=>node.textContent),['-1 Creativity affinity','+1 Intelligence affinity']);
   assert.equal(ui.all('.encounter-card .birth-condition').length,2);
   assert.ok(ui.query('.encounter-card .birth-conditions').getAttribute('aria-label').includes(fixture.encounters[0].name));
