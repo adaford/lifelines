@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SPORTS, EXTRACURRICULARS, SCHOOL_OFFER_COUNT, schoolActivity, gradeScore, gradeLetter,
+import { SPORTS, EXTRACURRICULARS, SCHOOL_OFFER_COUNT, MAX_SCHOOL_OFFERS, schoolOfferRules, schoolActivity, gradeScore, gradeLetter,
   activityPerformance, activitySuccessChange, activityEligible, annualSchoolOffers, createSchoolRecord } from '../school.js';
 import { heightReference } from '../growth.js';
 
@@ -205,12 +205,13 @@ test('lifestyle gates expensive school sports without preventing the offer from 
   assert.equal(activityEligible({ ...person, lifestyle: 0 }, schoolActivity('sports', 'soccer')), true);
   for (const age of [0, 4, 18, 30]) assert.equal(activityEligible({ ...person, age, lifestyle: 10 }, lacrosse), false);
   assert.equal(activityEligible(person, null), false);
-  assert.deepEqual(annualSchoolOffers({ ...person, lifestyle: 0 }, 'sports'), annualSchoolOffers({ ...person, lifestyle: 10 }, 'sports'), 'eligibility does not secretly reroll offers');
+  assert.ok(annualSchoolOffers({ ...person, lifestyle: 10 }, 'sports').length === 10, 'wealth increases access while individual activity eligibility remains separate');
 });
 
-test('annual offers are three distinct fresh choices, reproducible without mutating saves or using Math.random', () => {
+test('annual offers at maximum Lifestyle are ten distinct fresh choices without mutating saves or using Math.random', () => {
   assert.equal(SCHOOL_OFFER_COUNT, 3);
-  const person = pupil(5);
+  assert.equal(MAX_SCHOOL_OFFERS, 10);
+  const person = { ...pupil(5), lifestyle: 10 };
   const random = Math.random;
   Math.random = () => { throw new Error('School offers must not draw from ambient RNG'); };
   try {
@@ -223,8 +224,8 @@ test('annual offers are three distinct fresh choices, reproducible without mutat
         person.school = { [kind]: { id: enrolled, success: 4 } };
         const before = copy(person), oldOffers = [...previous];
         const offers = annualSchoolOffers(person, kind, previous);
-        assert.equal(offers.length, 3);
-        assert.equal(new Set(offers).size, 3);
+        assert.equal(offers.length, 10);
+        assert.equal(new Set(offers).size, 10);
         assert.ok(offers.every(id => schoolActivity(kind, id) && !previous.includes(id) && id !== enrolled));
         assert.deepEqual(annualSchoolOffers(copy(person), kind, [...previous]), offers);
         assert.deepEqual(person, before);
@@ -251,4 +252,42 @@ test('a school record computes a starting grade without inventing a completed re
   assert.deepEqual(record.offers.extracurricular, annualSchoolOffers(person, 'extracurricular'));
   assert.deepEqual(person, expected);
   assert.equal(person.rng, before.rng);
+});
+
+
+test('Lifestyle controls offer probability and count with clamped boundaries', () => {
+  for (const [lifestyle, chance, count] of [[-5, .2, 2], [0, .2, 2], [1, .28, 2], [5, .6, 5], [10, 1, 10], [15, 1, 10]]) {
+    const rules = schoolOfferRules(lifestyle);
+    near(rules.chance, chance);
+    assert.equal(rules.count, count);
+  }
+  assert.equal(schoolOfferRules(4.49).count, 4);
+  assert.equal(schoolOfferRules(4.5).count, 5);
+  for (const age of [0, 4, 18, 80]) for (const kind of ['sports', 'extracurricular']) {
+    assert.deepEqual(annualSchoolOffers({ ...pupil(age), lifestyle: 10 }, kind), []);
+  }
+});
+
+test('sampled school offers match Lifestyle rates and independently allow both, either, or neither category', () => {
+  const samples = 10000;
+  for (const lifestyle of [0, 1, 5, 10]) {
+    const rules = schoolOfferRules(lifestyle);
+    let sports = 0, extracurricular = 0, both = 0;
+    for (let index = 0; index < samples; index++) {
+      const person = { ...pupil(5 + index % 13), seed: index + 1, id: `offer-sample-${index}`, lifestyle };
+      const sportOffers = annualSchoolOffers(person, 'sports');
+      const clubOffers = annualSchoolOffers(person, 'extracurricular');
+      for (const offers of [sportOffers, clubOffers]) assert.ok(offers.length === 0 || offers.length === rules.count);
+      sports += Number(sportOffers.length > 0);
+      extracurricular += Number(clubOffers.length > 0);
+      both += Number(sportOffers.length > 0 && clubOffers.length > 0);
+    }
+    for (const count of [sports, extracurricular]) assert.ok(Math.abs(count / samples - rules.chance) < .025,
+      `${lifestyle} Lifestyle: observed ${count / samples}, expected ${rules.chance}`);
+    assert.ok(Math.abs(both / samples - rules.chance ** 2) < .025, 'category rolls remain independent');
+    if (lifestyle < 10) {
+      assert.ok(both > 0 && sports > both && extracurricular > both);
+      assert.ok(samples - sports - extracurricular + both > 0, 'some years have no offers at all');
+    } else assert.equal(both, samples);
+  }
 });

@@ -1,4 +1,4 @@
-import { heightReference } from './growth.js?v=activity-events';
+import { heightReference } from './growth.js?v=lifestyle-offers';
 
 // Fictional school activities and success rules, independent of save mutation
 // and the gameplay RNG. The engine supplies effective ratings and any draw.
@@ -13,7 +13,14 @@ const activity = (id, name, weights, training, minLifestyle, heightPreference) =
 const sport = (id, name, weights = { strength: 1 }, extraTraining = {}, minLifestyle, heightPreference) =>
   activity(id, name, weights, { strength: .3, social: .24, ...extraTraining }, minLifestyle, heightPreference);
 const instrument = (id, name) => activity(id, name, { creativity: 1 }, { creativity: .24 });
+// Retained only for pre-update save validation/migration.
 export const SCHOOL_OFFER_COUNT = 3;
+export const MAX_SCHOOL_OFFERS = 10;
+
+export function schoolOfferRules(lifestyle) {
+  const rating = clamp(finite(lifestyle), 0, 10);
+  return { chance: .2 + .08 * rating, count: Math.max(2, Math.round(rating)) };
+}
 
 export const SPORTS = Object.freeze([
   sport('basketball', 'Basketball', { strength: .7, height: .3 }),
@@ -140,17 +147,28 @@ function hash(value) {
 }
 
 export function annualSchoolOffers(person, kind, previousIds = []) {
+  if (!(person?.age >= 5 && person.age < 18)) return [];
+  const { chance, count } = schoolOfferRules(person.lifestyle);
   const excluded = new Set([...previousIds, person?.school?.[kind]?.id]);
   const candidates = catalog(kind).filter(entry => !excluded.has(entry.id));
   let seed = hash(`${person?.seed ?? 0}:${person?.id ?? ''}:${person?.generation ?? 1}:${person?.age ?? 0}:${kind}`);
+  // Separate, reproducible rolls per category. Mix the seed before the first
+  // draw so similar identities/years do not produce clustered invitations.
+  const draw = () => {
+    seed = (seed + 0x6D2B79F5) >>> 0;
+    let value = seed;
+    value = Math.imul(value ^ value >>> 15, value | 1);
+    value ^= value + Math.imul(value ^ value >>> 7, value | 61);
+    return ((value ^ value >>> 14) >>> 0) / 4294967296;
+  };
+  if (draw() >= chance) return [];
   // A local seeded shuffle keeps annual offers repeatable without touching
   // person.rng, Math.random, saved selections, or the previous offer list.
   for (let index = candidates.length - 1; index > 0; index--) {
-    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
-    const other = Math.floor(seed / 4294967296 * (index + 1));
+    const other = Math.floor(draw() * (index + 1));
     [candidates[index], candidates[other]] = [candidates[other], candidates[index]];
   }
-  return candidates.slice(0, SCHOOL_OFFER_COUNT).map(entry => entry.id);
+  return candidates.slice(0, count).map(entry => entry.id);
 }
 
 export function createSchoolRecord(person) {

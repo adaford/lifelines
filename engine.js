@@ -1,23 +1,23 @@
 // Lifelines: deterministic, browser-independent simulation rules.
 // All public actions mutate their state and return { ok, reason? }.
-import { JOBS } from './jobs.js?v=activity-events';
-import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=activity-events';
-import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=activity-events';
-import { mortalityRisk, rollMortality } from './mortality.js?v=activity-events';
-import { heightReference, advanceGrowth } from './growth.js?v=activity-events';
-import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=activity-events';
-import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, standardFocusPractice, schoolAppearanceChange, DEVELOPMENT_BALANCE, BIRTH_VARIATION, SKILL_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, PARENT_FAMILY_STABILITY_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=activity-events';
-import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=activity-events';
-import { normalPercentile } from './percentiles.js?v=activity-events';
-import { changedRating } from './rating-changes.js?v=activity-events';
-import { MAX_FOCUS, DEFAULT_FOCUS, SCHOOL_FOCUS_KEYS, focusMaxFor, focusNeutralFor, isSchoolActivityFocus, focusEffect, focusKeysForAge, focusBudget, temporaryFocusPoints, defaultFocus, legacyFocusValue } from './focus-rules.js?v=activity-events';
-import { SCHOOL_OFFER_COUNT, schoolActivity, gradeScore, activitySuccessChange, activityEligible, annualSchoolOffers, createSchoolRecord } from './school.js?v=activity-events';
-import { assignBirthConditions, applyBirthConditions, getBirthConditions, conditionFocusPoints, conditionFocusLimits, validateBirthConditions } from './birth-conditions.js?v=activity-events';
+import { JOBS } from './jobs.js?v=lifestyle-offers';
+import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=lifestyle-offers';
+import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=lifestyle-offers';
+import { mortalityRisk, rollMortality } from './mortality.js?v=lifestyle-offers';
+import { heightReference, advanceGrowth } from './growth.js?v=lifestyle-offers';
+import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=lifestyle-offers';
+import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, standardFocusPractice, schoolAppearanceChange, DEVELOPMENT_BALANCE, BIRTH_VARIATION, SKILL_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, PARENT_FAMILY_STABILITY_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=lifestyle-offers';
+import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=lifestyle-offers';
+import { normalPercentile } from './percentiles.js?v=lifestyle-offers';
+import { changedRating } from './rating-changes.js?v=lifestyle-offers';
+import { MAX_FOCUS, DEFAULT_FOCUS, SCHOOL_FOCUS_KEYS, focusMaxFor, focusNeutralFor, isSchoolActivityFocus, focusEffect, focusKeysForAge, focusBudget, temporaryFocusPoints, defaultFocus, legacyFocusValue } from './focus-rules.js?v=lifestyle-offers';
+import { SCHOOL_OFFER_COUNT, MAX_SCHOOL_OFFERS, schoolActivity, gradeScore, activitySuccessChange, activityEligible, annualSchoolOffers, createSchoolRecord } from './school.js?v=lifestyle-offers';
+import { assignBirthConditions, applyBirthConditions, getBirthConditions, conditionFocusPoints, conditionFocusLimits, validateBirthConditions } from './birth-conditions.js?v=lifestyle-offers';
 export { DEVELOPMENT_BALANCE };
-export { heightPercentile } from './growth.js?v=activity-events';
-export { mortalityRisk } from './mortality.js?v=activity-events';
-import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=activity-events';
-export { JOBS, JOB_CATEGORIES } from './jobs.js?v=activity-events';
+export { heightPercentile } from './growth.js?v=lifestyle-offers';
+export { mortalityRisk } from './mortality.js?v=lifestyle-offers';
+import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=lifestyle-offers';
+export { JOBS, JOB_CATEGORIES } from './jobs.js?v=lifestyle-offers';
 export const EVENTS = [...PERSONAL_EVENTS, ...FAMILY_EVENTS];
 
 export const SKILLS = [
@@ -789,10 +789,19 @@ function schoolYear(state, growthRandom) {
   state.school.reportedAge = state.age + 1;
   return report;
 }
+function logSchoolOffers(state) {
+  for (const kind of ['sports', 'extracurricular']) {
+    const names = state.school.offers[kind].map(id => schoolActivity(kind, id).name);
+    if (!names.length) continue;
+    const label = kind === 'sports' ? 'sports' : 'extracurriculars';
+    log(state, kind === 'sports' ? 'Sports offered' : 'Extracurriculars offered', `You have been offered these ${label}: ${names.join(', ')}.`, 'activity-offer');
+  }
+}
 function refreshSchoolOffers(state) {
-  if (state.age < 5 || state.age >= 18 || !state.school || state.school.offersAge === state.age) return;
-  for (const kind of ['sports', 'extracurricular']) state.school.offers[kind] = annualSchoolOffers(state, kind, state.school.offers[kind]);
+  if (state.age < 5 || state.age >= 18 || !state.school || state.school.offersAge === state.age && state.age !== 5) return;
+  for (const kind of ['sports', 'extracurricular']) state.school.offers[kind] = state.alive ? annualSchoolOffers(state, kind, state.age === 5 ? [] : state.school.offers[kind]) : [];
   state.school.offersAge = state.age;
+  logSchoolOffers(state);
 }
 function routineYear(state, growthRandom, careerRandom) {
   const schoolReport = schoolYear(state, growthRandom);
@@ -834,7 +843,6 @@ function routineYear(state, growthRandom, careerRandom) {
   state.age += 1;
   focusAfterBirthday(state);
   syncFamilyLifestyles(state);
-  refreshSchoolOffers(state);
   for (const event of careerEvents) log(state, event.title, event.text, event.kind);
   return schoolReport;
 }
@@ -967,7 +975,6 @@ export function advanceYear(state, { mortalityRandom, growthRandom, parentCareer
   }
   selected = completed;
   state.lastYearEvents = selected.map(roll => roll.id);
-  if (!selected.length && !deaths.length && !state.history.some(memory => !oldMemories.has(memory.id))) log(state, 'Events', 'None', 'quiet');
   syncFamilyLifestyles(state);
   if (state.age === 2) log(state, 'Toddler activities unlocked', 'No stat changes.', 'milestone');
   if (state.age === 5) log(state, 'School started', 'No stat changes.', 'milestone');
@@ -991,6 +998,9 @@ export function advanceYear(state, { mortalityRandom, growthRandom, parentCareer
   } else if (state.alive && !state.pregnancy && random(state) < pregnancyChance(state)) startPregnancy(state, state.partner);
   syncFamilyLifestyles(state);
   state.encounters = state.alive ? createProspects(state, datingHelpers(state), effectiveStats(state)).map(person => demographics(person)) : [];
+  // Invitations are opportunities for the newly playable year. They have
+  // independent category rolls and do not compete for ordinary event slots.
+  refreshSchoolOffers(state);
   state.encounterYear = state.age;
   if (state.encounters.length) log(state, 'Someone new', `You meet ${state.encounters.length} new ${state.encounters.length === 1 ? 'person' : 'people'}.`, 'relationship');
   if (state.age >= 85) {
@@ -999,6 +1009,7 @@ export function advanceYear(state, { mortalityRandom, growthRandom, parentCareer
     state.ended = false;
     if (state.alive) log(state, 'Time for the next chapter', 'You retire at 85.', 'milestone');
   }
+  if (!selected.length && !deaths.length && !state.history.some(memory => !oldMemories.has(memory.id))) log(state, 'Events', 'None', 'quiet');
   state.yearSummary = { ...yearChanges(before, state), decisions, ...(schoolReport ? { school: schoolReport } : {}), events: state.history.filter(memory => !oldMemories.has(memory.id)).map(({ title, text, kind, description }) => ({ title, text, kind, ...(description === undefined ? {} : { description }) })), dismissed: false };
   return { ok: true, eventId: selected[0]?.eventId || selected[0]?.id || null, eventIds: [...state.lastYearEvents] };
 }
@@ -1118,14 +1129,15 @@ export function succeed(state, heirId) {
   state.babyChoice = 'quiet'; state.cryLevel = 1; state.alive = true; state.death = null; state.yearSummary = null; state.schoolProgress = 0; state.lastChildAge = -1; state.ended = false; state.needsSuccession = false;
   state.education = { status: state.age < 18 ? 'school' : 'undecided', years: 0 };
   state.jobOffers = state.age < 18 ? [] : makeJobOffers(state);
-  state.school = state.age >= 5 && state.age < 18 ? createSchoolRecord({ ...state, school: null, stats: effectiveStats(state) }) : null;
   syncFamilyLifestyles(state);
+  state.school = state.age >= 5 && state.age < 18 ? createSchoolRecord({ ...state, school: null, stats: effectiveStats(state) }) : null;
   const inheritance = info.route === 'children' ? 'You inherit an equal share.' : 'You inherit the family legacy.';
   log(state, 'The story continues', 'You continue as ' + state.name + ', age ' + state.age + '. ' + inheritance, 'milestone');
+  if (state.school) logSchoolOffers(state);
   return ok();
 }
 
-function validSchema(raw, version, schoolOfferCount = SCHOOL_OFFER_COUNT) {
+function validSchema(raw, version, schoolOfferCount = version >= 20 ? null : SCHOOL_OFFER_COUNT) {
   try {
     if (!raw || typeof raw !== 'object' || raw.version !== version) return false;
     const finite = (n, min, max) => typeof n === 'number' && Number.isFinite(n) && n >= min && n <= max;
@@ -1160,7 +1172,7 @@ function validSchema(raw, version, schoolOfferCount = SCHOOL_OFFER_COUNT) {
     if (version >= 19) {
       const school = raw.school;
       const validEnrollment = (entry, kind) => entry === null || entry && Object.keys(entry).length === 2 && Boolean(schoolActivity(kind, entry.id)) && (entry.success === null || finite(entry.success, 0, 10));
-      const validOffers = (ids, kind) => Array.isArray(ids) && ids.length === schoolOfferCount && new Set(ids).size === schoolOfferCount && ids.every(id => Boolean(schoolActivity(kind, id)));
+      const validOffers = (ids, kind) => Array.isArray(ids) && (schoolOfferCount === null ? ids.length <= MAX_SCHOOL_OFFERS : ids.length === schoolOfferCount) && new Set(ids).size === ids.length && ids.every(id => Boolean(schoolActivity(kind, id)));
       if (school === null) { if (raw.age >= 5 && raw.age < 18) return false; }
       else if (raw.age < 5 || !school || Object.keys(school).length !== 6 || !finite(school.gpa, 50, 100)
         || !(school.reportedAge === null || Number.isInteger(school.reportedAge) && finite(school.reportedAge, 6, Math.min(18, raw.age)))

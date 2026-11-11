@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createGame, advanceYear, chooseEducation, haveChild, EVENTS, resolveEventChoice,
   migrateSave, validateSave, succeed } from '../engine.js';
 import { defaultFocus } from '../focus-rules.js';
-import { createSchoolRecord } from '../school.js';
+import { createSchoolRecord, SPORTS, EXTRACURRICULARS } from '../school.js';
 
 const copy = value => structuredClone(value);
 const calm = { mortalityRandom: () => 1, growthRandom: () => 0, parentCareerRandom: () => 1 };
@@ -62,6 +62,9 @@ function adultFamily() {
   assert.ok(event);
   state.pendingEvents = [{ eventId: event.id, age: state.age }];
   state.lastYearEvents = [event.id];
+  // These fixtures model legacy schema-19 records with fixed three offers.
+  state.school.offers = { sports: SPORTS.slice(0, 3).map(entry => entry.id),
+    extracurricular: EXTRACURRICULARS.slice(0, 3).map(entry => entry.id) };
   assert.equal(validateSave(state), true, 'the fixture has valid current person and historical records');
   return state;
 }

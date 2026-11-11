@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createGame, advanceYear, annualForecast, effectiveStats, setFocus, focusLimits,
-  enrollSchoolActivity, leaveSchoolActivity, migrateSave, validateSave, chooseEducation } from '../engine.js';
+  enrollSchoolActivity, leaveSchoolActivity, migrateSave, validateSave, chooseEducation, succeed, successionInfo, haveChild } from '../engine.js';
 import { defaultFocus, focusBudget } from '../focus-rules.js';
 import { schoolChoiceImpacts } from '../choice-impacts.js';
-import { SCHOOL_OFFER_COUNT, SPORTS, EXTRACURRICULARS, schoolActivity, createSchoolRecord, gradeScore, activitySuccessChange } from '../school.js';
+import { SCHOOL_OFFER_COUNT, MAX_SCHOOL_OFFERS, schoolOfferRules, annualSchoolOffers, SPORTS, EXTRACURRICULARS, schoolActivity, createSchoolRecord, gradeScore, activitySuccessChange } from '../school.js';
 import { familyEventChances } from '../family-events.js';
 import { heightReference } from '../growth.js';
 import { standardFocusCoefficients, standardFocusPractice, schoolFocusEffects, schoolAppearanceChange,
@@ -131,14 +131,14 @@ test('inactivity previews clip at rating limits and school family members withou
   }
 });
 
-test('new school records have exactly three distinct known offers per activity category', () => {
+test('new school records contain a saved Lifestyle-dependent offer roll for each activity category', () => {
   assert.equal(SCHOOL_OFFER_COUNT, 3);
   for (const age of [5, 12, 17]) {
     const state = pupil(age);
     for (const kind of ['sports', 'extracurricular']) {
       const ids = state.school.offers[kind];
-      assert.equal(ids.length, 3);
-      assert.equal(new Set(ids).size, 3);
+      assert.ok(ids.length === 0 || ids.length === schoolOfferRules(state.lifestyle).count);
+      assert.equal(new Set(ids).size, ids.length);
       assert.ok(ids.every(id => schoolActivity(kind, id)));
     }
     assert.equal(validateSave(state), true);
@@ -225,9 +225,9 @@ test('annual activity offers are fresh while enrollment, success, saved offers, 
     assert.equal(advanced.school[kind].id, before.school[kind].id);
     assert.equal(advanced.school[kind].success, 5, 'the first eligible year starts from five before its success change');
     assert.equal(advanced.yearSummary.school.activities.find(activity => activity.kind === kind).before, null);
-    assert.equal(advanced.school.offers[kind].length, 3);
+    assert.deepEqual(advanced.school.offers[kind], annualSchoolOffers(advanced, kind, offers[kind]));
     assert.ok(advanced.school.offers[kind].every(id => !offers[kind].includes(id) && id !== advanced.school[kind].id));
-    assert.equal(new Set(advanced.school.offers[kind]).size, 3);
+    assert.equal(new Set(advanced.school.offers[kind]).size, advanced.school.offers[kind].length);
   }
   assert.equal(advanced.school.offersAge, advanced.age);
   const saved = copy(advanced);
@@ -253,7 +253,7 @@ test('five-offer schema nineteen saves trim only their shortlists and keep selec
     };
     assert.equal(saved.school.offers.sports[3], saved.school.sports.id);
     assert.equal(saved.school.offers.extracurricular[4], saved.school.extracurricular.id);
-    assert.equal(validateSave(saved), false, 'current saves require three offers');
+    assert.equal(validateSave(saved), false, 'legacy nineteen lists require the migration validator');
     const before = copy(saved), expected = copy(saved);
     expected.version = 20;
     for (const kind of ['sports', 'extracurricular']) expected.school.offers[kind] = expected.school.offers[kind].slice(0, 3);
@@ -279,9 +279,10 @@ test('five-offer schema nineteen saves trim only their shortlists and keep selec
   }
 });
 
-test('shortlist migration rejects malformed current and legacy lists instead of discarding invalid entries', () => {
-  for (const count of [3, 5]) {
+test('shortlist validation rejects malformed current and legacy lists without silently repairing entries', () => {
+  for (const [version, count] of [[20, 3], [20, 10], [19, 3], [19, 5]]) {
     const saved = pupil();
+    saved.version = version;
     saved.school.offers = { sports: SPORTS.slice(0, count).map(entry => entry.id), extracurricular: EXTRACURRICULARS.slice(0, count).map(entry => entry.id) };
     const variants = [
       state => { state.school.offers.sports[count - 1] = 'unknown-sport'; },
@@ -290,19 +291,56 @@ test('shortlist migration rejects malformed current and legacy lists instead of 
       state => { state.school.offers.extracurricular[count - 1] = state.school.offers.extracurricular[0]; },
       state => { delete state.school.offers.sports; },
       state => { state.school.offers.extracurricular = null; },
-      state => { state.school.offers.sports = SPORTS.slice(0, count + 1).map(entry => entry.id); },
-      state => { state.school.offers.extracurricular.pop(); },
-      state => { state.school.offers.sports = SPORTS.slice(0, count === 3 ? 5 : 3).map(entry => entry.id); },
+      state => { state.school.offers.sports = SPORTS.slice(0, 11).map(entry => entry.id); },
       state => { state.stats.intelligence = 11; },
+      ...(version === 19 ? [
+        state => { state.school.offers.extracurricular.pop(); },
+        state => { state.school.offers.sports = SPORTS.slice(0, count === 3 ? 5 : 3).map(entry => entry.id); },
+      ] : []),
     ];
     for (const mutate of variants) {
       const malformed = copy(saved);
       mutate(malformed);
       const before = copy(malformed);
       assert.equal(validateSave(malformed), false);
-      assert.equal(migrateSave(malformed), null, `${count}-offer malformed data must not be repaired by trimming`);
+      assert.equal(migrateSave(malformed), null, `v${version} ${count}-offer malformed data must not be repaired by trimming`);
       assert.deepEqual(malformed, before);
     }
+  }
+});
+
+test('schema twenty preserves every valid shortlist length, including empty and asymmetric offers', () => {
+  for (let count = 0; count <= MAX_SCHOOL_OFFERS; count++) {
+    const saved = pupil();
+    saved.school.offers = {
+      sports: SPORTS.slice(0, count).map(entry => entry.id),
+      extracurricular: EXTRACURRICULARS.slice(0, MAX_SCHOOL_OFFERS - count).map(entry => entry.id),
+    };
+    saved.school.sports = { id: 'soccer', success: 6.72 };
+    saved.focus.sports = 1;
+    const before = copy(saved);
+    assert.equal(validateSave(saved), true);
+    assert.deepEqual(migrateSave(saved), before, 'reload never trims or rerolls valid offers');
+    assert.deepEqual(saved, before);
+  }
+});
+
+test('no offers prevents joining but preserves keeping and quitting an existing activity', () => {
+  for (const kind of ['sports', 'extracurricular']) {
+    const state = pupil(), id = kind === 'sports' ? 'soccer' : 'chess';
+    join(state, kind, id);
+    state.school[kind].success = 7.21;
+    state.school.offers[kind] = [];
+    const before = copy(state);
+    assert.equal(enrollSchoolActivity(state, kind, id).ok, true);
+    assert.deepEqual(state, before, 'keeping an enrollment needs no new offer');
+    assert.equal(leaveSchoolActivity(state, kind).ok, true);
+    assert.equal(state.school[kind], null);
+    assert.equal(state.focus[kind], 0);
+    const after = copy(state);
+    assert.equal(enrollSchoolActivity(state, kind, id).ok, false, 'quitting does not create a new offer');
+    assert.deepEqual(state, after);
+    assert.deepEqual(migrateSave(copy(state)), state);
   }
 });
 
@@ -471,7 +509,7 @@ test('version eighteen migration preserves existing progress, history and pendin
   assert.equal(migrated.school.sports, null);
   assert.equal(migrated.school.extracurricular, null);
   assert.equal(migrated.school.reportedAge, null);
-  for (const kind of ['sports', 'extracurricular']) assert.equal(migrated.school.offers[kind].length, 3);
+  for (const kind of ['sports', 'extracurricular']) assert.deepEqual(migrated.school.offers[kind], annualSchoolOffers(migrated, kind));
   const restored = copy(migrated);
   delete restored.school;
   restored.version = before.version;
@@ -522,4 +560,68 @@ test('parent reactions use this year’s grade and grounding shares the five-eve
   const after = quietYear(grounded);
   assert.equal(focusLimits(after).social, 4);
   assert.equal(after.focus.social, 1, 'expiry never restores the old allocation');
+});
+
+
+function assertOfferNotices(state) {
+  const notices = state.history.filter(entry => entry.kind === 'activity-offer' && entry.age === state.age && entry.generation === state.generation);
+  for (const kind of ['sports', 'extracurricular']) {
+    const title = kind === 'sports' ? 'Sports offered' : 'Extracurriculars offered';
+    const matches = notices.filter(entry => entry.title === title);
+    assert.equal(matches.length, state.school.offers[kind].length ? 1 : 0, 'each nonempty category has exactly one notice');
+    if (matches.length) for (const id of state.school.offers[kind]) assert.ok(matches[0].text.includes(schoolActivity(kind, id).name));
+  }
+  if (state.yearSummary) assert.deepEqual(state.yearSummary.events.filter(entry => entry.kind === 'activity-offer'),
+    notices.map(({ title, text, kind }) => ({ title, text, kind })));
+}
+
+test('annual offer notices include both categories and start at age five without occupying ordinary event slots', () => {
+  for (const age of [4, 5, 12, 16]) {
+    const state = pupil(age);
+    for (const parent of state.parents) { parent.lifestyle = 10; parent.career.progress = 10; }
+    state.lifestyle = 10;
+    const advanced = quietYear(state);
+    assert.equal(advanced.lastYearEvents.length, 0, 'invitation notices do not consume ordinary event slots');
+    for (const kind of ['sports', 'extracurricular']) assert.equal(advanced.school.offers[kind].length, 10);
+    assertOfferNotices(advanced);
+    assert.equal(advanced.yearSummary.events.some(entry => entry.kind === 'quiet'), false, 'offer years never claim Events None in the journal');
+    const saved = copy(advanced);
+    annualForecast(advanced);
+    assert.deepEqual(advanced, saved, 'forecasting neither logs nor rerolls live offers');
+    assert.deepEqual(migrateSave(copy(advanced)), saved, 'loading preserves notices and offers exactly');
+  }
+  const adult = quietYear(pupil(17));
+  assert.equal(adult.yearSummary.events.filter(entry => entry.kind === 'activity-offer').length, 0);
+});
+
+test('empty and single-category years show notices only for offers actually available', () => {
+  const outcomes = new Set();
+  for (let seed = 1; seed <= 150 && outcomes.size < 4; seed++) {
+    const state = pupil();
+    state.seed = seed;
+    state.id = `notice-sample-${seed}`;
+    for (const parent of state.parents) { parent.lifestyle = 1; parent.career.progress = 1; }
+    state.lifestyle = 1;
+    const advanced = quietYear(state);
+    outcomes.add(['sports', 'extracurricular'].map(kind => Number(advanced.school.offers[kind].length > 0)).join(''));
+    assertOfferNotices(advanced);
+  }
+  assert.deepEqual([...outcomes].sort(), ['00', '01', '10', '11']);
+});
+
+test('a school-age successor receives saved offers and invitation notices for the new chapter', () => {
+  const state = pupil(30);
+  state.education = { status: 'working', years: 0 };
+  assert.equal(haveChild(state).ok, true);
+  state.children[0].age = 8;
+  state.age = 65;
+  state.adultHeight = state.height;
+  state.lifestyle = 10;
+  const heir = successionInfo(state).candidates[0];
+  assert.equal(succeed(state, heir.id).ok, true);
+  assert.equal(state.age, 8);
+  for (const kind of ['sports', 'extracurricular']) assert.equal(state.school.offers[kind].length, 10);
+  assertOfferNotices(state);
+  assert.equal(validateSave(state), true);
+  assert.deepEqual(migrateSave(copy(state)), state);
 });
