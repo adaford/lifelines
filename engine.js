@@ -1,23 +1,24 @@
 // Lifelines: deterministic, browser-independent simulation rules.
 // All public actions mutate their state and return { ok, reason? }.
-import { JOBS } from './jobs.js?v=random-offer-counts';
-import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=random-offer-counts';
-import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=random-offer-counts';
-import { mortalityRisk, rollMortality } from './mortality.js?v=random-offer-counts';
-import { heightReference, advanceGrowth } from './growth.js?v=random-offer-counts';
-import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=random-offer-counts';
-import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, standardFocusPractice, schoolAppearanceChange, DEVELOPMENT_BALANCE, BIRTH_VARIATION, SKILL_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, PARENT_FAMILY_STABILITY_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=random-offer-counts';
-import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=random-offer-counts';
-import { normalPercentile } from './percentiles.js?v=random-offer-counts';
-import { changedRating } from './rating-changes.js?v=random-offer-counts';
-import { MAX_FOCUS, DEFAULT_FOCUS, SCHOOL_FOCUS_KEYS, focusMaxFor, focusNeutralFor, isSchoolActivityFocus, focusEffect, focusKeysForAge, focusBudget, temporaryFocusPoints, defaultFocus, legacyFocusValue } from './focus-rules.js?v=random-offer-counts';
-import { SCHOOL_OFFER_COUNT, MAX_SCHOOL_OFFERS, schoolActivity, gradeScore, activitySuccessChange, activityEligible, annualSchoolOffers, createSchoolRecord } from './school.js?v=random-offer-counts';
-import { assignBirthConditions, applyBirthConditions, getBirthConditions, conditionFocusPoints, conditionFocusLimits, validateBirthConditions } from './birth-conditions.js?v=random-offer-counts';
+import { JOBS } from './jobs.js?v=event-causes';
+import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=event-causes';
+import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=event-causes';
+import { eventStatCause } from './event-causes.js?v=event-causes';
+import { mortalityRisk, rollMortality } from './mortality.js?v=event-causes';
+import { heightReference, advanceGrowth } from './growth.js?v=event-causes';
+import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=event-causes';
+import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, standardFocusPractice, schoolAppearanceChange, DEVELOPMENT_BALANCE, BIRTH_VARIATION, SKILL_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, PARENT_FAMILY_STABILITY_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=event-causes';
+import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=event-causes';
+import { normalPercentile } from './percentiles.js?v=event-causes';
+import { changedRating } from './rating-changes.js?v=event-causes';
+import { MAX_FOCUS, DEFAULT_FOCUS, SCHOOL_FOCUS_KEYS, focusMaxFor, focusNeutralFor, isSchoolActivityFocus, focusEffect, focusKeysForAge, focusBudget, temporaryFocusPoints, defaultFocus, legacyFocusValue } from './focus-rules.js?v=event-causes';
+import { SCHOOL_OFFER_COUNT, MAX_SCHOOL_OFFERS, schoolActivity, gradeScore, activitySuccessChange, activityEligible, annualSchoolOffers, createSchoolRecord } from './school.js?v=event-causes';
+import { assignBirthConditions, applyBirthConditions, getBirthConditions, conditionFocusPoints, conditionFocusLimits, validateBirthConditions } from './birth-conditions.js?v=event-causes';
 export { DEVELOPMENT_BALANCE };
-export { heightPercentile } from './growth.js?v=random-offer-counts';
-export { mortalityRisk } from './mortality.js?v=random-offer-counts';
-import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=random-offer-counts';
-export { JOBS, JOB_CATEGORIES } from './jobs.js?v=random-offer-counts';
+export { heightPercentile } from './growth.js?v=event-causes';
+export { mortalityRisk } from './mortality.js?v=event-causes';
+import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=event-causes';
+export { JOBS, JOB_CATEGORIES } from './jobs.js?v=event-causes';
 export const EVENTS = [...PERSONAL_EVENTS, ...FAMILY_EVENTS];
 
 export const SKILLS = [
@@ -87,8 +88,8 @@ function useFamilyName(person, familyName) {
   person.name = `${firstName.slice(0, 49 - familyName.length)} ${familyName}`;
   return person;
 }
-function log(state, title, text, kind = 'neutral', description) {
-  state.history.unshift({ id: uid(state, 'memory'), age: state.age, generation: state.generation, title, text, kind, ...(description === undefined ? {} : { description }) });
+function log(state, title, text, kind = 'neutral', description, cause) {
+  state.history.unshift({ id: uid(state, 'memory'), age: state.age, generation: state.generation, title, text, kind, ...(description === undefined ? {} : { description }), ...(cause ? { cause } : {}) });
   state.history = state.history.slice(0, 500);
 }
 function addStat(person, key, amount) { person.stats[key] = changedRating(person.stats[key], amount); }
@@ -711,7 +712,7 @@ function applyOutcome(state, event, outcome = event, context = {}) {
   // Keep the event context separate from the concise journal outcome. The year
   // review can explain what happened without restoring flavor to saved results.
   const eventDescription = event.description.replaceAll('{name}', subject?.name || 'Your family member');
-  log(state, `${context.subjectId ? `${subject.name}: ` : ''}${event.name}`, `${decision}${result}${restrictions}${duration}`, event.kind, eventDescription);
+  log(state, `${context.subjectId ? `${subject.name}: ` : ''}${event.name}`, `${decision}${result}${restrictions}${duration}`, event.kind, eventDescription, context.cause);
 }
 
 function ensureCare(state, finalChildhoodTurn = false) {
@@ -939,7 +940,12 @@ export function advanceYear(state, { mortalityRandom, growthRandom, parentCareer
     const other = integer(state, 0, index);
     [odds[index], odds[other]] = [odds[other], odds[index]];
   }
-  let selected = odds.filter(event => random(state) < event.chance).slice(0, 5);
+  let selected = odds.filter(event => random(state) < event.chance).slice(0, 5).map(roll => {
+    const event = EVENTS.find(event => event.id === (roll.eventId || roll.id));
+    const person = pendingEventSubject(state, roll);
+    const cause = eventStatCause(event, person, roll.subjectId ? person?.stats : before.stats);
+    return cause ? { ...roll, cause } : roll;
+  });
   // One independent competing-risk draw for each living person, using their
   // start-of-year age/stats. Mortality never competes for ordinary event slots.
   const people = [state, ...state.parents, state.guardian, ...state.children, ...state.siblings, livingPartner(state)].filter(person => person && person.alive !== false);
@@ -958,7 +964,7 @@ export function advanceYear(state, { mortalityRandom, growthRandom, parentCareer
   const completed = [];
   for (const roll of selected) {
     const event = EVENTS.find(event => event.id === (roll.eventId || roll.id));
-    const context = roll.subjectId ? { subjectType: roll.subjectType, subjectId: roll.subjectId } : {};
+    const context = { ...(roll.subjectId ? { subjectType: roll.subjectType, subjectId: roll.subjectId } : {}), ...(roll.cause ? { cause: roll.cause } : {}) };
     if (roll.subjectType === 'parent' && pendingEventSubject(state, roll)?.abandonedAt !== undefined) continue;
     if (event.id === 'household_parent_abandonment') {
       if (applyAbandonment(state, event, context)) completed.push(roll);
@@ -969,7 +975,7 @@ export function advanceYear(state, { mortalityRandom, growthRandom, parentCareer
       state.pendingEvents.push({ eventId: event.id, age: state.age, ...context });
       const subject = pendingEventSubject(state, context);
       const description = event.description.replaceAll('{name}', subject.name);
-      log(state, roll.name, description, 'choice', description);
+      log(state, roll.name, description, 'choice', description, context.cause);
     } else applyOutcome(state, event, event, context);
   }
   selected = completed;
@@ -1009,7 +1015,7 @@ export function advanceYear(state, { mortalityRandom, growthRandom, parentCareer
     if (state.alive) log(state, 'Time for the next chapter', 'You retire at 85.', 'milestone');
   }
   if (!selected.length && !deaths.length && !state.history.some(memory => !oldMemories.has(memory.id))) log(state, 'Events', 'None', 'quiet');
-  state.yearSummary = { ...yearChanges(before, state), decisions, ...(schoolReport ? { school: schoolReport } : {}), events: state.history.filter(memory => !oldMemories.has(memory.id)).map(({ title, text, kind, description }) => ({ title, text, kind, ...(description === undefined ? {} : { description }) })), dismissed: false };
+  state.yearSummary = { ...yearChanges(before, state), decisions, ...(schoolReport ? { school: schoolReport } : {}), events: state.history.filter(memory => !oldMemories.has(memory.id)).map(({ title, text, kind, description, cause }) => ({ title, text, kind, ...(description === undefined ? {} : { description }), ...(cause ? { cause } : {}) })), dismissed: false };
   return { ok: true, eventId: selected[0]?.eventId || selected[0]?.id || null, eventIds: [...state.lastYearEvents] };
 }
 
@@ -1142,6 +1148,7 @@ function validSchema(raw, version, schoolOfferCount = version >= 20 ? null : SCH
     const finite = (n, min, max) => typeof n === 'number' && Number.isFinite(n) && n >= min && n <= max;
     const heightBound = cm => version >= 10 ? fromCentimeters(cm) : cm;
     const text = (s, max = 1000) => typeof s === 'string' && s.length > 0 && s.length <= max;
+    const validCause = entry => entry.cause === undefined || text(entry.cause, 1000);
     const legacy = version < 4;
     const ratingFloor = version >= 15 ? 0 : 1;
     const coreKeys = legacy ? [...CORE, 'discipline'] : CORE;
@@ -1225,7 +1232,7 @@ function validSchema(raw, version, schoolOfferCount = version >= 20 ? null : SCH
             && (activity.after === null ? activity.before === null && activity.focus === 0 : finite(activity.after, 0, 10)))) return false;
       }
       if (summary?.height !== undefined && (!finite(summary.height.before, heightBound(40), heightBound(240)) || !finite(summary.height.after, heightBound(40), heightBound(240)) || !finite(summary.height.change, 0, heightBound(200)) || Math.abs(round(summary.height.after - summary.height.before) - summary.height.change) > .001)) return false;
-      if (summary !== null && (!summary || typeof summary.dismissed !== 'boolean' || summary.toAge !== raw.age || summary.fromAge !== raw.age - 1 || !summary.stats || Object.keys(summary.stats).length !== STAT_KEYS.length || !STAT_KEYS.every(key => validDelta(summary.stats[key], true)) || !validDelta(summary.lifestyle, true) || !Array.isArray(summary.parents) || summary.parents.length > (version >= 15 ? 3 : 2) || !summary.parents.every(parent => text(parent.id, 100) && text(parent.name, 50) && validDelta(parent.stability) && validDelta(parent.relationship) && (parent.lifestyle === undefined || validDelta(parent.lifestyle, true))) || !Array.isArray(summary.events) || summary.events.length > 30 || !summary.events.every(event => text(event.title, 200) && text(event.text, 2000) && text(event.kind, 50) && (event.description === undefined || text(event.description, 1000))))) return false;
+      if (summary !== null && (!summary || typeof summary.dismissed !== 'boolean' || summary.toAge !== raw.age || summary.fromAge !== raw.age - 1 || !summary.stats || Object.keys(summary.stats).length !== STAT_KEYS.length || !STAT_KEYS.every(key => validDelta(summary.stats[key], true)) || !validDelta(summary.lifestyle, true) || !Array.isArray(summary.parents) || summary.parents.length > (version >= 15 ? 3 : 2) || !summary.parents.every(parent => text(parent.id, 100) && text(parent.name, 50) && validDelta(parent.stability) && validDelta(parent.relationship) && (parent.lifestyle === undefined || validDelta(parent.lifestyle, true))) || !Array.isArray(summary.events) || summary.events.length > 30 || !summary.events.every(event => text(event.title, 200) && text(event.text, 2000) && text(event.kind, 50) && validCause(event) && (event.description === undefined || text(event.description, 1000))))) return false;
     }
     if (!Array.isArray(raw.parents) || raw.parents.length > 2 || !raw.parents.every(person => validPerson(person) && validLivingAge(person) && (!person.alive || person.age > raw.age))) return false;
     if (version >= 7 && !raw.parents.every(person => finite(person.relationship, ratingFloor, 10))) return false;
@@ -1302,7 +1309,7 @@ function validSchema(raw, version, schoolOfferCount = version >= 20 ? null : SCH
       if (!Array.isArray(raw.lastYearEvents) || raw.lastYearEvents.length > 5 || new Set(raw.lastYearEvents).size !== raw.lastYearEvents.length || !raw.lastYearEvents.every(knownKey)) return false;
       if (!Array.isArray(raw.pendingEvents) || raw.pendingEvents.length > 5 || new Set(raw.pendingEvents.map(pending => pending && eventKey(pending))).size !== raw.pendingEvents.length) return false;
       if (!raw.pendingEvents.every(pending => {
-        if (!pending || pending.age !== raw.age || !raw.lastYearEvents.includes(eventKey(pending))) return false;
+        if (!pending || !validCause(pending) || pending.age !== raw.age || !raw.lastYearEvents.includes(eventKey(pending))) return false;
         const event = EVENTS.find(event => event.id === pending.eventId);
         if (!event?.choices?.length) return false;
         if (event.subjectType) {
@@ -1313,7 +1320,7 @@ function validSchema(raw, version, schoolOfferCount = version >= 20 ? null : SCH
         return !pending.subjectType && !pending.subjectId && raw.age - 1 >= event.minAge && raw.age - 1 <= (event.maxAge ?? 85);
       })) return false;
     }
-    if (!Array.isArray(raw.history) || raw.history.length > 500 || !raw.history.every(memory => text(memory.id, 100) && finite(memory.age, 0, 85) && finite(memory.generation, 1, 100000) && text(memory.title, 200) && text(memory.text, 2000) && text(memory.kind, 50) && (memory.description === undefined || text(memory.description, 1000)))) return false;
+    if (!Array.isArray(raw.history) || raw.history.length > 500 || !raw.history.every(memory => text(memory.id, 100) && finite(memory.age, 0, 85) && finite(memory.generation, 1, 100000) && text(memory.title, 200) && text(memory.text, 2000) && text(memory.kind, 50) && validCause(memory) && (memory.description === undefined || text(memory.description, 1000)))) return false;
     if (!Array.isArray(raw.lineage) || !raw.lineage.every(person => validPerson(person) && validGeneration(person.generation) && typeof person.alive === 'boolean' && validLifestyle(person.lifestyle) && finite(person.money, 0, 1e15) && finite(person.estate, 0, 1e15) && finite(person.share, 0, 1e15) && Array.isArray(person.children) && person.children.length <= 6 && person.children.every(child => child && text(child.id, 100) && text(child.name, 50) && finite(child.inheritance, 0, 1e15)))) return false;
     if (raw.needsSuccession && ((raw.age < 85 && (version < 7 || raw.alive)) || raw.ended || version < 6 && !raw.children.some(child => child.alive !== false && child.age < 85))) return false;
     if (version >= 6 && raw.ended) return false;

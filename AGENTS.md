@@ -1,5 +1,13 @@
 # Lifelines
 
+## Visible stat influences on events (12 November 2026)
+
+New stat-driven events record a separate cause explanation from the ratings used for their roll. Show Contributing stats in pending decisions, completed year reviews and the journal, naming the low/high stat and its one-decimal starting rating. Personal events use effective player ratings, including Lifestyle; family events use the named person's own ratings and relationship. Include declared stat factors, stat eligibility gates and the special abandonment inputs. List only factors matching the displayed rating's direction below/above 5; omit neutral or contrary ratings and unrelated outcome stats. Abandonment's unconditional floor gets no stat explanation when either input is 10. These are contributing inputs, not claims that a stat guarantees an event or is its sole cause.
+
+Capture explanations before the routine, modifier expiry and all event outcomes. Persist the same optional cause string in pending choices, history and reviews, including after resolving a choice or reloading. Render saved text safely and annotate known family names. Old records without cause stay unchanged, without guessing historical ratings. Schema 20 accepts the optional nonempty string up to 1,000 characters; no migration, rate, eligibility, effect, RNG, annual-event limit or saved-rating change. Cache token: `event-causes`. Browser/visual checks remain omitted by preference.
+
+Validation: all 519 tests pass on Node 24.14.0, including 11 event-cause checks and three new DOM regressions for captured ratings, named relatives, escaped text, resolved choices and unchanged legacy records. All 25 local HTTP assets match source. The percentile reference is unchanged and the independent 1,600-life cohort passes.
+
 ## Random school invitation sizes (12 November 2026)
 
 Lifestyle now sets the median number of choices, not a fixed count. Keep each category's independent yearly invitation chance at 20% + 8% * clamped Lifestyle. When invited, start with median max(2, round(Lifestyle)), then draw an offset -2/-1/0/+1/+2 with probabilities 10%/20%/40%/20%/10%, clamping the resulting count to 1-10. Lifestyle 1 therefore offers 1/2/3/4 choices with probabilities 30%/40%/20%/10% when an invitation arrives, giving median 2. Lifestyle 5 offers 3-7 with median 5; Lifestyle 10 offers 8-10 with median 10. These medians describe invitation years; years without an invitation still offer zero choices.

@@ -6,15 +6,15 @@ import {
   offeredJobs, needsEducationChoice, pendingEventSubject, focusLimits, focusLimitDetails, caregivers,
   relationshipOdds, meetingChances, proposalChance, pregnancyChance, oneNightChance,
   respondToEncounter, proposeMarriage, endRelationship, normalizeSurname, heightPercentile, statPercentiles
-} from './engine.js?v=random-offer-counts';
-import { LEGACY_EVENT_COPY } from './event-copy-history.js?v=random-offer-counts';
-import { annotateNarrative } from './narrative.js?v=random-offer-counts';
-import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome } from './display.js?v=random-offer-counts';
+} from './engine.js?v=event-causes';
+import { LEGACY_EVENT_COPY } from './event-copy-history.js?v=event-causes';
+import { annotateNarrative } from './narrative.js?v=event-causes';
+import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome } from './display.js?v=event-causes';
 
-import { MAX_FOCUS, focusBudget, focusMaxFor } from './focus-rules.js?v=random-offer-counts';
-import { schoolActivity, gradeScore, gradeLetter, activityGradeLetter, activityEligible } from './school.js?v=random-offer-counts';
-import { getBirthConditions } from './birth-conditions.js?v=random-offer-counts';
-import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=random-offer-counts';
+import { MAX_FOCUS, focusBudget, focusMaxFor } from './focus-rules.js?v=event-causes';
+import { schoolActivity, gradeScore, gradeLetter, activityGradeLetter, activityEligible } from './school.js?v=event-causes';
+import { getBirthConditions } from './birth-conditions.js?v=event-causes';
+import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=event-causes';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const app = document.querySelector('#app');
@@ -276,13 +276,18 @@ function outcomeSummary(outcome, subject, pending) {
   return changes.join(' · ');
 }
 
+function eventCauseView(entry, age = state.age) {
+  if (!entry?.cause) return '';
+  return `<p class="event-cause form-note"><strong>Contributing stats:</strong> ${narrativeText(entry.cause,age)}</p>`;
+}
+
 function eventDecisionView() {
   const pending = state.pendingEvents[0];
   if (!pending) return '';
   const event = EVENTS.find(event => event.id===pending.eventId);
   const subject = pendingEventSubject(state,pending);
   const story = text => String(text).replaceAll('{name}',subject?.name || 'your loved one');
-  return `<section class="panel event-decision" aria-labelledby="event-title" data-event-id="${esc(event.id)}" data-subject-id="${esc(pending.subjectId || '')}"><div class="panel-heading"><span class="eyebrow">${pending.subjectId?'A FAMILY MOMENT':'A TURN IN YOUR STORY'}</span><span class="tag">${state.pendingEvents.length} CHOICE${state.pendingEvents.length===1?'':'S'} LEFT</span></div><h3 id="event-title" tabindex="-1">${journalText(event.name)}</h3><p class="event-context">${pending.subjectId?`${narrativeText(subject?.name)} · Age ${subject?.age} · Your age ${pending.age}`:`Age ${pending.age}`} · Year in review</p><p class="section-description">${journalText(story(event.description))}</p><div class="event-choices">${event.choices.map(choice=>`<button class="event-option" data-action="event-choice" data-event="${esc(event.id)}" data-subject="${esc(pending.subjectId || '')}" data-choice="${esc(choice.id)}"><strong>${journalText(choice.label)} ${icon('arrow')}</strong><span>${journalText(story(choice.description))}</span><span class="event-consequences">${narrativeText(outcomeSummary(choice,subject,pending))}</span></button>`).join('')}</div><p class="decision-required">Choose before moving on.</p></section>`;
+  return `<section class="panel event-decision" aria-labelledby="event-title" data-event-id="${esc(event.id)}" data-subject-id="${esc(pending.subjectId || '')}"><div class="panel-heading"><span class="eyebrow">${pending.subjectId?'A FAMILY MOMENT':'A TURN IN YOUR STORY'}</span><span class="tag">${state.pendingEvents.length} CHOICE${state.pendingEvents.length===1?'':'S'} LEFT</span></div><h3 id="event-title" tabindex="-1">${journalText(event.name)}</h3><p class="event-context">${pending.subjectId?`${narrativeText(subject?.name)} · Age ${subject?.age} · Your age ${pending.age}`:`Age ${pending.age}`} · Year in review</p><p class="section-description">${journalText(story(event.description))}</p>${eventCauseView(pending,pending.age)}<div class="event-choices">${event.choices.map(choice=>`<button class="event-option" data-action="event-choice" data-event="${esc(event.id)}" data-subject="${esc(pending.subjectId || '')}" data-choice="${esc(choice.id)}"><strong>${journalText(choice.label)} ${icon('arrow')}</strong><span>${journalText(story(choice.description))}</span><span class="event-consequences">${narrativeText(outcomeSummary(choice,subject,pending))}</span></button>`).join('')}</div><p class="decision-required">Choose before moving on.</p></section>`;
 }
 
 function focusEventDecision() {
@@ -376,7 +381,7 @@ function yearEventsView(summary) {
     const copy = completedEventCopy(event);
     const description = reviewEventDescription(event);
     const result = event.kind==='choice' && description ? 'Choice offered.' : copy.text;
-    return `<li><strong>${journalText(copy.title,summary.toAge)}</strong>${description?`<p class="year-event-description">${narrativeText(description,summary.toAge)}</p>`:''}<p class="year-event-results">${eventOutcomeText(result,summary.toAge)}</p></li>`;
+    return `<li><strong>${journalText(copy.title,summary.toAge)}</strong>${description?`<p class="year-event-description">${narrativeText(description,summary.toAge)}</p>`:''}${eventCauseView(event,summary.toAge)}<p class="year-event-results">${eventOutcomeText(result,summary.toAge)}</p></li>`;
   }).join('')}</ul>`:'<p>None</p>'}</details>`;
 }
 
@@ -511,7 +516,7 @@ function focusView(disabled) {
 
 function journalView() {
   const entries = showAllHistory ? state.history : state.history.slice(0,8);
-  return `<section class="panel journal-panel"><div class="panel-heading"><h3>Journal</h3></div><div class="journal-list">${entries.map(entry => `<article class="journal-entry ${esc(entry.kind || 'neutral')}"><div class="journal-age"><strong>${entry.age}</strong><span>${entry.generation===state.generation?'AGE':`GEN ${entry.generation}`}</span></div><span class="journal-marker"></span><div class="journal-content"><h4>${journalText(completedEventCopy(entry).title,entry.age)}</h4><p>${eventOutcomeText(completedEventCopy(entry).text,entry.age)}</p></div></article>`).join('')}</div>${state.history.length>8?`<button class="button ghost small" data-action="history">${showAllHistory?'Recent years':'Show all'} ${icon('arrow')}</button>`:''}</section>`;
+  return `<section class="panel journal-panel"><div class="panel-heading"><h3>Journal</h3></div><div class="journal-list">${entries.map(entry => `<article class="journal-entry ${esc(entry.kind || 'neutral')}"><div class="journal-age"><strong>${entry.age}</strong><span>${entry.generation===state.generation?'AGE':`GEN ${entry.generation}`}</span></div><span class="journal-marker"></span><div class="journal-content"><h4>${journalText(completedEventCopy(entry).title,entry.age)}</h4>${eventCauseView(entry,entry.age)}<p>${eventOutcomeText(completedEventCopy(entry).text,entry.age)}</p></div></article>`).join('')}</div>${state.history.length>8?`<button class="button ghost small" data-action="history">${showAllHistory?'Recent years':'Show all'} ${icon('arrow')}</button>`:''}</section>`;
 }
 
 function collegeProgressView() {

@@ -92,7 +92,7 @@ test('mechanics explanations live in help across childhood, college, and adult r
       ui.click(`.nav-list [data-tab="${tab}"]`);
       if(tab==='career' && fixture.age<18) assert.ok(ui.query('.career-locked-bar').disabled);
       else assert.ok(ui.all('#main-content [data-action="topic-help"]').length,`${tab} needs contextual help`);
-      assert.equal(ui.all('#app .form-note, #app .trait-legend, #app .forecast-legend, #app .character-guide, #app .profile-affinity-note, #app .focus-copy p, #app .job-description').length,0);
+      assert.equal(ui.all('#app .form-note:not(.event-cause), #app .trait-legend, #app .forecast-legend, #app .character-guide, #app .profile-affinity-note, #app .focus-copy p, #app .job-description').length,0);
       assert.doesNotMatch(ui.query('#app').textContent,/Higher is calmer|College focus builds|Family focus strengthens|Attractiveness, social ability, and lifestyle shape|Small −3 to \+3 ratings|\bbonds?\b/i);
       for(const button of ui.all('#main-content [data-action="topic-help"]')) {
         assert.equal(button.tagName,'BUTTON');
@@ -287,6 +287,87 @@ test('year reviews show one saved explanation while journals retain only titles 
   assert.deepEqual(ui.saved(), fixture, 'adding review context changes neither saved history nor RNG');
   const reloaded = await mount(ui.saved());
   assert.equal(reloaded.query('.year-event-description').textContent, `${dad.name} (Dad) could not sleep after a <loud> storm.`);
+});
+
+test('saved automatic event causes show captured family ratings separately and safely in reviews and journals', async () => {
+  const fixture=ageTo(createGame({seed:78123}),3);
+  const mom=fixture.parents.find(parent=>parent.parentRole==='mom');
+  mom.stats.stability=9;
+  const cause=`${mom.name}'s low Mental stability (2.3/10) contributed to this event (start-of-year ratings). <em>Recorded note</em>`;
+  const entry={title:'A difficult journey home',description:'A missed bus leads to an argument.',text:`Your mental stability 5.2 → 5; ${mom.name}: Mental stability 2.3 → 2.2.`,kind:'negative',cause};
+  fixture.history=[{id:'cause-ui-auto',age:fixture.age,generation:fixture.generation,...entry}];
+  fixture.yearSummary.events=[entry]; fixture.yearSummary.dismissed=false;
+  assert.equal(validateSave(fixture),true);
+  let ui=await mount(fixture);
+  for(let reload=0;reload<2;reload++) {
+    for(const selector of ['.year-review-events','.journal-list']) {
+      const note=ui.query(`${selector} .event-cause`);
+      assert.equal(note.querySelector('strong').textContent,'Contributing stats:');
+      assert.ok(note.textContent.includes(`${mom.name} (Mom)'s low Mental stability (2.3/10)`));
+      assert.match(note.textContent,/start-of-year ratings.*<em>Recorded note<\/em>/);
+      assert.equal(note.querySelectorAll('em').length,0,'saved cause text is escaped');
+      assert.doesNotMatch(note.textContent,/9\.0/,'current ratings never replace the captured cause');
+    }
+    const results=ui.query('.year-event-results');
+    assert.equal(results.querySelectorAll('br').length,1);
+    assert.match(results.textContent,/Your Mental stability 5\.2 \u2192 5\.0/);
+    assert.match(results.textContent,/Mental stability 2\.3 \u2192 2\.2/);
+    assert.doesNotMatch(results.textContent,/Contributing stats|Recorded note/);
+    assert.equal(ui.query('.year-event-description').textContent,entry.description);
+    assert.deepEqual(ui.saved(),fixture,'reading causes preserves the complete saved life');
+    ui=await mount(ui.saved());
+  }
+});
+
+test('personal and named family choices retain their saved stat cause through selection and reload', async () => {
+  for(const family of [false,true]) {
+    const fixture=family?partnerFixture():ageTo(createGame({seed:78123}),25);
+    const event=EVENTS.find(entry=>entry.id===(family?'household_partner_argument':'investment_pitch'));
+    const cause=family?`${fixture.partner.name}'s low Mental stability (2.3/10) contributed to this event (start-of-year ratings).`:'Your low Intelligence (2.3/10) contributed to this event (start-of-year ratings).';
+    const pending={eventId:event.id,age:fixture.age,cause,...(family?{subjectType:'partner',subjectId:fixture.partner.id}:{})};
+    fixture.pendingEvents=[pending];
+    fixture.lastYearEvents=[family?`${event.id}:${fixture.partner.id}`:event.id];
+    fixture.stats.intelligence=9; if(family) fixture.partner.stats.stability=9;
+    const entry={title:family?`${fixture.partner.name}: ${event.name}`:event.name,description:event.description,text:event.description,kind:'choice',cause};
+    fixture.history=[{id:'cause-ui-choice',age:fixture.age,generation:fixture.generation,...entry}];
+    fixture.yearSummary.events=[entry]; fixture.yearSummary.dismissed=true;
+    assert.equal(validateSave(fixture),true);
+    let ui=await mount(fixture),before=ui.saved();
+    const note=ui.query('.event-decision .event-cause');
+    assert.match(note.textContent,/Contributing stats:.*2\.3\/10.*start-of-year ratings/);
+    assert.doesNotMatch(note.textContent,/9\.0/);
+    if(family) assert.ok(note.textContent.includes(`${fixture.partner.name} (Girlfriend)`));
+    assert.deepEqual(ui.saved(),before,'opening a pending choice does not recompute or save its cause');
+    ui=await mount(before);
+    assert.equal(ui.query('.event-decision .event-cause').textContent,note.textContent);
+    ui.click(`[data-action="event-choice"][data-choice="${event.choices[0].id}"]`);
+    const completed=ui.saved();
+    assert.equal(completed.pendingEvents.length,0);
+    assert.equal(completed.history[0].cause,cause,'the chosen result keeps the original cause');
+    assert.equal(completed.yearSummary.events[0].cause,cause);
+    assert.equal(completed.rng,before.rng);
+    assert.equal(ui.query('.journal-entry .event-cause').textContent,note.textContent);
+    ui=await mount(completed);
+    assert.deepEqual(ui.saved(),completed);
+    assert.equal(ui.query('.journal-entry .event-cause').textContent,note.textContent);
+  }
+});
+
+test('legacy event entries and pending choices never infer causes from current low ratings', async () => {
+  const fixture=ageTo(createGame({seed:78123}),25);
+  fixture.stats.intelligence=0;
+  const event=EVENTS.find(entry=>entry.id==='investment_pitch');
+  fixture.pendingEvents=[{eventId:event.id,age:fixture.age}]; fixture.lastYearEvents=[event.id];
+  const entry={title:event.name,text:event.description,kind:'choice'};
+  fixture.history=[{id:'legacy-cause-ui',age:fixture.age,generation:fixture.generation,...entry}];
+  fixture.yearSummary.events=[entry]; fixture.yearSummary.dismissed=false;
+  assert.equal(validateSave(fixture),true);
+  let ui=await mount(fixture);
+  for(let reload=0;reload<2;reload++) {
+    assert.equal(ui.all('.event-cause').length,0);
+    assert.deepEqual(ui.saved(),fixture,'legacy history and pending decisions remain untouched');
+    ui=await mount(ui.saved());
+  }
 });
 
 test('older catalog events gain review context without restoring journal flavor or duplicating choices', async () => {

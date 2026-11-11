@@ -1,6 +1,6 @@
-import { assignBirthConditions } from './birth-conditions.js?v=random-offer-counts';
-import { legacyFocusValue } from './focus-rules.js?v=random-offer-counts';
-import { naturalSkillRating, BIRTH_VARIATION } from './development.js?v=random-offer-counts';
+import { assignBirthConditions } from './birth-conditions.js?v=event-causes';
+import { legacyFocusValue } from './focus-rules.js?v=event-causes';
+import { naturalSkillRating, BIRTH_VARIATION } from './development.js?v=event-causes';
 // Fictional relationship balance. These are game rules, not real-world estimates.
 // Actor identity and pregnancy capability are separate so future playable genders
 // can use the same relationship system. The current default is men meeting women.
