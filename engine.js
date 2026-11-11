@@ -1,24 +1,24 @@
 // Lifelines: deterministic, browser-independent simulation rules.
 // All public actions mutate their state and return { ok, reason? }.
-import { JOBS } from './jobs.js?v=perk-wording';
-import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=perk-wording';
-import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=perk-wording';
-import { eventStatCause } from './event-causes.js?v=perk-wording';
-import { mortalityRisk, rollMortality } from './mortality.js?v=perk-wording';
-import { heightReference, advanceGrowth } from './growth.js?v=perk-wording';
-import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=perk-wording';
-import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, standardFocusPractice, schoolAppearanceChange, DEVELOPMENT_BALANCE, BIRTH_VARIATION, SKILL_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, PARENT_FAMILY_STABILITY_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=perk-wording';
-import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=perk-wording';
-import { normalPercentile } from './percentiles.js?v=perk-wording';
-import { changedRating } from './rating-changes.js?v=perk-wording';
-import { MAX_FOCUS, DEFAULT_FOCUS, SCHOOL_FOCUS_KEYS, focusMaxFor, focusNeutralFor, isSchoolActivityFocus, focusEffect, focusKeysForAge, focusBudget, temporaryFocusPoints, defaultFocus, legacyFocusValue } from './focus-rules.js?v=perk-wording';
-import { SCHOOL_OFFER_COUNT, MAX_SCHOOL_OFFERS, schoolActivity, gradeScore, activitySuccessChange, activityEligible, annualSchoolOffers, createSchoolRecord } from './school.js?v=perk-wording';
-import { assignBirthConditions, applyBirthConditions, getBirthConditions, conditionFocusPoints, conditionFocusLimits, validateBirthConditions } from './birth-conditions.js?v=perk-wording';
+import { JOBS } from './jobs.js?v=event-causality';
+import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=event-causality';
+import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=event-causality';
+import { eventStatCause } from './event-causes.js?v=event-causality';
+import { mortalityRisk, rollMortality } from './mortality.js?v=event-causality';
+import { heightReference, advanceGrowth } from './growth.js?v=event-causality';
+import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=event-causality';
+import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, standardFocusPractice, schoolAppearanceChange, DEVELOPMENT_BALANCE, BIRTH_VARIATION, SKILL_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, PARENT_FAMILY_STABILITY_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=event-causality';
+import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=event-causality';
+import { normalPercentile } from './percentiles.js?v=event-causality';
+import { changedRating } from './rating-changes.js?v=event-causality';
+import { MAX_FOCUS, DEFAULT_FOCUS, SCHOOL_FOCUS_KEYS, focusMaxFor, focusNeutralFor, isSchoolActivityFocus, focusEffect, focusKeysForAge, focusBudget, temporaryFocusPoints, defaultFocus, legacyFocusValue } from './focus-rules.js?v=event-causality';
+import { SCHOOL_OFFER_COUNT, MAX_SCHOOL_OFFERS, schoolActivity, gradeScore, activitySuccessChange, activityEligible, annualSchoolOffers, createSchoolRecord } from './school.js?v=event-causality';
+import { assignBirthConditions, applyBirthConditions, getBirthConditions, conditionFocusPoints, conditionFocusLimits, validateBirthConditions } from './birth-conditions.js?v=event-causality';
 export { DEVELOPMENT_BALANCE };
-export { heightPercentile } from './growth.js?v=perk-wording';
-export { mortalityRisk } from './mortality.js?v=perk-wording';
-import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=perk-wording';
-export { JOBS, JOB_CATEGORIES } from './jobs.js?v=perk-wording';
+export { heightPercentile } from './growth.js?v=event-causality';
+export { mortalityRisk } from './mortality.js?v=event-causality';
+import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=event-causality';
+export { JOBS, JOB_CATEGORIES } from './jobs.js?v=event-causality';
 export const EVENTS = [...PERSONAL_EVENTS, ...FAMILY_EVENTS];
 
 export const SKILLS = [
@@ -943,7 +943,7 @@ export function advanceYear(state, { mortalityRandom, growthRandom, parentCareer
   let selected = odds.filter(event => random(state) < event.chance).slice(0, 5).map(roll => {
     const event = EVENTS.find(event => event.id === (roll.eventId || roll.id));
     const person = pendingEventSubject(state, roll);
-    const cause = eventStatCause(event, person, roll.subjectId ? person?.stats : before.stats);
+    const cause = eventStatCause(event, person, roll.subjectId ? person?.stats : before.stats, before.lifestyle);
     return cause ? { ...roll, cause } : roll;
   });
   // One independent competing-risk draw for each living person, using their

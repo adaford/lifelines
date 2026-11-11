@@ -6,16 +6,16 @@ import {
   offeredJobs, needsEducationChoice, pendingEventSubject, focusLimits, focusLimitDetails, caregivers,
   relationshipOdds, meetingChances, proposalChance, pregnancyChance, oneNightChance,
   respondToEncounter, proposeMarriage, endRelationship, normalizeSurname, heightPercentile, statPercentiles
-} from './engine.js?v=perk-wording';
-import { LEGACY_EVENT_COPY } from './event-copy-history.js?v=perk-wording';
-import { formatEventCause } from './event-causes.js?v=perk-wording';
-import { annotateNarrative } from './narrative.js?v=perk-wording';
-import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome } from './display.js?v=perk-wording';
+} from './engine.js?v=event-causality';
+import { LEGACY_EVENT_COPY } from './event-copy-history.js?v=event-causality';
+import { formatEventCause } from './event-causes.js?v=event-causality';
+import { annotateNarrative } from './narrative.js?v=event-causality';
+import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome } from './display.js?v=event-causality';
 
-import { MAX_FOCUS, focusBudget, focusMaxFor } from './focus-rules.js?v=perk-wording';
-import { schoolActivity, gradeScore, gradeLetter, activityGradeLetter, activityEligible } from './school.js?v=perk-wording';
-import { getBirthConditions } from './birth-conditions.js?v=perk-wording';
-import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=perk-wording';
+import { MAX_FOCUS, focusBudget, focusMaxFor } from './focus-rules.js?v=event-causality';
+import { schoolActivity, gradeScore, gradeLetter, activityGradeLetter, activityEligible } from './school.js?v=event-causality';
+import { getBirthConditions } from './birth-conditions.js?v=event-causality';
+import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=event-causality';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const app = document.querySelector('#app');
@@ -279,7 +279,14 @@ function outcomeSummary(outcome, subject, pending) {
 
 function eventCauseView(entry, age = state.age) {
   if (!entry?.cause) return '';
-  return `<p class="event-cause form-note">${narrativeText(formatEventCause(entry.cause),age)}</p>`;
+  const recorded = entry.eventId ? null : eventCopiesFor(entry).find(event => event.id);
+  const event = EVENTS.find(event => event.id === (entry.eventId || recorded?.id));
+  const subject = recorded && entry.title !== recorded.name ? entry.title.slice(0, -recorded.name.length - 2) : 'Your family member';
+  const description = recorded?.description.replaceAll('{name}', subject);
+  const supersededStory = recorded && event && recorded !== event
+    && (recorded.name !== event.name || entry.description === description || entry.text?.startsWith(description));
+  const cause = formatEventCause(entry.cause, supersededStory ? {} : event);
+  return cause ? `<p class="event-cause form-note">${narrativeText(cause,age)}</p>` : '';
 }
 
 function eventDecisionView() {

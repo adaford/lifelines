@@ -245,7 +245,8 @@ test('toddler events follow play, electronics and crafts while school events beg
   const crafts = odds({ ...state, focus: { ...state.focus, creative: 5 } });
   assert.ok(crafts.treehouse > play.treehouse && crafts.child_art > play.child_art);
   assert.ok(play.stamina_gain > rest.stamina_gain);
-  assert.ok(explore.child_library > rest.child_library);
+  assert.ok(crafts.child_library > rest.child_library);
+  assert.equal(explore.child_library, rest.child_library, 'screen time does not increase hands-on storytelling opportunities');
   assert.ok(odds({ ...state, age: 5 }).good_grades > 0);
 });
 

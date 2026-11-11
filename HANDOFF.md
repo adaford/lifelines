@@ -1,5 +1,15 @@
 # Lifelines development handoff
 
+## Realistic event causes (12 November 2026)
+
+Audit all 317 event definitions: 176 personal, 57 family and 84 rare aptitude events. Revise 135 definitions, including 19 stat-factor corrections, while preserving IDs, choices, outcomes, age/grade/stat gates, base chances and the five-event maximum. Environmental noise and housing/access problems depend on Lifestyle rather than mental stability. Remove victim-ability factors from theft, clerical mistakes and unprovoked bullying. Retained trait links describe participation, demonstrated ability, requests for support or coping with an incident; traits do not cause unrelated external events.
+
+Family Lifestyle factors use the player household rating in both probability and captured explanations, not an individual relative rating; their note says Your household's low lifestyle contributed to this event. Other family factors still use the named person. School creative/physical opportunity exposure uses extracurricular/sports focus through optional schoolFocusFactors, with 0/1/2 points mapped to the shared legacy 0/3/5 exposure scale. Adult Yourself and toddler-specific mappings retain their stage meanings.
+
+Retain 119 previous event-copy records with IDs for historical rendering. Suppress a known saved cause when its captured factor is no longer supported by the corrected event or the saved narrative describes a superseded external cause; never invent a historical replacement rating or rewrite saved data. Keep concise cause wording, schema 20, saved history and RNG on load. Regenerate observed percentile references without fitting. Cache token: `event-causality`. Browser/visual checks remain omitted by preference.
+
+Validation: all 528 release tests pass on Node 24.14.0, including 115 DOM checks and 7 causal regressions; all 25 local HTTP assets match source. The 4,000-life percentile reference was regenerated without fitting and reproduces exactly; the independent 1,600-life cohort passes.
+
 ## Clearer perk names and focus limits (12 November 2026)
 
 Rename Movement sensitive to Uncoordinated, Social hesitancy to Shy, Screen sensitive to Screen fatigue, and Needs recovery to Needs more rest. Clarify Uncoordinated as physical activities taking extra care while quiet learning comes more easily. Prefix every perk activity limit with Focus, such as Focus Yourself max 2, retaining its ages and lifelong status. Keep all perk IDs, affinities, probabilities, focus mechanics, saves and history unchanged. Cache token: `perk-wording`. Browser/visual checks remain omitted by preference.

@@ -246,12 +246,15 @@ test('Mom helping with the load keeps each actual stat change on a separate revi
   for (const legacy of [false, true]) {
     const fixture = structuredClone(original);
     if (legacy) delete fixture.yearSummary.events.find(item => item.title === entry.title).description;
+    const expectedDescription = legacy
+      ? 'A neighbor brings cooked meals and helps {name} with the laundry for a few weeks, giving you both a calmer home.'
+      : event.description;
     const before = structuredClone(fixture);
     let ui = await mount(fixture);
     for (let reload = 0; reload < 2; reload++) {
       const card = ui.all('.year-review-events li').find(item => item.querySelector('strong').textContent.includes(event.name));
       assert.ok(card);
-      assert.equal(card.querySelector('.year-event-description').textContent, event.description.replaceAll('{name}', `${mom.name} (Mom)`));
+      assert.equal(card.querySelector('.year-event-description').textContent, expectedDescription.replaceAll('{name}', `${mom.name} (Mom)`));
       const results = card.querySelector('.year-event-results');
       const lines = results.innerHTML.split('<br>');
       assert.equal(results.querySelectorAll('br').length, 3, 'four changes need three actual HTML line breaks');
@@ -349,6 +352,66 @@ test('personal and family choices render concise causes while retaining detailed
     ui=await mount(completed);
     assert.deepEqual(ui.saved(),completed);
     assert.equal(ui.query('.journal-entry .event-cause').textContent,note.textContent);
+  }
+});
+
+test('obsolete and superseded event causes are hidden without rewriting saved stories or outcomes', async () => {
+  for (const example of [
+    { title: 'Night works outside your window', family: true,
+      description: 'Overnight road repairs keep waking you and {name}; lost sleep leaves home tense and exhausting.' },
+    { title: 'A barking dog next door', family: true,
+      description: 'A new dog next door barks through the night, repeatedly waking {name} and wearing you both down.' },
+    { title: 'A storm on the trail', family: false,
+      description: 'A sudden storm strands your walking group; a ranger guides you to shelter and teaches you how to stay calm under pressure.' },
+  ]) {
+    const fixture=ageTo(createGame({seed:78123}),1);
+    const mom=fixture.parents.find(parent=>parent.parentRole==='mom');
+    fixture.lifestyle=1.2;
+    for(const parent of fixture.parents) parent.lifestyle=1.2;
+    mom.stats.stability=9;
+    const description=example.description.replaceAll('{name}',mom.name);
+    const entry={title:example.family?`${mom.name}: ${example.title}`:example.title,description,
+      text:`Your mental stability 5 \u2192 4.8; ${mom.name}: Mental stability 2.3 \u2192 2.0.`,kind:'negative',
+      cause:example.family?`${mom.name}'s low Mental stability (2.3/10) contributed to this event (start-of-year ratings).`:
+        'Your high Health (8.2/10) contributed to this event (start-of-year ratings).'};
+    fixture.history=[{id:'obsolete-event-cause',age:fixture.age,generation:fixture.generation,...entry}];
+    fixture.yearSummary.events=[entry]; fixture.yearSummary.dismissed=false;
+    assert.equal(validateSave(fixture),true);
+    let ui=await mount(fixture);
+    for(let reload=0;reload<2;reload++) {
+      for(const selector of ['.year-review-events','.journal-list']) {
+        assert.equal(ui.all(`${selector} .event-cause`).length,0,`${example.title}: unsupported or superseded saved cause is omitted`);
+        assert.doesNotMatch(ui.query(selector).textContent,/contributed to this event|low lifestyle|low mental stability|high health/i,'current ratings are not substituted as guessed historical causes');
+        assert.match(ui.query(selector).textContent,/5\.0 \u2192 4\.8/);
+        assert.match(ui.query(selector).textContent,/2\.3 \u2192 2\.0/);
+      }
+      assert.equal(ui.query('.year-event-description').textContent,description.replaceAll(mom.name,`${mom.name} (Mom)`));
+      assert.deepEqual(ui.saved(),fixture,'hidden causal prose stays intact in the saved history and review');
+      ui=await mount(ui.saved());
+    }
+  }
+});
+
+test('new environmental event causes name household Lifestyle rather than the affected parent', async () => {
+  const fixture=ageTo(createGame({seed:78123}),1);
+  const mom=fixture.parents.find(parent=>parent.parentRole==='mom');
+  const event=EVENTS.find(entry=>entry.id==='household_parent_sleepless');
+  const entry={title:`${mom.name}: ${event.name}`,description:event.description.replaceAll('{name}',mom.name),
+    text:`Your mental stability 5 → 4.8; ${mom.name}: Mental stability 2.3 → 2.0.`,kind:'negative',
+    cause:"Your household's low Lifestyle (1.2/10) contributed to this event (start-of-year ratings)."};
+  fixture.history=[{id:'household-roadworks-cause',age:fixture.age,generation:fixture.generation,...entry}];
+  fixture.yearSummary.events=[entry]; fixture.yearSummary.dismissed=false;
+  assert.equal(validateSave(fixture),true);
+  let ui=await mount(fixture);
+  for(let reload=0;reload<2;reload++) {
+    for(const selector of ['.year-review-events','.journal-list']) {
+      const note=ui.query(`${selector} .event-cause`);
+      assert.equal(note.textContent,"Your household's low lifestyle contributed to this event.");
+      assert.ok(!note.textContent.includes(mom.name),'household resources are not attributed to one parent');
+      assert.doesNotMatch(note.textContent,/Mental stability|\/10|start-of-year|Contributing stats/i);
+    }
+    assert.deepEqual(ui.saved(),fixture,'rendering preserves the captured household cause and all other saved fields');
+    ui=await mount(ui.saved());
   }
 });
 
@@ -1806,6 +1869,7 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     assert.equal(haveChild(fixture).ok, true);
     advanceYear(fixture);
     resolvePending(fixture);
+    fixture.children[0].stats.attractiveness = 5; // Keep this stability fixture outside the separate legacy infant appearance repair.
     fixture.focus = { work: 3, social: 1, family: 2, self: 2 };
     fixture.effects = [{ id: 'burnout', name: 'Running on empty', description: 'A difficult stretch.', years: 2, modifiers: { stability: -1.2 }, kind: 'negative' }];
     legacyRatingFloor(fixture);
@@ -2014,6 +2078,7 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     startOfferedJob(fixture);
     assert.equal(advanceYear(fixture).ok, true);
     resolvePending(fixture);
+    legacyRatingFloor(fixture); // Construct ratings that existed in the v2 save format.
     const legacy = toLegacyCentimeters(structuredClone(fixture));
     legacy.version = 2;
     for (const person of [legacy, ...legacy.parents, ...legacy.children, ...legacy.siblings, ...legacy.lineage]) {

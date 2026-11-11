@@ -27,7 +27,7 @@ const advanceYear = state => {
 const decision = (seed = 22) => { const s = createGame({ seed }); for (let i = 0; i < 18; i++) advanceYearRaw(s); return s; };
 const adult = (seed = 22) => { const s = decision(seed); chooseEducation(s, 'work'); return s; };
 function advanceMatchedQuietYears(...states) {
-  for (let attempt = 0; attempt < 100; attempt++) {
+  for (let attempt = 0; attempt < 2000; attempt++) {
     const next = states.map(state => {
       const draft = copy(state);
       draft.rng = (state.rng + Math.imul(attempt, 2654435761)) >>> 0;
