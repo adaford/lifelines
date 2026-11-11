@@ -1,5 +1,5 @@
-import { MAX_FOCUS, DEFAULT_FOCUS, focusEffect, defaultFocus, focusMaxFor, focusNeutralFor } from './focus-rules.js?v=event-causality';
-import { schoolActivity, activityEligible } from './school.js?v=event-causality';
+import { MAX_FOCUS, DEFAULT_FOCUS, focusEffect, defaultFocus, focusMaxFor, focusNeutralFor } from './focus-rules.js?v=small-refactor';
+import { schoolActivity, activityEligible } from './school.js?v=small-refactor';
 // Ratings use the same scale throughout life. Balanced toddler activities use
 // TODDLER_FOCUS; core areas use 2, enrolled school activities use 1.
 // Existing ratings change only through practice, care, events, or aging.
@@ -156,6 +156,24 @@ export function schoolAppearanceChange(person) {
 export function wellbeingResponse(person, key, amount) {
   const aptitude = clamp(number(person.aptitudes?.[key], 0), -3, 3);
   return YEARLY_DECISION_SCALE * practiceResponse(amount, aptitude);
+}
+
+// Simulation and choice previews share these contributions. Callers apply
+// rating bounds and rounding in their existing order.
+export function caregiverCryEffects(person, level) {
+  return {
+    stability: wellbeingResponse(person, 'stability', [.2, 0, -.6, -1.2, -1.8][level - 1]),
+    relationship: YEARLY_DECISION_SCALE * .2 * (level - 3),
+  };
+}
+
+export function unemploymentFocusCoefficient(person, career) {
+  return !career && person.education.status !== 'college' && focusEffect(person.focus.work) > 0 ? -.15 : 0;
+}
+
+export function unemploymentStabilityChange(person, career) {
+  const coefficient = unemploymentFocusCoefficient(person, career);
+  return coefficient ? wellbeingResponse(person, 'stability', coefficient * focusEffect(person.focus.work)) : 0;
 }
 
 function toddlerWellbeingPractice(focus) {

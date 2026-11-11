@@ -1,7 +1,7 @@
-import { annualForecast, effectiveStats, needsEducationChoice, focusLimits, caregivers, JOBS } from './engine.js?v=event-causality';
-import { infantChoiceEffects, wellbeingResponse, toddlerActivityEffects, toddlerActivityNeutral, toddlerActivitySteps, schoolFocusEffects, schoolFocusSteps, focusChoiceEffects, focusEffectStrength, standardFocusCoefficients, TODDLER_FOCUS, TODDLER_ACTIVITY_EFFECTS, PARENT_FAMILY_STABILITY_GAIN, PARENT_FAMILY_RELATIONSHIP_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=event-causality';
-import { DEFAULT_FOCUS, focusEffect, focusNeutralFor } from './focus-rules.js?v=event-causality';
-import { changedRating } from './rating-changes.js?v=event-causality';
+import { annualForecast, effectiveStats, needsEducationChoice, focusLimits, caregivers, JOBS } from './engine.js?v=small-refactor';
+import { infantChoiceEffects, wellbeingResponse, caregiverCryEffects, unemploymentFocusCoefficient, unemploymentStabilityChange, toddlerActivityEffects, toddlerActivityNeutral, toddlerActivitySteps, schoolFocusEffects, schoolFocusSteps, focusChoiceEffects, focusEffectStrength, standardFocusCoefficients, TODDLER_FOCUS, TODDLER_ACTIVITY_EFFECTS, PARENT_FAMILY_STABILITY_GAIN, PARENT_FAMILY_RELATIONSHIP_GAIN } from './development.js?v=small-refactor';
+import { DEFAULT_FOCUS, focusEffect, focusNeutralFor } from './focus-rules.js?v=small-refactor';
+import { changedRating } from './rating-changes.js?v=small-refactor';
 
 const nonzero = value => Math.abs(value) > .000001;
 const keyOf = entry => `${entry.parentId || 'you'}:${entry.stat}`;
@@ -126,11 +126,12 @@ function cryEntries(state, level, clip) {
   for (const entry of entries) {
     if (!entry.parentId) continue;
     const parent = caregivers(state).find(person => person.id === entry.parentId);
+    const effects = caregiverCryEffects(parent, level);
     if (entry.stat === 'stability') {
-      const effect = wellbeingResponse(parent, 'stability', [.2, 0, -.6, -1.2, -1.8][level - 1]);
+      const effect = effects.stability;
       entry.change = clip ? changedRating(parent.stats.stability, effect) - parent.stats.stability : effect;
     } else if (entry.stat === 'relationship') {
-      const effect = YEARLY_DECISION_SCALE * .2 * (level - 3);
+      const effect = effects.relationship;
       entry.change = clip ? bounded(parent.relationship, effect) : effect;
     }
   }
@@ -140,8 +141,7 @@ function cryEntries(state, level, clip) {
 function adultFocusEntries(state, clip) {
   const career = JOBS.find(job => job.id === state.jobId);
   const effects = focusChoiceEffects(state, career);
-  const unemployedStrain = !career && state.education.status !== 'college'
-    ? wellbeingResponse(state, 'stability', -.15 * Math.max(0, focusEffect(state.focus.work))) : 0;
+  const unemployedStrain = unemploymentStabilityChange(state, career);
   const entries = personalChoiceEntries(state, effects, clip);
   const stability = entries.find(entry => entry.stat === 'stability');
   if (unemployedStrain) stability.change = clip
@@ -161,7 +161,7 @@ function adultFocusLevel(state, entry) {
   if (entry.parentId) return Math.abs(focusEffect(state.focus.family));
   const career = JOBS.find(job => job.id === state.jobId);
   const coefficients = standardFocusCoefficients(state, career);
-  if (!career && state.education.status !== 'college' && focusEffect(state.focus.work) > 0) coefficients.work.stability -= .15;
+  coefficients.work.stability += unemploymentFocusCoefficient(state, career);
   const units = Object.entries(coefficients).reduce((sum, [area, effects]) => sum + Math.sign(effects[entry.stat] || 0) * focusEffectStrength(coefficients, area, entry.stat) * (state.age < 18 ? schoolFocusSteps(area, entry.stat, state.focus[area]) : focusEffect(state.focus[area])), 0);
   return Math.min(6, Math.max(1, Math.abs(units)));
 }

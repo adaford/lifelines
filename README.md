@@ -1,5 +1,14 @@
 # Lifelines
 
+## Small structural refactor (12 November 2026)
+
+Move save validation into save-schema.js with explicit references to existing engine-owned helpers. Keep the validator body and migration behavior unchanged, retain validateSave/migrateSave exports from engine.js, and avoid circular imports. Extract pure avatar and family/gender label rendering into profile-view.js; share the unchanged HTML escape helper from display.js. Consolidate caregiver crying contributions and unemployment focus strain in development.js so simulation and previews use the same rules, preserving bounds, rounding order and all existing values.
+
+This is a structural change only. Preserve schema 20, save/history contents, RNG sequences, event and activity rules, DOM/ARIA markup and the existing percentile reference. Cache token: `small-refactor`. Browser/visual checks remain omitted by preference.
+
+
+Validation: all 528 release tests pass on Node 24.14.0, including 115 DOM checks; all 27 local HTTP assets match source. Before/after comparison passes 102,643 equality checks across 1,411 yearly advances, 815 resolved choices, 2,735 forecast/preview passes, 2,141 reloads, 44 legacy fixtures and 31 successions, preserving complete state and RNG. All 24 source modules have no circular or missing imports. The percentile reference remains byte-for-byte unchanged.
+
 ## Realistic event causes (12 November 2026)
 
 Audit all 317 event definitions: 176 personal, 57 family and 84 rare aptitude events. Revise 135 definitions, including 19 stat-factor corrections, while preserving IDs, choices, outcomes, age/grade/stat gates, base chances and the five-event maximum. Environmental noise and housing/access problems depend on Lifestyle rather than mental stability. Remove victim-ability factors from theft, clerical mistakes and unprovoked bullying. Retained trait links describe participation, demonstrated ability, requests for support or coping with an incident; traits do not cause unrelated external events.
