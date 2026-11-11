@@ -101,10 +101,15 @@ test('all five stats exist at birth with established natural ratings and average
     assert.ok(Math.abs(mean - 5) < .5, `${key} starts around 5 rather than near the ceiling`);
     assert.ok(values.some(value => value < 5) && values.some(value => value > 5), `${key} varies on both sides of average`);
   }
-  const fast = createGame({ seed: 93 }), slow = copy(fast);
+  const fast = createGame({ seed: 93 });
+  for (const person of [fast, ...fast.parents]) for (const key of Object.keys(person.stats)) person.stats[key] = 5;
+  fast.cryLevel = 5;
+  const slow = copy(fast);
   for (const { key } of SKILLS) { fast.aptitudes[key] = 3; slow.aptitudes[key] = -3; }
-  advanceYear(fast); advanceYear(slow);
-  for (const { key } of SKILLS.filter(skill => skill.key !== 'attractiveness')) assert.ok(fast.stats[key] > slow.stats[key], `${key} responds to affinity`);
+  advanceMatchedQuietYears(fast, slow);
+  for (const key of ['intelligence', 'social', 'creativity']) assert.ok(fast.stats[key] > slow.stats[key], `${key} practice responds to affinity`);
+  assert.equal(fast.stats.strength, 5, 'untrained infant Strength does not grow from affinity alone');
+  assert.equal(slow.stats.strength, 5);
   const parent = adult(90); haveChild(parent);
   for (const { key } of SKILLS) assert.ok(parent.children[0].stats[key] >= 0 && parent.children[0].stats[key] <= 10);
 });
@@ -236,7 +241,8 @@ test('stability effects and self care follow the higher-is-calmer scale', () => 
   assert.ok(EVENTS.find(event => event.id === 'crisis').statChanges.social < 0);
   assert.ok(EVENTS.find(event => event.id === 'burnout').statChanges.health < 0);
   assert.ok(EVENTS.find(event => event.id === 'friendship').statChanges.stability > 0);
-  const resting = adult(88); resting.stats.stability = 5; resting.effects = [];
+  const resting = adult(88); resting.effects = [];
+  for (const person of [resting, ...resting.parents]) for (const key of Object.keys(person.stats)) person.stats[key] = 5;
   const pressured = copy(resting);
   resting.focus = { work: 0, social: 1, family: 3, self: 4 };
   pressured.focus = { work: 4, social: 0, family: 0, self: 0 };
@@ -812,7 +818,7 @@ test('long simulations retain bounds and mix quiet years with at most five uniqu
       }
     }
   }
-  assert.ok(quiet > 100 && quiet < 60 * 85 / 2, 'quiet years remain possible but events occur in most years');
+  assert.ok(quiet > 0 && quiet < 60 * 85 / 2, `quiet years remain possible while low-stat consequences make events frequent: ${quiet}`);
   assert.ok(multiple > 0, 'events are independent, not mutually exclusive');
   assert.ok(events / (60 * 85) >= 1.2 && events / (60 * 85) <= 2.8, `overall events per year: ${events / (60 * 85)}`);
 });
@@ -970,6 +976,8 @@ test('intelligence, stability, social focus, and athletic work strongly alter re
   state.stats.stability = 1; assert.ok(chance('crisis') > calm * 30);
   state.focus.social = 0; const quiet = chance('friendship');
   state.focus.social = 5; assert.ok(chance('friendship') > quiet * 3);
+  // Hold health neutral so the cap cannot mask the career risk multiplier.
+  state.stats.health = 5;
   state.jobId = 'retail'; const shopInjury = chance('injury');
   assert.equal(chance('sports_sprain'), 0);
   state.jobId = 'athlete';
@@ -1465,7 +1473,7 @@ test('v5 family migration preserves partnership, pregnancy, offers, and future s
   while(!state.pregnancy&&state.age<42) advanceYear(state);
   assert.ok(state.pregnancy);
   const previous=toLegacyCentimeters(copy(state)); previous.version=5;
-  for (const effect of previous.effects) delete effect.focusLimits;
+  for (const effect of previous.effects) for (const key of ['focusLimits', 'focusCapacity', 'focusMinimums', 'focusPoints']) delete effect[key];
   for(const person of [previous,...previous.parents,...previous.children,...previous.siblings,...previous.lineage,...previous.encounters,previous.partner,previous.pregnancy.otherParent]) { delete person.familyName; person.appearancePeakAge = 30; }
   const migrated=migrateSave(previous);
   assert.equal(validateSave(migrated),true);

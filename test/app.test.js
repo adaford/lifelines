@@ -73,6 +73,10 @@ test('health, appearance, growth, crying, and household help contain the request
     ui.click(`[data-topic="${topic}"]`);
     assert.match(ui.query('.help-popup').textContent,content);
     assert.ok(ui.query('.modal-body').textContent.split(/\s+/).length<60,`${topic} help should stay brief`);
+    if(['strength','health','attractiveness'].includes(topic)) {
+      assert.match(ui.query('.help-popup').textContent,/Changes need activity, care, events or aging/);
+      assert.match(ui.query('.help-popup').textContent,/Low ratings amplify existing gains without creating them/);
+    }
     assertNoMoneyDisplay(ui.query('.help-popup'),`${topic} popup`);
     ui.click('.help-popup [data-action="close"]');
   }
@@ -252,10 +256,12 @@ test('Mom helping with the load keeps each actual stat change on a separate revi
       const lines = results.innerHTML.split('<br>');
       assert.equal(results.querySelectorAll('br').length, 3, 'four changes need three actual HTML line breaks');
       assert.equal(lines.length, 4);
-      assert.match(lines[0], /Your Mental stability 6\.4 \u2192 6\.5/);
-      assert.match(lines[1], /Mental stability 3\.1 \u2192 3\.7/);
-      assert.match(lines[2], /Health 6\.8 \u2192 6\.9/);
-      assert.match(lines[3], /Relationship 7\.6 \u2192 7\.8/);
+      for (const [index,label] of ['Your Mental stability','Mental stability','Health','Relationship'].entries()) {
+        const endpoints=entry.text.split(';')[index].match(/(-?\d+(?:\.\d+)?) \u2192 (-?\d+(?:\.\d+)?)/);
+        assert.ok(endpoints,'the actual event records both endpoints');
+        const displayed=`${Number(endpoints[1]).toFixed(1)} \u2192 ${Number(endpoints[2]).toFixed(1)}`;
+        assert.ok(lines[index].includes(`${label} ${displayed}`),'each line displays its recorded values');
+      }
       assert.ok(lines.slice(1).every(line => line.includes(`${mom.name} (Mom)`)), 'each Mom change keeps its subject label');
       assert.doesNotMatch(results.textContent, /;/, "Mom's multiple outcomes are never joined by semicolons");
       assert.deepEqual(ui.saved(), before, 'rendering and reloading never rewrite saved history, ratings, or RNG');
@@ -399,7 +405,9 @@ test('cry levels update the combined choice impact list without numeric deltas o
   assert.equal(ui.query('.status-strip [data-stat="intelligence"] .status-value').firstChild.textContent,'5.0');
   ui.click('.choice-impact-summary [data-topic="forecast"]');
   assert.match(ui.query('.help-popup').textContent,/routine changes/);
-  assert.match(ui.query('.help-popup').textContent,/events.*yearly variation|yearly variation.*events/i);
+  assert.match(ui.query('.help-popup').textContent,/Activities, care, events and aging cause changes/);
+  assert.match(ui.query('.help-popup').textContent,/Yearly variation changes the size of routine effects without reversing them/);
+  assert.doesNotMatch(ui.query('.help-popup').textContent,/Background development/);
   assert.doesNotMatch(ui.query('.help-popup').textContent,/Green:|Red:|segments|stat bars/);
   ui.click('.help-popup [data-action="close"]');
   assert.equal(ui.saved().rng,initial.rng);
@@ -3548,10 +3556,10 @@ test('dating prospects show their own perk rows and perk-free profiles stay comp
 });
 
 
-test('parent help explains recovery despite zero Family time without changing the save', async () => {
+test('parent help explains caused gains and zero Family time losses without changing the save', async () => {
   const fixture=ageTo(createGame({seed:121}),3);
   const ui=await mount(fixture),saved=ui.saved(),writes=ui.writes();
   ui.click('[data-topic="parents"]');
-  assert.match(ui.query('.help-popup').textContent,/Routine recovery toward 5 can outweigh the penalty from zero Family time/);
+  assert.match(ui.query('.help-popup').textContent,/Gains need care, activity or an event.*Low ratings amplify existing gains.*Zero Family time contributes a loss/);
   assert.deepEqual(ui.saved(),saved); assert.equal(ui.writes(),writes);
 });

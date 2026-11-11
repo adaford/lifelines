@@ -186,7 +186,7 @@ test('infant crying supports intelligence and mental stability without training 
 });
 
 test('low and high crying have meaningful Intelligence changes even across the full ordinary noise range', () => {
-  const expectedMeans = [-.28, -.14, .13, .27, .41];
+  const expectedMeans = [-.28, -.14, .14, .28, .41];
   for (const age of [0, 1]) for (let level = 1; level <= 5; level++) {
     const template = createGame({ seed: 57 });
     template.age = age;
@@ -237,17 +237,17 @@ test('annual development varies around the pure mean forecast and is reproducibl
     stressChanges.push(round(state.parents[0].stats.stability - template.parents[0].stats.stability));
   }
   assert.ok(gains.length > 60);
-  assert.ok(new Set(gains).size > 6, 'ordinary gains vary even without a random event');
+  assert.ok(new Set(gains).size > 4, 'ordinary gains vary even without a random event');
   const expectedGain = forecast.stats.intelligence.change;
   assert.ok(Math.abs(median(gains) - expectedGain) < .025);
   const spread = standardDeviation(gains);
-  assert.ok(spread > .02 && spread < .05, 'annual variation remains smaller than the chosen gain');
+  assert.ok(spread > .008 && spread < .025, 'annual variation scales with the chosen gain and has no baseline noise');
   assert.ok(gains.every(gain => gain > 0), 'ordinary noise does not reverse this positive crying choice at a midscale rating');
-  const expectedStressSpread = Math.abs(forecast.parents[0].stability.change) * .25 + .02;
+  const expectedStressSpread = Math.abs(forecast.parents[0].stability.change) * .25;
   assert.ok(Math.abs(standardDeviation(stressChanges) - expectedStressSpread) < .025, 'parent variation follows the reduced mean strain');
 });
 
-test('neutral focus retains small random gains and losses without consuming RNG in previews', () => {
+test('neutral focus leaves ratings unchanged without consuming RNG in previews', () => {
   const template = createGame({ seed: 76 });
   template.age = 3;
   template.conditions = [];
@@ -265,9 +265,9 @@ test('neutral focus retains small random gains and losses without consuming RNG 
     if (!state.lastYearEvents.length) gains.push(round(state.stats.intelligence - 5));
   }
   assert.ok(gains.length > 60);
-  assert.ok(gains.some(gain => gain < 0) && gains.some(gain => gain > 0), 'neutral choices still permit small variation in both directions');
-  assert.ok(Math.abs(average(gains) - forecast.stats.intelligence.change) < .015);
-  assert.ok(standardDeviation(gains) > .015 && standardDeviation(gains) < .03, 'neutral variation is modest and nonzero');
+  assert.ok(gains.every(gain => gain === 0), 'no practice means no random change');
+  assert.equal(forecast.stats.intelligence.change, 0);
+  assert.equal(standardDeviation(gains), 0);
 });
 
 test('v7 migration preserves existing height, bonds, random state and non-infant appearance', () => {

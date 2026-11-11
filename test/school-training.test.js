@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createGame, enrollSchoolActivity, leaveSchoolActivity, setFocus, focusLimits, annualForecast, advanceYear, validateSave, migrateSave } from '../engine.js';
 import { defaultFocus, focusBudget, focusMaxFor, focusNeutralFor } from '../focus-rules.js';
 import { SPORTS, EXTRACURRICULARS, createSchoolRecord } from '../school.js';
-import { standardFocusCoefficients, standardFocusPractice, schoolFocusSteps, schoolFocusEffects, schoolAppearanceChange, focusChoiceEffects, DEVELOPMENT_BALANCE, CHILDHOOD_DEDUCTION_SCALE } from '../development.js';
+import { standardFocusCoefficients, standardFocusPractice, schoolFocusSteps, schoolFocusEffects, schoolAppearanceChange, focusChoiceEffects } from '../development.js';
 import { schoolChoiceImpacts } from '../choice-impacts.js';
 import { changedRating } from '../rating-changes.js';
 
@@ -121,8 +121,7 @@ test('both unjoined activity penalties affect the actual year and forecast witho
   const forecast = annualForecast(state);
   for (const [stat, coefficient] of Object.entries({ ...inactivity.sports, ...inactivity.extracurricular })) {
     near(standardFocusPractice(state)[stat], -coefficient, `${stat} has one raw negative unit without enrollment`);
-    const bias = DEVELOPMENT_BALANCE.childhoodBias[stat];
-    const expected = changedRating(5, -coefficient * .575 + bias * (bias < 0 ? CHILDHOOD_DEDUCTION_SCALE : 1));
+    const expected = changedRating(5, -coefficient * .575);
     assert.equal(forecast.stats[stat].after, expected);
   }
   assert.deepEqual(state, before, 'previewing the default penalty preserves RNG and saves');

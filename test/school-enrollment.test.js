@@ -7,8 +7,7 @@ import { schoolChoiceImpacts } from '../choice-impacts.js';
 import { SCHOOL_OFFER_COUNT, MAX_SCHOOL_OFFERS, schoolOfferRules, annualSchoolOffers, SPORTS, EXTRACURRICULARS, schoolActivity, createSchoolRecord, gradeScore, activitySuccessChange } from '../school.js';
 import { familyEventChances } from '../family-events.js';
 import { heightReference } from '../growth.js';
-import { standardFocusCoefficients, standardFocusPractice, schoolFocusEffects, schoolAppearanceChange,
-  DEVELOPMENT_BALANCE, CHILDHOOD_DEDUCTION_SCALE } from '../development.js';
+import { standardFocusCoefficients, standardFocusPractice, schoolFocusEffects, schoolAppearanceChange } from '../development.js';
 import { changedRating } from '../rating-changes.js';
 
 const copy = value => structuredClone(value);
@@ -86,8 +85,7 @@ test('unjoined and paused school activities apply one general loss unit without 
   const state = pupil(), before = copy(state), forecast = annualForecast(state);
   const inputs = { strength: -.3, social: -.24, creativity: -.24, intelligence: -.225 };
   for (const [stat, amount] of Object.entries(inputs)) {
-    const bias = DEVELOPMENT_BALANCE.childhoodBias[stat];
-    const expected = changedRating(5, amount * .5 * 1.15 + bias * (bias < 0 ? CHILDHOOD_DEDUCTION_SCALE : 1));
+    const expected = changedRating(5, amount * .5 * 1.15);
     assert.equal(forecast.stats[stat].after, expected, `${stat} includes exactly one category inactivity contribution`);
   }
   assert.deepEqual(state, before);

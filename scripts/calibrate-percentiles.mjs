@@ -1,10 +1,9 @@
 // Offline calibration only. Rendering uses the generated reference constants.
 // Reproduce: node scripts/calibrate-percentiles.mjs --samples 2000 --seed 200001
-// Refit childhood wellbeing after changing the simulation: add --fit.
-// Skill deductions are an explicit gameplay setting and must not be refitted.
-import { readFile, writeFile } from 'node:fs/promises';
+// Regenerate observed references only; no passive rating targets are fitted.
+import { writeFile } from 'node:fs/promises';
 import { defaultFocus, MAX_FOCUS, fitFocusBudget } from '../focus-rules.js';
-import { BIRTH_VARIATION, TODDLER_FOCUS, CHILDHOOD_DEDUCTION_SCALE, CHOICE_STAT_MULTIPLIER, INFANT_STABILITY_MULTIPLIER, SKILL_VARIATION } from '../development.js';
+import { BIRTH_VARIATION, TODDLER_FOCUS, CHOICE_STAT_MULTIPLIER, INFANT_STABILITY_MULTIPLIER, SKILL_VARIATION } from '../development.js';
 import {
   createGame, advanceYear, resolveEventChoice, EVENTS, effectiveStats, focusLimits,
   DEVELOPMENT_BALANCE,
@@ -79,25 +78,7 @@ function cohort(measureAges) {
   return { stats, ageStats, height, ageHeight, lifestyle, survivors };
 }
 
-if (args.includes('--fit')) {
-  let best = { error: Infinity, balance: structuredClone(DEVELOPMENT_BALANCE) };
-  for (let iteration = 0; iteration < 8; iteration++) {
-    const measured = cohort(false);
-    const averages = Object.fromEntries(statKeys.map(key => [key, round(mean(measured.stats[key]))]));
-    console.log(`Fit ${iteration + 1}: ${JSON.stringify(averages)}`);
-    const error = ['health', 'stability'].reduce((sum, key) => sum + (averages[key] - 5) ** 2, 0);
-    if (error < best.error) best = { error, balance: structuredClone(DEVELOPMENT_BALANCE) };
-    if (['health', 'stability'].every(key => Math.abs(averages[key] - 5) <= .025)) break;
-    for (const key of ['health', 'stability']) {
-      const response = 1 - (1 - DEVELOPMENT_BALANCE.wellbeingReversion[key]) ** 18;
-      DEVELOPMENT_BALANCE.wellbeingTarget[key] = round(DEVELOPMENT_BALANCE.wellbeingTarget[key] + (5 - averages[key]) / response);
-    }
-  }
-  Object.assign(DEVELOPMENT_BALANCE, best.balance);
-  const moduleUrl = new URL('../development.js', import.meta.url);
-  const source = await readFile(moduleUrl, 'utf8');
-  await writeFile(moduleUrl, source.replace(/export const DEVELOPMENT_BALANCE = \{[\s\S]*?\n\};/, `export const DEVELOPMENT_BALANCE = ${JSON.stringify(DEVELOPMENT_BALANCE, null, 2)};`));
-}
+if (args.includes('--fit')) throw new Error('Fitting is disabled: ratings require causes; regenerate the reference without --fit.');
 
 const result = cohort(true);
 const reference = {
@@ -109,7 +90,6 @@ const reference = {
     conditionedOn: 'alive at the observed age',
     observationsByAge: [...result.ageStats.map(stats => stats.health.count), result.stats.health.count],
     birthVariation: BIRTH_VARIATION,
-    childhoodDeductionScale: CHILDHOOD_DEDUCTION_SCALE,
     choiceStatMultiplier: CHOICE_STAT_MULTIPLIER,
     infantStabilityMultiplier: INFANT_STABILITY_MULTIPLIER,
     skillVariation: SKILL_VARIATION,

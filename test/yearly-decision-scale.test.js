@@ -4,7 +4,7 @@ import { changedRating } from '../rating-changes.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  YEARLY_DECISION_SCALE, DEVELOPMENT_BALANCE, TODDLER_FOCUS, CHILDHOOD_DEDUCTION_SCALE,
+  YEARLY_DECISION_SCALE, TODDLER_FOCUS,
   infantChoiceEffects, toddlerActivityEffects, skillChanges, childhoodWellbeing,
 } from '../development.js';
 import { createGame, annualForecast, advanceYear, chooseEducation, resolveEventChoice, effectiveStats } from '../engine.js';
@@ -89,7 +89,7 @@ test('stronger toddler activity effects retain proportional signs and unused poi
   }
 });
 
-test('school, career, and later-life practice have stronger gains and losses without scaling background development', () => {
+test('school, career, and later-life practice produce gains and losses without background development', () => {
   const focused = { work: 4, social: 0, family: 0, self: 4 };
   const neglected = { work: 0, social: 4, family: 4, self: 0 };
   const practice = { intelligence: .675, strength: .45, social: -.72, creativity: 0 };
@@ -98,7 +98,7 @@ test('school, career, and later-life practice have stronger gains and losses wit
     state.stats.intelligence = 8;
     const baseline = skillChanges(state);
     const background = skillChanges(state, null, 0);
-    close(background.intelligence, -.036 * flexibility + (age < 18 ? DEVELOPMENT_BALANCE.childhoodBias.intelligence * CHILDHOOD_DEDUCTION_SCALE : 0), 'innate tendency and reduced childhood deduction remain independent of practice scaling');
+    close(background.intelligence, 0, 'no practice means no innate tendency or background adjustment');
     close(baseline.intelligence - background.intelligence, age < 18 ? -.225 * .5 * flexibility : 0, 'unjoined extracurricular Intelligence loss receives the yearly factor once');
     for (const [focus, sign] of [[focused, 1], [neglected, -1]]) {
       const changed = skillChanges({ ...state, focus });
@@ -112,8 +112,8 @@ test('school, career, and later-life practice have stronger gains and losses wit
   }
   const child = stateAt(10);
   const wellbeing = childhoodWellbeing(child);
-  close(wellbeing.health, .06 * (DEVELOPMENT_BALANCE.wellbeingTarget.health - 5), 'health reversion');
-  close(wellbeing.stability, .08 * (DEVELOPMENT_BALANCE.wellbeingTarget.stability - 5), 'mental stability reversion');
+  close(wellbeing.health, 0, 'neutral choices do not change health');
+  close(wellbeing.stability, 0, 'neutral choices do not change mental stability');
   const senior = stateAt(65);
   senior.focus.self = 2;
   assert.equal(annualForecast(senior).stats.health.change, -.1, 'age-related health loss remains whole');
@@ -149,23 +149,21 @@ test('stronger child focus practice preserves caregiver strain and family relati
         assert.equal(grown.stats.health, round(5 + effort * .01));
       } else if (child.age === 0) {
         const carePractice = .12 * effort;
-        assert.equal(grown.stats.intelligence, round(5 + (.24 + carePractice) * .575 + DEVELOPMENT_BALANCE.childhoodBias.intelligence * CHILDHOOD_DEDUCTION_SCALE));
+        assert.equal(grown.stats.intelligence, round(5 + (.24 + carePractice) * .575));
       } else {
         const toddler = child.age < 5;
         const skillPractice = toddler
           ? { intelligence: 0, strength: 0, social: .165 * effort, creativity: 0 }
           : { intelligence: 0, strength: 0, social: .24 * effort, creativity: 0 };
         for (const key of learned) {
-          const bias = DEVELOPMENT_BALANCE.childhoodBias[key];
-          const background = bias < 0 ? bias * CHILDHOOD_DEDUCTION_SCALE : bias;
-          assert.equal(grown.stats[key], round(5 + skillPractice[key] * .575 + background), `${child.age}-year-old child ${key} care`);
+          assert.equal(grown.stats[key], round(5 + skillPractice[key] * .575), `${child.age}-year-old child ${key} care`);
         }
         const healthPractice = (toddler ? .3 : .105) * effort;
         const stabilityPractice = toddler
           ? .24 * effort
           : .6 * effort;
-        assert.equal(grown.stats.health, round(5 + .06 * (DEVELOPMENT_BALANCE.wellbeingTarget.health - 5) + healthPractice * .5));
-        assert.equal(grown.stats.stability, round(5 + .08 * (DEVELOPMENT_BALANCE.wellbeingTarget.stability - 5) + stabilityPractice * .5));
+        assert.equal(grown.stats.health, round(5 + healthPractice * .5));
+        assert.equal(grown.stats.stability, round(5 + stabilityPractice * .5));
       }
     }
   }

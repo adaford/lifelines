@@ -1,20 +1,19 @@
 import { fitFocusBudget } from '../focus-rules.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { naturalSkillRating, skillChanges, childhoodWellbeing, infantChoiceEffects, wellbeingResponse, TODDLER_FOCUS, CHILDHOOD_DEDUCTION_SCALE } from '../development.js';
+import { naturalSkillRating, skillChanges, childhoodWellbeing, infantChoiceEffects, wellbeingResponse, TODDLER_FOCUS } from '../development.js';
 import { createGame, advanceYear, resolveEventChoice, EVENTS, effectiveStats, focusLimits } from '../engine.js';
 import { eventChances } from '../events.js';
 import { PERCENTILE_REFERENCE } from '../percentile-reference.js';
 
-test('childhood deductions retain ten percent strength alongside stronger crying and unchanged positive background growth', () => {
-  assert.equal(CHILDHOOD_DEDUCTION_SCALE, .1);
+test('childhood skill changes come only from chosen practice, without background deductions or gains', () => {
   const near = (actual, expected, label) => assert.ok(Math.abs(actual - expected) < 1e-12, `${label}: ${actual} vs ${expected}`);
   const person = {
     alive: true, cryLevel: 5,
     stats: { intelligence: 5, strength: 5, social: 5, creativity: 5 },
     aptitudes: { intelligence: 0, strength: 0, social: 0, creativity: 0 },
   };
-  const expected = { intelligence: -.006525, strength: .008169, social: -.0085835, creativity: -.0082402 };
+  const expected = { intelligence: 0, strength: 0, social: 0, creativity: 0 };
   for (const age of [2, 5, 17]) {
     const state = { ...person, age, focus: age < 5 ? { ...TODDLER_FOCUS } : { work: 2, social: 2, family: 2, self: 2 } };
     for (const [key, amount] of Object.entries(expected)) near(skillChanges(state)[key], amount, `${age}: ${key}`);
@@ -25,8 +24,8 @@ test('childhood deductions retain ten percent strength alongside stronger crying
     const crying = infantChoiceEffects(state), total = skillChanges(state);
     near(crying.intelligence, .414, 'maximum crying Intelligence contribution');
     near(crying.social, .138, 'maximum crying Social contribution');
-    near(total.intelligence, .407475, 'Intelligence after the smaller deduction');
-    near(total.social, .1294165, 'Social after the smaller deduction');
+    near(total.intelligence, .414, 'Intelligence changes solely from crying');
+    near(total.social, .138, 'Social changes solely from crying');
     assert.deepEqual(state, before, 'reading development leaves ratings and choices unchanged');
   }
   assert.deepEqual(skillChanges({ ...person, age: 18, focus: { work: 2, social: 2, family: 2, self: 2 } }),
@@ -123,12 +122,12 @@ test('aptitude has a gentler influence on starting ratings, practice and routine
   }
 });
 
-test('childhood wellbeing recovers toward its usual range while choices still matter', () => {
+test('childhood wellbeing stays unchanged at low and high ratings without a cause', () => {
   const child = { age: 10, alive: true, stats: { health: 5, stability: 5 }, focus: { work: 2, social: 2, family: 2, self: 2 } };
   const low = childhoodWellbeing({ ...child, stats: { health: 2, stability: 2 } });
   const high = childhoodWellbeing({ ...child, stats: { health: 9, stability: 9 } });
-  assert.ok(low.health > 0 && low.stability > 0);
-  assert.ok(high.health < 0 && high.stability < 0);
+  assert.deepEqual(low, { health: 0, stability: 0 });
+  assert.deepEqual(high, { health: 0, stability: 0 });
   const rested = childhoodWellbeing({ ...child, focus: { work: 1, social: 2, family: 4, self: 5 } });
   const strained = childhoodWellbeing({ ...child, focus: { work: 4, social: 2, family: 2, self: 0 } });
   assert.ok(rested.health > strained.health);
@@ -172,7 +171,7 @@ test('crying choice effects isolate the selected level from background developme
   }
 });
 
-test('natural resilience boosts routine wellbeing gains and buffers losses without changing reversion', () => {
+test('natural resilience boosts caused wellbeing gains and buffers caused losses', () => {
   for (const key of ['health', 'stability']) {
     assert.equal(wellbeingResponse({}, key, .2), .1, 'missing legacy aptitude is neutral with half-strength decisions');
     assert.equal(wellbeingResponse({ aptitudes: { [key]: 0 } }, key, -.2), -.1);
@@ -190,7 +189,7 @@ test('natural resilience boosts routine wellbeing gains and buffers losses witho
     const withAptitude = aptitude => ({ ...person, aptitudes: { health: aptitude, stability: aptitude } });
     const neutral = childhoodWellbeing(person);
     for (const aptitude of [-3, 0, 3]) assert.deepEqual(childhoodWellbeing(withAptitude(aptitude)), neutral,
-      'natural resilience does not scale the background return toward wellbeing targets');
+      'natural resilience alone does not cause a wellbeing change');
     const positive = toddler ? { work: 0, social: 0, family: 4, self: 4, creative: 0 } : { work: 0, social: 2, family: 2, self: 4 };
     const negative = toddler ? { work: 4, social: 4, family: 0, self: 0, creative: 0 } : { work: 4, social: 2, family: 2, self: 0 };
     for (const focus of [positive, negative]) {
@@ -283,13 +282,12 @@ test('independent game lives match the reduced-deduction reference while retaini
     assert.ok(values.length > samplesPerProfile * 2 * .95);
     const average = values.reduce((sum, value) => sum + value, 0) / values.length;
     const sd = Math.sqrt(values.reduce((sum, value) => sum + (value - average) ** 2, 0) / values.length);
-    // Trainable skills may rise above five with the intentionally smaller
-    // deductions. Held-out lives must still reproduce the measured population;
-    // appearance and wellbeing retain their original near-five balance check.
-    const target = ['intelligence', 'strength', 'social', 'creativity'].includes(key)
-      ? PERCENTILE_REFERENCE.stats[key].observedMean : 5;
+    // Compare every stat with observed lives; no passive target holds wellbeing at five.
+    const target = PERCENTILE_REFERENCE.stats[key].observedMean;
     assert.ok(Math.abs(average - target) < .2, `${key} mean ${average}, expected near ${target}`);
-    assert.ok(sd > .25 && sd < 3, `${key} SD ${sd}`);
+    // Outcomes reflect play and events, with no target pulling the cohort toward five.
+    assert.ok(values.every(value => value >= 0 && value <= 10), `${key} stays within rating bounds`);
+    assert.ok(sd > .25 && sd < 3, `${key} retains broad but bounded SD: ${sd}`);
     assert.ok(new Set(values).size > 50, `${key} varies between lives`);
   }
 });

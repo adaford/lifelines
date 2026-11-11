@@ -119,7 +119,7 @@ test('v8 mixed parent lifestyles retain the recorded child household support aft
   assert.ok(state.parents.every(parent => parent.lifestyle === state.lifestyle));
 });
 
-test('attractiveness has small positive and negative annual variation with no juvenile mean drift', () => {
+test('juvenile attractiveness remains unchanged without training or an event', () => {
   const original = createGame({ seed: 502 });
   original.stats.attractiveness = 5;
   const before = copy(original);
@@ -135,10 +135,7 @@ test('attractiveness has small positive and negative annual variation with no ju
     assert.equal(state.yearSummary.stats.attractiveness.after, state.stats.attractiveness);
     return state.stats.attractiveness;
   });
-  assert.ok(values[0] < 5 && values[2] > 5);
-  assert.equal(values[1], 5);
-  assert.ok(5 - values[0] <= .15 && values[2] - 5 <= .15, 'ordinary appearance variation stays slight');
-  assert.ok(Math.abs((values[0] + values[2]) / 2 - 5) < .001, 'variation is centered at the unchanged mean');
+  assert.deepEqual(values, [5, 5, 5], 'random draws cannot create appearance changes without a cause');
 });
 
 test('poor health reduces annual growth, saves retain growth genetics, and maturity freezes attained height', () => {

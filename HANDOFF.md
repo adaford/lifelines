@@ -1,5 +1,17 @@
 # Lifelines development handoff
 
+## Ratings require a cause (12 November 2026)
+
+Every existing rated stat now changes only when an activity, care, event, aging, or another explicit system supplies a contribution. Remove all skill movement toward innate ratings, all childhood stat calibration offsets, both childhood wellbeing target adjustments, and caregiver mental-stability recovery toward 5. This supersedes earlier passive-recovery, background-deduction, and mean-reversion rules. Birth distributions and initial affinity effects are unchanged.
+
+Keep the shared directional rating response: a positive contribution gains more at a low rating, while a negative contribution loses more at a high rating. A rating's position never supplies a contribution by itself. Routine randomness scales the already-caused net change by 1 + boundedNormalDraw * rate, with rates .1 for learned skills, .25 for Health/Mental stability and .3 for Attractiveness. Relationship variation likewise scales caused changes at .2. Zero net input remains exactly zero; bounded draws cannot reverse direction. Preserve every existing routine draw even when its contribution is zero. Appearance and late-life Health aging, school inactivity, care, activity performance, household finances and explicit events retain their causes.
+
+With neutral affinity, a caregiver at Mental stability 2.3 and Family time 0 now falls to 2.27 in a mean event-free year, then 2.24. Family time 2 is neutral; positive Family contributions and supportive events can raise stability. Other causes can still offset one another. Temporary modifiers keep their explicit effects and expiry.
+
+No save migration or schema change: preserve ratings, focus, history, pending choices, enrollment, effects and RNG on load. The percentile reference is regenerated from observed lives without fitting; --fit is disabled so calibration cannot restore passive targets. Help now explains that contributions cause movement. Cache token: `caused-stats`. Browser/visual checks remain omitted by preference.
+
+Validation: all 504 tests pass on Node 24.14.0, including the nine cause-driven regressions and the independent 1,600-life cohort. All 24 local HTTP assets match source. The 4,000-life reference was regenerated without fitting and reproduces byte for byte. Browser/visual checks remain omitted by preference.
+
 ## Lifestyle-based school invitations (12 November 2026)
 
 Sports and extracurricular offers now roll independently at the start of each playable school year (ages 5-17), using current effective household Lifestyle. For rating L clamped to 0-10, each category has chance 20% + 8% * L and, when offered, max(2, round(L)) choices. Lifestyle 1 gives a 28% yearly chance of two choices per category (about once every 3.6 years); 5 gives 60% and five choices; 10 guarantees ten of each. Both, either, or neither category can appear. These are fictional gameplay settings.

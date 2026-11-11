@@ -1,4 +1,4 @@
-import { heightReference } from './growth.js?v=lifestyle-offers';
+import { heightReference } from './growth.js?v=caused-stats';
 
 // Fictional school activities and success rules, independent of save mutation
 // and the gameplay RNG. The engine supplies effective ratings and any draw.

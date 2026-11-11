@@ -43,7 +43,7 @@ test('school-age Family uses the same two-point neutral and triple endpoints', (
   }
 });
 
-test('toddler parent mental stability preserves aptitude response and background recovery', () => {
+test('toddler parent mental stability responds to Family time without automatic recovery', () => {
   for (const points of [1, 2, 3]) {
     const state = familyTime(3, points);
     state.parents.forEach((parent, index) => {
@@ -52,7 +52,7 @@ test('toddler parent mental stability preserves aptitude response and background
     });
     const forecast = annualForecast(state);
     for (const parent of state.parents) {
-      const change = .08 * (5 - parent.stats.stability) + wellbeingResponse(parent, 'stability', focusEffect(points) * .025);
+      const change = wellbeingResponse(parent, 'stability', focusEffect(points) * .025);
       assert.equal(forecast.parents.find(row => row.id === parent.id).stability.after, changedRating(parent.stats.stability, change));
     }
   }

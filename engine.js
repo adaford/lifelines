@@ -1,23 +1,23 @@
 // Lifelines: deterministic, browser-independent simulation rules.
 // All public actions mutate their state and return { ok, reason? }.
-import { JOBS } from './jobs.js?v=lifestyle-offers';
-import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=lifestyle-offers';
-import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=lifestyle-offers';
-import { mortalityRisk, rollMortality } from './mortality.js?v=lifestyle-offers';
-import { heightReference, advanceGrowth } from './growth.js?v=lifestyle-offers';
-import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=lifestyle-offers';
-import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, standardFocusPractice, schoolAppearanceChange, DEVELOPMENT_BALANCE, BIRTH_VARIATION, SKILL_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, PARENT_FAMILY_STABILITY_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=lifestyle-offers';
-import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=lifestyle-offers';
-import { normalPercentile } from './percentiles.js?v=lifestyle-offers';
-import { changedRating } from './rating-changes.js?v=lifestyle-offers';
-import { MAX_FOCUS, DEFAULT_FOCUS, SCHOOL_FOCUS_KEYS, focusMaxFor, focusNeutralFor, isSchoolActivityFocus, focusEffect, focusKeysForAge, focusBudget, temporaryFocusPoints, defaultFocus, legacyFocusValue } from './focus-rules.js?v=lifestyle-offers';
-import { SCHOOL_OFFER_COUNT, MAX_SCHOOL_OFFERS, schoolActivity, gradeScore, activitySuccessChange, activityEligible, annualSchoolOffers, createSchoolRecord } from './school.js?v=lifestyle-offers';
-import { assignBirthConditions, applyBirthConditions, getBirthConditions, conditionFocusPoints, conditionFocusLimits, validateBirthConditions } from './birth-conditions.js?v=lifestyle-offers';
+import { JOBS } from './jobs.js?v=caused-stats';
+import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=caused-stats';
+import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=caused-stats';
+import { mortalityRisk, rollMortality } from './mortality.js?v=caused-stats';
+import { heightReference, advanceGrowth } from './growth.js?v=caused-stats';
+import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=caused-stats';
+import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, standardFocusPractice, schoolAppearanceChange, DEVELOPMENT_BALANCE, BIRTH_VARIATION, SKILL_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, PARENT_FAMILY_STABILITY_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=caused-stats';
+import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=caused-stats';
+import { normalPercentile } from './percentiles.js?v=caused-stats';
+import { changedRating } from './rating-changes.js?v=caused-stats';
+import { MAX_FOCUS, DEFAULT_FOCUS, SCHOOL_FOCUS_KEYS, focusMaxFor, focusNeutralFor, isSchoolActivityFocus, focusEffect, focusKeysForAge, focusBudget, temporaryFocusPoints, defaultFocus, legacyFocusValue } from './focus-rules.js?v=caused-stats';
+import { SCHOOL_OFFER_COUNT, MAX_SCHOOL_OFFERS, schoolActivity, gradeScore, activitySuccessChange, activityEligible, annualSchoolOffers, createSchoolRecord } from './school.js?v=caused-stats';
+import { assignBirthConditions, applyBirthConditions, getBirthConditions, conditionFocusPoints, conditionFocusLimits, validateBirthConditions } from './birth-conditions.js?v=caused-stats';
 export { DEVELOPMENT_BALANCE };
-export { heightPercentile } from './growth.js?v=lifestyle-offers';
-export { mortalityRisk } from './mortality.js?v=lifestyle-offers';
-import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=lifestyle-offers';
-export { JOBS, JOB_CATEGORIES } from './jobs.js?v=lifestyle-offers';
+export { heightPercentile } from './growth.js?v=caused-stats';
+export { mortalityRisk } from './mortality.js?v=caused-stats';
+import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=caused-stats';
+export { JOBS, JOB_CATEGORIES } from './jobs.js?v=caused-stats';
 export const EVENTS = [...PERSONAL_EVENTS, ...FAMILY_EVENTS];
 
 export const SKILLS = [
@@ -526,7 +526,7 @@ function growYear(state) {
   }
   if (studying) state.schoolProgress = round(clamp(state.schoolProgress + legacyFocusValue(f.work) * .9, 0, 100));
   for (const parent of caregivers(state)) {
-    addStat(parent, 'stability', .08 * (5 - parent.stats.stability) + wellbeingResponse(parent, 'stability', focusEffect(f.family) * PARENT_FAMILY_STABILITY_GAIN));
+    addStat(parent, 'stability', wellbeingResponse(parent, 'stability', focusEffect(f.family) * PARENT_FAMILY_STABILITY_GAIN));
     parent.relationship = round(clamp(parent.relationship + focusEffect(f.family) * PARENT_FAMILY_RELATIONSHIP_GAIN, 0, 10));
   }
 }
@@ -823,19 +823,18 @@ function routineYear(state, growthRandom, careerRandom) {
     if (!growthRandom) continue;
     for (const key of STAT_KEYS) {
       const change = person.stats[key] - previous.stats[key];
-      // Abstract skill variation is gameplay calibration, not measured human
-      // intelligence/appearance SD. Affinity supplies persistent differences;
-      // this residual provides modest, reproducible year-to-year variation.
+      // Randomness varies an existing cause's magnitude, never inventing or
+      // reversing a change. Routine inputs already received their directional
+      // rating response; do not apply it again to the variation. Keep every
+      // draw, including neutral stats, so the RNG schedule stays unchanged.
       const draw = growthRandom();
       const wellbeing = key === 'health' || key === 'stability';
-      const sd = Math.abs(change) * (wellbeing ? .25 : key === 'attractiveness' ? .3 : SKILL_VARIATION.proportional) + (wellbeing ? .02 : key === 'attractiveness' ? .04 : SKILL_VARIATION.base);
-      addStat(person, key, clamp(draw, -3, 3) * sd);
+      const variation = wellbeing ? .25 : key === 'attractiveness' ? .3 : SKILL_VARIATION.proportional;
+      person.stats[key] = round(clamp(previous.stats[key] + change * (1 + clamp(draw, -3, 3) * variation), 0, 10));
     }
     if (Number.isFinite(previous.relationship) && person.abandonedAt === undefined) {
       const change = person.relationship - previous.relationship;
-      const neutralCrying = state.age < 2 && state.cryLevel === 3 && caregivers(state).includes(person);
-      const sd = neutralCrying ? 0 : Math.abs(change) * .2 + .01;
-      person.relationship = round(clamp(previous.relationship + change + clamp(growthRandom(), -3, 3) * sd, 0, 10));
+      person.relationship = round(clamp(previous.relationship + change * (1 + clamp(growthRandom(), -3, 3) * .2), 0, 10));
     }
   }
   state.effects.forEach(effect => { effect.years -= 1; });

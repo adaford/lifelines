@@ -1,8 +1,8 @@
-import { MAX_FOCUS, DEFAULT_FOCUS, focusEffect, defaultFocus, focusMaxFor, focusNeutralFor } from './focus-rules.js?v=lifestyle-offers';
-import { schoolActivity, activityEligible } from './school.js?v=lifestyle-offers';
+import { MAX_FOCUS, DEFAULT_FOCUS, focusEffect, defaultFocus, focusMaxFor, focusNeutralFor } from './focus-rules.js?v=caused-stats';
+import { schoolActivity, activityEligible } from './school.js?v=caused-stats';
 // Ratings use the same scale throughout life. Balanced toddler activities use
-// TODDLER_FOCUS; core areas use 2, enrolled school activities use 1. Keep the historical calibration
-// offsets, with childhood deductions reduced to the requested tenth strength.
+// TODDLER_FOCUS; core areas use 2, enrolled school activities use 1.
+// Existing ratings change only through practice, care, events, or aging.
 export const BIRTH_VARIATION = {
   skill: 2,
   health: 2,
@@ -12,25 +12,8 @@ export const BIRTH_VARIATION = {
 };
 
 export const DEVELOPMENT_BALANCE = {
-  "innateScale": 0.6,
-  "skillReversion": 0.012,
-  "childhoodBias": {
-    "intelligence": -0.06525,
-    "strength": 0.008169,
-    "social": -0.085835,
-    "creativity": -0.082402
-  },
-  "wellbeingTarget": {
-    "health": 5.208824,
-    "stability": 5.478434
-  },
-  "wellbeingReversion": {
-    "health": 0.06,
-    "stability": 0.08
-  }
+  "innateScale": 0.6
 };
-
-export const CHILDHOOD_DEDUCTION_SCALE = .1;
 
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
 const number = (value, fallback) => Number.isFinite(value) ? value : fallback;
@@ -45,7 +28,7 @@ export const YEARLY_DECISION_SCALE = .5;
 // deductions. Keep caregiver strain and autonomous development independent.
 export const CHOICE_STAT_MULTIPLIER = 6;
 export const INFANT_STABILITY_MULTIPLIER = 2;
-export const SKILL_VARIATION = { base: .02, proportional: .1 };
+export const SKILL_VARIATION = { proportional: .1 };
 const choiceCoefficients = activities => Object.fromEntries(Object.entries(activities).map(([area, effects]) =>
   [area, Object.fromEntries(Object.entries(effects).map(([stat, amount]) => [stat, amount * CHOICE_STAT_MULTIPLIER]))]));
 export const PARENT_FAMILY_RELATIONSHIP_GAIN = .08 * YEARLY_DECISION_SCALE;
@@ -168,8 +151,8 @@ export function schoolAppearanceChange(person) {
   return personalPracticeResponse(person, 'attractiveness', effort);
 }
 
-// Natural resilience changes responses to routine choices, not the background
-// return toward a central wellbeing rating. Missing legacy values are neutral.
+// Natural resilience changes responses to routine choices. It never supplies
+// a change of its own. Missing legacy values are neutral.
 export function wellbeingResponse(person, key, amount) {
   const aptitude = clamp(number(person.aptitudes?.[key], 0), -3, 3);
   return YEARLY_DECISION_SCALE * practiceResponse(amount, aptitude);
@@ -226,7 +209,7 @@ export function toddlerActivityEffects(person) {
   }));
 }
 
-// This is a weak innate tendency, not a destination or a preselected final score.
+// The center of a new person's birth distribution, never a target for growth.
 export function naturalSkillRating(aptitude = 0) {
   return clamp(5 + DEVELOPMENT_BALANCE.innateScale * clamp(number(aptitude, 0), -3, 3), 0, 10);
 }
@@ -245,11 +228,7 @@ export function skillChanges(person, career = null, practiceScale = YEARLY_DECIS
     const effort = practice[key];
     // Aptitude helps improvement and buffers loss without eliminating either.
     const response = practiceScale * practiceResponse(effort, aptitude);
-    const current = number(person.stats?.[key], naturalSkillRating(aptitude));
-    const tendency = DEVELOPMENT_BALANCE.skillReversion * (naturalSkillRating(aptitude) - current);
-    const calibratedBias = age < 18 ? number(DEVELOPMENT_BALANCE.childhoodBias[key], 0) : 0;
-    const eventBias = calibratedBias * (calibratedBias < 0 ? CHILDHOOD_DEDUCTION_SCALE : 1);
-    return [key, (response + tendency) * flexibility + eventBias];
+    return [key, response * flexibility];
   }));
 }
 
@@ -281,17 +260,11 @@ export function focusChoiceEffects(person, career = null) {
   };
 }
 
-// Wellbeing varies around a middle rating while natural resilience shapes its
-// response to choices. Events can also move it; high scores do not drift
-// automatically to the ceiling. Call with the age at the start of the year.
+// Choices supply wellbeing changes; a low or high rating supplies none by
+// itself. Call with the age at the start of the year.
 export function childhoodWellbeing(person) {
   if (person.alive === false || person.age >= 18) return { health: 0, stability: 0 };
-  const health = number(person.stats?.health, 5);
-  const stability = number(person.stats?.stability, 5);
-  const result = {
-    health: DEVELOPMENT_BALANCE.wellbeingReversion.health * (DEVELOPMENT_BALANCE.wellbeingTarget.health - health),
-    stability: DEVELOPMENT_BALANCE.wellbeingReversion.stability * (DEVELOPMENT_BALANCE.wellbeingTarget.stability - stability),
-  };
+  const result = { health: 0, stability: 0 };
   if (person.age < 2) {
     const effects = infantChoiceEffects(person);
     result.health += effects.health;
