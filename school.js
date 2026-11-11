@@ -1,4 +1,4 @@
-import { heightReference } from './growth.js?v=chronological-events';
+import { heightReference } from './growth.js?v=activity-projection';
 
 // Fictional school activities and success rules, independent of save mutation
 // and the gameplay RNG. The engine supplies effective ratings and any draw.
@@ -138,6 +138,13 @@ export function activitySuccessChange(person, selected, points, randomDraw = 0) 
 export function activityEligible(person, selected) {
   return Boolean(selected && person?.age >= 5 && person.age < 18
     && finite(person.lifestyle) >= (selected.minLifestyle ?? 0));
+}
+
+// Previews use zero noise; completed reports supply their existing annual draw.
+export function activitySuccessAfterYear(person, selected, previousSuccess, points, randomDraw = 0) {
+  if (!activityEligible(person, selected)) return previousSuccess;
+  const delta = activitySuccessChange(person, selected, points, randomDraw);
+  return round(clamp((previousSuccess ?? 5) + delta, 0, 10), 2);
 }
 
 function hash(value) {

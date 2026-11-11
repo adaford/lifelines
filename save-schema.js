@@ -1,12 +1,12 @@
 // Read-only validation for current and legacy saves. Migration stays in the
 // engine, where it can use the same generation and progression rules.
-import { JOBS } from './jobs.js?v=chronological-events';
-import { EVENTS as PERSONAL_EVENTS } from './events.js?v=chronological-events';
-import { FAMILY_EVENTS } from './family-events.js?v=chronological-events';
-import { MAX_FOCUS, DEFAULT_FOCUS, SCHOOL_FOCUS_KEYS, focusMaxFor, focusBudget } from './focus-rules.js?v=chronological-events';
-import { SCHOOL_OFFER_COUNT, MAX_SCHOOL_OFFERS, schoolActivity } from './school.js?v=chronological-events';
-import { conditionFocusPoints, conditionFocusLimits, validateBirthConditions } from './birth-conditions.js?v=chronological-events';
-import { gestatingActor } from './relationships.js?v=chronological-events';
+import { JOBS } from './jobs.js?v=activity-projection';
+import { EVENTS as PERSONAL_EVENTS } from './events.js?v=activity-projection';
+import { FAMILY_EVENTS } from './family-events.js?v=activity-projection';
+import { MAX_FOCUS, DEFAULT_FOCUS, SCHOOL_FOCUS_KEYS, focusMaxFor, focusBudget } from './focus-rules.js?v=activity-projection';
+import { SCHOOL_OFFER_COUNT, MAX_SCHOOL_OFFERS, schoolActivity } from './school.js?v=activity-projection';
+import { conditionFocusPoints, conditionFocusLimits, validateBirthConditions } from './birth-conditions.js?v=activity-projection';
+import { gestatingActor } from './relationships.js?v=activity-projection';
 
 // Inject engine-owned helpers rather than importing the engine back here.
 // Keeping these references shared prevents validation rules from drifting.

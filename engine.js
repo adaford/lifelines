@@ -1,25 +1,25 @@
 // Lifelines: deterministic, browser-independent simulation rules.
 // All public actions mutate their state and return { ok, reason? }.
-import { createSaveValidator } from './save-schema.js?v=chronological-events';
-import { JOBS } from './jobs.js?v=chronological-events';
-import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=chronological-events';
-import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=chronological-events';
-import { eventStatCause } from './event-causes.js?v=chronological-events';
-import { mortalityRisk, rollMortality } from './mortality.js?v=chronological-events';
-import { heightReference, advanceGrowth } from './growth.js?v=chronological-events';
-import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=chronological-events';
-import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, caregiverCryEffects, unemploymentStabilityChange, standardFocusPractice, schoolAppearanceChange, DEVELOPMENT_BALANCE, BIRTH_VARIATION, SKILL_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, PARENT_FAMILY_STABILITY_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=chronological-events';
-import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=chronological-events';
-import { normalPercentile } from './percentiles.js?v=chronological-events';
-import { changedRating } from './rating-changes.js?v=chronological-events';
-import { MAX_FOCUS, DEFAULT_FOCUS, focusMaxFor, focusNeutralFor, isSchoolActivityFocus, focusEffect, focusKeysForAge, focusBudget, temporaryFocusPoints, defaultFocus, legacyFocusValue } from './focus-rules.js?v=chronological-events';
-import { SCHOOL_OFFER_COUNT, schoolActivity, gradeScore, activitySuccessChange, activityEligible, annualSchoolOffers, createSchoolRecord } from './school.js?v=chronological-events';
-import { assignBirthConditions, applyBirthConditions, getBirthConditions, conditionFocusLimits } from './birth-conditions.js?v=chronological-events';
+import { createSaveValidator } from './save-schema.js?v=activity-projection';
+import { JOBS } from './jobs.js?v=activity-projection';
+import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=activity-projection';
+import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=activity-projection';
+import { eventStatCause } from './event-causes.js?v=activity-projection';
+import { mortalityRisk, rollMortality } from './mortality.js?v=activity-projection';
+import { heightReference, advanceGrowth } from './growth.js?v=activity-projection';
+import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=activity-projection';
+import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, caregiverCryEffects, unemploymentStabilityChange, standardFocusPractice, schoolAppearanceChange, DEVELOPMENT_BALANCE, BIRTH_VARIATION, SKILL_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, PARENT_FAMILY_STABILITY_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=activity-projection';
+import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=activity-projection';
+import { normalPercentile } from './percentiles.js?v=activity-projection';
+import { changedRating } from './rating-changes.js?v=activity-projection';
+import { MAX_FOCUS, DEFAULT_FOCUS, focusMaxFor, focusNeutralFor, isSchoolActivityFocus, focusEffect, focusKeysForAge, focusBudget, temporaryFocusPoints, defaultFocus, legacyFocusValue } from './focus-rules.js?v=activity-projection';
+import { SCHOOL_OFFER_COUNT, schoolActivity, gradeScore, activitySuccessAfterYear, activityEligible, annualSchoolOffers, createSchoolRecord } from './school.js?v=activity-projection';
+import { assignBirthConditions, applyBirthConditions, getBirthConditions, conditionFocusLimits } from './birth-conditions.js?v=activity-projection';
 export { DEVELOPMENT_BALANCE };
-export { heightPercentile } from './growth.js?v=chronological-events';
-export { mortalityRisk } from './mortality.js?v=chronological-events';
-import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=chronological-events';
-export { JOBS, JOB_CATEGORIES } from './jobs.js?v=chronological-events';
+export { heightPercentile } from './growth.js?v=activity-projection';
+export { mortalityRisk } from './mortality.js?v=activity-projection';
+import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=activity-projection';
+export { JOBS, JOB_CATEGORIES } from './jobs.js?v=activity-projection';
 export const EVENTS = [...PERSONAL_EVENTS, ...FAMILY_EVENTS];
 
 export const SKILLS = [
@@ -781,8 +781,7 @@ function schoolYear(state, growthRandom) {
     if (!enrollment || !activity) continue;
     const before = enrollment.success;
     if (activityEligible(person, activity)) {
-      const delta = activitySuccessChange(person, activity, state.focus[kind], growthRandom ? growthRandom() : 0);
-      enrollment.success = round(clamp((before ?? 5) + delta, 0, 10));
+      enrollment.success = activitySuccessAfterYear(person, activity, before, state.focus[kind], growthRandom ? growthRandom() : 0);
     }
     report.activities.push({ kind, id: activity.id, name: activity.name, focus: state.focus[kind], before, after: enrollment.success });
   }

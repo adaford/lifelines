@@ -6,17 +6,17 @@ import {
   offeredJobs, needsEducationChoice, pendingEventSubject, focusLimits, focusLimitDetails, caregivers,
   relationshipOdds, meetingChances, proposalChance, pregnancyChance, oneNightChance,
   respondToEncounter, proposeMarriage, endRelationship, normalizeSurname, heightPercentile, statPercentiles
-} from './engine.js?v=chronological-events';
-import { LEGACY_EVENT_COPY } from './event-copy-history.js?v=chronological-events';
-import { formatEventCause } from './event-causes.js?v=chronological-events';
-import { annotateNarrative } from './narrative.js?v=chronological-events';
-import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome, escapeHTML as esc } from './display.js?v=chronological-events';
-import { avatar, genderBadge, parentLabel } from './profile-view.js?v=chronological-events';
+} from './engine.js?v=activity-projection';
+import { LEGACY_EVENT_COPY } from './event-copy-history.js?v=activity-projection';
+import { formatEventCause } from './event-causes.js?v=activity-projection';
+import { annotateNarrative } from './narrative.js?v=activity-projection';
+import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome, escapeHTML as esc } from './display.js?v=activity-projection';
+import { avatar, genderBadge, parentLabel } from './profile-view.js?v=activity-projection';
 
-import { MAX_FOCUS, focusBudget, focusMaxFor } from './focus-rules.js?v=chronological-events';
-import { schoolActivity, gradeScore, gradeLetter, activityGradeLetter, activityEligible } from './school.js?v=chronological-events';
-import { getBirthConditions } from './birth-conditions.js?v=chronological-events';
-import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=chronological-events';
+import { MAX_FOCUS, focusBudget, focusMaxFor } from './focus-rules.js?v=activity-projection';
+import { schoolActivity, gradeScore, gradeLetter, activityGradeLetter, activitySuccessAfterYear, activityEligible } from './school.js?v=activity-projection';
+import { getBirthConditions } from './birth-conditions.js?v=activity-projection';
+import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=activity-projection';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const app = document.querySelector('#app');
@@ -493,13 +493,18 @@ function focusView(disabled) {
   const rows = toddler?toddlerFocusRows:state.age<18?schoolFocusRows:[['work',studying?'College':'Career',studying?'school':'career'],['social','Friends','social'],['family','Family','family'],['self','Yourself','self']];
   const mode = toddler?'activity':'focus';
   const limits = focusLimits(state), details = focusLimitDetails(state);
-  const expectedGpa = !disabled && state.alive!==false && state.age>=5 && state.age<18 && state.school
-    ? gradeLetter(gradeScore(state.focus.work,effectiveStats(state).intelligence)) : null;
+  const schoolPerson = !disabled && state.alive!==false && state.age>=5 && state.age<18 && state.school
+    ? { ...state, stats: effectiveStats(state) } : null;
+  const expectedGpa = schoolPerson ? gradeLetter(gradeScore(state.focus.work,schoolPerson.stats.intelligence)) : null;
   return `<div class="focus-list">${rows.map(([key,label,ico]) => {
     const maximum=focusMaxFor(state,key);
+    const enrollment = schoolPerson && ['sports','extracurricular'].includes(key) ? state.school[key] : null;
+    const activity = enrollment && schoolActivity(key,enrollment.id);
+    const expectedSuccess = activityEligible(schoolPerson,activity)
+      ? activityGradeLetter(activitySuccessAfterYear(schoolPerson,activity,enrollment.success,state.focus[key])) : null;
     const restrictions = details.filter(limit=>limit.key===key);
     const limitText = restrictions.length?'Max '+limits[key]+' · '+restrictions.map(limit=>limit.name+' ('+(limit.years===null?'lifelong':limit.years===1?'this year':limit.years+' years left')+')').join('; '):'';
-    return `<div class="focus-row" data-focus-key="${key}"><span class="focus-icon">${icon(ico)}</span><div class="focus-copy"><h4>${labelWithHelp(label,`${toddler?'toddler':'focus'}-${key}`)}</h4><div class="focus-scale" aria-hidden="true">${Array.from({length:maximum},(_,i)=>`<span class="${i<(state.focus[key] ?? 0)?'filled':i>=limits[key]?'limited':''}"></span>`).join('')}</div>${limitText?`<div class="focus-limit" id="focus-limit-${key}">${esc(limitText)}</div>`:''}</div><div class="stepper" role="group" aria-label="${esc(label)} ${mode}" ${limitText?`aria-describedby="focus-limit-${key}"`:''}><button data-action="focus" data-key="${key}" data-delta="-1" aria-label="Decrease ${esc(label.toLowerCase())} ${mode}" ${(state.focus[key] ?? 0)<=0||disabled?'disabled':''}>${icon('minus')}</button><output aria-label="${esc(label)} ${mode} level">${state.focus[key] ?? 0}</output><button data-action="focus" data-key="${key}" data-delta="1" aria-label="Increase ${esc(label.toLowerCase())} ${mode}" ${(state.focus[key] ?? 0)>=limits[key]||focusUsed()>=focusBudget(state)||disabled?'disabled':''}>${icon('plus')}</button></div>${key==='work' && expectedGpa!==null?`<div class="school-gpa-preview" role="status">Expected GPA <strong>${esc(expectedGpa)}</strong></div>`:''}${(toddler||studying)&&!disabled?activityEffectsView(key,label):''}${state.age>=5 && state.age<18 && ['sports','extracurricular'].includes(key)?schoolEnrollmentView(key,disabled):''}</div>`;
+    return `<div class="focus-row" data-focus-key="${key}"><span class="focus-icon">${icon(ico)}</span><div class="focus-copy"><h4>${labelWithHelp(label,`${toddler?'toddler':'focus'}-${key}`)}</h4><div class="focus-scale" aria-hidden="true">${Array.from({length:maximum},(_,i)=>`<span class="${i<(state.focus[key] ?? 0)?'filled':i>=limits[key]?'limited':''}"></span>`).join('')}</div>${limitText?`<div class="focus-limit" id="focus-limit-${key}">${esc(limitText)}</div>`:''}</div><div class="stepper" role="group" aria-label="${esc(label)} ${mode}" ${limitText?`aria-describedby="focus-limit-${key}"`:''}><button data-action="focus" data-key="${key}" data-delta="-1" aria-label="Decrease ${esc(label.toLowerCase())} ${mode}" ${(state.focus[key] ?? 0)<=0||disabled?'disabled':''}>${icon('minus')}</button><output aria-label="${esc(label)} ${mode} level">${state.focus[key] ?? 0}</output><button data-action="focus" data-key="${key}" data-delta="1" aria-label="Increase ${esc(label.toLowerCase())} ${mode}" ${(state.focus[key] ?? 0)>=limits[key]||focusUsed()>=focusBudget(state)||disabled?'disabled':''}>${icon('plus')}</button></div>${key==='work' && expectedGpa!==null?`<div class="school-gpa-preview" role="status">Expected GPA <strong>${esc(expectedGpa)}</strong></div>`:''}${expectedSuccess!==null?`<div class="school-success-preview" role="status">Expected success <strong>${esc(expectedSuccess)}</strong></div>`:''}${(toddler||studying)&&!disabled?activityEffectsView(key,label):''}${state.age>=5 && state.age<18 && ['sports','extracurricular'].includes(key)?schoolEnrollmentView(key,disabled):''}</div>`;
   }).join('')}</div>`;
 }
 
@@ -687,8 +692,8 @@ function topicHelpModal(topic, id) {
     'focus-family': ['Family focus', ['Strengthens relationships, helps children develop and supports parents’ mental stability.']],
     'focus-self': ['Yourself focus', [state.age<18 ? 'Personal care supports Attractiveness, mental stability and Health.' : 'Exercise, learning and self-care support strength, creativity, health and mental stability.']],
     'school-gpa': ['School GPA', ['Study effort sets your yearly grade, with Intelligence adjusting it. Higher Intelligence can achieve the same grade with less study. The grade updates after each school year.', 'Good and poor grades can lead to family events. Your first grade arrives after completing your first school year. Expected GPA previews your next report with the current study focus and Intelligence.']],
-    'focus-sports': ['Sports focus', ['Higher Lifestyle brings more frequent offers and more options. Sports and extracurriculars can both be offered in a year. Keep or leave your current activity even when no new ones are offered. Sign up to unlock 0–2 points, starting at 1. Every sport trains Strength and Social; some train an extra skill. Active training gives + at 1 point and ++ at 2. No sport, paused participation, or 0 points gives - Strength and - Social only. Success is N/A until your first year of participation, then graded F- through A+ based on abilities, focus and chance. Performance varies by sport: endurance sports reward Health, archery rewards Mental stability, orienteering rewards Intelligence, and figure skating rewards Creativity. Wrestling rewards shorter height; swimming and basketball reward taller height for your age. Switching returns success to N/A.']],
-    'focus-extracurricular': ['Extracurriculars focus', ['Higher Lifestyle brings more frequent offers and more options. Sports and extracurriculars can both be offered in a year. Keep or leave your current activity even when no new ones are offered. Sign up to unlock 0–2 points, starting at 1. Each activity trains its listed stats, with + at 1 point and ++ at 2. No extracurricular or 0 points gives - Creativity and - Intelligence only. Success is N/A until your first year of participation, then graded F- through A+ based on abilities, focus and chance. Keep your activity or switch and return success to N/A.']],
+    'focus-sports': ['Sports focus', ['Higher Lifestyle brings more frequent offers and more options. Sports and extracurriculars can both be offered in a year. Keep or leave your current activity even when no new ones are offered. Sign up to unlock 0–2 points, starting at 1. Every sport trains Strength and Social; some train an extra skill. Active training gives + at 1 point and ++ at 2. No sport, paused participation, or 0 points gives - Strength and - Social only. Success is N/A until your first year of participation, then graded F- through A+ based on abilities, focus and chance. Expected success estimates your next grade from current abilities, focus and success; chance can change the result. Performance varies by sport: endurance sports reward Health, archery rewards Mental stability, orienteering rewards Intelligence, and figure skating rewards Creativity. Wrestling rewards shorter height; swimming and basketball reward taller height for your age. Switching returns success to N/A.']],
+    'focus-extracurricular': ['Extracurriculars focus', ['Higher Lifestyle brings more frequent offers and more options. Sports and extracurriculars can both be offered in a year. Keep or leave your current activity even when no new ones are offered. Sign up to unlock 0–2 points, starting at 1. Each activity trains its listed stats, with + at 1 point and ++ at 2. No extracurricular or 0 points gives - Creativity and - Intelligence only. Success is N/A until your first year of participation, then graded F- through A+ based on abilities, focus and chance. Expected success estimates your next grade from current abilities, focus and success; chance can change the result. Keep your activity or switch and return success to N/A.']],
     parents: ['Parents & guardians', ['Their wellbeing and careers affect your childhood. Gains need care, activity or an event. Low ratings amplify existing gains; they do not recover by themselves. Zero Family time contributes a loss. Low mental stability and a weak relationship raise the rare chance of abandonment. The other parent takes over; if neither can care for you, an adult relative adopts you. Departures cause severe setbacks.']],
     'parent-career': ['Parents’ careers', ['Higher career focus and experience tend to improve lifestyle; job loss can set it back.']],
     relationship: ['Relationship', ['Higher means closer; family time and shared events change this rating. Partners support social and mental stability, but lower lifestyle.']],

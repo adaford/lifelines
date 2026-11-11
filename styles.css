@@ -528,9 +528,9 @@ details p { font-size: 13px; color: var(--muted); line-height: 1.65; padding-bot
 .choice-impact-summary > p { font-size: 12px; line-height: 1.5; }
 .activity-effects { grid-column: 2 / -1; min-width: 0; }
 .activity-effects .choice-impact-list { margin-top: 0; }
-.school-gpa-preview { grid-column: 2 / -1; min-width: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
-.school-gpa-preview strong { color: var(--ink); font-weight: 700; }
+.school-gpa-preview, .school-success-preview { grid-column: 2 / -1; min-width: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.school-gpa-preview strong, .school-success-preview strong { color: var(--ink); font-weight: 700; }
 @media (max-width: 370px) {
-  .activity-effects, .school-gpa-preview { grid-column: 1 / -1; }
+  .activity-effects, .school-gpa-preview, .school-success-preview { grid-column: 1 / -1; }
   .choice-impact-list { grid-template-columns: minmax(0,1fr); gap: 6px; }
 }

@@ -4,7 +4,7 @@ import { createGame, advanceYear, annualForecast, effectiveStats, setFocus, focu
   enrollSchoolActivity, leaveSchoolActivity, migrateSave, validateSave, chooseEducation, succeed, successionInfo, haveChild } from '../engine.js';
 import { defaultFocus, focusBudget } from '../focus-rules.js';
 import { schoolChoiceImpacts } from '../choice-impacts.js';
-import { SCHOOL_OFFER_COUNT, MAX_SCHOOL_OFFERS, schoolOfferRules, annualSchoolOffers, SPORTS, EXTRACURRICULARS, schoolActivity, createSchoolRecord, gradeScore, activitySuccessChange } from '../school.js';
+import { SCHOOL_OFFER_COUNT, MAX_SCHOOL_OFFERS, schoolOfferRules, annualSchoolOffers, SPORTS, EXTRACURRICULARS, schoolActivity, createSchoolRecord, gradeScore, activitySuccessChange, activitySuccessAfterYear } from '../school.js';
 import { familyEventChances } from '../family-events.js';
 import { heightReference } from '../growth.js';
 import { standardFocusCoefficients, standardFocusPractice, schoolFocusEffects, schoolAppearanceChange } from '../development.js';
@@ -386,6 +386,40 @@ test('saved grades and report cards survive grading changes and use the new scal
     assert.equal(validateSave(malformed), false, 'historical grade validation retains score bounds');
   }
   assert.deepEqual(saved, before);
+});
+
+test('activity success projections use starting effective ratings without initializing or changing the saved result', () => {
+  for (const [kind, id, stat] of [['sports', 'soccer', 'strength'], ['extracurricular', 'chess', 'intelligence']]) {
+    const state = pupil();
+    join(state, kind, id);
+    state.stats[stat] = 3;
+    state.effects = [{ id: 'activity-support', name: 'Activity support', description: 'Saved support', years: 1,
+      modifiers: { [stat]: 2 }, kind: 'positive' }];
+    const activity = schoolActivity(kind, id);
+    for (const [previous, expected] of [[null, [4.4, 5, 5.6]], [6.25, [5.65, 6.25, 6.85]]]) {
+      for (const points of [0, 1, 2]) {
+        state.school[kind].success = previous;
+        state.focus[kind] = points;
+        const before = copy(state), person = { ...state, stats: effectiveStats(state) };
+        assert.equal(activitySuccessAfterYear(person, activity, previous, points), expected[points]);
+        assert.equal(activitySuccessAfterYear(person, activity, previous, points), expected[points], 'repeated projections are deterministic');
+        const report = annualForecast(state).school.activities.find(entry => entry.kind === kind);
+        assert.equal(report.before, previous);
+        assert.equal(report.after, expected[points], 'projection matches the noise-free annual forecast, including one-year modifiers');
+        assert.deepEqual(state, before, 'forecasting preserves earned success, effective modifiers, all ratings, and RNG');
+        assert.deepEqual(migrateSave(copy(state)), before);
+      }
+    }
+    const low = { ...state, stats: { ...state.stats, [stat]: 0 } };
+    const high = { ...state, stats: { ...state.stats, [stat]: 10 } };
+    assert.equal(activitySuccessAfterYear(low, activity, .01, 0), 0);
+    assert.equal(activitySuccessAfterYear(high, activity, 9.99, 2), 10);
+  }
+  const paused = pupil(), activity = schoolActivity('sports', 'lacrosse');
+  paused.lifestyle = 6;
+  for (const previous of [null, 0, 6.25, 10]) for (const points of [0, 1, 2]) {
+    assert.equal(activitySuccessAfterYear(paused, activity, previous, points, 3), previous, 'ineligible activities retain their exact earned or unreported success');
+  }
 });
 
 test('activity success uses starting weighted performance, one supplied draw, and rating bounds', () => {

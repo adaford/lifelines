@@ -2915,6 +2915,83 @@ test('expected GPA respects study limits and hides while school progression is u
   }
 });
 
+test('expected activity success updates at each focus allocation without replacing earned grades or consuming RNG', async () => {
+  for (const [age, previous, rating, bonus, letters] of [
+    [5, null, 3, 2, ['C-', 'C', 'C+']],
+    [17, 6.25, 5, 0, ['C+', 'B-', 'B']],
+  ]) {
+    const fixture=ageTo(createGame({seed:121}),age);
+    fixture.conditions=[]; fixture.effects=[];
+    fixture.school.sports={id:'soccer',success:previous};
+    fixture.school.extracurricular={id:'chess',success:previous};
+    fixture.focus={work:1,social:1,family:1,self:1,sports:0,extracurricular:0};
+    fixture.stats.strength=rating; fixture.stats.intelligence=rating;
+    if(bonus) fixture.effects=[{id:'saved-activity-support',name:'Activity support',description:'Saved support',years:1,
+      modifiers:{strength:bonus,intelligence:bonus},kind:'positive'}];
+    assert.equal(validateSave(fixture),true);
+    let ui=await mount(fixture);
+    const before=ui.saved(),earned=`Success ${activityGradeLetter(previous)}`;
+    for(let points=0;points<=2;points++) {
+      for(const kind of ['sports','extracurricular']) {
+        if(points) ui.click(`.focus-row[data-focus-key="${kind}"] [data-delta="1"]`);
+        const preview=ui.query(`.focus-row[data-focus-key="${kind}"] .school-success-preview`);
+        assert.equal(preview.getAttribute('role'),'status');
+        assert.equal(preview.textContent,`Expected success ${letters[points]}`);
+        assert.equal(ui.query(`.school-enrollment[data-school-kind="${kind}"] .school-enrollment-title span`).textContent,earned);
+      }
+      assert.equal(ui.all('.school-success-preview').length,2);
+      const planned=ui.saved();
+      assert.deepEqual(planned,{...before,focus:{...before.focus,sports:points,extracurricular:points}},'planning changes only the selected focus points');
+      const forecast=annualForecast(planned);
+      for(const activity of forecast.school.activities) assert.equal(activityGradeLetter(activity.after),letters[points]);
+      assert.deepEqual(ui.saved(),planned);
+    }
+    const planned=ui.saved(),writes=ui.writes();
+    ui.click('[data-action="school-offers"][data-kind="sports"]');
+    ui.click('[role="dialog"] [data-action="close"]');
+    assert.equal(ui.writes(),writes);
+    assert.deepEqual(ui.saved(),planned);
+    ui=await mount(planned);
+    assert.deepEqual(ui.all('.school-success-preview').map(node=>node.textContent),Array(2).fill(`Expected success ${letters[2]}`));
+    assert.deepEqual(ui.saved(),planned,'rendering and reload keep earned success, saved reports, ratings, and RNG unchanged');
+  }
+});
+
+test('expected activity success is limited to eligible enrolled activities in playable school years', async () => {
+  const fixture=ageTo(createGame({seed:121}),10);
+  fixture.conditions=[]; fixture.effects=[];
+  fixture.school.sports={id:'lacrosse',success:6.25};
+  fixture.school.extracurricular={id:'chess',success:null};
+  fixture.focus={...defaultFocus(fixture),sports:0,extracurricular:1};
+  fixture.lifestyle=6;
+  fixture.parents.forEach(parent=>{parent.lifestyle=6;parent.career.progress=6;});
+  assert.equal(validateSave(fixture),true);
+  let ui=await mount(fixture);
+  assert.equal(ui.all('.focus-row[data-focus-key="sports"] .school-success-preview').length,0,'paused Lacrosse has no projected participation');
+  assert.equal(ui.all('.focus-row[data-focus-key="extracurricular"] .school-success-preview').length,1);
+  assert.match(ui.query('.school-enrollment[data-school-kind="sports"]').textContent,/Success B-/);
+  assert.deepEqual(ui.saved(),fixture);
+  for(const tab of ['family','career']) {
+    ui.click(`.nav-list [data-tab="${tab}"]`);
+    assert.equal(ui.all('.school-success-preview').length,0);
+  }
+  const unjoined=structuredClone(fixture);
+  unjoined.school.sports=null; unjoined.school.extracurricular=null;
+  unjoined.focus.sports=0; unjoined.focus.extracurricular=0;
+  const blocked=structuredClone(fixture);
+  blocked.pendingEvents=[{eventId:'school_team',age:blocked.age}]; blocked.lastYearEvents=['school_team'];
+  const deceased=structuredClone(fixture);
+  deceased.alive=false; deceased.death={cause:'disease',age:deceased.age}; deceased.needsSuccession=true;
+  deceased.pendingEvents=[]; deceased.pregnancy=null;
+  const college=ageTo(createGame({seed:121}),18);
+  assert.equal(chooseEducation(college,'college').ok,true);
+  for(const other of [unjoined,blocked,deceased,createGame({seed:121}),ageTo(createGame({seed:121}),4),college,ageTo(createGame({seed:121}),19)]) {
+    ui=await mount(other);
+    assert.equal(ui.all('.school-success-preview').length,0);
+    assert.deepEqual(ui.saved(),other);
+  }
+});
+
 test('school starts with N/A through planning and reload, then shows only the first earned grade', async () => {
   const fixture=ageTo(createGame({seed:121}),5);
   fixture.conditions=[]; fixture.effects=[]; fixture.focus=defaultFocus(fixture);
