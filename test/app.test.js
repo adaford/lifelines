@@ -289,7 +289,7 @@ test('year reviews show one saved explanation while journals retain only titles 
   assert.equal(reloaded.query('.year-event-description').textContent, `${dad.name} (Dad) could not sleep after a <loud> storm.`);
 });
 
-test('saved automatic event causes show captured family ratings separately and safely in reviews and journals', async () => {
+test('saved automatic event causes render concise family explanations safely without rewriting detailed history', async () => {
   const fixture=ageTo(createGame({seed:78123}),3);
   const mom=fixture.parents.find(parent=>parent.parentRole==='mom');
   mom.stats.stability=9;
@@ -302,9 +302,9 @@ test('saved automatic event causes show captured family ratings separately and s
   for(let reload=0;reload<2;reload++) {
     for(const selector of ['.year-review-events','.journal-list']) {
       const note=ui.query(`${selector} .event-cause`);
-      assert.equal(note.querySelector('strong').textContent,'Contributing stats:');
-      assert.ok(note.textContent.includes(`${mom.name} (Mom)'s low Mental stability (2.3/10)`));
-      assert.match(note.textContent,/start-of-year ratings.*<em>Recorded note<\/em>/);
+      assert.equal(note.textContent,`${mom.name} (Mom)'s low mental stability contributed to this event. <em>Recorded note</em>`);
+      assert.doesNotMatch(note.textContent,/Contributing stats|\/10|start-of-year/);
+      assert.equal(note.querySelector('strong'),null);
       assert.equal(note.querySelectorAll('em').length,0,'saved cause text is escaped');
       assert.doesNotMatch(note.textContent,/9\.0/,'current ratings never replace the captured cause');
     }
@@ -319,7 +319,7 @@ test('saved automatic event causes show captured family ratings separately and s
   }
 });
 
-test('personal and named family choices retain their saved stat cause through selection and reload', async () => {
+test('personal and family choices render concise causes while retaining detailed saved causes through selection and reload', async () => {
   for(const family of [false,true]) {
     const fixture=family?partnerFixture():ageTo(createGame({seed:78123}),25);
     const event=EVENTS.find(entry=>entry.id===(family?'household_partner_argument':'investment_pitch'));
@@ -334,9 +334,8 @@ test('personal and named family choices retain their saved stat cause through se
     assert.equal(validateSave(fixture),true);
     let ui=await mount(fixture),before=ui.saved();
     const note=ui.query('.event-decision .event-cause');
-    assert.match(note.textContent,/Contributing stats:.*2\.3\/10.*start-of-year ratings/);
-    assert.doesNotMatch(note.textContent,/9\.0/);
-    if(family) assert.ok(note.textContent.includes(`${fixture.partner.name} (Girlfriend)`));
+    assert.equal(note.textContent,family?`${fixture.partner.name} (Girlfriend)'s low mental stability contributed to this event.`:'Low intelligence contributed to this event.');
+    assert.doesNotMatch(note.textContent,/Contributing stats|\/10|start-of-year|9\.0/);
     assert.deepEqual(ui.saved(),before,'opening a pending choice does not recompute or save its cause');
     ui=await mount(before);
     assert.equal(ui.query('.event-decision .event-cause').textContent,note.textContent);
@@ -365,6 +364,7 @@ test('legacy event entries and pending choices never infer causes from current l
   let ui=await mount(fixture);
   for(let reload=0;reload<2;reload++) {
     assert.equal(ui.all('.event-cause').length,0);
+    assert.doesNotMatch(ui.query('#app').textContent,/Contributing stats:|Low intelligence contributed to this event/);
     assert.deepEqual(ui.saved(),fixture,'legacy history and pending decisions remain untouched');
     ui=await mount(ui.saved());
   }

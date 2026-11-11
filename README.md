@@ -1,5 +1,11 @@
 # Lifelines
 
+## Concise event cause notes (12 November 2026)
+
+Display cause notes as short sentences, such as Low intelligence contributed to this event. Remove the numeric rating, start-of-year wording and Contributing stats prefix. Family notes retain the person's name. Shorten the known previously saved format at render time, preserving custom prose, escaping and stored history. Simulation, cause capture, saves, RNG and event probabilities are unchanged. Cache token: `short-causes`. Browser/visual checks remain omitted by preference.
+
+Validation: all 519 tests pass on Node 24.14.0. All 25 local HTTP assets match source. Existing cause metadata and percentile references remain unchanged.
+
 ## Visible stat influences on events (12 November 2026)
 
 New stat-driven events record a separate cause explanation from the ratings used for their roll. Show Contributing stats in pending decisions, completed year reviews and the journal, naming the low/high stat and its one-decimal starting rating. Personal events use effective player ratings, including Lifestyle; family events use the named person's own ratings and relationship. Include declared stat factors, stat eligibility gates and the special abandonment inputs. List only factors matching the displayed rating's direction below/above 5; omit neutral or contrary ratings and unrelated outcome stats. Abandonment's unconditional floor gets no stat explanation when either input is 10. These are contributing inputs, not claims that a stat guarantees an event or is its sole cause.

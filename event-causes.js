@@ -6,6 +6,20 @@ const labels = {
   creativity: 'Creativity', lifestyle: 'Lifestyle', relationship: 'Relationship with you',
 };
 
+// Shorten the known saved explanation for display without rewriting history
+// or losing which person's stat contributed. Leave custom prose intact.
+export function formatEventCause(cause) {
+  const marker = ' contributed to this event (start-of-year ratings).';
+  const at = typeof cause === 'string' ? cause.indexOf(marker) : -1;
+  if (at < 0) return cause || '';
+  const original = cause.slice(0, at);
+  let subject = original.replace(/\b(low|high) (Health|Mental stability|Attractiveness|Intelligence|Strength|Social|Creativity|Lifestyle|Relationship with you) \(-?\d+(?:\.\d+)?\/10\)/g,
+    (_, direction, stat) => `${direction} ${stat.toLowerCase()}`);
+  if (subject === original) return cause;
+  subject = subject.replace(/^Your (low|high) /, (_, direction) => `${direction[0].toUpperCase()}${direction.slice(1)} `);
+  return `${subject} contributed to this event.${cause.slice(at + marker.length)}`;
+}
+
 export function eventStatCause(event, person, stats = person?.stats) {
   if (!event || !person) return '';
   const valueFor = key => key === 'lifestyle' ? person.lifestyle

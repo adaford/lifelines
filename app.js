@@ -6,15 +6,16 @@ import {
   offeredJobs, needsEducationChoice, pendingEventSubject, focusLimits, focusLimitDetails, caregivers,
   relationshipOdds, meetingChances, proposalChance, pregnancyChance, oneNightChance,
   respondToEncounter, proposeMarriage, endRelationship, normalizeSurname, heightPercentile, statPercentiles
-} from './engine.js?v=event-causes';
-import { LEGACY_EVENT_COPY } from './event-copy-history.js?v=event-causes';
-import { annotateNarrative } from './narrative.js?v=event-causes';
-import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome } from './display.js?v=event-causes';
+} from './engine.js?v=short-causes';
+import { LEGACY_EVENT_COPY } from './event-copy-history.js?v=short-causes';
+import { formatEventCause } from './event-causes.js?v=short-causes';
+import { annotateNarrative } from './narrative.js?v=short-causes';
+import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome } from './display.js?v=short-causes';
 
-import { MAX_FOCUS, focusBudget, focusMaxFor } from './focus-rules.js?v=event-causes';
-import { schoolActivity, gradeScore, gradeLetter, activityGradeLetter, activityEligible } from './school.js?v=event-causes';
-import { getBirthConditions } from './birth-conditions.js?v=event-causes';
-import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=event-causes';
+import { MAX_FOCUS, focusBudget, focusMaxFor } from './focus-rules.js?v=short-causes';
+import { schoolActivity, gradeScore, gradeLetter, activityGradeLetter, activityEligible } from './school.js?v=short-causes';
+import { getBirthConditions } from './birth-conditions.js?v=short-causes';
+import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=short-causes';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const app = document.querySelector('#app');
@@ -278,7 +279,7 @@ function outcomeSummary(outcome, subject, pending) {
 
 function eventCauseView(entry, age = state.age) {
   if (!entry?.cause) return '';
-  return `<p class="event-cause form-note"><strong>Contributing stats:</strong> ${narrativeText(entry.cause,age)}</p>`;
+  return `<p class="event-cause form-note">${narrativeText(formatEventCause(entry.cause),age)}</p>`;
 }
 
 function eventDecisionView() {
