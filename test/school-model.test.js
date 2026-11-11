@@ -205,10 +205,10 @@ test('lifestyle gates expensive school sports without preventing the offer from 
   assert.equal(activityEligible({ ...person, lifestyle: 0 }, schoolActivity('sports', 'soccer')), true);
   for (const age of [0, 4, 18, 30]) assert.equal(activityEligible({ ...person, age, lifestyle: 10 }, lacrosse), false);
   assert.equal(activityEligible(person, null), false);
-  assert.ok(annualSchoolOffers({ ...person, lifestyle: 10 }, 'sports').length === 10, 'wealth increases access while individual activity eligibility remains separate');
+  assert.ok(annualSchoolOffers({ ...person, lifestyle: 10 }, 'sports').length >= 8, 'wealth increases access while individual activity eligibility remains separate');
 });
 
-test('annual offers at maximum Lifestyle are ten distinct fresh choices without mutating saves or using Math.random', () => {
+test('maximum Lifestyle gives eight to ten distinct fresh choices without mutating saves or using Math.random', () => {
   assert.equal(SCHOOL_OFFER_COUNT, 3);
   assert.equal(MAX_SCHOOL_OFFERS, 10);
   const person = { ...pupil(5), lifestyle: 10 };
@@ -224,8 +224,8 @@ test('annual offers at maximum Lifestyle are ten distinct fresh choices without 
         person.school = { [kind]: { id: enrolled, success: 4 } };
         const before = copy(person), oldOffers = [...previous];
         const offers = annualSchoolOffers(person, kind, previous);
-        assert.equal(offers.length, 10);
-        assert.equal(new Set(offers).size, 10);
+        assert.ok(offers.length >= 8 && offers.length <= 10);
+        assert.equal(new Set(offers).size, offers.length);
         assert.ok(offers.every(id => schoolActivity(kind, id) && !previous.includes(id) && id !== enrolled));
         assert.deepEqual(annualSchoolOffers(copy(person), kind, [...previous]), offers);
         assert.deepEqual(person, before);
@@ -255,14 +255,14 @@ test('a school record computes a starting grade without inventing a completed re
 });
 
 
-test('Lifestyle controls offer probability and count with clamped boundaries', () => {
+test('Lifestyle controls offer probability and conditional median count with clamped boundaries', () => {
   for (const [lifestyle, chance, count] of [[-5, .2, 2], [0, .2, 2], [1, .28, 2], [5, .6, 5], [10, 1, 10], [15, 1, 10]]) {
     const rules = schoolOfferRules(lifestyle);
     near(rules.chance, chance);
-    assert.equal(rules.count, count);
+    assert.equal(rules.medianCount, count);
   }
-  assert.equal(schoolOfferRules(4.49).count, 4);
-  assert.equal(schoolOfferRules(4.5).count, 5);
+  assert.equal(schoolOfferRules(4.49).medianCount, 4);
+  assert.equal(schoolOfferRules(4.5).medianCount, 5);
   for (const age of [0, 4, 18, 80]) for (const kind of ['sports', 'extracurricular']) {
     assert.deepEqual(annualSchoolOffers({ ...pupil(age), lifestyle: 10 }, kind), []);
   }
@@ -277,7 +277,7 @@ test('sampled school offers match Lifestyle rates and independently allow both, 
       const person = { ...pupil(5 + index % 13), seed: index + 1, id: `offer-sample-${index}`, lifestyle };
       const sportOffers = annualSchoolOffers(person, 'sports');
       const clubOffers = annualSchoolOffers(person, 'extracurricular');
-      for (const offers of [sportOffers, clubOffers]) assert.ok(offers.length === 0 || offers.length === rules.count);
+      for (const offers of [sportOffers, clubOffers]) assert.ok(offers.length === 0 || offers.length >= Math.max(1, rules.medianCount - 2) && offers.length <= Math.min(10, rules.medianCount + 2));
       sports += Number(sportOffers.length > 0);
       extracurricular += Number(clubOffers.length > 0);
       both += Number(sportOffers.length > 0 && clubOffers.length > 0);
@@ -289,5 +289,43 @@ test('sampled school offers match Lifestyle rates and independently allow both, 
       assert.ok(both > 0 && sports > both && extracurricular > both);
       assert.ok(samples - sports - extracurricular + both > 0, 'some years have no offers at all');
     } else assert.equal(both, samples);
+  }
+});
+
+
+test('conditional offer counts vary around Lifestyle medians with independent category draws', () => {
+  const distributions = [
+    [1, 2, { 1: .3, 2: .4, 3: .2, 4: .1 }],
+    [5, 5, { 3: .1, 4: .2, 5: .4, 6: .2, 7: .1 }],
+    [10, 10, { 8: .1, 9: .2, 10: .7 }],
+  ];
+  for (const [lifestyle, median, distribution] of distributions) {
+    const observed = { sports: [], extracurricular: [] }, paired = new Map();
+    let both = 0;
+    for (let index = 0; index < 10000; index++) {
+      const person = { ...pupil(5 + index % 13), seed: index + 101, id: `count-sample-${index}`, lifestyle };
+      const sports = annualSchoolOffers(person, 'sports').length;
+      const extracurricular = annualSchoolOffers(person, 'extracurricular').length;
+      if (sports) observed.sports.push(sports);
+      if (extracurricular) observed.extracurricular.push(extracurricular);
+      if (sports && extracurricular) {
+        both++;
+        const key = `${sports}:${extracurricular}`;
+        paired.set(key, (paired.get(key) || 0) + 1);
+      }
+    }
+    for (const [kind, values] of Object.entries(observed)) {
+      const sorted = values.toSorted((a, b) => a - b);
+      assert.equal(sorted[Math.floor(sorted.length / 2)], median, `${kind}: Lifestyle ${lifestyle} conditional median`);
+      assert.deepEqual([...new Set(sorted)], Object.keys(distribution).map(Number), 'all supported counts occur');
+      for (const [count, probability] of Object.entries(distribution)) {
+        const frequency = values.filter(value => value === Number(count)).length / values.length;
+        assert.ok(Math.abs(frequency - probability) < .03, `${kind} at Lifestyle ${lifestyle}: ${count} options occur ${frequency}, expected ${probability}`);
+      }
+    }
+    for (const [sports, sportChance] of Object.entries(distribution)) for (const [club, clubChance] of Object.entries(distribution)) {
+      const frequency = (paired.get(`${sports}:${club}`) || 0) / both;
+      assert.ok(Math.abs(frequency - sportChance * clubChance) < .04, `Lifestyle ${lifestyle}: count pair ${sports}/${club} rolls independently`);
+    }
   }
 });

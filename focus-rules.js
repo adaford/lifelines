@@ -1,4 +1,4 @@
-import { conditionFocusPoints } from './birth-conditions.js?v=caused-stats';
+import { conditionFocusPoints } from './birth-conditions.js?v=random-offer-counts';
 
 // One shared allocation scale for all playable focus stages.
 export const MAX_FOCUS = 4;

@@ -6,15 +6,15 @@ import {
   offeredJobs, needsEducationChoice, pendingEventSubject, focusLimits, focusLimitDetails, caregivers,
   relationshipOdds, meetingChances, proposalChance, pregnancyChance, oneNightChance,
   respondToEncounter, proposeMarriage, endRelationship, normalizeSurname, heightPercentile, statPercentiles
-} from './engine.js?v=caused-stats';
-import { LEGACY_EVENT_COPY } from './event-copy-history.js?v=caused-stats';
-import { annotateNarrative } from './narrative.js?v=caused-stats';
-import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome } from './display.js?v=caused-stats';
+} from './engine.js?v=random-offer-counts';
+import { LEGACY_EVENT_COPY } from './event-copy-history.js?v=random-offer-counts';
+import { annotateNarrative } from './narrative.js?v=random-offer-counts';
+import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome } from './display.js?v=random-offer-counts';
 
-import { MAX_FOCUS, focusBudget, focusMaxFor } from './focus-rules.js?v=caused-stats';
-import { schoolActivity, gradeScore, gradeLetter, activityGradeLetter, activityEligible } from './school.js?v=caused-stats';
-import { getBirthConditions } from './birth-conditions.js?v=caused-stats';
-import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=caused-stats';
+import { MAX_FOCUS, focusBudget, focusMaxFor } from './focus-rules.js?v=random-offer-counts';
+import { schoolActivity, gradeScore, gradeLetter, activityGradeLetter, activityEligible } from './school.js?v=random-offer-counts';
+import { getBirthConditions } from './birth-conditions.js?v=random-offer-counts';
+import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=random-offer-counts';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const app = document.querySelector('#app');
@@ -490,7 +490,7 @@ function schoolOffersModal(kind) {
     const reason=!eligible?`Requires Lifestyle ${number(activity.minLifestyle)}+.`:freePoints<1?'Free one focus point to sign up.':'';
     return `<article class="school-offer" data-offer-id="${esc(id)}"><h3>${esc(activity.name)}</h3><p>Performance: ${Object.keys(activity.weights).map(key=>key==='height'?(activity.heightPreference==='shorter'?'Shorter height':'Taller height'):skillLabel(key)).map(esc).join(', ')}.</p><p>Training: ${Object.keys(activity.training).map(skillLabel).map(esc).join(', ')}.</p>${activity.minLifestyle?`<p>Minimum Lifestyle ${number(activity.minLifestyle)}</p>`:''}${reason?`<p class="form-note">${esc(reason)}</p>`:''}<button class="button secondary small" data-action="school-enroll" data-kind="${kind}" data-id="${esc(id)}" ${blocked || !eligible || freePoints<1?'disabled':''}>Join ${esc(activity.name)}</button></article>`;
   }).join('');
-  openModal(kind==='sports'?'Choose a sport':'Choose an extracurricular', `<p class="form-note">Higher Lifestyle brings more frequent offers and more choices. Sports and extracurriculars are offered separately: at Lifestyle 1, each has a 28% yearly chance of 2 options; at Lifestyle 10, both offer 10 every year. Offers last this school year.</p><p class="form-note">Joining assigns 1 point. Success is N/A until your first completed year of participation, then graded F- through A+. Switching starts a new unrated activity.</p>${current?`<div class="school-current"><strong>Current: ${esc(current.name)} · ${activitySuccessLabel(enrolled.success)}</strong><button class="button secondary small" data-action="close">Keep ${esc(current.name)}</button><button class="button ghost small" data-action="school-leave" data-kind="${kind}" ${blocked?'disabled':''}>Leave ${esc(current.name)}</button></div>`:''}${!cards?`<p class="form-note">No ${kind==='sports'?'sports':'extracurriculars'} offered this year.${current?' You can keep or leave your current activity.':''}</p>`:''}<div class="school-offers">${cards}</div>`);
+  openModal(kind==='sports'?'Choose a sport':'Choose an extracurricular', `<p class="form-note">Higher Lifestyle brings more frequent offers and usually more choices. Each category rolls separately. At Lifestyle 1, each has a 28% yearly chance of 1-4 options, with a median of 2. At Lifestyle 10, both arrive every year with 8-10 options and a median of 10. Offers last this school year.</p><p class="form-note">Joining assigns 1 point. Success is N/A until your first completed year of participation, then graded F- through A+. Switching starts a new unrated activity.</p>${current?`<div class="school-current"><strong>Current: ${esc(current.name)} · ${activitySuccessLabel(enrolled.success)}</strong><button class="button secondary small" data-action="close">Keep ${esc(current.name)}</button><button class="button ghost small" data-action="school-leave" data-kind="${kind}" ${blocked?'disabled':''}>Leave ${esc(current.name)}</button></div>`:''}${!cards?`<p class="form-note">No ${kind==='sports'?'sports':'extracurriculars'} offered this year.${current?' You can keep or leave your current activity.':''}</p>`:''}<div class="school-offers">${cards}</div>`);
 }
 
 function focusView(disabled) {

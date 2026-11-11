@@ -1,23 +1,23 @@
 // Lifelines: deterministic, browser-independent simulation rules.
 // All public actions mutate their state and return { ok, reason? }.
-import { JOBS } from './jobs.js?v=caused-stats';
-import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=caused-stats';
-import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=caused-stats';
-import { mortalityRisk, rollMortality } from './mortality.js?v=caused-stats';
-import { heightReference, advanceGrowth } from './growth.js?v=caused-stats';
-import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=caused-stats';
-import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, standardFocusPractice, schoolAppearanceChange, DEVELOPMENT_BALANCE, BIRTH_VARIATION, SKILL_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, PARENT_FAMILY_STABILITY_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=caused-stats';
-import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=caused-stats';
-import { normalPercentile } from './percentiles.js?v=caused-stats';
-import { changedRating } from './rating-changes.js?v=caused-stats';
-import { MAX_FOCUS, DEFAULT_FOCUS, SCHOOL_FOCUS_KEYS, focusMaxFor, focusNeutralFor, isSchoolActivityFocus, focusEffect, focusKeysForAge, focusBudget, temporaryFocusPoints, defaultFocus, legacyFocusValue } from './focus-rules.js?v=caused-stats';
-import { SCHOOL_OFFER_COUNT, MAX_SCHOOL_OFFERS, schoolActivity, gradeScore, activitySuccessChange, activityEligible, annualSchoolOffers, createSchoolRecord } from './school.js?v=caused-stats';
-import { assignBirthConditions, applyBirthConditions, getBirthConditions, conditionFocusPoints, conditionFocusLimits, validateBirthConditions } from './birth-conditions.js?v=caused-stats';
+import { JOBS } from './jobs.js?v=random-offer-counts';
+import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=random-offer-counts';
+import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=random-offer-counts';
+import { mortalityRisk, rollMortality } from './mortality.js?v=random-offer-counts';
+import { heightReference, advanceGrowth } from './growth.js?v=random-offer-counts';
+import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=random-offer-counts';
+import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, standardFocusPractice, schoolAppearanceChange, DEVELOPMENT_BALANCE, BIRTH_VARIATION, SKILL_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, PARENT_FAMILY_STABILITY_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=random-offer-counts';
+import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=random-offer-counts';
+import { normalPercentile } from './percentiles.js?v=random-offer-counts';
+import { changedRating } from './rating-changes.js?v=random-offer-counts';
+import { MAX_FOCUS, DEFAULT_FOCUS, SCHOOL_FOCUS_KEYS, focusMaxFor, focusNeutralFor, isSchoolActivityFocus, focusEffect, focusKeysForAge, focusBudget, temporaryFocusPoints, defaultFocus, legacyFocusValue } from './focus-rules.js?v=random-offer-counts';
+import { SCHOOL_OFFER_COUNT, MAX_SCHOOL_OFFERS, schoolActivity, gradeScore, activitySuccessChange, activityEligible, annualSchoolOffers, createSchoolRecord } from './school.js?v=random-offer-counts';
+import { assignBirthConditions, applyBirthConditions, getBirthConditions, conditionFocusPoints, conditionFocusLimits, validateBirthConditions } from './birth-conditions.js?v=random-offer-counts';
 export { DEVELOPMENT_BALANCE };
-export { heightPercentile } from './growth.js?v=caused-stats';
-export { mortalityRisk } from './mortality.js?v=caused-stats';
-import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=caused-stats';
-export { JOBS, JOB_CATEGORIES } from './jobs.js?v=caused-stats';
+export { heightPercentile } from './growth.js?v=random-offer-counts';
+export { mortalityRisk } from './mortality.js?v=random-offer-counts';
+import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=random-offer-counts';
+export { JOBS, JOB_CATEGORIES } from './jobs.js?v=random-offer-counts';
 export const EVENTS = [...PERSONAL_EVENTS, ...FAMILY_EVENTS];
 
 export const SKILLS = [

@@ -1,5 +1,13 @@
 # Lifelines development handoff
 
+## Random school invitation sizes (12 November 2026)
+
+Lifestyle now sets the median number of choices, not a fixed count. Keep each category's independent yearly invitation chance at 20% + 8% * clamped Lifestyle. When invited, start with median max(2, round(Lifestyle)), then draw an offset -2/-1/0/+1/+2 with probabilities 10%/20%/40%/20%/10%, clamping the resulting count to 1-10. Lifestyle 1 therefore offers 1/2/3/4 choices with probabilities 30%/40%/20%/10% when an invitation arrives, giving median 2. Lifestyle 5 offers 3-7 with median 5; Lifestyle 10 offers 8-10 with median 10. These medians describe invitation years; years without an invitation still offer zero choices.
+
+Sports and extracurriculars roll their invitation and size independently. Use the existing local seeded generator, keeping gameplay RNG untouched. Counts and activities remain saved for the year, with no rerolls on menus, forecasts, Lifestyle changes or reloads. Keep previous/current-activity exclusions, enrollment, keeping/leaving, saved history, schema 20 and all existing offers unchanged. This supersedes the fixed-count wording of the earlier invitation update. Cache token: `random-offer-counts`. Browser/visual checks remain omitted by preference.
+
+Validation: all 505 tests pass on Node 24.14.0, including 30,000 sampled offer-size pairs and 40,000 invitation-chance pairs. All 24 local HTTP assets match source. The percentile reference is unchanged and the independent 1,600-life cohort passes.
+
 ## Ratings require a cause (12 November 2026)
 
 Every existing rated stat now changes only when an activity, care, event, aging, or another explicit system supplies a contribution. Remove all skill movement toward innate ratings, all childhood stat calibration offsets, both childhood wellbeing target adjustments, and caregiver mental-stability recovery toward 5. This supersedes earlier passive-recovery, background-deduction, and mean-reversion rules. Birth distributions and initial affinity effects are unchanged.

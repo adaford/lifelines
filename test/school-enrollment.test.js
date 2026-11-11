@@ -135,7 +135,8 @@ test('new school records contain a saved Lifestyle-dependent offer roll for each
     const state = pupil(age);
     for (const kind of ['sports', 'extracurricular']) {
       const ids = state.school.offers[kind];
-      assert.ok(ids.length === 0 || ids.length === schoolOfferRules(state.lifestyle).count);
+      const median = schoolOfferRules(state.lifestyle).medianCount;
+      assert.ok(ids.length === 0 || ids.length >= Math.max(1, median - 2) && ids.length <= Math.min(10, median + 2));
       assert.equal(new Set(ids).size, ids.length);
       assert.ok(ids.every(id => schoolActivity(kind, id)));
     }
@@ -580,7 +581,7 @@ test('annual offer notices include both categories and start at age five without
     state.lifestyle = 10;
     const advanced = quietYear(state);
     assert.equal(advanced.lastYearEvents.length, 0, 'invitation notices do not consume ordinary event slots');
-    for (const kind of ['sports', 'extracurricular']) assert.equal(advanced.school.offers[kind].length, 10);
+    for (const kind of ['sports', 'extracurricular']) assert.ok(advanced.school.offers[kind].length >= 8 && advanced.school.offers[kind].length <= 10);
     assertOfferNotices(advanced);
     assert.equal(advanced.yearSummary.events.some(entry => entry.kind === 'quiet'), false, 'offer years never claim Events None in the journal');
     const saved = copy(advanced);
@@ -618,7 +619,7 @@ test('a school-age successor receives saved offers and invitation notices for th
   const heir = successionInfo(state).candidates[0];
   assert.equal(succeed(state, heir.id).ok, true);
   assert.equal(state.age, 8);
-  for (const kind of ['sports', 'extracurricular']) assert.equal(state.school.offers[kind].length, 10);
+  for (const kind of ['sports', 'extracurricular']) assert.ok(state.school.offers[kind].length >= 8 && state.school.offers[kind].length <= 10);
   assertOfferNotices(state);
   assert.equal(validateSave(state), true);
   assert.deepEqual(migrateSave(copy(state)), state);

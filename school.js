@@ -1,4 +1,4 @@
-import { heightReference } from './growth.js?v=caused-stats';
+import { heightReference } from './growth.js?v=random-offer-counts';
 
 // Fictional school activities and success rules, independent of save mutation
 // and the gameplay RNG. The engine supplies effective ratings and any draw.
@@ -19,7 +19,7 @@ export const MAX_SCHOOL_OFFERS = 10;
 
 export function schoolOfferRules(lifestyle) {
   const rating = clamp(finite(lifestyle), 0, 10);
-  return { chance: .2 + .08 * rating, count: Math.max(2, Math.round(rating)) };
+  return { chance: .2 + .08 * rating, medianCount: Math.max(2, Math.round(rating)) };
 }
 
 export const SPORTS = Object.freeze([
@@ -148,7 +148,7 @@ function hash(value) {
 
 export function annualSchoolOffers(person, kind, previousIds = []) {
   if (!(person?.age >= 5 && person.age < 18)) return [];
-  const { chance, count } = schoolOfferRules(person.lifestyle);
+  const { chance, medianCount } = schoolOfferRules(person.lifestyle);
   const excluded = new Set([...previousIds, person?.school?.[kind]?.id]);
   const candidates = catalog(kind).filter(entry => !excluded.has(entry.id));
   let seed = hash(`${person?.seed ?? 0}:${person?.id ?? ''}:${person?.generation ?? 1}:${person?.age ?? 0}:${kind}`);
@@ -162,6 +162,11 @@ export function annualSchoolOffers(person, kind, previousIds = []) {
     return ((value ^ value >>> 14) >>> 0) / 4294967296;
   };
   if (draw() >= chance) return [];
+  // Lifestyle centers the distribution; each invitation gets its own size.
+  // Symmetric offsets preserve the median, including at the 1/10 bounds.
+  const sizeRoll = draw();
+  const offset = sizeRoll < .1 ? -2 : sizeRoll < .3 ? -1 : sizeRoll < .7 ? 0 : sizeRoll < .9 ? 1 : 2;
+  const count = clamp(medianCount + offset, 1, MAX_SCHOOL_OFFERS);
   // A local seeded shuffle keeps annual offers repeatable without touching
   // person.rng, Math.random, saved selections, or the previous offer list.
   for (let index = candidates.length - 1; index > 0; index--) {

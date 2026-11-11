@@ -2933,7 +2933,7 @@ test('both activity categories can show ten saved options and their offer notice
     ui.click(`[data-action="school-offers"][data-kind="${kind}"]`);
     assert.equal(ui.all('.school-offer').length,10);
     assert.deepEqual(ui.all('.school-offer').map(card=>card.dataset.offerId),fixture.school.offers[kind]);
-    assert.match(ui.query('.modal-body').textContent,/Lifestyle 1, each has a 28% yearly chance of 2 options; at Lifestyle 10, both offer 10 every year/);
+    assert.match(ui.query('.modal-body').textContent,/Lifestyle 1, each has a 28% yearly chance of 1-4 options, with a median of 2.*Lifestyle 10, both arrive every year with 8-10 options and a median of 10/);
     ui.click('[role="dialog"] [data-action="close"]');
     assert.deepEqual(ui.saved(),dismissed);
   }
@@ -3014,7 +3014,7 @@ test('school menus preserve yearly Lifestyle-based offers while keeping the curr
       const writes=ui.writes();
       ui.click(`[data-action="school-offers"][data-kind="${kind}"]`);
       assert.deepEqual(ui.all('.school-offer').map(card=>card.dataset.offerId),offers);
-      assert.match(ui.query('.modal-body').textContent,/Higher Lifestyle brings more frequent offers and more choices/);
+      assert.match(ui.query('.modal-body').textContent,/Higher Lifestyle brings more frequent offers and usually more choices/);
       assert.match(ui.query('.school-current').textContent,kind==='sports'?/Current: Basketball/:/Current: Chess club/);
       ui.click('.school-current [data-action="close"]');
       assert.deepEqual(ui.saved(),completed,'keeping a selection outside the shortlist does not reset progress or use RNG');
