@@ -1171,6 +1171,7 @@ test('marriage proposals depend strongly on years together and are limited to on
     outcomes.add(result.accepted);
     assert.equal(result.ok,true);
     assert.equal(state.stats.stability,base.stats.stability,'a proposal response does not automatically change mental stability');
+    assert.equal(state.partner.relationship,base.partner.relationship,'proposal outcomes cannot change the relationship that influenced their roll');
     assert.equal(state.partner.lastProposalAge,state.age);
     const snapshot=copy(state);
     assert.equal(proposeMarriage(state).ok,false);
@@ -1195,7 +1196,7 @@ test('casual encounters are consensual rolls, consumed once, and never create a 
     assert.equal(result.ok,true); outcomes.add(result.accepted);
     assert.equal(state.partner,null);
     assert.equal(respondToEncounter(state,target.id,'casual').ok,false);
-    assert.equal(state.stats.social,result.accepted?changedRating(before,.25):before);
+    assert.equal(state.stats.social,before,'Social influences the encounter roll and cannot reward itself');
     assert.equal(state.stats.stability,stability,'consensual casual encounters and ordinary rejection have no automatic mental cost');
     if(result.accepted) assert.doesNotMatch(state.history.find(entry=>entry.title==='A brief connection').text,/mental stability/i);
     assert.equal(validateSave(state),true);

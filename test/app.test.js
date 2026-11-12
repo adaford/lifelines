@@ -259,7 +259,7 @@ test('Mom helping with the load keeps each actual stat change on a separate revi
   const event = EVENTS.find(event => event.id === 'household_parent_support');
   const entry = original.yearSummary.events.find(entry => entry.title === `${mom.name}: ${event.name}`);
   assert.ok(entry, 'the actual automatic household event rolled for Mom');
-  assert.equal(entry.text.split(';').length, 4, 'the engine recorded player wellbeing plus Mom wellbeing, health, and relationship');
+  assert.equal(entry.text.split(';').length, 3, 'the engine recorded player wellbeing plus Mom health and relationship, without changing her causal wellbeing');
   assert.equal(validateSave(original), true);
 
   for (const legacy of [false, true]) {
@@ -276,9 +276,9 @@ test('Mom helping with the load keeps each actual stat change on a separate revi
       assert.equal(card.querySelector('.year-event-description').textContent, expectedDescription.replaceAll('{name}', `${mom.name} (Mom)`));
       const results = card.querySelector('.year-event-results');
       const lines = results.innerHTML.split('<br>');
-      assert.equal(results.querySelectorAll('br').length, 3, 'four changes need three actual HTML line breaks');
-      assert.equal(lines.length, 4);
-      for (const [index,label] of ['Your Mental stability','Mental stability','Health','Relationship'].entries()) {
+      assert.equal(results.querySelectorAll('br').length, 2, 'three changes need two actual HTML line breaks');
+      assert.equal(lines.length, 3);
+      for (const [index,label] of ['Your Mental stability','Health','Relationship'].entries()) {
         const endpoints=entry.text.split(';')[index].match(/(-?\d+(?:\.\d+)?) \u2192 (-?\d+(?:\.\d+)?)/);
         assert.ok(endpoints,'the actual event records both endpoints');
         const displayed=`${Number(endpoints[1]).toFixed(1)} \u2192 ${Number(endpoints[2]).toFixed(1)}`;
@@ -1510,7 +1510,7 @@ describe('Dating and family DOM integration', {concurrency:false},()=>{
     ui.click('[data-action="encounter"][data-choice="casual"]');
     assert.deepEqual(ui.saved(),branch.after);
     assert.equal(ui.saved().partner,null);
-    assert.equal(ui.saved().stats.social,5.25);
+    assert.equal(ui.saved().stats.social,branch.before.stats.social,'casual interest does not change the Social rating that helped cause it');
     assert.equal(ui.saved().stats.stability,branch.before.stats.stability,'a consensual encounter has no automatic mental-stability penalty');
     assert.equal(ui.saved().encounters.length,fixture.encounters.length-1);
     assert.equal(ui.saved().age,fixture.age);
@@ -1567,7 +1567,7 @@ describe('Dating and family DOM integration', {concurrency:false},()=>{
     assert.equal(validateSave(ui.saved()),true);
   });
 
-  test('homework decisions name and help the correct child without changing the parent ratings',async()=>{
+  test('homework decisions help the correct relationship without changing causal child Intelligence or parent ratings',async()=>{
     const fixture=ageTo(createGame({seed:1500}),25);
     haveChild(fixture);ageTo(fixture,26);haveChild(fixture);ageTo(fixture,33);
     fixture.stats.stability=5;
@@ -1587,7 +1587,7 @@ describe('Dating and family DOM integration', {concurrency:false},()=>{
       assert.doesNotMatch(ui.query('.event-decision').textContent,/\{name\}/);
       assert.equal(ui.all('[data-action="advance"]').length,0);
       ui.click('[data-action="event-choice"][data-choice="home"]');
-      assert.equal(ui.saved().children[index].stats.intelligence,5.4);
+      assert.equal(ui.saved().children[index].stats.intelligence,5,'homework choices cannot change the child Intelligence that triggered the event');
       assert.equal(ui.saved().children[index].relationship,5.4);
       assert.deepEqual(ui.saved().stats,fixture.stats,'ordinary homework help preserves the parent ratings');
       if(index===0) {
@@ -1600,7 +1600,7 @@ describe('Dating and family DOM integration', {concurrency:false},()=>{
     assert.equal(validateSave(ui.saved()),true);
   });
 
-  test('partner decisions display personal and shared consequences and update the bond',async()=>{
+  test('partner decisions display shared practice while preserving their causal relationship',async()=>{
     const fixture=partnerFixture();fixture.stats.social=5;fixture.partner.stats.social=5;fixture.partner.relationship=5;
     const event=EVENTS.find(event=>event.id==='household_partner_argument');
     fixture.pendingEvents=[{eventId:event.id,age:fixture.age,subjectType:'partner',subjectId:fixture.partner.id}];
@@ -1609,14 +1609,16 @@ describe('Dating and family DOM integration', {concurrency:false},()=>{
     const ui=await mount(fixture);
     assert.equal(ui.query('.event-decision').dataset.subjectId,fixture.partner.id);
     assert.match(ui.query('.event-decision').textContent,new RegExp(fixture.partner.name));
-    assert.match(ui.query('[data-choice="listen"] .event-consequences').textContent,/Relationship.*5\.0 → 5\.6/);
+    assert.doesNotMatch(ui.query('[data-choice="listen"] .event-consequences').textContent,/Relationship/);
+    assert.equal(renderedEffectLines(ui.query('[data-choice="listen"] .event-consequences')).length,2,'only the two allowed Social changes are previewed');
     assert.doesNotMatch(ui.query('[data-choice="listen"] .event-consequences').textContent,/\bbond\b|[+−-]\d/i);
     ui.click('[data-action="event-choice"][data-choice="listen"]');
     assert.equal(ui.saved().stats.social,5.2);
     assert.equal(ui.saved().partner.stats.social,5.2);
-    assert.equal(ui.saved().partner.relationship,5.6);
+    assert.equal(ui.saved().partner.relationship,5);
+    assert.doesNotMatch(ui.saved().history[0].text,/Relationship/);
     ui.click('.nav-list [data-tab="family"]');
-    assert.equal(ui.query('.partner-panel .relationship-summary strong').textContent,'5.6/10');
+    assert.equal(ui.query('.partner-panel .relationship-summary strong').textContent,'5.0/10');
   });
 
   test('a v4 save preserves pending decisions and progress through the family update',async()=>{
@@ -3167,7 +3169,7 @@ test('fame decisions preview invitations, rating and household support without f
   contract.lastYearEvents=['fame_campaign_contract'];
   ui=await mount(contract);
   const preview=ui.query('[data-choice="travel"] .event-consequences').textContent;
-  assert.match(preview,/Fame 8\.0 → 8\.6/);
+  assert.doesNotMatch(preview,/Fame \d/,'fame-dependent choices do not preview a change to their causal Fame rating');
   assert.match(preview,/Fame household support \+0\.5 → \+1\.1/);
   assert.doesNotMatch(preview,/Mental stability/);
   assert.deepEqual(ui.saved(),contract);

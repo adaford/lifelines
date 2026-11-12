@@ -8,7 +8,7 @@ import { changedRating } from '../rating-changes.js';
 const event = id => EVENTS.find(entry => entry.id === id);
 
 test('ordinary discoveries and connections preserve skill gains without automatic mental rewards', () => {
-  assert.deepEqual(event('treehouse').statChanges, { intelligence: .2, creativity: .2 });
+  assert.deepEqual(event('treehouse').statChanges, { intelligence: .2 });
   for (const id of ['bedtime_stories', 'gentle_playgroup', 'treehouse', 'child_kindness', 'good_grades',
     'reading_award', 'school_music', 'study_buddy', 'teen_club', 'college_honors', 'college_exhibition',
     'work_friend', 'work_idea', 'family_tradition', 'friendship', 'inspiration', 'mentor', 'elder_mentor']) {
@@ -34,7 +34,7 @@ test('new wellbeing and material events are permanent while injuries retain acti
     { stability: -3, social: -1.5, health: -1 });
 });
 
-test('a backyard invention records permanent two-tenths gains without creating a temporary effect', () => {
+test('a backyard invention develops Intelligence without changing its causal Creativity or creating a temporary effect', () => {
   const original = createGame({ seed: 33021 });
   original.age = 3;
   original.focus = { work: 2, social: 2, family: 2, self: 2, creative: 2 };
@@ -48,11 +48,12 @@ test('a backyard invention records permanent two-tenths gains without creating a
   }
   assert.ok(found, 'the discovery can roll normally');
   const recorded = found.history.find(entry => entry.title === 'A backyard invention');
-  for (const key of ['intelligence', 'creativity']) {
+  for (const key of ['intelligence']) {
     const values = recorded.text.match(new RegExp(`Your ${key} (\\d+(?:\\.\\d+)?) → (\\d+(?:\\.\\d+)?)`));
     assert.ok(values, `${key} has a permanent before/after result`);
     assert.equal(Number(values[2]), changedRating(Number(values[1]), .2));
   }
+  assert.doesNotMatch(recorded.text, /Your creativity [\d.]+ (?:→|->)/);
   assert.equal(found.effects.some(effect => effect.id === 'treehouse'), false);
   assert.equal(validateSave(found), true);
   assert.deepEqual(migrateSave(structuredClone(found)), found);

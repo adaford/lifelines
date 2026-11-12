@@ -6,18 +6,18 @@ import {
   offeredJobs, needsEducationChoice, pendingEventSubject, focusLimits, focusLimitDetails, caregivers,
   relationshipOdds, meetingChances, proposalChance, pregnancyChance, oneNightChance,
   respondToEncounter, proposeMarriage, endRelationship, normalizeSurname, heightPercentile, statPercentiles
-} from './engine.js?v=event-effect-lines';
-import { LEGACY_EVENT_COPY } from './event-copy-history.js?v=event-effect-lines';
-import { formatEventCause } from './event-causes.js?v=event-effect-lines';
-import { annotateNarrative } from './narrative.js?v=event-effect-lines';
-import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome, focusCapLabel, escapeHTML as esc } from './display.js?v=event-effect-lines';
-import { avatar, genderBadge, parentLabel } from './profile-view.js?v=event-effect-lines';
+} from './engine.js?v=causal-stat-outcomes';
+import { LEGACY_EVENT_COPY } from './event-copy-history.js?v=causal-stat-outcomes';
+import { formatEventCause } from './event-causes.js?v=causal-stat-outcomes';
+import { annotateNarrative } from './narrative.js?v=causal-stat-outcomes';
+import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome, focusCapLabel, escapeHTML as esc } from './display.js?v=causal-stat-outcomes';
+import { avatar, genderBadge, parentLabel } from './profile-view.js?v=causal-stat-outcomes';
 
-import { MAX_FOCUS, focusBudget, focusMaxFor, isSchoolActivityFocus } from './focus-rules.js?v=event-effect-lines';
-import { schoolActivity, gradeScore, gradeLetter, activityGradeLetter, activitySuccessAfterYear, activityEligible } from './school.js?v=event-effect-lines';
-import { hasFame, fameFocusKey, fameFocusChange, fameLearningBonus, fameLossChance, fameLifestyleBonus } from './fame.js?v=event-effect-lines';
-import { getBirthConditions } from './birth-conditions.js?v=event-effect-lines';
-import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=event-effect-lines';
+import { MAX_FOCUS, focusBudget, focusMaxFor, isSchoolActivityFocus } from './focus-rules.js?v=causal-stat-outcomes';
+import { schoolActivity, gradeScore, gradeLetter, activityGradeLetter, activitySuccessAfterYear, activityEligible } from './school.js?v=causal-stat-outcomes';
+import { hasFame, fameFocusKey, fameFocusChange, fameLearningBonus, fameLossChance, fameLifestyleBonus } from './fame.js?v=causal-stat-outcomes';
+import { getBirthConditions } from './birth-conditions.js?v=causal-stat-outcomes';
+import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=causal-stat-outcomes';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const app = document.querySelector('#app');

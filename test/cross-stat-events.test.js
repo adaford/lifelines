@@ -71,10 +71,14 @@ test('rare odds respond only to the different source, respect aptitude limits, a
   assert.ok(odds().filter(event => event.id.startsWith('aptitude_strength_social_')).every(event => event.chance === 0), 'recess is confined to school years');
 });
 
-test('automatic trait-driven experiences generally affect a different stat and injuries limit activity', () => {
-  const automatic = EVENTS.filter(event => !event.choices && event.statFactors?.length && !event.rare);
-  const different = automatic.filter(event => event.statFactors.every(([key]) => !event.statChanges?.[key]));
-  assert.ok(different.length / automatic.length > .9, `${different.length}/${automatic.length}`);
+test('trait-driven experiences change different stats and injuries still limit activity', () => {
+  // The full owner-aware invariant, including gates and family events, lives
+  // in event-source-effects.test.js. Personal outcomes have no exceptions.
+  for (const event of EVENTS.filter(event => event.statFactors?.length)) {
+    for (const outcome of [event, ...(event.choices || [])]) {
+      for (const [key] of event.statFactors) assert.ok(!outcome.statChanges?.[key], `${event.id}:${outcome.id}:${key}`);
+    }
+  }
   for (const id of ['broken_bone', 'playground_fall', 'injury', 'sports_sprain', 'unsafe_lift', 'minor_strain', 'elder_fall']) {
     const event = EVENTS.find(event => event.id === id);
     assert.ok(event.focusLimits, id);

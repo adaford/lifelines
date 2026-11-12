@@ -1,27 +1,27 @@
 // Lifelines: deterministic, browser-independent simulation rules.
 // All public actions mutate their state and return { ok, reason? }.
-import { createSaveValidator } from './save-schema.js?v=event-effect-lines';
-import { JOBS } from './jobs.js?v=event-effect-lines';
-import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=event-effect-lines';
-import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=event-effect-lines';
-import { FAME_EVENTS, fameEventChances } from './fame-events.js?v=event-effect-lines';
-import { hasFame, fameFocusKey, fameActivityMatches, fameStartingRating, fameNextRating, fameLossChance, fameLifestyleBonus } from './fame.js?v=event-effect-lines';
-import { eventStatCause } from './event-causes.js?v=event-effect-lines';
-import { mortalityRisk, rollMortality } from './mortality.js?v=event-effect-lines';
-import { heightReference, advanceGrowth } from './growth.js?v=event-effect-lines';
-import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=event-effect-lines';
-import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, caregiverCryEffects, unemploymentStabilityChange, standardFocusPractice, schoolAppearanceChange, DEVELOPMENT_BALANCE, BIRTH_VARIATION, SKILL_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, PARENT_FAMILY_STABILITY_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=event-effect-lines';
-import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=event-effect-lines';
-import { normalPercentile } from './percentiles.js?v=event-effect-lines';
-import { changedRating } from './rating-changes.js?v=event-effect-lines';
-import { MAX_FOCUS, DEFAULT_FOCUS, focusMaxFor, focusNeutralFor, isSchoolActivityFocus, focusEffect, focusKeysForAge, focusBudget, temporaryFocusPoints, defaultFocus, legacyFocusValue } from './focus-rules.js?v=event-effect-lines';
-import { SCHOOL_OFFER_COUNT, schoolActivity, gradeScore, activitySuccessAfterYear, activityEligible, annualSchoolOffers, createSchoolRecord } from './school.js?v=event-effect-lines';
-import { assignBirthConditions, applyBirthConditions, getBirthConditions, conditionFocusLimits } from './birth-conditions.js?v=event-effect-lines';
+import { createSaveValidator } from './save-schema.js?v=causal-stat-outcomes';
+import { JOBS } from './jobs.js?v=causal-stat-outcomes';
+import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=causal-stat-outcomes';
+import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=causal-stat-outcomes';
+import { FAME_EVENTS, fameEventChances } from './fame-events.js?v=causal-stat-outcomes';
+import { hasFame, fameFocusKey, fameActivityMatches, fameStartingRating, fameNextRating, fameLossChance, fameLifestyleBonus } from './fame.js?v=causal-stat-outcomes';
+import { eventStatCause } from './event-causes.js?v=causal-stat-outcomes';
+import { mortalityRisk, rollMortality } from './mortality.js?v=causal-stat-outcomes';
+import { heightReference, advanceGrowth } from './growth.js?v=causal-stat-outcomes';
+import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=causal-stat-outcomes';
+import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, caregiverCryEffects, unemploymentStabilityChange, standardFocusPractice, schoolAppearanceChange, DEVELOPMENT_BALANCE, BIRTH_VARIATION, SKILL_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, PARENT_FAMILY_STABILITY_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=causal-stat-outcomes';
+import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=causal-stat-outcomes';
+import { normalPercentile } from './percentiles.js?v=causal-stat-outcomes';
+import { changedRating } from './rating-changes.js?v=causal-stat-outcomes';
+import { MAX_FOCUS, DEFAULT_FOCUS, focusMaxFor, focusNeutralFor, isSchoolActivityFocus, focusEffect, focusKeysForAge, focusBudget, temporaryFocusPoints, defaultFocus, legacyFocusValue } from './focus-rules.js?v=causal-stat-outcomes';
+import { SCHOOL_OFFER_COUNT, schoolActivity, gradeScore, activitySuccessAfterYear, activityEligible, annualSchoolOffers, createSchoolRecord } from './school.js?v=causal-stat-outcomes';
+import { assignBirthConditions, applyBirthConditions, getBirthConditions, conditionFocusLimits } from './birth-conditions.js?v=causal-stat-outcomes';
 export { DEVELOPMENT_BALANCE };
-export { heightPercentile } from './growth.js?v=event-effect-lines';
-export { mortalityRisk } from './mortality.js?v=event-effect-lines';
-import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=event-effect-lines';
-export { JOBS, JOB_CATEGORIES } from './jobs.js?v=event-effect-lines';
+export { heightPercentile } from './growth.js?v=causal-stat-outcomes';
+export { mortalityRisk } from './mortality.js?v=causal-stat-outcomes';
+import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=causal-stat-outcomes';
+export { JOBS, JOB_CATEGORIES } from './jobs.js?v=causal-stat-outcomes';
 export const EVENTS = [...PERSONAL_EVENTS, ...FAMILY_EVENTS, ...FAME_EVENTS];
 
 export const SKILLS = [
@@ -467,10 +467,7 @@ export function respondToEncounter(state, personId, decision) {
     syncFamilyLifestyles(state);
     log(state, 'A connection becomes a relationship', `You and ${person.name} begin dating.`, 'relationship');
   } else {
-    const before = effectiveStats(state);
-    addStat(state, 'social', .25);
-    const after = effectiveStats(state);
-    log(state, 'A brief connection', `You spend a night with ${person.name}. Social ${before.social} → ${after.social}.`, 'relationship');
+    log(state, 'A brief connection', `You spend a night with ${person.name}.`, 'relationship');
     if (random(state) < pregnancyChance(state, person, { casual: true })) startPregnancy(state, person, true);
   }
   return { ok: true, accepted: true, chance };
@@ -486,10 +483,9 @@ export function proposeMarriage(state) {
   partner.lastProposalAge = state.age;
   const accepted = random(state) < chance;
   if (accepted) {
-    partner.married = true; partner.relationship = round(clamp(partner.relationship + .5, 0, 10));
+    partner.married = true;
     log(state, 'A life together', `You marry ${partner.name}.`, 'relationship');
   } else {
-    partner.relationship = round(clamp(partner.relationship - .3, 0, 10));
     log(state, 'Not ready yet', `${partner.name} isn't ready for marriage.`, 'relationship');
   }
   syncFamilyLifestyles(state);

@@ -81,7 +81,7 @@ test('ordinary personal and family choices change practiced skills and relations
   queue(pupil, 'school_speech');
   const pupilBefore = copy(pupil);
   assert.equal(resolveEventChoice(pupil, 'speak', 'school_speech').ok, true);
-  assert.equal(pupil.stats.social, 5.45);
+  assert.equal(pupil.stats.social, pupilBefore.stats.social, 'the causal Social rating does not reward itself');
   assert.equal(pupil.stats.stability, pupilBefore.stats.stability);
   assert.equal(pupil.rng, pupilBefore.rng);
 
@@ -89,7 +89,7 @@ test('ordinary personal and family choices change practiced skills and relations
   queue(household, 'household_child_school', child);
   const before = copy(household);
   assert.equal(resolveEventChoice(household, 'home', 'household_child_school', child.id).ok, true);
-  assert.equal(child.stats.intelligence, 5.4);
+  assert.equal(child.stats.intelligence, before.children[0].stats.intelligence, 'the causal Intelligence rating stays unchanged');
   assert.equal(child.relationship, 5.4);
   assert.equal(child.stats.stability, before.children[0].stats.stability);
   assert.equal(household.stats.stability, before.stats.stability);
@@ -144,7 +144,7 @@ test('lasting bullying distress and meaningful recovery still affect the person 
   queue(state, 'household_child_direction', child);
   const before = copy(state);
   assert.equal(resolveEventChoice(state, 'listen', 'household_child_direction', child.id).ok, true);
-  assert.equal(child.stats.stability, 5.35, 'support helps the child losing sleep over their future');
+  assert.equal(child.stats.stability, before.children[0].stats.stability, 'the causal mental-stability rating stays unchanged');
   assert.equal(child.stats.social, 5.2);
   assert.equal(state.stats.stability, before.stats.stability, 'providing support does not automatically reward the parent’s mental stability');
   assert.deepEqual(migrateSave(copy(state)), state);

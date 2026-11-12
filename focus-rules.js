@@ -1,5 +1,5 @@
-import { conditionFocusPoints } from './birth-conditions.js?v=event-effect-lines';
-import { fameFocusKey, fameActivityMatches } from './fame.js?v=event-effect-lines';
+import { conditionFocusPoints } from './birth-conditions.js?v=causal-stat-outcomes';
+import { fameFocusKey, fameActivityMatches } from './fame.js?v=causal-stat-outcomes';
 
 // One shared allocation scale for all playable focus stages.
 export const MAX_FOCUS = 4;

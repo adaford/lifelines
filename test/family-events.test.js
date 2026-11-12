@@ -12,7 +12,7 @@ function household(childAge = 10) {
 }
 const chanceFor = (state, eventId, subjectId) => familyEventChances(state).find(event => event.eventId === eventId && (!subjectId || event.subjectId === subjectId))?.chance || 0;
 
-test('household catalog keeps distinct choices without inventing consequences for ordinary repair help', () => {
+test('household catalog keeps distinct choices without replacing removed causal-stat effects', () => {
   assert.ok(FAMILY_EVENTS.length >= 32);
   assert.equal(new Set(FAMILY_EVENTS.map(event => event.id)).size, FAMILY_EVENTS.length);
   for (const subjectType of ['partner', 'child']) {
@@ -38,7 +38,20 @@ test('household catalog keeps distinct choices without inventing consequences fo
       if (outcome.lifestyle) assert.ok(Number.isInteger(outcome.years) && outcome.years >= 1 && outcome.years <= 3);
     }
   }
-  assert.deepEqual(outcomesWithoutChanges, ['household_partner_roof_leak:hire'], 'hiring repair help has no invented lasting rating effect; other authored consequences remain present');
+  assert.deepEqual(outcomesWithoutChanges, [
+    'household_parent_overloaded:household_parent_overloaded',
+    'household_parent_illness:household_parent_illness',
+    'household_partner_learning:household_partner_learning',
+    'household_partner_illness:household_partner_illness',
+    'household_partner_creative:household_partner_creative',
+    'household_partner_argument:dismiss',
+    'household_partner_offer:back',
+    'household_partner_anniversary:household_partner_anniversary',
+    'household_child_friend:household_child_friend',
+    'household_child_art:household_child_art',
+    'household_child_illness:household_child_illness',
+    'household_partner_roof_leak:hire',
+  ], 'an event may remain without rating changes after its causal-stat effect is removed');
 });
 
 test('age and relationship context keep household events appropriate', () => {
