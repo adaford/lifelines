@@ -1,5 +1,7 @@
 export const escapeHTML = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
+export const focusCapLabel = (label, maximum) => `'${String(label)}' focus max ${maximum}`;
+
 const numeric = value => value !== null && value !== undefined && value !== '' && Number.isFinite(Number(value)) ? Number(value) : null;
 
 export function formatRating(value) {
@@ -44,33 +46,63 @@ const heightPair = new RegExp(`(\\bHeight(?:\\s*:\\s*|\\s+))(${amount})(?:\\s*${
 const heightSingle = new RegExp(`(\\bHeight(?:\\s*:\\s*|\\s+))(${amount})\\s*${heightUnit}\\b`, 'gi');
 const heightInches = (value, unit) => Number(value) / (unit.toLowerCase() === 'cm' ? 2.54 : 1);
 
-const outcomeStat = '(?:Intelligence|Strength|Attractiveness|Social(?: ability)?|Creativity|Health|(?:Mental\\s+)?stability|Lifestyle|Relationships?)';
-const outcomePart = new RegExp(`^(?:(?<person>.+?):\\s*${outcomeStat}|(?<prefix>.*?)Your\\s+${outcomeStat}|(?<lifestylePrefix>.*?)Lifestyle)\\s+(?<before>${ratingAmount})${arrow}(?<after>${ratingAmount})(?<suffix>[.!?](?:\\s.*)?)?$`, 'iu');
-const buffPart = new RegExp(`^(?<prefix>.*?)(?<buff>[+-](?:${amount}|\\.\\d+))\\s+${outcomeStat}(?<suffix>[.!?](?:\\s.*)?)?$`, 'iu');
-const aptitudePart = new RegExp(`^(?:(?<person>.+?):\\s*${outcomeStat}|(?<prefix>.*?)Your\\s+${outcomeStat})\\s+learning ability\\s+(?<before>[+-]?[0-3])${arrow}(?<after>[+-]?[0-3])(?<suffix>[.!?](?:\\s.*)?)?$`, 'iu');
-const parseOutcome = text => outcomePart.exec(text) || aptitudePart.exec(text) || buffPart.exec(text);
+const outcomeStat = '(?:Intelligence|Strength|Attractiveness|Social(?: ability)?|Creativity|Health|(?:Mental\\s+)?(?:in)?stability|Lifestyle|Relationships?|Bonds?)';
+const focusName = '(?:Arts\\s*&\\s*crafts|Family\\s+time|Extracurriculars?|Electronics|Yourself|Friends|College|Career|School|Sports|Study|Family|Play|Rest|Work)';
+const signedAmount = `[+−-](?:${amount}|\\.\\d+)`;
+const personLabel = '[^;\\r\\n]+?:\\s*';
+const effectPatterns = [
+  new RegExp(`^(?:Your\\s+${outcomeStat}|${personLabel}${outcomeStat}|(?:Household\\s+)?Lifestyle|Relationships?)\\s+(?:(?:learning ability|aptitude|affinity)\\s+)?[+-]?${amount}${arrow}[+-]?${amount}${valueEnd}`, 'iu'),
+  new RegExp(`^(?:Your\\s+|${personLabel})?${outcomeStat}\\s+${signedAmount}${valueEnd}`, 'iu'),
+  new RegExp(`^(?:${personLabel})?${signedAmount}\\s+${outcomeStat}(?:\\s+(?:learning ability|aptitude|affinity)(?:\\s+while famous)?)?\\b`, 'iu'),
+  new RegExp(`^(?:Focus\\s+)?['"]?(?<focus>${focusName})['"]?\\s+(?:focus\\s+)?max\\s+(?<maximum>\\d+)${valueEnd}`, 'iu'),
+  new RegExp(`^${signedAmount}\\s+['"]?${focusName}['"]?\\s+(?:focus capacity|minimum focus)\\b`, 'iu'),
+  new RegExp(`^['"]?${focusName}['"]?\\s+(?:focus\\s+)?(?:minimum|min|capacity)\\s+[+-]?\\d+${valueEnd}`, 'iu'),
+  new RegExp(`^${signedAmount}\\s+(?:total\\s+)?focus points?\\b`, 'iu'),
+  new RegExp(`^(?:Total\\s+)?focus points?\\s+[+-]?${amount}(?:${arrow}[+-]?${amount})?${valueEnd}`, 'iu'),
+  new RegExp(`^Fame(?: rating)?\\s+${ratingAmount}${arrow}${ratingAmount}${valueEnd}|^Fame begins at\\s+${ratingAmount}/10\\b`, 'iu'),
+  new RegExp(`^Fame(?: household)? support\\s+[+-]?(?:${amount}|\\.\\d+)${arrow}[+-]?(?:${amount}|\\.\\d+)${valueEnd}`, 'iu'),
+  /^(?:Temporary effects:\s*|Duration:\s*)?\d+\s+years?\b/iu,
+  /^No stat changes\b/iu,
+];
 
-// Both year reviews and the journal give every recorded stat its own line.
-// Only consecutive valid changes are split; custom prose, limits and durations
-// stay intact on the final line, including any semicolons they contain.
+function recordedEffect(source, allowPrefix) {
+  const starts = [source.match(/^\s*/u)[0].length];
+  if (allowPrefix) {
+    // A recorded choice label may precede the first effect. Do not step over
+    // custom semicolons/newlines or split periods inside a relative's name.
+    const first = source.split(/[;\r\n]/u, 1)[0];
+    for (const match of first.matchAll(/[.!?][ \t]+/gu)) starts.push(match.index + match[0].length);
+  }
+  for (const start of starts) {
+    // Prefer the first complete effect over a later "Name: Stat" match that
+    // could otherwise swallow an earlier buff, cap, duration or fame effect.
+    const match = effectPatterns.map(pattern => pattern.exec(source.slice(start)))
+      .filter(match => match && /^(?:\s*[.!?;\r\n]|\s*$)/u.test(source.slice(start + match[0].length)))
+      .sort((left, right) => left[0].length - right[0].length)[0];
+    if (!match) continue;
+    const rendered = match.groups?.focus ? focusCapLabel(match.groups.focus, match.groups.maximum) : match[0];
+    return { end: start + match[0].length, rendered: source.slice(0, start) + rendered };
+  }
+  return null;
+}
+
+// Split only a leading sequence of complete, recognized effects. Decimal
+// points and names stay inside their effect; unknown prose stays untouched.
+// This reads historical strings without modifying the saved record.
 export function splitEventOutcome(text) {
-  const source = String(text ?? '');
-  const parts = source.split(';');
-  if (parts.length < 2) return [source];
+  const original = String(text ?? '');
+  let source = original, current = recordedEffect(source, true);
+  if (!current) return [original];
   const lines = [];
-  for (let index = 0; index < parts.length; index++) {
-    const match = parseOutcome(parts[index].trim());
-    const valid = match && (index === 0 || !match.groups.prefix && !match.groups.lifestylePrefix);
-    if (!valid) {
-      if (lines.length < 2) return [source];
-      lines[lines.length - 1] += `;${parts.slice(index).join(';')}`;
-      return lines;
-    }
-    lines.push(index === 0 ? parts[index] : parts[index].trimStart());
-    if (match.groups.suffix && index < parts.length - 1) {
-      lines[lines.length - 1] += `;${parts.slice(index + 1).join(';')}`;
-      return lines;
-    }
+  while (current) {
+    const tail = source.slice(current.end);
+    const separator = /^([.!?]?)[ \t]*(?:;[ \t]*|\r?\n[ \t]*)/u.exec(tail)
+      || /^([.!?])[ \t]+/u.exec(tail);
+    const remaining = separator ? tail.slice(separator[0].length).trimStart() : '';
+    const next = separator && recordedEffect(remaining, false);
+    if (!next) { lines.push(current.rendered + tail); break; }
+    lines.push(current.rendered + separator[1]);
+    source = remaining; current = next;
   }
   return lines;
 }

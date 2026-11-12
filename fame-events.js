@@ -1,4 +1,4 @@
-import { fameOpportunityChance, hasFame } from './fame.js?v=fame';
+import { fameOpportunityChance, hasFame } from './fame.js?v=event-effect-lines';
 
 // Fictional encounters unlocked by public recognition. Rewards describe the
 // encounter itself; routine praise, inconvenience and money never imply a

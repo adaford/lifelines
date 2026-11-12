@@ -6,18 +6,18 @@ import {
   offeredJobs, needsEducationChoice, pendingEventSubject, focusLimits, focusLimitDetails, caregivers,
   relationshipOdds, meetingChances, proposalChance, pregnancyChance, oneNightChance,
   respondToEncounter, proposeMarriage, endRelationship, normalizeSurname, heightPercentile, statPercentiles
-} from './engine.js?v=fame';
-import { LEGACY_EVENT_COPY } from './event-copy-history.js?v=fame';
-import { formatEventCause } from './event-causes.js?v=fame';
-import { annotateNarrative } from './narrative.js?v=fame';
-import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome, escapeHTML as esc } from './display.js?v=fame';
-import { avatar, genderBadge, parentLabel } from './profile-view.js?v=fame';
+} from './engine.js?v=event-effect-lines';
+import { LEGACY_EVENT_COPY } from './event-copy-history.js?v=event-effect-lines';
+import { formatEventCause } from './event-causes.js?v=event-effect-lines';
+import { annotateNarrative } from './narrative.js?v=event-effect-lines';
+import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome, focusCapLabel, escapeHTML as esc } from './display.js?v=event-effect-lines';
+import { avatar, genderBadge, parentLabel } from './profile-view.js?v=event-effect-lines';
 
-import { MAX_FOCUS, focusBudget, focusMaxFor } from './focus-rules.js?v=fame';
-import { schoolActivity, gradeScore, gradeLetter, activityGradeLetter, activitySuccessAfterYear, activityEligible } from './school.js?v=fame';
-import { hasFame, fameFocusKey, fameFocusChange, fameLearningBonus, fameLossChance, fameLifestyleBonus } from './fame.js?v=fame';
-import { getBirthConditions } from './birth-conditions.js?v=fame';
-import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=fame';
+import { MAX_FOCUS, focusBudget, focusMaxFor, isSchoolActivityFocus } from './focus-rules.js?v=event-effect-lines';
+import { schoolActivity, gradeScore, gradeLetter, activityGradeLetter, activitySuccessAfterYear, activityEligible } from './school.js?v=event-effect-lines';
+import { hasFame, fameFocusKey, fameFocusChange, fameLearningBonus, fameLossChance, fameLifestyleBonus } from './fame.js?v=event-effect-lines';
+import { getBirthConditions } from './birth-conditions.js?v=event-effect-lines';
+import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=event-effect-lines';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const app = document.querySelector('#app');
@@ -241,18 +241,18 @@ function focusLabel(key) {
 
 function outcomeLimits(outcome) {
   const limits = { ...(state.age<2?{}:outcome.focusLimits?.[state.age<5?'toddler':'standard'] || {}) };
-  if (state.age>=5 && state.age<18 && limits.self!==undefined) limits.sports=Math.min(limits.sports ?? 2,Math.floor(Math.min(MAX_FOCUS,limits.self)/2));
+  if (isSchoolActivityFocus(state,'sports') && limits.self!==undefined && limits.self<MAX_FOCUS) limits.sports=Math.min(limits.sports ?? focusMaxFor(state,'sports'),Math.floor(limits.self/2));
   const active = focusLimits(state);
-  return Object.entries(limits).filter(([key,max])=>Object.hasOwn(active,key) && max<focusMaxFor(state,key)).map(([key,max])=>`${focusLabel(key)} max ${max}`);
+  return Object.entries(limits).filter(([key,max])=>Object.hasOwn(active,key) && max<focusMaxFor(state,key)).map(([key,max])=>focusCapLabel(focusLabel(key),max));
 }
 
-function outcomeSummary(outcome, subject, pending) {
+function outcomeLines(outcome, subject, pending) {
   if (!pending) {
-    return [...Object.entries(outcome.modifiers || {}).filter(([,amount])=>amount).map(([key,amount])=>`${signedModifier(amount)} ${skillLabel(key)}`), ...(outcome.lifestyle?[`${signedModifier(outcome.lifestyle)} Lifestyle`]:[]), ...(outcome.focusPoints?[focusPointChange(outcome.focusPoints)]:[]), ...outcomeLimits(outcome)].join(' \u00b7 ');
+    return [...Object.entries(outcome.modifiers || {}).filter(([,amount])=>amount).map(([key,amount])=>`${signedModifier(amount)} ${skillLabel(key)}`), ...(outcome.lifestyle?[`${signedModifier(outcome.lifestyle)} Lifestyle`]:[]), ...(outcome.focusPoints?[focusPointChange(outcome.focusPoints)]:[]), ...outcomeLimits(outcome)];
   }
   const preview = structuredClone(state);
   const result = resolveEventChoice(preview,outcome.id,pending.eventId,pending.subjectId || undefined);
-  if (!result.ok) return '';
+  if (!result.ok) return [];
   const change = (label,start,end) => `${label} ${beforeAfter({before:start,after:end})}`;
   const permanentKeys = [...new Set([...Object.keys(outcome.statChanges || {}),...Object.keys(outcome.playerChanges || {}),...Object.keys(outcome.modifiers || {})])];
   const before = effectiveStats(state);
@@ -269,7 +269,7 @@ function outcomeSummary(outcome, subject, pending) {
   if (outcome.focusPoints) changes.push(focusPointChange(outcome.focusPoints));
   changes.push(...outcomeLimits(outcome));
   if (outcome.years && (outcome.focusLimits || outcome.focusPoints)) changes.push(`${outcome.years} year${outcome.years===1?'':'s'}`);
-  return changes.join(' · ');
+  return changes;
 }
 
 function eventCauseView(entry, age = state.age) {
@@ -290,7 +290,7 @@ function eventDecisionView() {
   const event = EVENTS.find(event => event.id===pending.eventId);
   const subject = pendingEventSubject(state,pending);
   const story = text => String(text).replaceAll('{name}',subject?.name || 'your loved one');
-  return `<section class="panel event-decision" aria-labelledby="event-title" data-event-id="${esc(event.id)}" data-subject-id="${esc(pending.subjectId || '')}"><div class="panel-heading"><span class="eyebrow">${pending.subjectId?'A FAMILY MOMENT':'A TURN IN YOUR STORY'}</span><span class="tag">${state.pendingEvents.length} CHOICE${state.pendingEvents.length===1?'':'S'} LEFT</span></div><h3 id="event-title" tabindex="-1">${journalText(event.name)}</h3><p class="event-context">${pending.subjectId?`${narrativeText(subject?.name)} · Age ${subject?.age} · Your age ${pending.age}`:`Age ${pending.age}`} · Year in review</p><p class="section-description">${journalText(story(event.description))}</p>${eventCauseView(pending,pending.age)}<div class="event-choices">${event.choices.map(choice=>`<button class="event-option" data-action="event-choice" data-event="${esc(event.id)}" data-subject="${esc(pending.subjectId || '')}" data-choice="${esc(choice.id)}"><strong>${journalText(choice.label)} ${icon('arrow')}</strong><span>${journalText(story(choice.description))}</span><span class="event-consequences">${narrativeText(outcomeSummary(choice,subject,pending))}</span></button>`).join('')}</div><p class="decision-required">Choose before moving on.</p></section>`;
+  return `<section class="panel event-decision" aria-labelledby="event-title" data-event-id="${esc(event.id)}" data-subject-id="${esc(pending.subjectId || '')}"><div class="panel-heading"><span class="eyebrow">${pending.subjectId?'A FAMILY MOMENT':'A TURN IN YOUR STORY'}</span><span class="tag">${state.pendingEvents.length} CHOICE${state.pendingEvents.length===1?'':'S'} LEFT</span></div><h3 id="event-title" tabindex="-1">${journalText(event.name)}</h3><p class="event-context">${pending.subjectId?`${narrativeText(subject?.name)} · Age ${subject?.age} · Your age ${pending.age}`:`Age ${pending.age}`} · Year in review</p><p class="section-description">${journalText(story(event.description))}</p>${eventCauseView(pending,pending.age)}<div class="event-choices">${event.choices.map(choice=>`<button class="event-option" data-action="event-choice" data-event="${esc(event.id)}" data-subject="${esc(pending.subjectId || '')}" data-choice="${esc(choice.id)}"><strong>${journalText(choice.label)} ${icon('arrow')}</strong><span>${journalText(story(choice.description))}</span><span class="event-consequences">${outcomeLines(choice,subject,pending).map(line=>narrativeText(line)).join('<br>')}</span></button>`).join('')}</div><p class="decision-required">Choose before moving on.</p></section>`;
 }
 
 function focusEventDecision() {
@@ -303,7 +303,7 @@ function focusEventDecision() {
 function effectsView() {
   const activeEffects = state.effects.filter(effect=>effect.years>0);
   if (!activeEffects.length) return '';
-  return `<details class="panel active-effects"><summary>Active effects <span class="tag">${activeEffects.length}</span></summary><div class="effect-list">${activeEffects.map(effect => `<div class="effect-card ${Object.values(effect.modifiers || {}).some(value => value<0)||effect.lifestyle<0||effect.focusPoints<0||outcomeLimits(effect).length?'negative':'positive'}"><div class="effect-title">${icon('spark')} ${journalText(effect.name)}</div><div class="effect-meta">${esc(outcomeSummary(effect))}<br>${effect.years} year${effect.years===1?'':'s'} remaining</div></div>`).join('')}</div><button class="button ghost small" data-action="odds">View this year’s odds ${icon('arrow')}</button></details>`;
+  return `<details class="panel active-effects"><summary>Active effects <span class="tag">${activeEffects.length}</span></summary><div class="effect-list">${activeEffects.map(effect => `<div class="effect-card ${Object.values(effect.modifiers || {}).some(value => value<0)||effect.lifestyle<0||effect.focusPoints<0||outcomeLimits(effect).length?'negative':'positive'}"><div class="effect-title">${icon('spark')} ${journalText(effect.name)}</div><div class="effect-meta">${outcomeLines(effect).map(esc).join('<br>')}<br>${effect.years} year${effect.years===1?'':'s'} remaining</div></div>`).join('')}</div><button class="button ghost small" data-action="odds">View this year’s odds ${icon('arrow')}</button></details>`;
 }
 
 function yearView() {

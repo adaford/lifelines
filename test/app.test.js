@@ -232,6 +232,25 @@ test('journal and year-review outcomes put every stat on its own line', async ()
   assert.deepEqual(ui.saved(), fixture, 'line breaks do not rewrite event history or ratings');
 });
 
+test('a saved playground fall separates its stat, focus caps and duration in reviews and the journal without rewriting the save', async () => {
+  const fixture=ageTo(createGame({seed:78123}),8);
+  const event=EVENTS.find(event=>event.id==='playground_fall');
+  const entry={title:event.name,description:event.description,text:'Your attractiveness 5.8 → 5.7. Yourself max 2; Sports max 1. Temporary effects: 1 year.',kind:'negative'};
+  fixture.history=[{id:'saved-playground-fall',age:fixture.age,generation:fixture.generation,...entry}];
+  fixture.yearSummary.events=[entry]; fixture.yearSummary.dismissed=false;
+  assert.equal(validateSave(fixture),true);
+  let ui=await mount(fixture);
+  for(let reload=0;reload<2;reload++) {
+    for(const selector of ['.year-event-results','.journal-entry p']) {
+      const result=ui.query(selector);
+      assert.deepEqual(renderedEffectLines(result),['Your attractiveness 5.8 → 5.7.',"'Yourself' focus max 2","'Sports' focus max 1.",'Temporary effects: 1 year.']);
+      assert.equal(result.querySelectorAll('br').length,3);
+    }
+    assert.deepEqual(ui.saved(),fixture,'rendered effects do not rewrite recorded wording, stats, focus or RNG');
+    if(!reload) ui=await mount(ui.saved());
+  }
+});
+
 test('Mom helping with the load keeps each actual stat change on a separate review line after reload', async () => {
   const original = createGame({ surname: 'St. Clair', seed: 6 });
   const mom = original.parents.find(parent => parent.parentRole === 'mom');
@@ -961,7 +980,7 @@ test('temporary activity limits show their cause, enforce the cap, and survive r
   ui.click('.focus-row[data-focus-key="creative"] [data-delta="1"]');
   assert.equal(ui.saved().focus.creative, 3, 'freed points remain available elsewhere');
   ui.click('.nav-list [data-tab="year"]');
-  assert.match(ui.query('.effect-list').textContent, /Play max 2.*1 year remaining/);
+  assert.match(ui.query('.effect-list').textContent, /'Play' focus max 2.*1 year remaining/);
   assert.doesNotMatch(ui.query('.effect-list').textContent, /Recovery at home/);
   const persisted = ui.saved();
   ui = await mount(persisted);
@@ -984,8 +1003,8 @@ test('temporary activity limits show their cause, enforce the cap, and survive r
   school.effects=[{id:'sports-recovery',name:'Recovery',description:'',years:1,modifiers:{},kind:'negative',focusLimits:{standard:{self:2}}}];
   ui=await mount(school);
   const sport='.focus-row[data-focus-key="sports"]';
-  assert.match(ui.query('.effect-list').textContent,/Yourself max 2.*Sports max 1/);
-  assert.doesNotMatch(ui.query('.effect-list').textContent,/Sports max 2/);
+  assert.match(ui.query('.effect-list').textContent,/'Yourself' focus max 2.*'Sports' focus max 1/);
+  assert.doesNotMatch(ui.query('.effect-list').textContent,/'Sports' focus max 2/);
   assert.match(ui.query(`${sport} .focus-limit`).textContent,/Max 1.*Uncoordinated.*Recovery/);
   assert.equal(ui.query(`${sport} [data-delta="1"]`).disabled,true);
   assert.match(ui.query('.profile-bar [data-condition-id="movement_sensitive"]').textContent,/Yourself max 2 from age 5, lifelong.*Sports max 1 at ages 5–17, lifelong/);
@@ -1003,7 +1022,7 @@ test('a new event previews activity tradeoffs and frees points when the choice a
   for (const choice of event.choices) {
     const consequences = ui.query(`[data-choice="${choice.id}"] .event-consequences`).textContent;
     const cap = choice.focusLimits?.toddler?.social;
-    if (cap !== undefined) assert.ok(consequences.includes(`Electronics max ${cap}`));
+    if (cap !== undefined) assert.ok(consequences.includes(`'Electronics' focus max ${cap}`));
     if (choice.focusLimits) assert.match(consequences, /1 year/);
   }
   assert.deepEqual(ui.saved(), fixture, 'previewing tradeoffs does not apply them or consume RNG');
@@ -1034,7 +1053,7 @@ test('a focus-only choice previews signed whole points and duration without chan
     delete choice.focusLimits;
     assert.equal(validateSave(fixture),true);
     const ui=await mount(fixture),before=ui.saved(),writes=ui.writes();
-    assert.equal(ui.query(`[data-choice="${choice.id}"] .event-consequences`).textContent,'-1 focus point · 1 year');
+    assert.deepEqual(renderedEffectLines(ui.query(`[data-choice="${choice.id}"] .event-consequences`)),['-1 focus point','1 year']);
     for(const tab of ['family','career','year']) ui.click(`.nav-list [data-tab="${tab}"]`);
     assert.deepEqual(ui.saved(),before,'consequence previews preserve stats, allocations, pending choices and RNG');
     assert.equal(ui.writes(),writes);
@@ -1054,6 +1073,38 @@ test('a focus-only choice previews signed whole points and duration without chan
     for(const key of Object.keys(choice)) delete choice[key];
     Object.assign(choice,original);
   }
+});
+
+test('pending choices and active effects render one escaped effect per line with explicit focus cap labels', async () => {
+  const fixture=ageTo(createGame({seed:78124}),3);
+  fixture.conditions=[]; fixture.focus={work:1,social:2,family:2,self:2,creative:2};
+  fixture.effects=[{id:'saved-recovery-lines',name:'Recovery <img src=x>',description:'A saved restriction.',years:2,kind:'negative',modifiers:{health:-.4,intelligence:.5},focusPoints:-1,focusLimits:{toddler:{work:1,social:2}}}];
+  fixture.pendingEvents=[{eventId:'broken_tablet',age:fixture.age}]; fixture.lastYearEvents=['broken_tablet'];
+  const choice=EVENTS.find(event=>event.id==='broken_tablet').choices[0],original=structuredClone(choice);
+  try {
+    Object.assign(choice,{label:'Choose <em>rest</em>',description:'Keep <img src=x> as literal text.',statChanges:{health:.2,creativity:.3},modifiers:{},focusPoints:-1,years:2,focusLimits:{toddler:{work:1,social:2}}});
+    delete choice.focusCapacity; delete choice.focusMinimums;
+    assert.equal(validateSave(fixture),true);
+    let ui=await mount(fixture);
+    for(let reload=0;reload<2;reload++) {
+      const option=ui.query(`[data-choice="${choice.id}"]`),consequences=option.querySelector('.event-consequences');
+      const lines=renderedEffectLines(consequences);
+      assert.equal(lines.length,6);
+      assert.match(lines[0],/^Health -?\d+\.\d → -?\d+\.\d$/);
+      assert.match(lines[1],/^Creativity \d+\.\d → \d+\.\d$/);
+      assert.deepEqual(lines.slice(2),['-1 focus point',"'Play' focus max 1","'Electronics' focus max 2",'2 years']);
+      assert.equal(consequences.querySelectorAll('br').length,5);
+      assert.equal(option.querySelectorAll('em,img').length,0);
+      assert.ok(option.textContent.includes('Choose <em>rest</em>'));
+      assert.ok(option.textContent.includes('Keep <img src=x> as literal text.'));
+      const effect=ui.query('.effect-card');
+      assert.deepEqual(renderedEffectLines(effect.querySelector('.effect-meta')),['-.4 Health','+.5 Intelligence','-1 focus point',"'Play' focus max 1","'Electronics' focus max 2",'2 years remaining']);
+      assert.equal(effect.querySelectorAll('img').length,0);
+      assert.ok(effect.querySelector('.effect-title').textContent.includes('Recovery <img src=x>'));
+      assert.deepEqual(ui.saved(),fixture,'reading pending and active effects preserves the full save and RNG');
+      if(!reload) ui=await mount(ui.saved());
+    }
+  } finally { for(const key of Object.keys(choice)) delete choice[key]; Object.assign(choice,original); }
 });
 
 test('study headaches show a reduced budget for one full turn and preserve recorded outcomes after expiry', async () => {
@@ -1158,6 +1209,10 @@ function resolvePending(state) {
 function resolveUIEvents(ui) {
   if (ui.all('.year-review-modal').length) ui.click('.year-review-modal [data-action="close"]');
   while (ui.saved().pendingEvents.length) ui.click('[data-action="event-choice"]');
+}
+
+function renderedEffectLines(element) {
+  return element.innerHTML.split('<br>').map(line=>parseHTML(`<div>${line}</div>`).document.querySelector('div').textContent);
 }
 
 function pendingFixture(count = 1) {

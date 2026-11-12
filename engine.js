@@ -1,27 +1,27 @@
 // Lifelines: deterministic, browser-independent simulation rules.
 // All public actions mutate their state and return { ok, reason? }.
-import { createSaveValidator } from './save-schema.js?v=fame';
-import { JOBS } from './jobs.js?v=fame';
-import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=fame';
-import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=fame';
-import { FAME_EVENTS, fameEventChances } from './fame-events.js?v=fame';
-import { hasFame, fameFocusKey, fameActivityMatches, fameStartingRating, fameNextRating, fameLossChance, fameLifestyleBonus } from './fame.js?v=fame';
-import { eventStatCause } from './event-causes.js?v=fame';
-import { mortalityRisk, rollMortality } from './mortality.js?v=fame';
-import { heightReference, advanceGrowth } from './growth.js?v=fame';
-import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=fame';
-import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, caregiverCryEffects, unemploymentStabilityChange, standardFocusPractice, schoolAppearanceChange, DEVELOPMENT_BALANCE, BIRTH_VARIATION, SKILL_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, PARENT_FAMILY_STABILITY_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=fame';
-import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=fame';
-import { normalPercentile } from './percentiles.js?v=fame';
-import { changedRating } from './rating-changes.js?v=fame';
-import { MAX_FOCUS, DEFAULT_FOCUS, focusMaxFor, focusNeutralFor, isSchoolActivityFocus, focusEffect, focusKeysForAge, focusBudget, temporaryFocusPoints, defaultFocus, legacyFocusValue } from './focus-rules.js?v=fame';
-import { SCHOOL_OFFER_COUNT, schoolActivity, gradeScore, activitySuccessAfterYear, activityEligible, annualSchoolOffers, createSchoolRecord } from './school.js?v=fame';
-import { assignBirthConditions, applyBirthConditions, getBirthConditions, conditionFocusLimits } from './birth-conditions.js?v=fame';
+import { createSaveValidator } from './save-schema.js?v=event-effect-lines';
+import { JOBS } from './jobs.js?v=event-effect-lines';
+import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=event-effect-lines';
+import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=event-effect-lines';
+import { FAME_EVENTS, fameEventChances } from './fame-events.js?v=event-effect-lines';
+import { hasFame, fameFocusKey, fameActivityMatches, fameStartingRating, fameNextRating, fameLossChance, fameLifestyleBonus } from './fame.js?v=event-effect-lines';
+import { eventStatCause } from './event-causes.js?v=event-effect-lines';
+import { mortalityRisk, rollMortality } from './mortality.js?v=event-effect-lines';
+import { heightReference, advanceGrowth } from './growth.js?v=event-effect-lines';
+import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=event-effect-lines';
+import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, caregiverCryEffects, unemploymentStabilityChange, standardFocusPractice, schoolAppearanceChange, DEVELOPMENT_BALANCE, BIRTH_VARIATION, SKILL_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, PARENT_FAMILY_STABILITY_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=event-effect-lines';
+import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=event-effect-lines';
+import { normalPercentile } from './percentiles.js?v=event-effect-lines';
+import { changedRating } from './rating-changes.js?v=event-effect-lines';
+import { MAX_FOCUS, DEFAULT_FOCUS, focusMaxFor, focusNeutralFor, isSchoolActivityFocus, focusEffect, focusKeysForAge, focusBudget, temporaryFocusPoints, defaultFocus, legacyFocusValue } from './focus-rules.js?v=event-effect-lines';
+import { SCHOOL_OFFER_COUNT, schoolActivity, gradeScore, activitySuccessAfterYear, activityEligible, annualSchoolOffers, createSchoolRecord } from './school.js?v=event-effect-lines';
+import { assignBirthConditions, applyBirthConditions, getBirthConditions, conditionFocusLimits } from './birth-conditions.js?v=event-effect-lines';
 export { DEVELOPMENT_BALANCE };
-export { heightPercentile } from './growth.js?v=fame';
-export { mortalityRisk } from './mortality.js?v=fame';
-import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=fame';
-export { JOBS, JOB_CATEGORIES } from './jobs.js?v=fame';
+export { heightPercentile } from './growth.js?v=event-effect-lines';
+export { mortalityRisk } from './mortality.js?v=event-effect-lines';
+import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=event-effect-lines';
+export { JOBS, JOB_CATEGORIES } from './jobs.js?v=event-effect-lines';
 export const EVENTS = [...PERSONAL_EVENTS, ...FAMILY_EVENTS, ...FAME_EVENTS];
 
 export const SKILLS = [

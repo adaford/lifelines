@@ -1,9 +1,9 @@
 // Fictional life-sim probabilities and consequences, not real-world risk estimates.
 // Each eligible event gets an independent yearly roll. The engine caps a year at five.
 // Low/high factors are curved so extreme traits matter much more than small changes.
-import { legacyFocusValue, focusMaxFor } from './focus-rules.js?v=fame';
-import { APTITUDE_EVENTS } from './cross-aptitude-events.js?v=fame';
-import { schoolActivity, activityEligible } from './school.js?v=fame';
+import { legacyFocusValue, focusMaxFor } from './focus-rules.js?v=event-effect-lines';
+import { APTITUDE_EVENTS } from './cross-aptitude-events.js?v=event-effect-lines';
+import { schoolActivity, activityEligible } from './school.js?v=event-effect-lines';
 
 const low = key => [key, 'low'];
 const high = key => [key, 'high'];
