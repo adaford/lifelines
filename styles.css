@@ -33,6 +33,18 @@
 .school-enrollment-title { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; font-size: 12px; }
 .school-enrollment .rating-track { margin: 4px 0; }
 .school-enrollment .button { margin-top: 6px; }
+.fame-card .rating-track { margin-top: 2px; }
+.fame-rating { white-space: nowrap; }
+.fame-rating small { color: var(--muted); font-size: 12px; }
+.fame-source { margin: 10px 0 3px; font-weight: 700; }
+.fame-maintenance { margin: 0; color: var(--muted); font-size: 12px; }
+.fame-benefits { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 12px 0; font-size: 13px; }
+.fame-benefits small { display: block; color: var(--muted); font-size: 11px; }
+.fame-review { margin-bottom: 18px; }
+.fame-review p { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; }
+.fame-review .gain { color: #128238; }
+.fame-review .loss { color: var(--red); }
+.fame-review .unchanged { color: var(--muted); }
 .school-offers { display: grid; gap: 12px; }
 .school-offer, .school-current { padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
 .school-offer h3, .school-offer p { margin: 0 0 7px; }

@@ -325,6 +325,7 @@ test('saved automatic event causes render concise family explanations safely wit
 test('personal and family choices render concise causes while retaining detailed saved causes through selection and reload', async () => {
   for(const family of [false,true]) {
     const fixture=family?partnerFixture():ageTo(createGame({seed:78123}),25);
+    if(family) { fixture.partner.name='Marina Vale'; fixture.partner.familyName='Vale'; }
     const event=EVENTS.find(entry=>entry.id===(family?'household_partner_argument':'investment_pitch'));
     const cause=family?`${fixture.partner.name}'s low Mental stability (2.3/10) contributed to this event (start-of-year ratings).`:'Your low Intelligence (2.3/10) contributed to this event (start-of-year ratings).';
     const pending={eventId:event.id,age:fixture.age,cause,...(family?{subjectType:'partner',subjectId:fixture.partner.id}:{})};
@@ -1491,6 +1492,7 @@ describe('Dating and family DOM integration', {concurrency:false},()=>{
 
   test('a pregnancy survives reload and becomes a newborn with a numeric relationship',async()=>{
     const fixture=partnerFixture();fixture.partner.married=true;fixture.partner.yearsTogether=4;
+    fixture.partner.name='Marina Vale';fixture.partner.familyName='Vale';
     const branch=actionOutcome(fixture,advanceYear,(s)=>Boolean(s.pregnancy));
     resolvePending(branch.after);
     let ui=await mount(branch.after);ui.click('.nav-list [data-tab="family"]');
@@ -2989,6 +2991,168 @@ test('expected activity success is limited to eligible enrolled activities in pl
     ui=await mount(other);
     assert.equal(ui.all('.school-success-preview').length,0);
     assert.deepEqual(ui.saved(),other);
+  }
+});
+
+function fameFixture(kind = 'sports', age = 15) {
+  const fixture=ageTo(createGame({seed:121}),age);
+  if(needsEducationChoice(fixture)) assert.equal(chooseEducation(fixture,'work').ok,true);
+  fixture.conditions=[]; fixture.effects=[];
+  fixture.school ||= createSchoolRecord(fixture);
+  fixture.school.sports={id:'soccer',success:5};
+  fixture.school.extracurricular={id:'chess',success:5};
+  fixture.fame={kind,activityId:kind==='personal'?null:kind==='sports'?'soccer':'chess',rating:8,support:.5,startedAge:13};
+  fixture.focus={work:1,social:1,family:1,self:1,...(age<18?{sports:0,extracurricular:0}:kind==='personal'?{}:{[kind]:0})};
+  fixture.stats.strength=5; fixture.stats.intelligence=5; fixture.aptitudes.social=1;
+  assert.equal(validateSave(fixture),true);
+  return fixture;
+}
+
+test('fame profile separates learning and household bonuses, stays on Year, and can be left without changing natural aptitude', async () => {
+  const ordinary=await mount(ageTo(createGame({seed:121}),15));
+  assert.equal(ordinary.all('.fame-card, [data-stat="fame"]').length,0);
+  const fixture=fameFixture();
+  let ui=await mount(fixture);
+  const saved=ui.saved(),writes=ui.writes();
+  assert.equal(ui.query('.fame-rating').textContent,'8.0/10');
+  assert.equal(ui.query('.fame-card [role="meter"]').getAttribute('aria-valuenow'),'8.0');
+  assert.equal(ui.query('.fame-source').textContent,'Soccer');
+  assert.match(ui.query('.fame-maintenance').textContent,/Sports focus/);
+  assert.match(ui.query('.fame-learning-bonus').textContent,/\+5 Social learning ability.*Fame bonus/);
+  assert.match(ui.query('.fame-household-support').textContent,/\+1\.5 household Lifestyle/);
+  assert.equal(ui.all('.fame-card .aptitude').length,0);
+  assert.equal(ui.query('.status-strip [data-stat="social"] .aptitude').getAttribute('aria-label'),'Natural aptitude +1');
+  ui.click('.fame-card [data-topic="fame"]');
+  assert.match(ui.query('.help-popup').textContent,/Maintain fame through Sports focus.*Fame can end each year.*Lower ratings increase that risk/);
+  assert.match(ui.query('.help-popup').textContent,/separately from natural aptitude.*Leaving fame ends these bonuses/);
+  ui.click('.help-popup [data-action="close"]');
+  ui.click('.status-strip [data-topic="social"]');
+  assert.match(ui.query('.help-popup').textContent,/\+5 Social learning ability from fame is separate from natural aptitude/);
+  ui.click('.help-popup [data-action="close"]');
+  for(const tab of ['family','career']) {
+    ui.click(`.nav-list [data-tab="${tab}"]`);
+    assert.equal(ui.all('.fame-card').length,0);
+    if(tab==='family') for(const parent of fixture.parents.filter(parent=>parent.alive!==false && parent.abandonedAt==null)) {
+      assert.equal(ui.query(`.family-card[data-person-id="${parent.id}"] .family-lifestyle strong`).textContent,`${Math.min(10,parent.lifestyle+1.5).toFixed(1)}/10`);
+    }
+  }
+  assert.equal(ui.writes(),writes);
+  assert.deepEqual(ui.saved(),saved,'reading fame and its help does not mutate saves or RNG');
+  ui=await mount(saved);
+  assert.deepEqual(ui.saved(),saved);
+  ui.click('[data-action="quit-fame"]');
+  assert.equal(ui.all('.fame-card, [data-stat="fame"]').length,0);
+  assert.equal(ui.saved().fame,null);
+  assert.equal(ui.saved().aptitudes.social,1);
+  assert.deepEqual(ui.saved().stats,saved.stats);
+  assert.equal(ui.saved().rng,saved.rng);
+  assert.equal(ui.saved().school.sports.id,'soccer','leaving fame keeps the activity');
+});
+
+test('famous activity focus has three points, proportional fame signs, and success previews after school', async () => {
+  for(const kind of ['sports','extracurricular']) for(const age of [15,22]) {
+    const ui=await mount(fameFixture(kind,age));
+    const initial=ui.saved(),row=`.focus-row[data-focus-key="${kind}"]`;
+    assert.equal(ui.all(`${row} .focus-scale span`).length,3);
+    assert.equal(ui.all('.focus-row').length,age<18?6:5);
+    for(let points=0;points<=3;points++) {
+      if(points) ui.click(`${row} [data-delta="1"]`);
+      assert.equal(ui.query(`${row} [data-stat="fame"] b`).textContent,['--','-','+','+++'][points]);
+      assert.equal(ui.query(`${row} .school-success-preview`).textContent,`Expected success ${['C-','C','C+','B-'][points]}`);
+      assert.equal(ui.query(`${row} .school-enrollment-title span`).textContent,'Success C');
+      assert.equal(ui.saved().school[kind].success,5);
+      assert.equal(ui.saved().fame.rating,8);
+      assert.equal(ui.saved().rng,initial.rng);
+    }
+    assert.equal(ui.query(`${row} [data-delta="1"]`).disabled,true);
+    if(age>=18) {
+      assert.equal(ui.all('[data-action="school-offers"], .school-gpa-preview').length,0);
+      assert.equal(ui.all(`${row} .fame-activity`).length,1);
+      assert.ok(ui.all(`${row} [data-stat="${kind==='sports'?'strength':'intelligence'}"]`).length,'adult activity keeps its training preview');
+    }
+  }
+});
+
+test('personal fame follows Yourself focus and pending choices block fame controls and previews', async () => {
+  const fixture=fameFixture('personal',22);
+  fixture.focus={work:0,social:0,family:0,self:0};
+  let ui=await mount(fixture);
+  assert.equal(ui.query('.fame-source').textContent,'Personal fame');
+  assert.equal(ui.all('.focus-row').length,4);
+  for(let points=0;points<=4;points++) {
+    if(points) ui.click('.focus-row[data-focus-key="self"] [data-delta="1"]');
+    const signs=ui.all('.focus-row[data-focus-key="self"] [data-stat="fame"] b');
+    assert.equal(signs[0]?.textContent || '',['---','-','','+','+++'][points]);
+  }
+  const pending=ui.saved();
+  pending.pendingEvents=[{eventId:'fame_campaign_contract',age:pending.age}];
+  pending.lastYearEvents=['fame_campaign_contract'];
+  ui=await mount(pending);
+  assert.equal(ui.query('[data-action="quit-fame"]').disabled,true);
+  assert.equal(ui.query('.focus-row[data-focus-key="self"] [data-delta="-1"]').disabled,true);
+  assert.equal(ui.all('.activity-effects [data-stat="fame"]').length,0);
+  assert.deepEqual(ui.saved(),pending);
+});
+
+test('fame decisions preview invitations, rating and household support without fabricated stability or save writes', async () => {
+  const invited=fameFixture(); invited.fame=null;
+  invited.pendingEvents=[{eventId:'fame_sports_offer',age:invited.age,fameActivityId:'soccer'}];
+  invited.lastYearEvents=['fame_sports_offer'];
+  let ui=await mount(invited);
+  assert.match(ui.query('[data-choice="pursue"] .event-consequences').textContent,/Begin Soccer fame/);
+  assert.equal(ui.query('[data-choice="decline"] .event-consequences').textContent,'','declining has no fabricated zero stat changes');
+  assert.doesNotMatch(ui.query('.event-decision').textContent,/Mental stability|stability 0/);
+  assert.deepEqual(ui.saved(),invited);
+  ui.click('[data-choice="pursue"]');
+  assert.equal(ui.saved().fame.kind,'sports');
+  assert.equal(ui.saved().fame.activityId,'soccer');
+  assert.ok(ui.query('.fame-card'));
+  const contract=fameFixture('personal');
+  contract.pendingEvents=[{eventId:'fame_campaign_contract',age:contract.age}];
+  contract.lastYearEvents=['fame_campaign_contract'];
+  ui=await mount(contract);
+  const preview=ui.query('[data-choice="travel"] .event-consequences').textContent;
+  assert.match(preview,/Fame 8\.0 → 8\.6/);
+  assert.match(preview,/Fame household support \+0\.5 → \+1\.1/);
+  assert.doesNotMatch(preview,/Mental stability/);
+  assert.deepEqual(ui.saved(),contract);
+  const writes=ui.writes();
+  ui.click('.fame-card [data-topic="fame"]'); ui.click('.help-popup [data-action="close"]');
+  assert.equal(ui.writes(),writes);
+});
+
+test('fame signs hide fully clipped changes while retaining raw strength for partial clipping', async () => {
+  for(const kind of ['sports','extracurricular','personal']) {
+    const key=kind==='personal'?'self':kind;
+    const maximum=kind==='personal'?4:3;
+    for(const [rating,points,signs] of [[10,maximum,''],[0,0,''],[9.9,maximum,'+++'],[.1,0,kind==='personal'?'---':'--']]) {
+      const fixture=fameFixture(kind);
+      fixture.fame.rating=rating; fixture.focus[key]=points;
+      const ui=await mount(fixture);
+      assert.equal(ui.all(`.focus-row[data-focus-key="${key}"] [data-stat="fame"] b`)[0]?.textContent || '',signs,`${kind} at ${rating}, focus ${points}`);
+      assert.deepEqual(ui.saved(),fixture,'reading a clipped preview preserves saved fame, stats and RNG');
+    }
+  }
+});
+
+test('fame year reviews display recorded starts, rating changes and endings without rewriting history', async () => {
+  const fixture=fameFixture();
+  const original=structuredClone(fixture.fame);
+  for(const [before,after,expected,css] of [
+    [null,original,/Began at 8\.0\/10/,'gain'],
+    [original,{...original,rating:8.4},/8\.0 → 8\.4/,'gain'],
+    [original,{...original,rating:7.6},/8\.0 → 7\.6/,'loss'],
+    [original,null,/Fame ended/,'loss'],
+  ]) {
+    const current=structuredClone(fixture);
+    current.yearSummary.fame={before,after}; current.yearSummary.dismissed=false;
+    let ui=await mount(current);
+    assert.match(ui.query('.fame-review').textContent,expected);
+    assert.equal(ui.all(`.fame-review .stat-change.${css}`).length,1);
+    assert.deepEqual(ui.saved(),current);
+    ui=await mount(ui.saved());
+    assert.match(ui.query('.fame-review').textContent,expected);
+    assert.deepEqual(ui.saved(),current);
   }
 });
 

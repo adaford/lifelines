@@ -1,4 +1,5 @@
-import { heightReference } from './growth.js?v=mental-event-effects';
+import { heightReference } from './growth.js?v=fame';
+import { fameActivityMatches } from './fame.js?v=fame';
 
 // Fictional school activities and success rules, independent of save mutation
 // and the gameplay RNG. The engine supplies effective ratings and any draw.
@@ -130,13 +131,15 @@ export function activityPerformance(person, selected) {
 
 export function activitySuccessChange(person, selected, points, randomDraw = 0) {
   if (!selected) return 0;
+  const maximum = ['sports', 'extracurricular'].some(kind => fameActivityMatches(person, kind, selected.id)) ? 3 : 2;
   return round(.35 * (activityPerformance(person, selected) - 5)
-    + .6 * (clamp(finite(points, 1), 0, 2) - 1)
+    + .6 * (clamp(finite(points, 1), 0, maximum) - 1)
     + clamp(finite(randomDraw), -3, 3) * .12, 2);
 }
 
 export function activityEligible(person, selected) {
-  return Boolean(selected && person?.age >= 5 && person.age < 18
+  return Boolean(selected && person?.age >= 5
+    && (person.age < 18 || ['sports', 'extracurricular'].some(kind => fameActivityMatches(person, kind, selected.id)))
     && finite(person.lifestyle) >= (selected.minLifestyle ?? 0));
 }
 

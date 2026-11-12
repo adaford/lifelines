@@ -1,22 +1,23 @@
 import {
   SKILLS, JOBS, EVENTS, resolveEventChoice, createGame, advanceYear, setFocus, setCryLevel, dismissYearSummary, jobFit,
-  enrollSchoolActivity, leaveSchoolActivity,
+  enrollSchoolActivity, leaveSchoolActivity, quitFame, familyLifestyle,
   canTakeJob, takeJob, quitJob, haveChild, successionInfo, succeed,
   effectiveStats, eventOdds, mortalityOdds, stage, migrateSave, chooseEducation,
   offeredJobs, needsEducationChoice, pendingEventSubject, focusLimits, focusLimitDetails, caregivers,
   relationshipOdds, meetingChances, proposalChance, pregnancyChance, oneNightChance,
   respondToEncounter, proposeMarriage, endRelationship, normalizeSurname, heightPercentile, statPercentiles
-} from './engine.js?v=mental-event-effects';
-import { LEGACY_EVENT_COPY } from './event-copy-history.js?v=mental-event-effects';
-import { formatEventCause } from './event-causes.js?v=mental-event-effects';
-import { annotateNarrative } from './narrative.js?v=mental-event-effects';
-import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome, escapeHTML as esc } from './display.js?v=mental-event-effects';
-import { avatar, genderBadge, parentLabel } from './profile-view.js?v=mental-event-effects';
+} from './engine.js?v=fame';
+import { LEGACY_EVENT_COPY } from './event-copy-history.js?v=fame';
+import { formatEventCause } from './event-causes.js?v=fame';
+import { annotateNarrative } from './narrative.js?v=fame';
+import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome, escapeHTML as esc } from './display.js?v=fame';
+import { avatar, genderBadge, parentLabel } from './profile-view.js?v=fame';
 
-import { MAX_FOCUS, focusBudget, focusMaxFor } from './focus-rules.js?v=mental-event-effects';
-import { schoolActivity, gradeScore, gradeLetter, activityGradeLetter, activitySuccessAfterYear, activityEligible } from './school.js?v=mental-event-effects';
-import { getBirthConditions } from './birth-conditions.js?v=mental-event-effects';
-import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=mental-event-effects';
+import { MAX_FOCUS, focusBudget, focusMaxFor } from './focus-rules.js?v=fame';
+import { schoolActivity, gradeScore, gradeLetter, activityGradeLetter, activitySuccessAfterYear, activityEligible } from './school.js?v=fame';
+import { hasFame, fameFocusKey, fameFocusChange, fameLearningBonus, fameLossChance, fameLifestyleBonus } from './fame.js?v=fame';
+import { getBirthConditions } from './birth-conditions.js?v=fame';
+import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=fame';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const app = document.querySelector('#app');
@@ -193,6 +194,17 @@ function profileLifestyleView() {
   return `<button class="status-pill profile-lifestyle" data-stat="lifestyle" data-action="topic-help" data-topic="lifestyle" data-id="${esc(state.id)}" aria-haspopup="dialog" aria-label="Lifestyle ${number(state.lifestyle)} out of 10. ${esc(statEffectDescription('lifestyle'))} Open help."><span class="profile-lifestyle-heading"><span class="status-label">Lifestyle${statEmoji('lifestyle')}</span><strong class="status-value">${number(state.lifestyle)}<small>/10</small></strong>${statEffectBadge('lifestyle')}</span>${ratingBar('Lifestyle',state.lifestyle,'lifestyle')}</button>`;
 }
 
+function fameSource(fame) {
+  return fame?.kind === 'personal' ? 'Personal fame' : schoolActivity(fame?.kind,fame?.activityId)?.name || 'Activity fame';
+}
+
+function fameView() {
+  if (!hasFame(state)) return '';
+  const support = fameLifestyleBonus(state);
+  const blocked = state.ended || state.needsSuccession || state.pendingEvents.length > 0;
+  return `<section class="panel fame-card" aria-label="Fame"><div class="panel-heading"><h3>${labelWithHelp('Fame','fame')}</h3><strong class="fame-rating">${number(state.fame.rating)}<small>/10</small></strong></div>${ratingBar('Fame',state.fame.rating)}<p class="fame-source">${esc(fameSource(state.fame))}</p><p class="fame-maintenance">Maintain through ${esc(focusLabel(fameFocusKey(state)))} focus.</p><div class="fame-benefits"><span class="fame-learning-bonus">+${fameLearningBonus(state,'social')} Social learning ability <small>Fame bonus</small></span>${support?`<span class="fame-household-support">${signedModifier(support)} household Lifestyle <small>Fame support</small></span>`:''}</div><button class="button ghost small" data-action="quit-fame" ${blocked?'disabled':''}>Leave fame</button></section>`;
+}
+
 function render() {
   const lifeStage = stage(state);
   const stats = effectiveStats(state);
@@ -208,7 +220,7 @@ function render() {
     <div class="status-strip" aria-label="At a glance">${DISPLAY_STATS.map(skill=>[skill.key,skill.label,stats[skill.key]]).map(([key,label,value])=>`<button class="status-pill" data-stat="${key}" data-action="topic-help" data-topic="${key}" data-id="${esc(state.id)}" aria-haspopup="dialog" aria-label="${label} ${number(value)} out of 10.${Number.isInteger(state.aptitudes[key]) && state.aptitudes[key]!==0?` Natural aptitude ${aptitude(state.aptitudes[key])}.`: ''} ${esc(statEffectDescription(key))} Open help."><span class="status-label">${label}${statEmoji(key)}</span><span class="status-reading"><strong class="status-value">${number(value)}<small>/10</small></strong>${aptitudeBadge(state.aptitudes[key])}${statEffectBadge(key)}</span>${ratingBar(label,value,key)}</button>`).join('')}</div>
     ` : ''}
       <main class="main-column" id="main-content">${activeTab==='career'||isYear&&!stageNames[lifeStage]?'':`<div class="chapter-heading"><h2>${isYear ? stageNames[lifeStage] : ({family:'A life, connected'}[activeTab])}<span style="color:var(--orange)">.</span></h2></div>`}
-      ${isYear&&familyCareProfiles().length?`<section class="panel parent-status-panel">${parentStatusView()}</section>`:''}${eventDecisionView()}${state.ended ? endPanel() : ''}${state.needsSuccession ? successionPanel() : ''}
+      ${isYear?fameView():''}${isYear&&familyCareProfiles().length?`<section class="panel parent-status-panel">${parentStatusView()}</section>`:''}${eventDecisionView()}${state.ended ? endPanel() : ''}${state.needsSuccession ? successionPanel() : ''}
       ${activeTab==='year' ? yearView() : activeTab==='career' ? careerView() : familyView()}</main>
     <footer class="bottom-dock" aria-label="Game controls">${isYear?advanceControls():''}<nav class="nav-list" aria-label="Game sections">${[['year','Year'],['career','Career'],['family','Family']].map(([id,label])=>`<button class="nav-button ${activeTab===id?'active':''}" data-action="tab" data-tab="${id}" ${activeTab===id?'aria-current="page"':''}><span class="nav-icon">${icon(id)}</span><span class="nav-label">${label}</span>${id==='family'&&state.children.length?`<span class="nav-count">${state.children.length}</span>`:''}</button>`).join('')}</nav></footer>
   </div>`;
@@ -242,10 +254,13 @@ function outcomeSummary(outcome, subject, pending) {
   const result = resolveEventChoice(preview,outcome.id,pending.eventId,pending.subjectId || undefined);
   if (!result.ok) return '';
   const change = (label,start,end) => `${label} ${beforeAfter({before:start,after:end})}`;
-  const permanentKeys = [...new Set([...Object.keys(outcome.statChanges || {}),...Object.keys(outcome.playerChanges || {}),...Object.keys(outcome.modifiers || {}),...(outcome.lifestyle?['stability']:[])])];
+  const permanentKeys = [...new Set([...Object.keys(outcome.statChanges || {}),...Object.keys(outcome.playerChanges || {}),...Object.keys(outcome.modifiers || {})])];
   const before = effectiveStats(state);
   const afterPermanent = effectiveStats({ ...preview, effects: state.effects });
   const changes = permanentKeys.map(key => change(skillLabel(key),before[key],afterPermanent[key]));
+  if (outcome.fameAction === 'start' && preview.fame) changes.push(`Begin ${fameSource(preview.fame)}${preview.fame.kind==='personal'?'':' fame'}`);
+  if (outcome.fameChange && state.fame && preview.fame) changes.push(change('Fame',state.fame.rating,preview.fame.rating));
+  if (outcome.fameSupport && state.fame && preview.fame) changes.push(`Fame household support ${state.fame.support>0?'+':''}${number(state.fame.support)} → ${preview.fame.support>0?'+':''}${number(preview.fame.support)}`);
   const signedAptitude = value => value > 0 ? `+${value}` : String(value);
   for (const key of Object.keys(outcome.aptitudeChanges || {})) changes.push(`${skillLabel(key)} learning ability ${signedAptitude(state.aptitudes[key])} → ${signedAptitude(preview.aptitudes[key])}`);
   const nextSubject = pendingEventSubject(preview,pending);
@@ -330,7 +345,7 @@ function yearDecisionsView(decisions) {
   if (!decisions) return '';
   const entries=decisions.cryLevel!==undefined
     ? [['Cry level',`${decisions.cryLevel}/5`]]
-    : (decisions.workLabel==='Play'?(Object.hasOwn(decisions.focus,'creative')?toddlerFocusRows:legacyToddlerFocusRows).map(([key,label])=>[label,key]):decisions.workLabel==='School'?schoolFocusRows.filter(([key])=>Object.hasOwn(decisions.focus,key)).map(([key,label])=>[label,key]):[[decisions.workLabel || 'School/career','work'],['Friends','social'],['Family','family'],['Yourself','self']]).map(([label,key])=>[label,`${decisions.focus[key]}/${decisions.focusCaps?.[key] ?? decisions.focusMax ?? 5}`]);
+    : (decisions.workLabel==='Play'?(Object.hasOwn(decisions.focus,'creative')?toddlerFocusRows:legacyToddlerFocusRows).map(([key,label])=>[label,key]):decisions.workLabel==='School'?schoolFocusRows.filter(([key])=>Object.hasOwn(decisions.focus,key)).map(([key,label])=>[label,key]):[[decisions.workLabel || 'School/career','work'],['Friends','social'],['Family','family'],['Yourself','self'],...schoolFocusRows.filter(([key])=>['sports','extracurricular'].includes(key)&&Object.hasOwn(decisions.focus,key)).map(([key,label])=>[label,key])]).map(([label,key])=>[label,`${decisions.focus[key]}/${decisions.focusCaps?.[key] ?? decisions.focusMax ?? 5}`]);
   const rest=decisions.focus?(decisions.focusBudget ?? 12)-Object.values(decisions.focus).reduce((sum,value)=>sum+value,0):0;
   if(rest) entries.push([decisions.focusMax===MAX_FOCUS||decisions.workLabel==='Play'?'Unused':'Rest',`${rest} point${rest===1?'':'s'}`]);
   return `<section class="year-decisions" aria-label="Choices used this year"><h3>Your choices</h3><dl>${entries.map(([label,value])=>`<div><dt>${label}</dt><dd>${value}</dd></div>`).join('')}</dl></section>`;
@@ -402,10 +417,21 @@ function schoolReportView(report) {
   return `<section class="school-report" aria-label="School report card"><h3>Report card</h3><p>GPA <strong>${report.previousGpa==null?'':`${esc(gradeLetter(report.previousGpa))} → `}${esc(gradeLetter(report.gpa))}</strong></p>${(report.activities || []).map(activity=>`<p>${esc(activity.name)} success <strong>${activitySuccessLabel(activity.before)} → ${activitySuccessLabel(activity.after)}</strong></p>`).join('')}</section>`;
 }
 
+function fameReviewView(report) {
+  if (!report || !report.before && !report.after) return '';
+  const source = fameSource(report.after || report.before);
+  const direction = report.before && report.after ? Math.sign(Number(number(report.after.rating))-Number(number(report.before.rating))) : 0;
+  const result = report.before && report.after
+    ? `<span class="stat-change ${direction>0?'gain':direction<0?'loss':'unchanged'}">${beforeAfter({before:report.before.rating,after:report.after.rating})}</span>`
+    : report.after ? `<span class="stat-change gain">Began at ${number(report.after.rating)}/10</span>`
+    : '<span class="stat-change loss">Fame ended</span>';
+  return `<section class="fame-review" aria-label="Fame review"><h3>Fame</h3><p>${esc(source)} <strong>${result}</strong></p></section>`;
+}
+
 function yearSummaryModal() {
   const summary=state.yearSummary;
   if (!summary || summary.dismissed) return;
-  openModal(`Age ${summary.fromAge} → ${summary.toAge}`, `${schoolReportView(summary.school)}${yearDecisionsView(summary.decisions)}${changesView(summary.stats,summary.lifestyle,summary.height,summary.fromAge,summary.toAge)}${summary.parents?.length?`<details class="forecast-parents" open><summary>Parents & guardians</summary>${summary.parents.map(parent=>`<p><strong>${narrativeText(parent.name)}</strong><span>Mental stability${statEmoji('stability')} ${beforeAfter(parent.stability)}<br>Relationship${statEmoji('relationship')} ${beforeAfter(parent.relationship)}${parent.lifestyle?`<span class="parent-review-lifestyle">Lifestyle${statEmoji('lifestyle')} ${beforeAfter(parent.lifestyle)}</span>`:''}</span></p>`).join('')}</details>`:''}${yearEventsView(summary)}${state.pendingEvents.length?'<p class="form-note">Decisions waiting.</p>':''}`, '<button class="button primary" data-action="close">Continue '+icon('arrow')+'</button>');
+  openModal(`Age ${summary.fromAge} → ${summary.toAge}`, `${schoolReportView(summary.school)}${fameReviewView(summary.fame)}${yearDecisionsView(summary.decisions)}${changesView(summary.stats,summary.lifestyle,summary.height,summary.fromAge,summary.toAge)}${summary.parents?.length?`<details class="forecast-parents" open><summary>Parents & guardians</summary>${summary.parents.map(parent=>`<p><strong>${narrativeText(parent.name)}</strong><span>Mental stability${statEmoji('stability')} ${beforeAfter(parent.stability)}<br>Relationship${statEmoji('relationship')} ${beforeAfter(parent.relationship)}${parent.lifestyle?`<span class="parent-review-lifestyle">Lifestyle${statEmoji('lifestyle')} ${beforeAfter(parent.lifestyle)}</span>`:''}</span></p>`).join('')}</details>`:''}${yearEventsView(summary)}${state.pendingEvents.length?'<p class="form-note">Decisions waiting.</p>':''}`, '<button class="button primary" data-action="close">Continue '+icon('arrow')+'</button>');
   showingYearSummary=true;
   modalRoot.querySelector('.modal').classList.add('year-review-modal');
   modalRoot.querySelector('.modal-backdrop').classList.add('year-review-backdrop');
@@ -451,10 +477,14 @@ function activityEffectsView(activity, label) {
     if (existing) existing.parentIds.push(change.parentId);
     else entries.push({ ...change, ...(change.parentId?{parentIds:[change.parentId]}:{}) });
   }
+  if (activity === fameFocusKey(state)) {
+    const change = fameFocusChange(state);
+    if (change && (change>0?state.fame.rating<10:state.fame.rating>0)) entries.push({stat:'fame',change,level:Math.abs(change)<1?1:change<0 && state.fame.kind!=='personal'?2:3});
+  }
   if (!entries.length) return '';
   return `<div class="activity-effects" aria-label="${esc(label)} expected changes"><ul class="choice-impact-list">${entries.map(({stat,change,level,parentIds}) => {
     const family = !!parentIds;
-    const name = family?`${stat==='relationship'?'Relationships':skillLabel(stat)} (family)`:skillLabel(stat);
+    const name = stat==='fame'?'Fame':family?`${stat==='relationship'?'Relationships':skillLabel(stat)} (family)`:skillLabel(stat);
     const direction = change>0?'increase':'decrease';
     const signs = (change>0?'+':'-').repeat(level);
     const magnitude = ['small','medium','large'][Math.min(level,3)-1];
@@ -470,6 +500,13 @@ function schoolEnrollmentView(kind, disabled) {
   const offerCount=state.school?.offers[kind]?.length || 0;
   const emptyNote=`No ${kind==='sports'?'sports':'extracurriculars'} offered this year.`;
   return `<div class="school-enrollment" data-school-kind="${kind}">${activity?`<div class="school-enrollment-title"><strong>${esc(activity.name)}</strong><span>Success <strong>${activitySuccessLabel(enrolled.success)}</strong></span></div>${!eligible?`<p class="form-note">Requires Lifestyle ${number(activity.minLifestyle)}+. Participation is paused.</p>`:''}`:`<div class="school-enrollment-title"><span>Success N/A</span></div>${offerCount?'<p class="form-note">Sign up to spend focus points here.</p>':''}`}${!offerCount?`<p class="form-note">${emptyNote}</p>`:''}${activity || offerCount?`<button class="button ghost small" data-action="school-offers" data-kind="${kind}" ${disabled?'disabled':''}>${activity?(offerCount?'View this year’s options':'Manage current activity'):kind==='sports'?'Join a sport':'Join an extracurricular'}</button>`:''}</div>`;
+}
+
+function fameActivityView(kind) {
+  const enrolled = state.school?.[kind];
+  const activity = schoolActivity(kind,enrolled?.id);
+  if (!activity) return '';
+  return `<div class="school-enrollment fame-activity" data-school-kind="${kind}"><div class="school-enrollment-title"><strong>${esc(activity.name)}</strong><span>Success <strong>${activitySuccessLabel(enrolled.success)}</strong></span></div>${!activityEligible(state,activity)?`<p class="form-note">Requires Lifestyle ${number(activity.minLifestyle)}+. Participation is paused.</p>`:''}</div>`;
 }
 
 function schoolOffersModal(kind) {
@@ -491,11 +528,13 @@ function focusView(disabled) {
   const toddler = state.age < 5;
   const studying = state.age<18 || state.education.status==='college';
   const rows = toddler?toddlerFocusRows:state.age<18?schoolFocusRows:[['work',studying?'College':'Career',studying?'school':'career'],['social','Friends','social'],['family','Family','family'],['self','Yourself','self']];
+  const famousActivity = hasFame(state) && state.fame.kind !== 'personal' ? state.fame.kind : null;
+  if (state.age>=18 && famousActivity) rows.push([famousActivity,focusLabel(famousActivity),famousActivity==='sports'?'sports':'spark']);
   const mode = toddler?'activity':'focus';
   const limits = focusLimits(state), details = focusLimitDetails(state);
-  const schoolPerson = !disabled && state.alive!==false && state.age>=5 && state.age<18 && state.school
+  const schoolPerson = !disabled && state.alive!==false && state.age>=5 && (state.age<18 || famousActivity) && state.school
     ? { ...state, stats: effectiveStats(state) } : null;
-  const expectedGpa = schoolPerson ? gradeLetter(gradeScore(state.focus.work,schoolPerson.stats.intelligence)) : null;
+  const expectedGpa = schoolPerson && state.age<18 ? gradeLetter(gradeScore(state.focus.work,schoolPerson.stats.intelligence)) : null;
   return `<div class="focus-list">${rows.map(([key,label,ico]) => {
     const maximum=focusMaxFor(state,key);
     const enrollment = schoolPerson && ['sports','extracurricular'].includes(key) ? state.school[key] : null;
@@ -504,7 +543,7 @@ function focusView(disabled) {
       ? activityGradeLetter(activitySuccessAfterYear(schoolPerson,activity,enrollment.success,state.focus[key])) : null;
     const restrictions = details.filter(limit=>limit.key===key);
     const limitText = restrictions.length?'Max '+limits[key]+' · '+restrictions.map(limit=>limit.name+' ('+(limit.years===null?'lifelong':limit.years===1?'this year':limit.years+' years left')+')').join('; '):'';
-    return `<div class="focus-row" data-focus-key="${key}"><span class="focus-icon">${icon(ico)}</span><div class="focus-copy"><h4>${labelWithHelp(label,`${toddler?'toddler':'focus'}-${key}`)}</h4><div class="focus-scale" aria-hidden="true">${Array.from({length:maximum},(_,i)=>`<span class="${i<(state.focus[key] ?? 0)?'filled':i>=limits[key]?'limited':''}"></span>`).join('')}</div>${limitText?`<div class="focus-limit" id="focus-limit-${key}">${esc(limitText)}</div>`:''}</div><div class="stepper" role="group" aria-label="${esc(label)} ${mode}" ${limitText?`aria-describedby="focus-limit-${key}"`:''}><button data-action="focus" data-key="${key}" data-delta="-1" aria-label="Decrease ${esc(label.toLowerCase())} ${mode}" ${(state.focus[key] ?? 0)<=0||disabled?'disabled':''}>${icon('minus')}</button><output aria-label="${esc(label)} ${mode} level">${state.focus[key] ?? 0}</output><button data-action="focus" data-key="${key}" data-delta="1" aria-label="Increase ${esc(label.toLowerCase())} ${mode}" ${(state.focus[key] ?? 0)>=limits[key]||focusUsed()>=focusBudget(state)||disabled?'disabled':''}>${icon('plus')}</button></div>${key==='work' && expectedGpa!==null?`<div class="school-gpa-preview" role="status">Expected GPA <strong>${esc(expectedGpa)}</strong></div>`:''}${expectedSuccess!==null?`<div class="school-success-preview" role="status">Expected success <strong>${esc(expectedSuccess)}</strong></div>`:''}${(toddler||studying)&&!disabled?activityEffectsView(key,label):''}${state.age>=5 && state.age<18 && ['sports','extracurricular'].includes(key)?schoolEnrollmentView(key,disabled):''}</div>`;
+    return `<div class="focus-row" data-focus-key="${key}"><span class="focus-icon">${icon(ico)}</span><div class="focus-copy"><h4>${labelWithHelp(label,`${toddler?'toddler':'focus'}-${key}`)}</h4><div class="focus-scale" aria-hidden="true">${Array.from({length:maximum},(_,i)=>`<span class="${i<(state.focus[key] ?? 0)?'filled':i>=limits[key]?'limited':''}"></span>`).join('')}</div>${limitText?`<div class="focus-limit" id="focus-limit-${key}">${esc(limitText)}</div>`:''}</div><div class="stepper" role="group" aria-label="${esc(label)} ${mode}" ${limitText?`aria-describedby="focus-limit-${key}"`:''}><button data-action="focus" data-key="${key}" data-delta="-1" aria-label="Decrease ${esc(label.toLowerCase())} ${mode}" ${(state.focus[key] ?? 0)<=0||disabled?'disabled':''}>${icon('minus')}</button><output aria-label="${esc(label)} ${mode} level">${state.focus[key] ?? 0}</output><button data-action="focus" data-key="${key}" data-delta="1" aria-label="Increase ${esc(label.toLowerCase())} ${mode}" ${(state.focus[key] ?? 0)>=limits[key]||focusUsed()>=focusBudget(state)||disabled?'disabled':''}>${icon('plus')}</button></div>${key==='work' && expectedGpa!==null?`<div class="school-gpa-preview" role="status">Expected GPA <strong>${esc(expectedGpa)}</strong></div>`:''}${expectedSuccess!==null?`<div class="school-success-preview" role="status">Expected success <strong>${esc(expectedSuccess)}</strong></div>`:''}${(toddler||studying||key===fameFocusKey(state))&&!disabled?activityEffectsView(key,label):''}${state.age>=5 && state.age<18 && ['sports','extracurricular'].includes(key)?schoolEnrollmentView(key,disabled):state.age>=18 && key===famousActivity?fameActivityView(key):''}</div>`;
   }).join('')}</div>`;
 }
 
@@ -596,7 +635,8 @@ function retirementView() {
 
 function personCard(person, role, child = false, parent = false) {
   const employment = {employed:'Employed',unemployed:'Unemployed',retired:'Retired'}[person.career?.status] || 'Employed';
-  return `<article class="family-card" data-person-id="${esc(person.id)}"><div class="family-header"><div class="family-avatar">${avatar(person,true)}</div><div class="family-meta"><span class="eyebrow">${esc(role)}</span><div class="profile-name-row"><h3>${esc(person.name)}</h3>${genderBadge(person)}</div><p>${person.age} years old${person.abandonedAt!=null?' · Left the family':person.guardianRole&&person.alive!==false?' · Guardian':''}${person.alive===false?' · Remembered':''}</p></div></div>${birthConditionsView(person)}${parent?'':`<p class="family-lifestyle">${labelWithHelp('Lifestyle','lifestyle')} <strong>${number(person.lifestyle)}/10</strong>${person.age<18?' · Family household':''}</p>`}${parent?`<div class="parent-career"><span>${labelWithHelp('Career focus','parent-career')} <strong>${person.career?.focus ?? 0}/5</strong></span><span class="employment-status">${employment}</span></div>`:''}${Number.isFinite(person.relationship)?relationshipView(person):''}<details class="family-details" ${parent?'open':''}><summary>${parent?'Wellbeing':'Skills & wellbeing'}</summary>${profileStats(person,parent)}</details>${child&&person.alive===false?'<div class="family-card-footer"><span>Remembered with love</span></div>':''}</article>`;
+  const showLifestyle = !parent || hasFame(state) && state.age<18 && caregivers(state).some(caregiver=>caregiver.id===person.id);
+  return `<article class="family-card" data-person-id="${esc(person.id)}"><div class="family-header"><div class="family-avatar">${avatar(person,true)}</div><div class="family-meta"><span class="eyebrow">${esc(role)}</span><div class="profile-name-row"><h3>${esc(person.name)}</h3>${genderBadge(person)}</div><p>${person.age} years old${person.abandonedAt!=null?' · Left the family':person.guardianRole&&person.alive!==false?' · Guardian':''}${person.alive===false?' · Remembered':''}</p></div></div>${birthConditionsView(person)}${!showLifestyle?'':`<p class="family-lifestyle">${labelWithHelp('Lifestyle','lifestyle')} <strong>${number(familyLifestyle(state,person))}/10</strong>${person.age<18?' · Family household':''}</p>`}${parent?`<div class="parent-career"><span>${labelWithHelp('Career focus','parent-career')} <strong>${person.career?.focus ?? 0}/5</strong></span><span class="employment-status">${employment}</span></div>`:''}${Number.isFinite(person.relationship)?relationshipView(person):''}<details class="family-details" ${parent?'open':''}><summary>${parent?'Wellbeing':'Skills & wellbeing'}</summary>${profileStats(person,parent)}</details>${child&&person.alive===false?'<div class="family-card-footer"><span>Remembered with love</span></div>':''}</article>`;
 }
 
 function parentsView() {
@@ -706,6 +746,14 @@ function topicHelpModal(topic, id) {
     inheritance: ['Retirement & inheritance', ['Succession opens at 65 or on death and is required at 85; choose a child, sibling or unrelated child, in that order. Eligible children share inheritance equally; otherwise the chosen heir receives it.']]
   };
   let entry = help[topic];
+  if (topic==='fame') entry=['Fame',[
+    `Maintain fame through ${focusLabel(fameFocusKey(state))} focus. More focus builds your rating; too little lowers it. Fame can end each year (${pct(fameLossChance(state.fame?.rating))} at your current rating). Lower ratings increase that risk.`,
+    'Fame adds +5 Social learning ability, separately from natural aptitude. High fame and contracts support household Lifestyle. Leaving fame ends these bonuses.'
+  ]];
+  if (topic==='social' && id===state.id && hasFame(state)) entry=[entry[0],[...entry[1],'+5 Social learning ability from fame is separate from natural aptitude. The bonus ends when fame ends.']];
+  if (hasFame(state) && topic==='focus') entry=[entry[0],[...entry[1].map(text=>text.replace('use 0–2, starting at 1','normally use 0–2, starting at 1')),state.fame.kind==='personal'?'Yourself focus also maintains personal fame.':`Your famous ${focusLabel(fameFocusKey(state))} activity allows up to 3 points and continues after school.`]];
+  if (hasFame(state) && state.fame.kind!=='personal' && state.age>=18 && topic==='focus') entry[1][0]=`Share ${focusBudget(state)} points. Core focuses use 0–4, neutral at 2. Your famous ${focusLabel(fameFocusKey(state))} activity uses 0–3. Events and perks can restrict these limits.`;
+  if (hasFame(state) && topic===`focus-${fameFocusKey(state)}`) entry=[entry[0],state.fame.kind==='personal'?[...entry[1],'Yourself focus also maintains personal fame. Two points are neutral; higher builds fame and lower reduces it.']:['Your famous activity continues after school, using 0–3 focus points. Points 0–1 reduce fame; 2–3 build it. Training and success still follow your activity. Expected success estimates the next grade; chance can change the result. Leaving or switching the activity ends its fame.']];
   if(topic==='height' && id===state.id && state.age<18) entry=[entry[0],[...entry[1],'Percentile compares simulated heights at your age.']];
   if (topic==='job') {
     const job = JOBS.find(candidate=>candidate.id===id);
@@ -808,6 +856,7 @@ document.addEventListener('click', event => {
   if (action==='confirm-breakup') { closeModal(); update(()=>endRelationship(state),'Your relationship has ended.'); }
   if (action==='job') update(()=>takeJob(state,button.dataset.id),'A new chapter in your career.');
   if (action==='quit') update(()=>quitJob(state),'You’ve made room for a new path.');
+  if (action==='quit-fame') update(()=>quitFame(state),'You have left the spotlight.');
   if (action==='child') update(()=>haveChild(state),'Welcome to the family, little one.');
   if (action==='heir') {
     const info = successionInfo(state);

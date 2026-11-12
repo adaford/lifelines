@@ -1,5 +1,6 @@
-import { MAX_FOCUS, DEFAULT_FOCUS, focusEffect, defaultFocus, focusMaxFor, focusNeutralFor } from './focus-rules.js?v=mental-event-effects';
-import { schoolActivity, activityEligible } from './school.js?v=mental-event-effects';
+import { MAX_FOCUS, DEFAULT_FOCUS, focusEffect, defaultFocus, focusMaxFor, focusNeutralFor, isSchoolActivityFocus } from './focus-rules.js?v=fame';
+import { schoolActivity, activityEligible } from './school.js?v=fame';
+import { fameFocusKey, fameActivityMatches, fameLearningBonus } from './fame.js?v=fame';
 // Ratings use the same scale throughout life. Balanced toddler activities use
 // TODDLER_FOCUS; core areas use 2, enrolled school activities use 1.
 // Existing ratings change only through practice, care, events, or aging.
@@ -19,6 +20,8 @@ const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
 const number = (value, fallback) => Number.isFinite(value) ? value : fallback;
 const skills = ['intelligence', 'strength', 'social', 'creativity'];
 const skillFlexibility = age => age < 18 ? 1.15 : age < 40 ? 1 : age < 60 ? .85 : .65;
+// Fame changes current learning response, never a person's stored natural aptitude.
+export const effectiveAptitude = (person, stat) => clamp(number(person.aptitudes?.[stat], 0), -3, 3) + fameLearningBonus(person, stat);
 
 export const TODDLER_FOCUS = defaultFocus(2);
 // Scale only yearly decision contributions, leaving natural development,
@@ -61,15 +64,18 @@ export const SCHOOL_INACTIVITY_EFFECTS = {
   extracurricular: { creativity: .24, intelligence: .225 },
 };
 const hasSchoolFocus = person => person.age >= 5 && person.age < 18 && !person.autonomousFocus;
+const adultFameActivity = person => !person.autonomousFocus && person.age >= 18
+  && isSchoolActivityFocus(person, fameFocusKey(person)) ? fameFocusKey(person) : null;
+const hasActivityPractice = person => hasSchoolFocus(person) || Boolean(adultFameActivity(person));
 function schoolActivityPoints(person, kind) {
   const activity = schoolActivity(kind, person.school?.[kind]?.id);
   return activity && activityEligible(person, activity)
-    ? clamp(Math.round(number(person.focus?.[kind], 1)), 0, 2) : 0;
+    ? clamp(Math.round(number(person.focus?.[kind], 1)), 0, focusMaxFor(person, kind)) : 0;
 }
-// Schoolwork has its own learning curves. Activity training uses -1,+1,+2
-// units at 0,1,2 points; the four core areas remain neutral at two.
+// Schoolwork has its own learning curves. Activities use -1,+1,+2,+3 units;
+// only a matching famous source can actually allocate the third point.
 export function schoolFocusSteps(area, stat, points) {
-  if (area === 'sports' || area === 'extracurricular') return [-1, 1, 2][clamp(Math.round(number(points, 1)), 0, 2)];
+  if (area === 'sports' || area === 'extracurricular') return [-1, 1, 2, 3][clamp(Math.round(number(points, 1)), 0, 3)];
   const index = clamp(Math.round(number(points, DEFAULT_FOCUS)), 0, MAX_FOCUS);
   if (area === 'work' && stat === 'intelligence') return [-3, -2, 0, 2, 3][index];
   if (area === 'work' && stat === 'creativity') return [-2, -1, 0, 1, 2][index];
@@ -90,12 +96,17 @@ const AUTONOMOUS_FOCUS_EFFECTS = {
 export function standardFocusCoefficients(person, career = null) {
   const source = person.autonomousFocus ? AUTONOMOUS_FOCUS_EFFECTS : hasSchoolFocus(person) ? SCHOOL_FOCUS_EFFECTS : STANDARD_FOCUS_EFFECTS;
   const coefficients = Object.fromEntries(Object.entries(source).map(([area, effects]) => [area, { ...effects }]));
-  if (hasSchoolFocus(person)) for (const kind of ['sports', 'extracurricular']) {
+  const adultActivity = adultFameActivity(person);
+  const activityKinds = hasSchoolFocus(person) ? ['sports', 'extracurricular'] : adultActivity ? [adultActivity] : [];
+  for (const kind of activityKinds) {
     const activity = schoolActivity(kind, person.school?.[kind]?.id);
     coefficients[kind] = person.school && schoolActivityPoints(person, kind) === 0
       ? { ...SCHOOL_INACTIVITY_EFFECTS[kind] }
       : activity && activityEligible(person, activity) ? { ...activity.training } : {};
   }
+  const fameArea = !person.autonomousFocus && fameFocusKey(person);
+  const fameSource = fameArea === 'self' || fameActivityMatches(person, fameArea, person.school?.[fameArea]?.id);
+  if (fameSource && Object.hasOwn(coefficients, fameArea)) coefficients[fameArea].social = (coefficients[fameArea].social || 0) + .24;
   if (person.age >= 18) for (const key of skills) {
     const extra = .035 * (person.autonomousFocus ? 1 : CHOICE_STAT_MULTIPLIER) * clamp(number(career?.weights?.[key], 0), 0, 1);
     if (extra) coefficients.work[key] = (coefficients.work[key] || 0) + extra;
@@ -107,10 +118,11 @@ export function standardFocusPractice(person, career = null, excludedArea = null
   for (const [area, effects] of Object.entries(standardFocusCoefficients(person, career))) {
     if (area === excludedArea) continue;
     for (const [stat, coefficient] of Object.entries(effects)) {
-      const points = hasSchoolFocus(person) && ['sports', 'extracurricular'].includes(area)
+      const activityArea = !person.autonomousFocus && isSchoolActivityFocus(person, area);
+      const points = activityArea
         ? schoolActivityPoints(person, area) : person.focus?.[area];
       const effort = person.autonomousFocus ? clamp(number(person.focus?.[area], 3), 0, 5) - 3
-        : hasSchoolFocus(person) ? schoolFocusSteps(area, stat, points) : focusEffect(points);
+        : hasSchoolFocus(person) || activityArea ? schoolFocusSteps(area, stat, points) : focusEffect(points);
       result[stat] = (result[stat] || 0) + coefficient * effort;
     }
   }
@@ -139,14 +151,14 @@ function practiceResponse(effort, aptitude) {
 }
 function personalPracticeResponse(person, stat, amount) {
   if (stat === 'health' || stat === 'stability') return wellbeingResponse(person, stat, amount);
-  const aptitude = clamp(number(person.aptitudes?.[stat], 0), -3, 3);
+  const aptitude = effectiveAptitude(person, stat);
   return YEARLY_DECISION_SCALE * skillFlexibility(number(person.age, 18)) * practiceResponse(amount, aptitude);
 }
 
 // Add this choice contribution to the existing appearance mean. The engine
 // retains its appearance noise draw and applies rating response/bounds once.
 export function schoolAppearanceChange(person) {
-  if (!hasSchoolFocus(person) || person.alive === false) return 0;
+  if (!hasActivityPractice(person) || person.alive === false) return 0;
   const effort = standardFocusPractice(person).attractiveness || 0;
   return personalPracticeResponse(person, 'attractiveness', effort);
 }
@@ -154,7 +166,7 @@ export function schoolAppearanceChange(person) {
 // Natural resilience changes responses to routine choices. It never supplies
 // a change of its own. Missing legacy values are neutral.
 export function wellbeingResponse(person, key, amount) {
-  const aptitude = clamp(number(person.aptitudes?.[key], 0), -3, 3);
+  const aptitude = effectiveAptitude(person, key);
   return YEARLY_DECISION_SCALE * practiceResponse(amount, aptitude);
 }
 
@@ -201,7 +213,7 @@ export function infantChoiceEffects(person) {
   const practice = infantPractice(person);
   const care = CHOICE_STAT_MULTIPLIER * .02 * focusEffect(number(person.careFocus, DEFAULT_FOCUS));
   for (const skill of skills) {
-    const aptitude = clamp(number(person.aptitudes?.[skill], 0), -3, 3);
+    const aptitude = effectiveAptitude(person, skill);
     effects[skill] = YEARLY_DECISION_SCALE * 1.15 * (practiceResponse(practice[skill] + care, aptitude) - practiceResponse(care, aptitude));
   }
   const level = clamp(number(person.cryLevel, 3), 1, 5);
@@ -221,7 +233,7 @@ export function toddlerActivityEffects(person) {
     const withoutWellbeing = toddlerWellbeingPractice({ ...focus, [key]: DEFAULT_FOCUS });
     return [key, Object.fromEntries(Object.entries(coefficients).map(([stat, coefficient]) => {
       if (!skills.includes(stat)) return [stat, wellbeingResponse(person, stat, wellbeing[stat]) - wellbeingResponse(person, stat, withoutWellbeing[stat])];
-      const aptitude = clamp(number(person.aptitudes?.[stat], 0), -3, 3);
+      const aptitude = effectiveAptitude(person, stat);
       return [stat, YEARLY_DECISION_SCALE * 1.15 * (practiceResponse(practice[stat], aptitude) - practiceResponse(without[stat], aptitude))];
     }))];
   }));
@@ -242,7 +254,7 @@ export function skillChanges(person, career = null, practiceScale = YEARLY_DECIS
     ? Object.fromEntries(Object.entries(infantPractice(person)).map(([key, effect]) => [key, effect + babyCare]))
     : age < 5 ? toddlerPractice(toddlerFocus(person)) : standardFocusPractice(person, career);
   return Object.fromEntries(skills.map(key => {
-    const aptitude = clamp(number(person.aptitudes?.[key], 0), -3, 3);
+    const aptitude = effectiveAptitude(person, key);
     const effort = practice[key];
     // Aptitude helps improvement and buffers loss without eliminating either.
     const response = practiceScale * practiceResponse(effort, aptitude);
@@ -260,7 +272,7 @@ export function schoolFocusEffects(person, area, career = null) {
   // No selected activity point is neutral. Remove this area's raw inputs to
   // isolate its contribution while retaining the other areas' net response.
   const baseline = standardFocusPractice({ ...person, focus }, career, area);
-  const keys = [...skills, 'health', 'stability', ...(hasSchoolFocus(person) ? ['attractiveness'] : [])];
+  const keys = [...skills, 'health', 'stability', ...(hasActivityPractice(person) ? ['attractiveness'] : [])];
   return Object.fromEntries(keys.map(key => [key,
     personalPracticeResponse(person, key, chosen[key] || 0) - personalPracticeResponse(person, key, baseline[key] || 0),
   ]));
@@ -274,7 +286,7 @@ export function focusChoiceEffects(person, career = null) {
     ...Object.fromEntries(skills.map(key => [key, person.alive === false ? 0 : personalPracticeResponse(person, key, practice[key])])),
     health: wellbeingResponse(person, 'health', practice.health),
     stability: wellbeingResponse(person, 'stability', practice.stability),
-    ...(hasSchoolFocus(person) ? { attractiveness: schoolAppearanceChange(person) } : {}),
+    ...(hasActivityPractice(person) ? { attractiveness: schoolAppearanceChange(person) } : {}),
   };
 }
 

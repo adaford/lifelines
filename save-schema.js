@@ -1,12 +1,13 @@
 // Read-only validation for current and legacy saves. Migration stays in the
 // engine, where it can use the same generation and progression rules.
-import { JOBS } from './jobs.js?v=mental-event-effects';
-import { EVENTS as PERSONAL_EVENTS } from './events.js?v=mental-event-effects';
-import { FAMILY_EVENTS } from './family-events.js?v=mental-event-effects';
-import { MAX_FOCUS, DEFAULT_FOCUS, SCHOOL_FOCUS_KEYS, focusMaxFor, focusBudget } from './focus-rules.js?v=mental-event-effects';
-import { SCHOOL_OFFER_COUNT, MAX_SCHOOL_OFFERS, schoolActivity } from './school.js?v=mental-event-effects';
-import { conditionFocusPoints, conditionFocusLimits, validateBirthConditions } from './birth-conditions.js?v=mental-event-effects';
-import { gestatingActor } from './relationships.js?v=mental-event-effects';
+import { JOBS } from './jobs.js?v=fame';
+import { EVENTS as PERSONAL_EVENTS } from './events.js?v=fame';
+import { FAMILY_EVENTS } from './family-events.js?v=fame';
+import { FAME_EVENTS } from './fame-events.js?v=fame';
+import { MAX_FOCUS, DEFAULT_FOCUS, SCHOOL_FOCUS_KEYS, focusMaxFor, focusBudget } from './focus-rules.js?v=fame';
+import { SCHOOL_OFFER_COUNT, MAX_SCHOOL_OFFERS, schoolActivity } from './school.js?v=fame';
+import { conditionFocusPoints, conditionFocusLimits, validateBirthConditions } from './birth-conditions.js?v=fame';
+import { gestatingActor } from './relationships.js?v=fame';
 
 // Inject engine-owned helpers rather than importing the engine back here.
 // Keeping these references shared prevents validation rules from drifting.
@@ -22,6 +23,15 @@ export function createSaveValidator({
       const heightBound = cm => version >= 10 ? fromCentimeters(cm) : cm;
       const text = (s, max = 1000) => typeof s === 'string' && s.length > 0 && s.length <= max;
       const validCause = entry => entry.cause === undefined || text(entry.cause, 1000);
+      const validFame = (fame, age) => fame && typeof fame === 'object' && !Array.isArray(fame)
+        && Object.keys(fame).length === 5 && ['sports', 'extracurricular', 'personal'].includes(fame.kind)
+        && finite(fame.rating, 0, 10) && fame.rating === Math.round(fame.rating * 10) / 10
+        && finite(fame.support, -2, 2) && Number.isInteger(fame.startedAge)
+        && finite(fame.startedAge, fame.kind === 'personal' ? 13 : 6, age)
+        && (fame.kind === 'personal' ? fame.activityId === null : Boolean(schoolActivity(fame.kind, fame.activityId)));
+      const validPersonFame = person => person.fame === undefined || person.fame === null
+        || person === raw && version >= 20 && person.alive === true && validFame(person.fame, person.age)
+          && (person.fame.kind === 'personal' || person.school?.[person.fame.kind]?.id === person.fame.activityId);
       const legacy = version < 4;
       const ratingFloor = version >= 15 ? 0 : 1;
       const coreKeys = legacy ? [...CORE, 'discipline'] : CORE;
@@ -38,13 +48,13 @@ export function createSaveValidator({
       const validAdultHeight = person => version >= 9 ? (person.adultHeight === null && person.age < (person.maturityAge ?? 18) || finite(person.adultHeight, heightBound(40), heightBound(240))) : finite(person.adultHeight, 145, 205);
       const validGrowth = person => ['male','female'].includes(person.growthSex) && Number.isInteger(person.maturityAge) && finite(person.maturityAge, 14, 18) && finite(person.birthHeight, heightBound(40), heightBound(60)) && validAdultHeight(person) && (version < 9 || finite(person.growthFactor, .8, 1.2)) && (person.growthAnchor === null || person.growthAnchor && Number.isInteger(person.growthAnchor.age) && finite(person.growthAnchor.age, 0, person.age) && finite(person.growthAnchor.height, heightBound(40), heightBound(210)));
       const validDeath = person => person.death === undefined || person.death === null || person.alive === false && ['disease', 'accident'].includes(person.death.cause) && person.death.age === person.age;
-      const validPerson = person => person && text(person.id, 100) && text(person.name, 50) && Number.isInteger(person.age) && finite(person.age, 0, version >= 7 ? 200 : 120) && finite(person.height, heightBound(40), heightBound(version >= 9 ? 240 : 210)) && validStats(person.stats) && validAptitudes(person.aptitudes) && (version < 17 || validateBirthConditions(person.conditions)) && (version === 1 || validLifestyle(person.lifestyle)) && (person.adopted === undefined || typeof person.adopted === 'boolean') && (version < 5 || validIdentity(person)) && (version < 6 || text(person.familyName, 30) && normalizeSurname(person.familyName) === person.familyName) && (version < 7 || validDeath(person));
+      const validPerson = person => person && text(person.id, 100) && text(person.name, 50) && Number.isInteger(person.age) && finite(person.age, 0, version >= 7 ? 200 : 120) && finite(person.height, heightBound(40), heightBound(version >= 9 ? 240 : 210)) && validStats(person.stats) && validAptitudes(person.aptitudes) && validPersonFame(person) && (version < 17 || validateBirthConditions(person.conditions)) && (version === 1 || validLifestyle(person.lifestyle)) && (person.adopted === undefined || typeof person.adopted === 'boolean') && (version < 5 || validIdentity(person)) && (version < 6 || text(person.familyName, 30) && normalizeSurname(person.familyName) === person.familyName) && (version < 7 || validDeath(person));
       if (!validPerson(raw) || raw.age > 85 || !Number.isInteger(raw.generation) || !finite(raw.generation, 1, 100000)) return false;
       if (version >= 8 && (!validGrowth(raw) || ![...raw.parents, ...(version >= 15 && raw.guardian ? [raw.guardian] : []), ...raw.children, ...raw.siblings, ...raw.lineage, raw.partner, ...raw.encounters, raw.pregnancy?.otherParent].filter(Boolean).every(person => (['growthSex','maturityAge','birthHeight','growthAnchor'].every(key => person[key] === undefined) || validGrowth(person)) && (person.parentRole === undefined || ['mom','dad','parent'].includes(person.parentRole))))) return false;
       if (![raw.seed, raw.rng, raw.nextId].every(value => Number.isInteger(value) && finite(value, 0, Number.MAX_SAFE_INTEGER))) return false;
       if (!finite(raw.height, heightBound(40), heightBound(version >= 9 ? 240 : 210)) || !validAdultHeight(raw)) return false;
       const validFocus = (focus, keys, maximum = version >= 17 ? MAX_FOCUS : 5, budget = version >= 17 ? DEFAULT_FOCUS * keys.length : 12) => focus && Object.keys(focus).length === keys.length && keys.every(key => Number.isInteger(focus[key]) && finite(focus[key], 0, typeof maximum === 'object' ? maximum[key] : maximum)) && keys.reduce((sum, key) => sum + focus[key], 0) <= budget;
-      const currentFocusKeys = version >= 18 ? focusKeys(raw.age) : version >= 17 || version >= 11 && raw.age >= 2 && raw.age < 5 && Object.hasOwn(raw.focus || {}, 'creative') ? legacyFocusKeys(raw.age) : FOCUS_KEYS;
+      const currentFocusKeys = version >= 20 ? focusKeys(raw) : version >= 18 ? focusKeys(raw.age) : version >= 17 || version >= 11 && raw.age >= 2 && raw.age < 5 && Object.hasOwn(raw.focus || {}, 'creative') ? legacyFocusKeys(raw.age) : FOCUS_KEYS;
       const currentBudget = version >= 19 ? focusBudget(raw) : version >= 17 ? Math.max(0, DEFAULT_FOCUS * currentFocusKeys.length + conditionFocusPoints(raw)) : 12;
       const currentMaximum = version >= 19 ? Object.fromEntries(currentFocusKeys.map(key => [key, focusMaxFor(raw, key)])) : version >= 17 ? MAX_FOCUS : 5;
       if (!validFocus(raw.focus, currentFocusKeys, currentMaximum, currentBudget)) return false;
@@ -69,6 +79,10 @@ export function createSaveValidator({
           return value && finite(value.before, low, high) && finite(value.after, low, high) && finite(value.change, low - high, high - low) && Math.abs(round(value.after - value.before) - value.change) < .001;
         };
         const summary = raw.yearSummary;
+        if (summary?.fame !== undefined && (version < 20 || !summary.fame || typeof summary.fame !== 'object' || Array.isArray(summary.fame)
+          || Object.keys(summary.fame).length !== 2 || summary.fame.before === null && summary.fame.after === null
+          || !(summary.fame.before === null || validFame(summary.fame.before, summary.fromAge))
+          || !(summary.fame.after === null || validFame(summary.fame.after, summary.toAge)))) return false;
         if (summary?.decisions !== undefined) {
           const decisions = summary.decisions;
           if (!decisions || typeof decisions !== 'object' || Array.isArray(decisions)) return false;
@@ -77,30 +91,37 @@ export function createSaveValidator({
             if (summary.fromAge >= 3 || Object.keys(decisions).length !== 1 || !Number.isInteger(decisions.cryLevel) || !finite(decisions.cryLevel, 1, 5)) return false;
           } else {
             const focus = decisions.focus;
+            const hasRecordedFame = Object.hasOwn(decisions, 'fame');
+            if (hasRecordedFame && (version < 20 || !validFame(decisions.fame, summary.fromAge))) return false;
+            const fameActivity = hasRecordedFame && decisions.fame.kind !== 'personal' ? decisions.fame.kind : null;
+            const adultFameActivity = summary.fromAge >= 18 && fameActivity;
             // Completed four-area School years remain valid after schema 18;
             // infer their shape from the recorded controls, never today's age.
             const expandedSchool = version >= 18 && summary.fromAge >= 5 && summary.fromAge < 18 && (Object.hasOwn(focus || {}, 'sports') || Object.hasOwn(focus || {}, 'extracurricular'));
-            const keys = expandedSchool ? SCHOOL_FOCUS_KEYS : version >= 17 && decisions.focusMax !== undefined || version >= 11 && decisions.workLabel === 'Play' && summary.fromAge >= 2 && summary.fromAge < 5 && Object.hasOwn(focus || {}, 'creative') ? legacyFocusKeys(summary.fromAge) : FOCUS_KEYS;
+            const keys = expandedSchool ? SCHOOL_FOCUS_KEYS : adultFameActivity ? [...FOCUS_KEYS, fameActivity] : version >= 17 && decisions.focusMax !== undefined || version >= 11 && decisions.workLabel === 'Play' && summary.fromAge >= 2 && summary.fromAge < 5 && Object.hasOwn(focus || {}, 'creative') ? legacyFocusKeys(summary.fromAge) : FOCUS_KEYS;
             const currentRules = decisions.focusMax !== undefined || decisions.focusBudget !== undefined;
             const mixedSchool = version >= 19 && expandedSchool && decisions.focusCaps !== undefined;
-            if (decisions.focusCaps !== undefined && (!mixedSchool || Object.keys(decisions.focusCaps || {}).length !== 2 || decisions.focusCaps.sports !== 2 || decisions.focusCaps.extracurricular !== 2)) return false;
+            if (decisions.focusCaps !== undefined && (!mixedSchool || Object.keys(decisions.focusCaps || {}).length !== 2 || !['sports', 'extracurricular'].every(kind => decisions.focusCaps[kind] === 2 || decisions.focusCaps[kind] === 3 && fameActivity === kind))) return false;
+            if (hasRecordedFame && (!currentRules || summary.fromAge < 18 && !mixedSchool)) return false;
             const hasPointModifier = Object.hasOwn(decisions, 'focusPointModifier');
             if (hasPointModifier && (version < 20 || !currentRules || !Number.isInteger(decisions.focusPointModifier) || !finite(decisions.focusPointModifier, -256, 256) || decisions.focusPointModifier === 0)) return false;
-            const recordedBudget = Math.max(0, (mixedSchool ? 10 : DEFAULT_FOCUS * keys.length) + conditionFocusPoints(raw) + (hasPointModifier ? decisions.focusPointModifier : 0));
+            const recordedBudget = Math.max(0, (mixedSchool ? 10 : adultFameActivity ? 8 : DEFAULT_FOCUS * keys.length) + conditionFocusPoints(raw) + (hasPointModifier ? decisions.focusPointModifier : 0));
             if (currentRules && (version < 17 || decisions.focusMax !== MAX_FOCUS || decisions.focusBudget !== recordedBudget)) return false;
-            const recordedMaximum = mixedSchool ? Object.fromEntries(keys.map(key => [key, decisions.focusCaps[key] ?? MAX_FOCUS])) : currentRules ? MAX_FOCUS : 5;
-            if (summary.fromAge < (version >= 10 ? 2 : 3) || Object.keys(decisions).length !== (currentRules ? mixedSchool ? 5 : 4 : 2) + Number(hasPointModifier) || !(version >= 10 ? ['Play', 'School', 'College', 'Career'] : ['School', 'College', 'Career']).includes(decisions.workLabel) || !validFocus(focus, keys, recordedMaximum, currentRules ? decisions.focusBudget : 12)) return false;
+            const recordedMaximum = mixedSchool ? Object.fromEntries(keys.map(key => [key, decisions.focusCaps[key] ?? MAX_FOCUS])) : adultFameActivity ? Object.fromEntries(keys.map(key => [key, key === fameActivity ? 3 : MAX_FOCUS])) : currentRules ? MAX_FOCUS : 5;
+            if (summary.fromAge < (version >= 10 ? 2 : 3) || Object.keys(decisions).length !== (currentRules ? mixedSchool ? 5 : 4 : 2) + Number(hasPointModifier) + Number(hasRecordedFame) || !(version >= 10 ? ['Play', 'School', 'College', 'Career'] : ['School', 'College', 'Career']).includes(decisions.workLabel) || !validFocus(focus, keys, recordedMaximum, currentRules ? decisions.focusBudget : 12)) return false;
           }
         }
         if (summary?.school !== undefined) {
           const report = summary.school;
+          const reportMaximum = activity => summary.decisions?.fame?.kind === activity.kind
+            && summary.decisions.fame.activityId === activity.id && summary.decisions.focusCaps?.[activity.kind] === 3 ? 3 : 2;
           // Reports record the grading rules used that year. Balance changes
           // must not invalidate or recalculate already saved grades.
           if (version < 19 || summary.fromAge < 5 || summary.fromAge >= 18 || !report || !finite(report.gpa, 50, 100) || !(report.previousGpa === null || finite(report.previousGpa, 50, 100))
             || !Number.isInteger(report.study) || !finite(report.study, 0, 4) || !finite(report.intelligence, effectiveFloor, effectiveCeiling)
             || !Array.isArray(report.activities) || report.activities.length > 2
             || new Set(report.activities.map(activity => activity.kind)).size !== report.activities.length
-            || !report.activities.every(activity => ['sports', 'extracurricular'].includes(activity.kind) && Boolean(schoolActivity(activity.kind, activity.id)) && text(activity.name, 100) && Number.isInteger(activity.focus) && finite(activity.focus, 0, 2)
+            || !report.activities.every(activity => ['sports', 'extracurricular'].includes(activity.kind) && Boolean(schoolActivity(activity.kind, activity.id)) && text(activity.name, 100) && Number.isInteger(activity.focus) && finite(activity.focus, 0, reportMaximum(activity))
               && (activity.before === null || finite(activity.before, 0, 10))
               && (activity.after === null ? activity.before === null && activity.focus === 0 : finite(activity.after, 0, 10)))) return false;
         }
@@ -178,13 +199,17 @@ export function createSaveValidator({
         if (Object.entries(limits).some(([key, max]) => raw.focus[key] > max)) return false;
       }
       if (!legacy) {
-        const knownKey = key => typeof key === 'string' && (PERSONAL_EVENTS.some(event => event.id === key) || version >= 5 && FAMILY_EVENTS.some(event => key.startsWith(`${event.id}:`) && key.length <= 200));
+        const knownKey = key => typeof key === 'string' && (PERSONAL_EVENTS.some(event => event.id === key) || version >= 20 && FAME_EVENTS.some(event => event.id === key) || version >= 5 && FAMILY_EVENTS.some(event => key.startsWith(`${event.id}:`) && key.length <= 200));
         if (!Array.isArray(raw.lastYearEvents) || raw.lastYearEvents.length > 5 || new Set(raw.lastYearEvents).size !== raw.lastYearEvents.length || !raw.lastYearEvents.every(knownKey)) return false;
         if (!Array.isArray(raw.pendingEvents) || raw.pendingEvents.length > 5 || new Set(raw.pendingEvents.map(pending => pending && eventKey(pending))).size !== raw.pendingEvents.length) return false;
         if (!raw.pendingEvents.every(pending => {
           if (!pending || !validCause(pending) || pending.age !== raw.age || !raw.lastYearEvents.includes(eventKey(pending))) return false;
           const event = EVENTS.find(event => event.id === pending.eventId);
           if (!event?.choices?.length) return false;
+          const invitationKind = ['sports', 'extracurricular'].includes(event.fameKind) ? event.fameKind : null;
+          if (invitationKind) {
+            if (version < 20 || !schoolActivity(invitationKind, pending.fameActivityId) || raw.school?.[invitationKind]?.id !== pending.fameActivityId) return false;
+          } else if (Object.hasOwn(pending, 'fameActivityId')) return false;
           if (event.subjectType) {
             if (version < 5 || pending.subjectType !== event.subjectType || !text(pending.subjectId, 100)) return false;
             const subject = pendingEventSubject(raw, pending);
