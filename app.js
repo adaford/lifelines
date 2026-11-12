@@ -6,18 +6,18 @@ import {
   offeredJobs, needsEducationChoice, pendingEventSubject, focusLimits, focusLimitDetails, caregivers,
   relationshipOdds, meetingChances, proposalChance, pregnancyChance, oneNightChance,
   respondToEncounter, proposeMarriage, endRelationship, normalizeSurname, heightPercentile, statPercentiles
-} from './engine.js?v=causal-stat-outcomes';
-import { LEGACY_EVENT_COPY } from './event-copy-history.js?v=causal-stat-outcomes';
-import { formatEventCause } from './event-causes.js?v=causal-stat-outcomes';
-import { annotateNarrative } from './narrative.js?v=causal-stat-outcomes';
-import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome, focusCapLabel, escapeHTML as esc } from './display.js?v=causal-stat-outcomes';
-import { avatar, genderBadge, parentLabel } from './profile-view.js?v=causal-stat-outcomes';
+} from './engine.js?v=deadline-effect';
+import { LEGACY_EVENT_COPY } from './event-copy-history.js?v=deadline-effect';
+import { formatEventCause } from './event-causes.js?v=deadline-effect';
+import { annotateNarrative } from './narrative.js?v=deadline-effect';
+import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome, focusCapLabel, escapeHTML as esc } from './display.js?v=deadline-effect';
+import { avatar, genderBadge, parentLabel } from './profile-view.js?v=deadline-effect';
 
-import { MAX_FOCUS, focusBudget, focusMaxFor, isSchoolActivityFocus } from './focus-rules.js?v=causal-stat-outcomes';
-import { schoolActivity, gradeScore, gradeLetter, activityGradeLetter, activitySuccessAfterYear, activityEligible } from './school.js?v=causal-stat-outcomes';
-import { hasFame, fameFocusKey, fameFocusChange, fameLearningBonus, fameLossChance, fameLifestyleBonus } from './fame.js?v=causal-stat-outcomes';
-import { getBirthConditions } from './birth-conditions.js?v=causal-stat-outcomes';
-import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=causal-stat-outcomes';
+import { MAX_FOCUS, focusBudget, focusMaxFor, isSchoolActivityFocus } from './focus-rules.js?v=deadline-effect';
+import { schoolActivity, gradeScore, gradeLetter, activityGradeLetter, activitySuccessAfterYear, activityEligible } from './school.js?v=deadline-effect';
+import { hasFame, fameFocusKey, fameFocusChange, fameLearningBonus, fameLossChance, fameLifestyleBonus } from './fame.js?v=deadline-effect';
+import { getBirthConditions } from './birth-conditions.js?v=deadline-effect';
+import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=deadline-effect';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const app = document.querySelector('#app');

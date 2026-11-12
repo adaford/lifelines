@@ -1,5 +1,5 @@
 // Pure profile markup shared by player, family, partner and heir views.
-import { escapeHTML as esc } from './display.js?v=causal-stat-outcomes';
+import { escapeHTML as esc } from './display.js?v=deadline-effect';
 
 const genderLabel = person => ({ male: 'Male', female: 'Female', nonbinary: 'Nonbinary' }[person.gender] || 'Unspecified');
 export const genderBadge = person => `<span class="gender-label" aria-label="Gender: ${genderLabel(person)}">${genderLabel(person)}</span>`;

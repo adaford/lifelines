@@ -1,6 +1,6 @@
-import { MAX_FOCUS, DEFAULT_FOCUS, focusEffect, defaultFocus, focusMaxFor, focusNeutralFor, isSchoolActivityFocus } from './focus-rules.js?v=causal-stat-outcomes';
-import { schoolActivity, activityEligible } from './school.js?v=causal-stat-outcomes';
-import { fameFocusKey, fameActivityMatches, fameLearningBonus } from './fame.js?v=causal-stat-outcomes';
+import { MAX_FOCUS, DEFAULT_FOCUS, focusEffect, defaultFocus, focusMaxFor, focusNeutralFor, isSchoolActivityFocus } from './focus-rules.js?v=deadline-effect';
+import { schoolActivity, activityEligible } from './school.js?v=deadline-effect';
+import { fameFocusKey, fameActivityMatches, fameLearningBonus } from './fame.js?v=deadline-effect';
 // Ratings use the same scale throughout life. Balanced toddler activities use
 // TODDLER_FOCUS; core areas use 2, enrolled school activities use 1.
 // Existing ratings change only through practice, care, events, or aging.

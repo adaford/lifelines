@@ -1,5 +1,5 @@
-import { legacyFocusValue } from './focus-rules.js?v=causal-stat-outcomes';
-import { gradeScore } from './school.js?v=causal-stat-outcomes';
+import { legacyFocusValue } from './focus-rules.js?v=deadline-effect';
+import { gradeScore } from './school.js?v=deadline-effect';
 // Fictional household events. Subject changes affect the named person; player
 // changes affect you. Relationship changes affect your bond with that person.
 // Individual rolls join the ordinary event pool and share its five-event cap.

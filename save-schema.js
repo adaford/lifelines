@@ -1,13 +1,13 @@
 // Read-only validation for current and legacy saves. Migration stays in the
 // engine, where it can use the same generation and progression rules.
-import { JOBS } from './jobs.js?v=causal-stat-outcomes';
-import { EVENTS as PERSONAL_EVENTS } from './events.js?v=causal-stat-outcomes';
-import { FAMILY_EVENTS } from './family-events.js?v=causal-stat-outcomes';
-import { FAME_EVENTS } from './fame-events.js?v=causal-stat-outcomes';
-import { MAX_FOCUS, DEFAULT_FOCUS, SCHOOL_FOCUS_KEYS, focusMaxFor, focusBudget } from './focus-rules.js?v=causal-stat-outcomes';
-import { SCHOOL_OFFER_COUNT, MAX_SCHOOL_OFFERS, schoolActivity } from './school.js?v=causal-stat-outcomes';
-import { conditionFocusPoints, conditionFocusLimits, validateBirthConditions } from './birth-conditions.js?v=causal-stat-outcomes';
-import { gestatingActor } from './relationships.js?v=causal-stat-outcomes';
+import { JOBS } from './jobs.js?v=deadline-effect';
+import { EVENTS as PERSONAL_EVENTS } from './events.js?v=deadline-effect';
+import { FAMILY_EVENTS } from './family-events.js?v=deadline-effect';
+import { FAME_EVENTS } from './fame-events.js?v=deadline-effect';
+import { MAX_FOCUS, DEFAULT_FOCUS, SCHOOL_FOCUS_KEYS, focusMaxFor, focusBudget } from './focus-rules.js?v=deadline-effect';
+import { SCHOOL_OFFER_COUNT, MAX_SCHOOL_OFFERS, schoolActivity } from './school.js?v=deadline-effect';
+import { conditionFocusPoints, conditionFocusLimits, validateBirthConditions } from './birth-conditions.js?v=deadline-effect';
+import { gestatingActor } from './relationships.js?v=deadline-effect';
 
 // Inject engine-owned helpers rather than importing the engine back here.
 // Keeping these references shared prevents validation rules from drifting.

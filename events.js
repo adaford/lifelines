@@ -1,9 +1,9 @@
 // Fictional life-sim probabilities and consequences, not real-world risk estimates.
 // Each eligible event gets an independent yearly roll. The engine caps a year at five.
 // Low/high factors are curved so extreme traits matter much more than small changes.
-import { legacyFocusValue, focusMaxFor } from './focus-rules.js?v=causal-stat-outcomes';
-import { APTITUDE_EVENTS } from './cross-aptitude-events.js?v=causal-stat-outcomes';
-import { schoolActivity, activityEligible } from './school.js?v=causal-stat-outcomes';
+import { legacyFocusValue, focusMaxFor } from './focus-rules.js?v=deadline-effect';
+import { APTITUDE_EVENTS } from './cross-aptitude-events.js?v=deadline-effect';
+import { schoolActivity, activityEligible } from './school.js?v=deadline-effect';
 
 const low = key => [key, 'low'];
 const high = key => [key, 'high'];
@@ -307,7 +307,7 @@ export const EVENTS = [
     { id: 'study_headache', name: 'Headaches interrupt your studies', description: 'Long study sessions leave you with recurring headaches, forcing you to clear time for recovery next year.', activityFocus: 'work', minFocus: 3, baseChance: .01, kind: 'negative', focusPoints: -1, years: 1 },
     { id: 'teacher_study_feedback', name: 'A teacher reviews your extra work', description: 'A teacher notices your extra work and gives you a detailed explanation that makes a difficult topic click.', activityFocus: 'work', ...change({ intelligence: .2 }) },
     { id: 'school_activity_showcase', name: 'Invited to explain your activity', description: 'Your extracurricular group asks you to introduce its work at a school open day, giving you practice speaking with visitors.', activityFocus: 'extracurricular', ...change({ social: .2 }) },
-    { id: 'club_deadline_pressure', name: 'An activity deadline moves forward', description: 'An extracurricular organizer brings a group event forward, leaving you rushed to finish your preparations.', activityFocus: 'extracurricular', kind: 'negative', ...change({}) },
+    { id: 'club_deadline_pressure', name: 'An activity deadline moves forward', description: 'An extracurricular organizer brings a group event forward and schedules extra preparation sessions, taking time from your other plans over the coming year.', activityFocus: 'extracurricular', kind: 'negative', focusPoints: -1, years: 1 },
     { id: 'school_friends_outing', name: 'Friends invite you on an outing', description: 'Friends include you in a weekend outing, and shared games and conversation bring you closer.', activityFocus: 'social', ...change({ social: .2 }) },
     { id: 'family_recipe_lesson', name: 'A relative teaches you a family recipe', description: 'A relative invites you into the kitchen to prepare a family recipe and encourages you to invent your own variation.', activityFocus: 'family', ...change({ creativity: .2 }) },
   ]),

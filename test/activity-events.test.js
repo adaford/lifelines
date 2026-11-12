@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EVENTS, eventChances } from '../events.js';
-import { createGame, advanceYear, validateSave, migrateSave } from '../engine.js';
+import { createGame, advanceYear, annualForecast, chooseEducation, validateSave, migrateSave } from '../engine.js';
+import { focusBudget, temporaryFocusPoints } from '../focus-rules.js';
 import { createSchoolRecord, EXTRACURRICULARS } from '../school.js';
 import { heightReference } from '../growth.js';
 import { changedRating } from '../rating-changes.js';
@@ -33,7 +34,7 @@ function pupil(age = 12) {
 }
 const chanceOf = (state, id) => eventChances(state, state.stats).find(event => event.id === id).chance;
 
-test('eight concrete school activity events keep concrete outcomes without penalizing ordinary deadline pressure', () => {
+test('eight school activity events keep concrete outcomes and temporary time costs without a deadline mental penalty', () => {
   assert.equal(additions.length, 8);
   assert.ok(additions.every(Boolean));
   assert.equal(new Set(EVENTS.map(event => event.id)).size, EVENTS.length);
@@ -45,18 +46,75 @@ test('eight concrete school activity events keep concrete outcomes without penal
     assert.equal(event.statFactors, undefined, `${event.id} depends on participation, not a stat threshold`);
     assert.equal(event.focusFactors, undefined, 'new participation scaling does not reinterpret legacy focus factors');
     assert.deepEqual(event.modifiers, {});
-    if (event.id === 'study_headache') {
-      assert.equal(event.activityFocus, 'work');
-      assert.equal(event.minFocus, 3);
+    if (['study_headache', 'club_deadline_pressure'].includes(event.id)) {
+      assert.equal(event.activityFocus, event.id === 'study_headache' ? 'work' : 'extracurricular');
+      assert.equal(event.minFocus, event.id === 'study_headache' ? 3 : 1);
       assert.equal(event.focusPoints, -1);
       assert.equal(event.years, 1);
-      assert.equal(event.statChanges, undefined);
+      assert.equal(event.statChanges, undefined, 'a time cost does not create a permanent stat penalty');
     } else {
       assert.equal(event.years, 0);
       assert.equal(event.minFocus, 1);
-      if (event.id === 'club_deadline_pressure') assert.equal(event.statChanges, undefined, 'a rushed preparation is not a lasting mental change');
-      else assert.ok(Object.values(event.statChanges).every(amount => Math.abs(amount) <= .3 && amount !== 0));
+      assert.ok(Object.values(event.statChanges).every(amount => Math.abs(amount) <= .3 && amount !== 0));
     }
+  }
+});
+
+test('a rolled club deadline removes one total point for the next full year, including entry into adulthood, then expires without refilling', () => {
+  const event = additions.find(event => event.id === 'club_deadline_pressure');
+  for (const age of [12, 17]) {
+    const original = pupil(age);
+    original.focus = { work: 2, social: 2, family: 2, self: 2, sports: 0, extracurricular: 2 };
+    const legacy = { id: event.id, name: event.name, description: 'A saved old penalty.', kind: 'negative', years: 3, modifiers: { stability: -.2 } };
+    if (age === 12) original.effects = [copy(legacy)];
+    assert.deepEqual(migrateSave(copy(original)), original, 'an existing timed mental effect is preserved on load');
+    const forecast = annualForecast(original);
+    let received;
+    for (let attempt = 1; attempt <= 2000; attempt++) {
+      const state = copy(original);
+      state.rng = Math.imul(attempt, 2654435761) >>> 0;
+      assert.equal(advanceYear(state, calm).ok, true);
+      if (state.lastYearEvents.length === 1 && state.lastYearEvents[0] === event.id) { received = state; break; }
+    }
+    assert.ok(received, `an isolated automatic deadline event can roll at ${age}`);
+    assert.equal(received.age, age + 1);
+    assert.deepEqual(received.yearSummary.stats, forecast.stats, 'the deadline itself changes no rating, including mental stability');
+    assert.equal(received.yearSummary.decisions.focusBudget, 10, 'the triggering school year used its original budget');
+    assert.equal(received.yearSummary.decisions.focusPointModifier, undefined);
+    const pointEffect = received.effects.find(effect => effect.focusPoints === -1);
+    assert.ok(pointEffect);
+    assert.equal(pointEffect.id, age === 12 ? `${event.id}:limits` : event.id);
+    assert.equal(pointEffect.years, 1, 'the new effect still has one complete playable year');
+    assert.deepEqual(pointEffect.modifiers, {});
+    assert.equal(temporaryFocusPoints(received), -1);
+    assert.equal(focusBudget(received), age === 17 ? 7 : 9);
+    assert.equal(Object.values(received.focus).reduce((sum, points) => sum + points, 0), focusBudget(received));
+    if (age === 12) assert.deepEqual(received.effects.find(effect => effect.id === event.id), { ...legacy, years: 2 }, 'the point loss coexists with the old stat effect');
+    const entry = received.history.find(entry => entry.title === event.name);
+    assert.equal(entry.text, 'No stat changes. -1 focus point. Temporary effects: 1 year.');
+    assert.equal(received.yearSummary.events.find(entry => entry.title === event.name).text, entry.text);
+    assert.deepEqual(migrateSave(copy(received)), received);
+    if (age === 17) assert.equal(chooseEducation(received, 'work').ok, true);
+    const allocated = copy(received.focus), nextForecast = annualForecast(received), saved = copy(received);
+    assert.deepEqual(migrateSave(copy(received)), saved);
+    let completed;
+    for (let attempt = 1; attempt <= 1000; attempt++) {
+      const state = copy(received);
+      state.rng = Math.imul(attempt, 2654435761) >>> 0;
+      assert.equal(advanceYear(state, calm).ok, true);
+      if (!state.lastYearEvents.length) { completed = state; break; }
+    }
+    assert.ok(completed, 'an event-free next year isolates expiry');
+    assert.deepEqual(completed.yearSummary.stats, nextForecast.stats, 'the complete next routine uses the reduced allocation');
+    assert.deepEqual(completed.yearSummary.decisions.focus, allocated);
+    assert.equal(completed.yearSummary.decisions.focusBudget, age === 17 ? 7 : 9);
+    assert.equal(completed.yearSummary.decisions.focusPointModifier, -1);
+    assert.equal(completed.effects.some(effect => effect.id === pointEffect.id && effect.focusPoints === -1), false);
+    assert.equal(temporaryFocusPoints(completed), 0);
+    assert.equal(focusBudget(completed), age === 17 ? 8 : 10);
+    assert.deepEqual(completed.focus, allocated, 'expiry restores the total budget without allocating the recovered point');
+    assert.equal(validateSave(completed), true);
+    assert.deepEqual(migrateSave(copy(completed)), completed, 'the expired effect leaves its historical decision budget valid');
   }
 });
 

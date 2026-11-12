@@ -1,27 +1,27 @@
 // Lifelines: deterministic, browser-independent simulation rules.
 // All public actions mutate their state and return { ok, reason? }.
-import { createSaveValidator } from './save-schema.js?v=causal-stat-outcomes';
-import { JOBS } from './jobs.js?v=causal-stat-outcomes';
-import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=causal-stat-outcomes';
-import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=causal-stat-outcomes';
-import { FAME_EVENTS, fameEventChances } from './fame-events.js?v=causal-stat-outcomes';
-import { hasFame, fameFocusKey, fameActivityMatches, fameStartingRating, fameNextRating, fameLossChance, fameLifestyleBonus } from './fame.js?v=causal-stat-outcomes';
-import { eventStatCause } from './event-causes.js?v=causal-stat-outcomes';
-import { mortalityRisk, rollMortality } from './mortality.js?v=causal-stat-outcomes';
-import { heightReference, advanceGrowth } from './growth.js?v=causal-stat-outcomes';
-import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=causal-stat-outcomes';
-import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, caregiverCryEffects, unemploymentStabilityChange, standardFocusPractice, schoolAppearanceChange, DEVELOPMENT_BALANCE, BIRTH_VARIATION, SKILL_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, PARENT_FAMILY_STABILITY_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=causal-stat-outcomes';
-import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=causal-stat-outcomes';
-import { normalPercentile } from './percentiles.js?v=causal-stat-outcomes';
-import { changedRating } from './rating-changes.js?v=causal-stat-outcomes';
-import { MAX_FOCUS, DEFAULT_FOCUS, focusMaxFor, focusNeutralFor, isSchoolActivityFocus, focusEffect, focusKeysForAge, focusBudget, temporaryFocusPoints, defaultFocus, legacyFocusValue } from './focus-rules.js?v=causal-stat-outcomes';
-import { SCHOOL_OFFER_COUNT, schoolActivity, gradeScore, activitySuccessAfterYear, activityEligible, annualSchoolOffers, createSchoolRecord } from './school.js?v=causal-stat-outcomes';
-import { assignBirthConditions, applyBirthConditions, getBirthConditions, conditionFocusLimits } from './birth-conditions.js?v=causal-stat-outcomes';
+import { createSaveValidator } from './save-schema.js?v=deadline-effect';
+import { JOBS } from './jobs.js?v=deadline-effect';
+import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=deadline-effect';
+import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=deadline-effect';
+import { FAME_EVENTS, fameEventChances } from './fame-events.js?v=deadline-effect';
+import { hasFame, fameFocusKey, fameActivityMatches, fameStartingRating, fameNextRating, fameLossChance, fameLifestyleBonus } from './fame.js?v=deadline-effect';
+import { eventStatCause } from './event-causes.js?v=deadline-effect';
+import { mortalityRisk, rollMortality } from './mortality.js?v=deadline-effect';
+import { heightReference, advanceGrowth } from './growth.js?v=deadline-effect';
+import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=deadline-effect';
+import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, caregiverCryEffects, unemploymentStabilityChange, standardFocusPractice, schoolAppearanceChange, DEVELOPMENT_BALANCE, BIRTH_VARIATION, SKILL_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, PARENT_FAMILY_STABILITY_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=deadline-effect';
+import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=deadline-effect';
+import { normalPercentile } from './percentiles.js?v=deadline-effect';
+import { changedRating } from './rating-changes.js?v=deadline-effect';
+import { MAX_FOCUS, DEFAULT_FOCUS, focusMaxFor, focusNeutralFor, isSchoolActivityFocus, focusEffect, focusKeysForAge, focusBudget, temporaryFocusPoints, defaultFocus, legacyFocusValue } from './focus-rules.js?v=deadline-effect';
+import { SCHOOL_OFFER_COUNT, schoolActivity, gradeScore, activitySuccessAfterYear, activityEligible, annualSchoolOffers, createSchoolRecord } from './school.js?v=deadline-effect';
+import { assignBirthConditions, applyBirthConditions, getBirthConditions, conditionFocusLimits } from './birth-conditions.js?v=deadline-effect';
 export { DEVELOPMENT_BALANCE };
-export { heightPercentile } from './growth.js?v=causal-stat-outcomes';
-export { mortalityRisk } from './mortality.js?v=causal-stat-outcomes';
-import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=causal-stat-outcomes';
-export { JOBS, JOB_CATEGORIES } from './jobs.js?v=causal-stat-outcomes';
+export { heightPercentile } from './growth.js?v=deadline-effect';
+export { mortalityRisk } from './mortality.js?v=deadline-effect';
+import { meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=deadline-effect';
+export { JOBS, JOB_CATEGORIES } from './jobs.js?v=deadline-effect';
 export const EVENTS = [...PERSONAL_EVENTS, ...FAMILY_EVENTS, ...FAME_EVENTS];
 
 export const SKILLS = [

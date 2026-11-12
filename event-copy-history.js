@@ -1,6 +1,8 @@
 // Render-only copies from before the November 2026 event rewrite.
 // Never use these entries for new events, simulation, or save migrations.
 export const LEGACY_EVENT_COPY = [
+  { id: 'club_deadline_pressure', name: 'An activity deadline moves forward', description: 'An extracurricular organizer brings a group event forward, leaving you rushed to finish your preparations.' },
+
   {"name":"Health opens mental stability possibilities","description":"Feeling well lets you face a difficult day calmly; that steadiness starts to stick."},
   {"name":"Health opens mental stability challenges","description":"Repeated illness makes uncertainty harder to face; worry becomes harder to shake."},
   {"name":"Health opens attractiveness possibilities","description":"Feeling well helps you discover posture and grooming habits that suit you."},

@@ -1,4 +1,4 @@
-import { fameOpportunityChance, hasFame } from './fame.js?v=causal-stat-outcomes';
+import { fameOpportunityChance, hasFame } from './fame.js?v=deadline-effect';
 
 // Fictional encounters unlocked by public recognition. Rewards describe the
 // encounter itself; routine praise, inconvenience and money never imply a

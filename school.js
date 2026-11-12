@@ -1,5 +1,5 @@
-import { heightReference } from './growth.js?v=causal-stat-outcomes';
-import { fameActivityMatches } from './fame.js?v=causal-stat-outcomes';
+import { heightReference } from './growth.js?v=deadline-effect';
+import { fameActivityMatches } from './fame.js?v=deadline-effect';
 
 // Fictional school activities and success rules, independent of save mutation
 // and the gameplay RNG. The engine supplies effective ratings and any draw.
