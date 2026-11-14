@@ -1,8 +1,8 @@
-import { annualForecast, effectiveStats, needsEducationChoice, focusLimits, caregivers, JOBS } from './engine.js?v=parent-colors-events';
-import { infantChoiceEffects, wellbeingResponse, caregiverCryEffects, unemploymentFocusCoefficient, unemploymentStabilityChange, toddlerActivityEffects, toddlerActivityNeutral, toddlerActivitySteps, schoolFocusEffects, schoolFocusSteps, focusChoiceEffects, focusEffectStrength, standardFocusCoefficients, TODDLER_FOCUS, TODDLER_ACTIVITY_EFFECTS, PARENT_FAMILY_STABILITY_GAIN, PARENT_FAMILY_RELATIONSHIP_GAIN } from './development.js?v=parent-colors-events';
-import { DEFAULT_FOCUS, focusEffect, focusNeutralFor, isSchoolActivityFocus } from './focus-rules.js?v=parent-colors-events';
-import { changedRating } from './rating-changes.js?v=parent-colors-events';
-import { fameFocusKey } from './fame.js?v=parent-colors-events';
+import { annualForecast, effectiveStats, needsEducationChoice, focusLimits, caregivers, JOBS } from './engine.js?v=perk-affinity-overflow';
+import { infantChoiceEffects, wellbeingResponse, caregiverCryEffects, unemploymentFocusCoefficient, unemploymentStabilityChange, toddlerActivityEffects, toddlerActivityNeutral, toddlerActivitySteps, schoolFocusEffects, schoolFocusSteps, focusChoiceEffects, focusEffectStrength, standardFocusCoefficients, TODDLER_FOCUS, TODDLER_ACTIVITY_EFFECTS, PARENT_FAMILY_STABILITY_GAIN, PARENT_FAMILY_RELATIONSHIP_GAIN } from './development.js?v=perk-affinity-overflow';
+import { DEFAULT_FOCUS, focusEffect, focusNeutralFor, isSchoolActivityFocus } from './focus-rules.js?v=perk-affinity-overflow';
+import { changedRating } from './rating-changes.js?v=perk-affinity-overflow';
+import { fameFocusKey } from './fame.js?v=perk-affinity-overflow';
 
 const nonzero = value => Math.abs(value) > .000001;
 const keyOf = entry => `${entry.parentId || 'you'}:${entry.stat}`;

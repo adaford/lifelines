@@ -1,6 +1,6 @@
 // Ordinary, fictional experiences connecting causes to different consequences.
 // A definition has age-specific stories, rather than seven near-identical rolls.
-import { causalBridge } from './life-event-bridges.js?v=parent-colors-events';
+import { causalBridge } from './life-event-bridges.js?v=perk-affinity-overflow';
 export const LIFE_EVENT_STATS = ['intelligence', 'strength', 'attractiveness', 'social', 'creativity', 'health', 'stability', 'lifestyle'];
 export const LIFE_EVENT_STAGES = [
   { id: 'infant', min: 0, max: 1, place: 'At a baby group' },

@@ -1,4 +1,4 @@
-import { fameOpportunityChance, hasFame } from './fame.js?v=parent-colors-events';
+import { fameOpportunityChance, hasFame } from './fame.js?v=perk-affinity-overflow';
 
 // Fictional encounters unlocked by public recognition. Rewards describe the
 // encounter itself; routine praise, inconvenience and money never imply a

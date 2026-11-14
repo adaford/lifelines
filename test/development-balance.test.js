@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { naturalSkillRating, skillChanges, childhoodWellbeing, infantChoiceEffects, wellbeingResponse, TODDLER_FOCUS } from '../development.js';
+import { naturalSkillRating, skillChanges, childhoodWellbeing, infantChoiceEffects, wellbeingResponse, TODDLER_FOCUS, effectiveAptitude } from '../development.js';
+import { BIRTH_CONDITIONS, MAX_BIRTH_CONDITIONS, applyBirthConditions, aptitudeBounds } from '../birth-conditions.js';
 import { createGame, advanceYear, resolveEventChoice, EVENTS, effectiveStats, fitFocusAllocation, GENETICS_BALANCE } from '../engine.js';
 import { eventChances } from '../events.js';
 import { PERCENTILE_REFERENCE } from '../percentile-reference.js';
@@ -127,6 +128,34 @@ test('aptitude has a gentler influence on starting ratings, practice and routine
     assert.ok(Math.abs(wellbeingResponse(person, 'health', .2) - .05 * (1 + aptitude * .08)) < 1e-12);
     assert.ok(Math.abs(wellbeingResponse(person, 'health', -.2) + .05 * (1 - aptitude * .07)) < 1e-12);
   }
+});
+
+test('full perk affinities affect responses without reversing contributions at any permitted perk and Fame extreme', () => {
+  for (const key of ['intelligence', 'strength', 'social', 'creativity', 'attractiveness', 'health', 'stability']) {
+    for (const direction of [-1, 1]) {
+      const person = { age: 25, alive: true, aptitudes: { [key]: 3 * direction }, conditions:
+        BIRTH_CONDITIONS.filter(perk => perk.aptitudeChanges[key] === direction).slice(0, MAX_BIRTH_CONDITIONS).map(perk => perk.id) };
+      applyBirthConditions(person);
+      const bounds = aptitudeBounds(person, key);
+      assert.equal(person.aptitudes[key], direction < 0 ? bounds.min : bounds.max);
+      assert.equal(person.aptitudes[key], direction * 8);
+      for (const famous of [false, true]) {
+        if (famous) person.fame = { kind: 'personal', activityId: null, rating: 5, support: 0, startedAge: 18 };
+        const aptitude = effectiveAptitude(person, key);
+        assert.equal(aptitude, person.aptitudes[key] + (famous && key === 'social' ? 5 : 0));
+        const before = structuredClone(person);
+        const gain = wellbeingResponse(person, key, .2, 1), loss = wellbeingResponse(person, key, -.2, 1);
+        assert.ok(Math.abs(gain - .2 * (1 + aptitude * .08)) < 1e-12);
+        assert.ok(Math.abs(loss + .2 * (1 - aptitude * .07)) < 1e-12);
+        assert.ok(gain > 0 && loss < 0, `${key}/${aptitude}: affinity changes magnitude, never direction`);
+        assert.equal(wellbeingResponse(person, key, 0, 1), 0, 'aptitude supplies no independent contribution');
+        assert.deepEqual(person, before);
+      }
+    }
+  }
+  const supported = { aptitudes: { health: 4 } }, naturalLimit = { aptitudes: { health: 3 } };
+  assert.ok(wellbeingResponse(supported, 'health', .2) > wellbeingResponse(naturalLimit, 'health', .2), '+4 retains its extra benefit');
+  assert.ok(wellbeingResponse(supported, 'health', -.2) > wellbeingResponse(naturalLimit, 'health', -.2), '+4 retains its extra protection');
 });
 
 test('childhood wellbeing stays unchanged at low and high ratings without a cause', () => {

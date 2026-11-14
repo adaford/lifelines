@@ -11,6 +11,9 @@ function legacyFocusFixture(value) {
   }
 }
 function removeNewFocusMetadata(value) {
+  // Synthetic pre-20 fixtures cannot contain modern perk overflow. Restore
+  // the old stored-affinity contract when explicitly constructing old data.
+  if (value.aptitudes) for (const key of Object.keys(value.aptitudes)) value.aptitudes[key] = Math.max(-3, Math.min(3, value.aptitudes[key]));
   // Explicit downgrade helpers also restore the four-area school format in
   // recorded decisions. Production migrations must preserve those old reviews.
   if (value.focus) { delete value.focus.sports; delete value.focus.extracurricular; }

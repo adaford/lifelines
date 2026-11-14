@@ -8,6 +8,8 @@ function toddler() {
   const state = createGame({ seed: 13579 });
   state.age = 3;
   state.conditions = [];
+  // Removing the fixture's perks also removes support for any birth overflow.
+  for (const key of Object.keys(state.aptitudes)) state.aptitudes[key] = Math.max(-3, Math.min(3, state.aptitudes[key]));
   state.focus = { work: 2, social: 2, family: 2, self: 2, creative: 2 };
   return state;
 }

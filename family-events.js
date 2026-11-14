@@ -1,7 +1,7 @@
-import { legacyFocusValue } from './focus-rules.js?v=parent-colors-events';
-import { gradeScore } from './school.js?v=parent-colors-events';
-import { boostLowStatRates } from './event-rates.js?v=parent-colors-events';
-import { LIFE_FAMILY_EVENTS } from './life-events.js?v=parent-colors-events';
+import { legacyFocusValue } from './focus-rules.js?v=perk-affinity-overflow';
+import { gradeScore } from './school.js?v=perk-affinity-overflow';
+import { boostLowStatRates } from './event-rates.js?v=perk-affinity-overflow';
+import { LIFE_FAMILY_EVENTS } from './life-events.js?v=perk-affinity-overflow';
 // Fictional household events. Subject changes affect the named person; player
 // changes affect you. Relationship changes affect your bond with that person.
 // Individual rolls join the ordinary event pool and share its five-event cap.

@@ -1,6 +1,6 @@
-import { conditionFocusPoints } from './birth-conditions.js?v=parent-colors-events';
-import { fameFocusKey, fameActivityMatches } from './fame.js?v=parent-colors-events';
-import { currentSchoolEnrollment } from './school.js?v=parent-colors-events';
+import { conditionFocusPoints } from './birth-conditions.js?v=perk-affinity-overflow';
+import { fameFocusKey, fameActivityMatches } from './fame.js?v=perk-affinity-overflow';
+import { currentSchoolEnrollment } from './school.js?v=perk-affinity-overflow';
 
 // One shared allocation scale for all playable focus stages.
 export const MAX_FOCUS = 4;

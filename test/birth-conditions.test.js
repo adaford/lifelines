@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { BIRTH_CONDITIONS, ACTIVE_BIRTH_CONDITIONS, MAX_BIRTH_CONDITIONS,
   INHERITANCE_CHANCE_BOOST_PER_PARENT, LEGACY_INHERITANCE_CHANCE_PER_PARENT, LEGACY_INHERITANCE_SUCCESSORS,
-  generateBirthConditions, assignBirthConditions, applyBirthConditions, validateBirthConditions } from '../birth-conditions.js';
+  generateBirthConditions, assignBirthConditions, applyBirthConditions, validateBirthConditions, perkAffinityBonus, aptitudeBounds } from '../birth-conditions.js';
 import { createGame, advanceYear, chooseEducation, resolveEventChoice, EVENTS, haveChild, focusLimits, focusLimitDetails, setFocus, validateSave, migrateSave, successionInfo, succeed } from '../engine.js';
 import { defaultFocus, focusBudget, fitFocusBudget } from '../focus-rules.js';
 import { createSchoolRecord } from '../school.js';
@@ -88,28 +88,47 @@ test('every birth condition affects affinities without writing to ratings or oth
   }
 });
 
-test('affinity changes stack once, cancel before clamping, and remain within integer limits', () => {
+test('affinity changes stack once beyond natural bounds and opposing perks cancel before addition', () => {
   const gifted = { stats: stats(), aptitudes: { ...aptitudes(), intelligence: 2 },
     conditions: ['quick_learner', 'sharp_memory', 'curious_mind'] };
   applyBirthConditions(gifted);
-  assert.equal(gifted.aptitudes.intelligence, 3, 'overlapping positive affinities stop at +3');
+  assert.equal(gifted.aptitudes.intelligence, 5, 'all three positive perks add to the natural +2');
   assert.equal(gifted.aptitudes.creativity, 1);
   assert.deepEqual(gifted.stats, stats());
   const vulnerable = { stats: stats(), aptitudes: { ...aptitudes(), health: -2 },
     conditions: ['delicate_constitution', 'low_appetite', 'low_endurance'] };
   applyBirthConditions(vulnerable);
-  assert.equal(vulnerable.aptitudes.health, -3, 'overlapping negative affinities stop at -3');
+  assert.equal(vulnerable.aptitudes.health, -5, 'all three negative perks add to the natural -2');
   assert.equal(vulnerable.aptitudes.strength, -2);
   assert.deepEqual(vulnerable.stats, stats());
   const balanced = { stats: stats(), aptitudes: { ...aptitudes(), intelligence: 3 }, conditions: ['sharp_memory', 'forgetful'] };
   const reversed = { ...clone(balanced), conditions: [...balanced.conditions].reverse() };
   applyBirthConditions(balanced);
   applyBirthConditions(reversed);
-  assert.equal(balanced.aptitudes.intelligence, 3, 'opposing affinities cancel before the upper bound is applied');
+  assert.equal(balanced.aptitudes.intelligence, 3, 'opposing affinities cancel before addition');
   assert.deepEqual(balanced.aptitudes, reversed.aptitudes, 'condition ordering does not change the result');
   const assigned = clone(gifted);
   assignBirthConditions(gifted, 8, [{ conditions: ['autism'] }]);
   assert.deepEqual(gifted, assigned, 'an already assigned person never receives the shifts again');
+});
+
+test('perk affinity bounds extend only the net bonus side and preserve old natural-range totals', () => {
+  for (const [conditions, key, bonus, expected] of [
+    [['robust_constitution'], 'health', 1, { min: -3, max: 4 }],
+    [['delicate_constitution'], 'health', -1, { min: -4, max: 3 }],
+    [['sharp_memory', 'forgetful'], 'intelligence', 0, { min: -3, max: 3 }],
+    [['quick_learner', 'sharp_memory', 'forgetful'], 'intelligence', 1, { min: -3, max: 4 }],
+    [[], 'social', 0, { min: -3, max: 3 }],
+  ]) {
+    const person = { conditions, aptitudes: { [key]: 3 }, rng: 123 }, before = clone(person);
+    assert.equal(perkAffinityBonus(person, key), bonus);
+    assert.deepEqual(aptitudeBounds(person, key), expected);
+    assert.ok(expected.min <= -3 && expected.max >= 3, 'old clipped totals remain valid');
+    assert.deepEqual(person, before, 'reading bounds never reapplies birth perks');
+  }
+  const robust = { aptitudes: { health: 3 }, conditions: ['robust_constitution'] };
+  applyBirthConditions(robust);
+  assert.equal(robust.aptitudes.health, 4);
 });
 
 test('condition bonuses and lifelong limits apply to focus actions and coexist with temporary limits', () => {
@@ -193,13 +212,16 @@ test('succession keeps the chosen childs conditions and applies their budget wit
   assert.equal(haveChild(state).ok, true);
   const heir = state.children[0];
   heir.conditions = ['autism', 'high_energy'];
+  heir.aptitudes = { ...aptitudes(), intelligence: 4 };
   heir.age = 6;
   const before = clone(heir.stats);
+  const beforeAptitudes = clone(heir.aptitudes);
   state.age = 65;
   state.yearSummary = null;
   assert.equal(succeed(state, heir.id).ok, true);
   assert.deepEqual(state.conditions, ['autism', 'high_energy']);
   assert.deepEqual(state.stats, before);
+  assert.deepEqual(state.aptitudes, beforeAptitudes, 'succession retains the chosen perk total without applying it again');
   assert.equal(focusBudget(state), 11);
   assert.equal(state.focus.social, 1);
   assert.equal(validateSave(state), true);
@@ -228,7 +250,10 @@ test('older saves receive empty condition lists without changing existing rating
     if (value.stats && value.aptitudes) action(value);
     for (const child of Object.values(value)) visit(child, action);
   };
-  visit(state, person => { delete person.conditions; });
+  visit(state, person => {
+    delete person.conditions;
+    for (const key of Object.keys(person.aptitudes)) person.aptitudes[key] = Math.max(-3, Math.min(3, person.aptitudes[key]));
+  });
   const before = clone(state);
   const loaded = migrateSave(state);
   assert.ok(loaded);

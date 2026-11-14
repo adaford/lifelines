@@ -1,6 +1,6 @@
-import { MAX_FOCUS, DEFAULT_FOCUS, focusEffect, defaultFocus, focusMaxFor, focusNeutralFor, isSchoolActivityFocus } from './focus-rules.js?v=parent-colors-events';
-import { currentSchoolActivity, currentSchoolEnrollment, activityEligible } from './school.js?v=parent-colors-events';
-import { fameFocusKey, fameActivityMatches, fameLearningBonus } from './fame.js?v=parent-colors-events';
+import { MAX_FOCUS, DEFAULT_FOCUS, focusEffect, defaultFocus, focusMaxFor, focusNeutralFor, isSchoolActivityFocus } from './focus-rules.js?v=perk-affinity-overflow';
+import { currentSchoolActivity, currentSchoolEnrollment, activityEligible } from './school.js?v=perk-affinity-overflow';
+import { fameFocusKey, fameActivityMatches, fameLearningBonus } from './fame.js?v=perk-affinity-overflow';
 // Ratings use the same scale throughout life. Balanced toddler activities use
 // TODDLER_FOCUS; core areas use 2, enrolled school activities use 1.
 // Existing ratings change only through practice, care, events, or aging.
@@ -21,7 +21,7 @@ const number = (value, fallback) => Number.isFinite(value) ? value : fallback;
 const skills = ['intelligence', 'strength', 'social', 'creativity'];
 const skillFlexibility = age => age < 18 ? 1.15 : age < 40 ? 1 : age < 60 ? .85 : .65;
 // Fame changes current learning response, never a person's stored natural aptitude.
-export const effectiveAptitude = (person, stat) => clamp(number(person.aptitudes?.[stat], 0), -3, 3) + fameLearningBonus(person, stat);
+export const effectiveAptitude = (person, stat) => number(person.aptitudes?.[stat], 0) + fameLearningBonus(person, stat);
 
 export const TODDLER_FOCUS = defaultFocus(2);
 // Scale only yearly decision contributions, leaving natural development,

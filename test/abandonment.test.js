@@ -76,6 +76,8 @@ test('zero ratings survive saves, effective modifiers and full-range review delt
 
 test('schema 14 migration adapts focus and keeps its original rating-floor contract', () => {
   const previous = child();
+  // This synthetic old save must use the historical stored-affinity interval.
+  for (const person of [previous, ...previous.parents]) for (const key of Object.keys(person.aptitudes)) person.aptitudes[key] = Math.max(-3, Math.min(3, person.aptitudes[key]));
   previous.version = 14;
   delete previous.guardian;
   for (const parent of previous.parents) { parent.stats.stability = 1.25; parent.relationship = 1.5; }

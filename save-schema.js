@@ -1,16 +1,16 @@
 // Read-only validation for current and legacy saves. Migration stays in the
 // engine, where it can use the same generation and progression rules.
-import { JOBS } from './jobs.js?v=parent-colors-events';
-import { EVENTS as PERSONAL_EVENTS } from './events.js?v=parent-colors-events';
-import { FAMILY_EVENTS } from './family-events.js?v=parent-colors-events';
-import { FAME_EVENTS } from './fame-events.js?v=parent-colors-events';
-import { MAX_FOCUS, DEFAULT_FOCUS, SCHOOL_FOCUS_KEYS, focusMaxFor, focusBudget } from './focus-rules.js?v=parent-colors-events';
-import { SCHOOL_OFFER_COUNT, MAX_SCHOOL_OFFERS, schoolActivity, currentSchoolEnrollment } from './school.js?v=parent-colors-events';
-import { conditionFocusPoints, conditionFocusLimits, validateBirthConditions } from './birth-conditions.js?v=parent-colors-events';
-import { gestatingActor } from './relationships.js?v=parent-colors-events';
-import { COLLEGES, COLLEGE_BALANCE, collegeById } from './college.js?v=parent-colors-events';
-import { HOUSING_BALANCE } from './housing.js?v=parent-colors-events';
-import { MAX_RESOURCES } from './lifestyle.js?v=parent-colors-events';
+import { JOBS } from './jobs.js?v=perk-affinity-overflow';
+import { EVENTS as PERSONAL_EVENTS } from './events.js?v=perk-affinity-overflow';
+import { FAMILY_EVENTS } from './family-events.js?v=perk-affinity-overflow';
+import { FAME_EVENTS } from './fame-events.js?v=perk-affinity-overflow';
+import { MAX_FOCUS, DEFAULT_FOCUS, SCHOOL_FOCUS_KEYS, focusMaxFor, focusBudget } from './focus-rules.js?v=perk-affinity-overflow';
+import { SCHOOL_OFFER_COUNT, MAX_SCHOOL_OFFERS, schoolActivity, currentSchoolEnrollment } from './school.js?v=perk-affinity-overflow';
+import { conditionFocusPoints, conditionFocusLimits, validateBirthConditions, aptitudeBounds } from './birth-conditions.js?v=perk-affinity-overflow';
+import { gestatingActor } from './relationships.js?v=perk-affinity-overflow';
+import { COLLEGES, COLLEGE_BALANCE, collegeById } from './college.js?v=perk-affinity-overflow';
+import { HOUSING_BALANCE } from './housing.js?v=perk-affinity-overflow';
+import { MAX_RESOURCES } from './lifestyle.js?v=perk-affinity-overflow';
 
 // Inject engine-owned helpers rather than importing the engine back here.
 // Keeping these references shared prevents validation rules from drifting.
@@ -50,14 +50,19 @@ export function createSaveValidator({
       const effectiveCeiling = version >= 16 ? 10 + effectCapacity * modifierMagnitude : 10;
       const validLifestyle = value => finite(value, effectiveFloor, effectiveCeiling) && (version >= 13 || Number.isInteger(value));
       const aptitudeKeys = version >= 12 ? STAT_KEYS : coreKeys;
-      const validAptitudes = aptitude => aptitude && Object.keys(aptitude).length === aptitudeKeys.length && aptitudeKeys.every(key => Number.isInteger(aptitude[key]) && finite(aptitude[key], -3, 3));
+      const validAptitudes = person => person.aptitudes && Object.keys(person.aptitudes).length === aptitudeKeys.length && aptitudeKeys.every(key => {
+        // Only current saves can contain an earned perk overflow. Retain the
+        // full historical -3..3 interval so old clipped totals load unchanged.
+        const bounds = version >= 20 ? aptitudeBounds(person, key) : { min: -3, max: 3 };
+        return Number.isInteger(person.aptitudes[key]) && finite(person.aptitudes[key], bounds.min, bounds.max);
+      });
       const validGeneration = value => Number.isInteger(value) && finite(value, 1, 100000);
       const genders = ['male', 'female', 'nonbinary'];
       const validIdentity = person => genders.includes(person.gender) && typeof person.canGestate === 'boolean' && Array.isArray(person.attractedTo) && person.attractedTo.length > 0 && person.attractedTo.length <= 3 && new Set(person.attractedTo).size === person.attractedTo.length && person.attractedTo.every(gender => genders.includes(gender)) && Number.isInteger(person.appearancePeakAge) && finite(person.appearancePeakAge, version >= 8 ? 22 : 27, 33);
       const validAdultHeight = person => version >= 9 ? (person.adultHeight === null && person.age < (person.maturityAge ?? 18) || finite(person.adultHeight, heightBound(40), heightBound(240))) : finite(person.adultHeight, 145, 205);
       const validGrowth = person => ['male','female'].includes(person.growthSex) && Number.isInteger(person.maturityAge) && finite(person.maturityAge, 14, 18) && finite(person.birthHeight, heightBound(40), heightBound(60)) && validAdultHeight(person) && (version < 9 || finite(person.growthFactor, .8, 1.2)) && (person.growthAnchor === null || person.growthAnchor && Number.isInteger(person.growthAnchor.age) && finite(person.growthAnchor.age, 0, person.age) && finite(person.growthAnchor.height, heightBound(40), heightBound(210)));
       const validDeath = person => person.death === undefined || person.death === null || person.alive === false && ['disease', 'accident'].includes(person.death.cause) && person.death.age === person.age;
-      const validPerson = person => person && text(person.id, 100) && text(person.name, 50) && Number.isInteger(person.age) && finite(person.age, 0, version >= 7 ? 200 : 120) && finite(person.height, heightBound(40), heightBound(version >= 9 ? 240 : 210)) && validStats(person.stats) && validAptitudes(person.aptitudes) && validPersonFame(person) && (version < 17 || validateBirthConditions(person.conditions)) && (version === 1 || validLifestyle(person.lifestyle)) && (person.adopted === undefined || typeof person.adopted === 'boolean') && (version < 5 || validIdentity(person)) && (version < 6 || text(person.familyName, 30) && normalizeSurname(person.familyName) === person.familyName) && (version < 7 || validDeath(person));
+      const validPerson = person => person && text(person.id, 100) && text(person.name, 50) && Number.isInteger(person.age) && finite(person.age, 0, version >= 7 ? 200 : 120) && finite(person.height, heightBound(40), heightBound(version >= 9 ? 240 : 210)) && validStats(person.stats) && validAptitudes(person) && validPersonFame(person) && (version < 17 || validateBirthConditions(person.conditions)) && (version === 1 || validLifestyle(person.lifestyle)) && (person.adopted === undefined || typeof person.adopted === 'boolean') && (version < 5 || validIdentity(person)) && (version < 6 || text(person.familyName, 30) && normalizeSurname(person.familyName) === person.familyName) && (version < 7 || validDeath(person));
       if (!validPerson(raw) || raw.age > 85 || !Number.isInteger(raw.generation) || !finite(raw.generation, 1, 100000)) return false;
       if (raw.householdEventBase !== undefined && (version < 20 || !validLifestyle(raw.householdEventBase))) return false;
       if (raw.economyVersion !== undefined && raw.economyVersion !== 1) return false;

@@ -1,36 +1,36 @@
 // Lifelines: deterministic, browser-independent simulation rules.
 // All public actions mutate their state and return { ok, reason? }.
-import { createSaveValidator } from './save-schema.js?v=parent-colors-events';
-import { JOBS } from './jobs.js?v=parent-colors-events';
-import { careerFit, careerYear } from './career-rules.js?v=parent-colors-events';
-import { collegeById, createCollegeOffers, collegeGradeScore, graduateJobOffers } from './college.js?v=parent-colors-events';
-import { collegeSportSuccessAfterYear, collegeSportFameChance, professionalSportChance } from './college-sports.js?v=parent-colors-events';
-import { HOUSING_BALANCE, nextHousing, housingLifestyle, housingChanges } from './housing.js?v=parent-colors-events';
-import { MAX_RESOURCES, lifestyleFromResources, changedLifestyle } from './lifestyle.js?v=parent-colors-events';
-import { GENETICS_BALANCE, inheritRatings, inheritAffinities, inheritedGrowthFactor } from './genetics.js?v=parent-colors-events';
+import { createSaveValidator } from './save-schema.js?v=perk-affinity-overflow';
+import { JOBS } from './jobs.js?v=perk-affinity-overflow';
+import { careerFit, careerYear } from './career-rules.js?v=perk-affinity-overflow';
+import { collegeById, createCollegeOffers, collegeGradeScore, graduateJobOffers } from './college.js?v=perk-affinity-overflow';
+import { collegeSportSuccessAfterYear, collegeSportFameChance, professionalSportChance } from './college-sports.js?v=perk-affinity-overflow';
+import { HOUSING_BALANCE, nextHousing, housingLifestyle, housingChanges } from './housing.js?v=perk-affinity-overflow';
+import { MAX_RESOURCES, lifestyleFromResources, changedLifestyle } from './lifestyle.js?v=perk-affinity-overflow';
+import { GENETICS_BALANCE, inheritRatings, inheritAffinities, inheritedGrowthFactor } from './genetics.js?v=perk-affinity-overflow';
 export { GENETICS_BALANCE };
 export { lifestyleFromResources };
-import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=parent-colors-events';
-import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=parent-colors-events';
-import { FAME_EVENTS, fameEventChances } from './fame-events.js?v=parent-colors-events';
-import { hasFame, fameFocusKey, fameActivityMatches, fameStartingRating, fameNextRating, fameLossChance, fameLifestyleBonus } from './fame.js?v=parent-colors-events';
-import { eventStatCause } from './event-causes.js?v=parent-colors-events';
-import { eventDescriptionAtAge } from './life-events.js?v=parent-colors-events';
-import { mortalityRisk, rollMortality } from './mortality.js?v=parent-colors-events';
-import { heightReference, advanceGrowth } from './growth.js?v=parent-colors-events';
-import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=parent-colors-events';
-import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, caregiverCryEffects, unemploymentStabilityChange, standardFocusPractice, schoolAppearanceChange, DEVELOPMENT_BALANCE, BIRTH_VARIATION, SKILL_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, PARENT_FAMILY_STABILITY_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=parent-colors-events';
-import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=parent-colors-events';
-import { normalPercentile } from './percentiles.js?v=parent-colors-events';
-import { changedRating } from './rating-changes.js?v=parent-colors-events';
-import { MAX_FOCUS, DEFAULT_FOCUS, focusMaxFor, focusNeutralFor, isSchoolActivityFocus, focusEffect, focusKeysForAge, focusBudget, temporaryFocusPoints, defaultFocus, legacyFocusValue } from './focus-rules.js?v=parent-colors-events';
-import { SCHOOL_OFFER_COUNT, schoolActivity, currentSchoolEnrollment, currentSchoolActivity, gradeScore, gradeLetter, activityGradeLetter, activitySuccessAfterYear, activityEligible, annualSchoolOffers, createSchoolRecord } from './school.js?v=parent-colors-events';
-import { assignBirthConditions, applyBirthConditions, getBirthConditions, conditionFocusLimits } from './birth-conditions.js?v=parent-colors-events';
+import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=perk-affinity-overflow';
+import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=perk-affinity-overflow';
+import { FAME_EVENTS, fameEventChances } from './fame-events.js?v=perk-affinity-overflow';
+import { hasFame, fameFocusKey, fameActivityMatches, fameStartingRating, fameNextRating, fameLossChance, fameLifestyleBonus } from './fame.js?v=perk-affinity-overflow';
+import { eventStatCause } from './event-causes.js?v=perk-affinity-overflow';
+import { eventDescriptionAtAge } from './life-events.js?v=perk-affinity-overflow';
+import { mortalityRisk, rollMortality } from './mortality.js?v=perk-affinity-overflow';
+import { heightReference, advanceGrowth } from './growth.js?v=perk-affinity-overflow';
+import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=perk-affinity-overflow';
+import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, caregiverCryEffects, unemploymentStabilityChange, standardFocusPractice, schoolAppearanceChange, DEVELOPMENT_BALANCE, BIRTH_VARIATION, SKILL_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, PARENT_FAMILY_STABILITY_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=perk-affinity-overflow';
+import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=perk-affinity-overflow';
+import { normalPercentile } from './percentiles.js?v=perk-affinity-overflow';
+import { changedRating } from './rating-changes.js?v=perk-affinity-overflow';
+import { MAX_FOCUS, DEFAULT_FOCUS, focusMaxFor, focusNeutralFor, isSchoolActivityFocus, focusEffect, focusKeysForAge, focusBudget, temporaryFocusPoints, defaultFocus, legacyFocusValue } from './focus-rules.js?v=perk-affinity-overflow';
+import { SCHOOL_OFFER_COUNT, schoolActivity, currentSchoolEnrollment, currentSchoolActivity, gradeScore, gradeLetter, activityGradeLetter, activitySuccessAfterYear, activityEligible, annualSchoolOffers, createSchoolRecord } from './school.js?v=perk-affinity-overflow';
+import { assignBirthConditions, applyBirthConditions, getBirthConditions, conditionFocusLimits, aptitudeBounds } from './birth-conditions.js?v=perk-affinity-overflow';
 export { DEVELOPMENT_BALANCE };
-export { heightPercentile } from './growth.js?v=parent-colors-events';
-export { mortalityRisk } from './mortality.js?v=parent-colors-events';
-import { datingPotential as datingPotentialRules, meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=parent-colors-events';
-export { JOBS, JOB_CATEGORIES } from './jobs.js?v=parent-colors-events';
+export { heightPercentile } from './growth.js?v=perk-affinity-overflow';
+export { mortalityRisk } from './mortality.js?v=perk-affinity-overflow';
+import { datingPotential as datingPotentialRules, meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=perk-affinity-overflow';
+export { JOBS, JOB_CATEGORIES } from './jobs.js?v=perk-affinity-overflow';
 export const EVENTS = [...PERSONAL_EVENTS, ...FAMILY_EVENTS, ...FAME_EVENTS];
 const EVENT_BY_ID = new Map(EVENTS.map(event => [event.id, event]));
 
@@ -838,7 +838,10 @@ function applyOutcome(state, event, outcome = event, context = {}) {
   }
   for (const [key, amount] of Object.entries(permanent)) addStat(state, key, amount);
   for (const [key, amount] of Object.entries(outcome.aptitudeChanges || {})) {
-    if (STAT_KEYS.includes(key) && Number.isInteger(amount)) state.aptitudes[key] = clamp(state.aptitudes[key] + amount, -3, 3);
+    if (STAT_KEYS.includes(key) && Number.isInteger(amount)) {
+      const { min, max } = aptitudeBounds(state, key);
+      state.aptitudes[key] = clamp(state.aptitudes[key] + amount, min, max);
+    }
   }
   if (subject && subject !== state) {
     for (const [key, amount] of Object.entries(outcome.subjectChanges || {})) addStat(subject, key, amount);
@@ -1500,7 +1503,12 @@ function upgradeSchoolRecord(state) {
 function upgradePerkAffinities(state) {
   const people = [state, ...state.parents, state.guardian, ...state.children,
     ...state.siblings, state.partner, ...state.encounters, state.pregnancy?.otherParent];
-  for (const person of people.filter(Boolean)) applyBirthConditions(person);
+  for (const person of people.filter(Boolean)) {
+    applyBirthConditions(person);
+    // Preserve the original pre-20 migration. Lost historical overflow cannot
+    // be reconstructed; already-current saves are returned unchanged above.
+    for (const key of Object.keys(person.aptitudes)) person.aptitudes[key] = clamp(person.aptitudes[key], -3, 3);
+  }
 }
 
 export function migrateSave(raw) {

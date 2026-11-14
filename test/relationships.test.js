@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { desirability, meetingChances, prospectQuality, relationshipOdds, oneNightChance, proposalChance, pregnancyChance, gestatingActor, appearanceDeclineAge, attractivenessAgeChange, createProspects } from '../relationships.js';
+import { aptitudeBounds } from '../birth-conditions.js';
 
 const core = ['intelligence', 'strength', 'attractiveness', 'social', 'creativity'];
 const traits = [...core, 'health', 'stability'];
@@ -91,7 +92,10 @@ test('prospect generation is deterministic, bounded, adult-only, and supports fu
     assert.deepEqual(Object.keys(person.stats),traits);
     assert.ok(Object.values(person.stats).every(value=>value>=0 && value<=10));
     assert.deepEqual(Object.keys(person.aptitudes),traits);
-    assert.ok(Object.values(person.aptitudes).every(value=>Number.isInteger(value) && value>=-3 && value<=3));
+    assert.ok(Object.entries(person.aptitudes).every(([key,value])=>{
+      const { min, max } = aptitudeBounds(person,key);
+      return Number.isInteger(value) && value>=min && value<=max;
+    }));
     assert.equal(person.appearancePeakAge,22);
     assert.equal(person.gender,'female');assert.equal(person.canGestate,true);
   }

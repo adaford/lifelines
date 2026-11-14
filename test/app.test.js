@@ -76,7 +76,8 @@ test('health, appearance, growth, crying, and household help contain the request
     ui.click(`.nav-list [data-tab="${'year'}"]`);
     ui.click(`[data-topic="${topic}"]`);
     assert.match(ui.query('.help-popup').textContent,content);
-    assert.ok(ui.query('.modal-body').textContent.split(/\s+/).length<60,`${topic} help should stay brief`);
+    assert.ok(ui.query('.modal-body').textContent.split(/\s+/).length<100,`${topic} help should stay brief, including the affinity explanation`);
+    assert.ok(ui.all('.modal-body p').every(paragraph=>paragraph.textContent.split(/\s+/).length<60),`${topic} help paragraphs should stay brief`);
     if(['strength','health','attractiveness'].includes(topic)) {
       assert.match(ui.query('.help-popup').textContent,/Changes need activity, care, events or aging/);
       assert.match(ui.query('.help-popup').textContent,/Low ratings amplify existing gains without creating them/);
@@ -1149,6 +1150,7 @@ test('a focus-only choice previews signed whole points and duration without chan
 test('pending choices and active effects render one escaped effect per line with explicit focus cap labels', async () => {
   const fixture=ageTo(createGame({seed:78124}),3);
   fixture.conditions=[]; fixture.focus={work:1,social:2,family:2,self:2,creative:2};
+  clampFixtureAffinitiesToBase(fixture);
   fixture.effects=[{id:'saved-recovery-lines',name:'Recovery <img src=x>',description:'A saved restriction.',years:2,kind:'negative',modifiers:{health:-.4,intelligence:.5},focusPoints:-1,focusLimits:{toddler:{work:1,social:2}}}];
   fixture.pendingEvents=[{eventId:'broken_tablet',age:fixture.age}]; fixture.lastYearEvents=['broken_tablet'];
   const choice=EVENTS.find(event=>event.id==='broken_tablet').choices[0],original=structuredClone(choice);
@@ -1181,6 +1183,7 @@ test('pending choices and active effects render one escaped effect per line with
 test('study headaches show a reduced budget for one full turn and preserve recorded outcomes after expiry', async () => {
   const initial=createGame({seed:78124});
   initial.age=10; initial.conditions=[]; initial.effects=[];
+  clampFixtureAffinitiesToBase(initial);
   initial.school=createSchoolRecord(initial);
   initial.focus={work:4,social:2,family:2,self:2,sports:0,extracurricular:0};
   const steady={mortalityRandom:()=>1,growthRandom:()=>0,parentCareerRandom:()=>1};
@@ -1349,6 +1352,12 @@ function ageTo(state, age) {
   if(state.yearSummary) state.yearSummary.dismissed=true;
   assert.equal(validateSave(state), true, 'fixture must be a valid loadable save');
   return state;
+}
+
+// Tests that replace birth perks cannot retain overflow supported only by the
+// removed perks. Keep their existing base-range affinities and other fields.
+function clampFixtureAffinitiesToBase(person) {
+  for(const key of Object.keys(person.aptitudes)) person.aptitudes[key]=Math.max(-3,Math.min(3,person.aptitudes[key]));
 }
 
 function fundCollegeOptions(state) {
@@ -4253,6 +4262,54 @@ test('toddler and family effects retain their point curves and crafts Intelligen
   }
 });
 
+test('perk affinity totals beyond the base range stay visible on player, dating and family profiles across reloads', async () => {
+  for(const fixture of [encounterFixture(),partnerFixture()]) {
+    const other=fixture.partner || fixture.encounters[0];
+    const people=[fixture,fixture.parents[0],other];
+    for(const person of people) {
+      person.conditions=['physical_resilience','stress_reactivity'];
+      for(const key of Object.keys(person.aptitudes)) person.aptitudes[key]=0;
+      person.aptitudes.health=4;
+      person.aptitudes.stability=-4;
+    }
+    fixture.focus=defaultFocus(fixture);
+    fixture.yearSummary=null;
+    assert.equal(validateSave(fixture),true,'perk contributions permit these saved affinity totals');
+    const assertBadge=(badge,value,label)=>{
+      assert.equal(badge.textContent,value>0?`+${value}`:String(value));
+      assert.equal(badge.getAttribute('aria-label'),`${label} ${value>0?'+':''}${value}`);
+      assert.equal(badge.getAttribute('title'),badge.getAttribute('aria-label'));
+      assert.ok(badge.classList.contains(value>0?'positive':'negative'));
+    };
+    for(let load=0;load<2;load++) {
+      const ui=await mount(fixture),writes=ui.writes();
+      assert.deepEqual(ui.saved(),fixture,'loading must preserve the total without reapplying or clipping perks');
+      assertBadge(ui.query('.status-strip [data-stat="health"] .aptitude'),4,'Natural aptitude');
+      assertBadge(ui.query('.status-strip [data-stat="stability"] .aptitude'),-4,'Natural aptitude');
+      assert.equal(ui.all('.status-strip [data-stat="intelligence"] .aptitude').length,0,'neutral affinity remains hidden');
+      assert.equal(ui.query('.profile-bar [data-condition-id="physical_resilience"] .birth-condition-effect').textContent,'+1 Health affinity','the perk shows its contribution, not the +4 total');
+      ui.click('.status-strip [data-topic="health"]');
+      assert.match(ui.query('.help-popup').textContent,/affinity badge already includes perk effects/);
+      assert.match(ui.query('.help-popup').textContent,/Generated base aptitude ranges from −3 to \+3; perks can take the total beyond that range/);
+      assert.match(ui.query('.help-popup').textContent,/Each perk lists only its own contribution/);
+      ui.click('.help-popup [data-action="close"]');
+      ui.click('.nav-list [data-tab="family"]');
+      for(const person of [fixture.parents[0],other]) {
+        const card=ui.query(`[data-person-id="${person.id}"]`);
+        assertBadge(card.querySelector('[data-skill="health"] .aptitude'),4,'Health natural aptitude');
+        assertBadge(card.querySelector('[data-skill="stability"] .aptitude'),-4,'Mental stability natural aptitude');
+        assert.equal(card.querySelector('[data-condition-id="physical_resilience"] .birth-condition-effect').textContent,'+1 Health affinity');
+        assert.equal(card.querySelector('[data-condition-id="stress_reactivity"] .birth-condition-effect').textContent,'-1 Mental stability affinity');
+        ui.click(`[data-person-id="${person.id}"] [data-topic="health"]`);
+        assert.match(ui.query('.help-popup').textContent,/affinity badge already includes perk effects/);
+        ui.click('.help-popup [data-action="close"]');
+      }
+      assert.deepEqual(ui.saved(),fixture,'viewing profiles and help must preserve ratings, affinities, history and RNG');
+      assert.equal(ui.writes(),writes);
+    }
+  }
+});
+
 test('perks show separate named rows and affinity effects across Year and family profiles without changing saves', async () => {
   const fixture=partnerFixture();
   assert.equal(haveChild(fixture).ok,true);
@@ -4361,6 +4418,8 @@ test('dating prospects show their own perk rows and perk-free profiles stay comp
   fixture.conditions=[];
   fixture.encounters[0].conditions=['autism','literal_thinker'];
   fixture.encounters[1].conditions=[];
+  for(const person of [fixture,...fixture.encounters.slice(0,2)]) clampFixtureAffinitiesToBase(person);
+  assert.equal(validateSave(fixture),true,'replacing perks must leave a valid constructed profile');
   const ui=await mount(fixture),saved=ui.saved();
   assert.equal(ui.all('.profile-bar .birth-conditions').length,0);
   ui.click('.nav-list [data-tab="family"]');
@@ -4378,6 +4437,7 @@ test('dating prospects show their own perk rows and perk-free profiles stay comp
 test('stacked capacity and minimum effects show their signed amounts and constrain controls without saving on reads', async () => {
   const fixture=createGame({seed:78124});
   fixture.age=3; fixture.conditions=[]; fixture.focus={work:2,social:1,family:3,self:2,creative:2};
+  clampFixtureAffinitiesToBase(fixture);
   const effect=(id,extra)=>({id,name:id,description:'',years:1,modifiers:{},kind:'neutral',...extra});
   fixture.effects=[
     effect('First delay',{focusCapacity:{toddler:{work:-1}}}),

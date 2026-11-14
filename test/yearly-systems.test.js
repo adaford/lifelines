@@ -29,7 +29,8 @@ function survivorAt(age, seed = 41, gender = 'male') {
 }
 function actor(state, id, age, gender = 'female') {
   return { id, name: `${id} River`, familyName: 'River', age, stats: clone(state.stats),
-    aptitudes: clone(state.aptitudes), height: 66.93, adultHeight: 66.93, money: 0,
+    // This unrelated fixture actor has no perks supporting the player's overflow.
+    aptitudes: Object.fromEntries(Object.entries(state.aptitudes).map(([key, value]) => [key, Math.max(-3, Math.min(3, value))])), height: 66.93, adultHeight: 66.93, money: 0,
     lifestyle: state.lifestyle, alive: true, relationship: 5, gender,
     canGestate: gender === 'female', attractedTo: [gender === 'female' ? 'male' : 'female'],
     appearancePeakAge: 30, conditions: [] };

@@ -1,5 +1,5 @@
-import { heightReference } from './growth.js?v=parent-colors-events';
-import { fameActivityMatches } from './fame.js?v=parent-colors-events';
+import { heightReference } from './growth.js?v=perk-affinity-overflow';
+import { fameActivityMatches } from './fame.js?v=perk-affinity-overflow';
 
 // Fictional school activities and success rules, independent of save mutation
 // and the gameplay RNG. The engine supplies effective ratings and any draw.

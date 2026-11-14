@@ -1,4 +1,5 @@
-import { heightReference } from './growth.js?v=parent-colors-events';
+import { heightReference } from './growth.js?v=perk-affinity-overflow';
+import { aptitudeBounds } from './birth-conditions.js?v=perk-affinity-overflow';
 
 // Fictional inheritance settings for the game, not claims about human genetics.
 // One shared scalar controls the spread around the parents' mean. Zero removes
@@ -42,15 +43,20 @@ export function inheritRatings(parents, normal, randomness = GENETICS_BALANCE.ra
 }
 
 /**
- * Return all seven inherited learning affinities from parents' aptitudes. The
- * parental mean plus one seeded normal residual per stat is rounded symmetrically
- * around zero, then bounded to integer -3..3. Zero randomness gives the nearest
- * representable parental mean, with exact halves rounded away from zero.
+ * Return all seven inherited natural affinities from parents' stored totals,
+ * including valid perk overflow. The parental mean plus one seeded normal
+ * residual per stat is rounded symmetrically, then bounded to integer -3..3.
+ * The caller applies the newborn's own perks once afterward, without clipping.
+ * Zero randomness gives the nearest representable parental mean, with exact
+ * halves rounded away from zero; parental Fame is never inherited.
  */
 export function inheritAffinities(parents, normal, randomness = GENETICS_BALANCE.randomness) {
   const people = contributors(parents);
   return Object.fromEntries(STAT_KEYS.map(key => {
-    const center = mean(people, parent => clamp(finite(parent.aptitudes?.[key]), -3, 3), 0);
+    const center = mean(people, parent => {
+      const { min, max } = aptitudeBounds(parent, key);
+      return clamp(finite(parent.aptitudes?.[key]), min, max);
+    }, 0);
     return [key, clamp(symmetricInteger(center + residual(normal, randomness) * GENETICS_BALANCE.affinityDeviation), -3, 3)];
   }));
 }

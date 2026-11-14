@@ -1,11 +1,12 @@
 // Fictional life-sim probabilities and consequences, not real-world risk estimates.
 // Each eligible event gets an independent yearly roll. The engine caps a year at five.
 // Low/high factors are curved so extreme traits matter much more than small changes.
-import { legacyFocusValue, focusMaxFor } from './focus-rules.js?v=parent-colors-events';
-import { APTITUDE_EVENTS } from './cross-aptitude-events.js?v=parent-colors-events';
-import { schoolActivity, activityEligible, gradeScore } from './school.js?v=parent-colors-events';
-import { boostLowStatRates } from './event-rates.js?v=parent-colors-events';
-import { LIFE_PERSONAL_EVENTS } from './life-events.js?v=parent-colors-events';
+import { legacyFocusValue, focusMaxFor } from './focus-rules.js?v=perk-affinity-overflow';
+import { APTITUDE_EVENTS } from './cross-aptitude-events.js?v=perk-affinity-overflow';
+import { schoolActivity, activityEligible, gradeScore } from './school.js?v=perk-affinity-overflow';
+import { boostLowStatRates } from './event-rates.js?v=perk-affinity-overflow';
+import { LIFE_PERSONAL_EVENTS } from './life-events.js?v=perk-affinity-overflow';
+import { aptitudeBounds } from './birth-conditions.js?v=perk-affinity-overflow';
 
 const low = key => [key, 'low'];
 const high = key => [key, 'high'];
@@ -373,7 +374,10 @@ function eligible(event, state, job, stats) {
   }
   if ((event.minStability !== undefined || event.maxStability !== undefined)
       && (!Number.isFinite(stats?.stability) || stats.stability < (event.minStability ?? -Infinity) || stats.stability > (event.maxStability ?? Infinity))) return false;
-  if (Object.entries(event.aptitudeChanges || {}).some(([key, amount]) => amount > 0 ? (state.aptitudes?.[key] || 0) >= 3 : (state.aptitudes?.[key] || 0) <= -3)) return false;
+  if (Object.entries(event.aptitudeChanges || {}).some(([key, amount]) => {
+    const { min, max } = aptitudeBounds(state, key);
+    return amount > 0 ? (state.aptitudes?.[key] || 0) >= max : (state.aptitudes?.[key] || 0) <= min;
+  })) return false;
   if (event.activityFocus) {
     if (activityFocusPoints(event, state) < (event.minFocus || 1)) return false;
     if (['sports', 'extracurricular'].includes(event.activityFocus)

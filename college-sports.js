@@ -1,5 +1,5 @@
-import { schoolActivity, activityPerformance } from './school.js?v=parent-colors-events';
-import { fameActivityMatches, hasFame } from './fame.js?v=parent-colors-events';
+import { schoolActivity, activityPerformance } from './school.js?v=perk-affinity-overflow';
+import { fameActivityMatches, hasFame } from './fame.js?v=perk-affinity-overflow';
 
 // Fictional competition settings, not estimates of real recruitment odds.
 // College success is relative to a much more selective field than high school.

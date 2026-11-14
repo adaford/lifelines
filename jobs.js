@@ -1,8 +1,8 @@
-import { lifestyleFromResources } from './lifestyle.js?v=parent-colors-events';
-import { CAREER_PROFILES } from './career-profiles.js?v=parent-colors-events';
+import { lifestyleFromResources } from './lifestyle.js?v=perk-affinity-overflow';
+import { CAREER_PROFILES } from './career-profiles.js?v=perk-affinity-overflow';
 // Fictional career balance for Lifelines, not real-world salary guidance.
 // Job affinities describe skill importance (+1 useful, +2 important, +3 central).
-// Character affinities remain the separate -3 to +3 learning-rate trait.
+// Character affinities are separate learning traits; perks can extend their natural -3 to +3 range.
 // College gates are simplified game qualifications, not licensing advice.
 const COLLEGE_ROLES = new Set([
   'engineer', 'data_analyst', 'cybersecurity_analyst', 'network_engineer',

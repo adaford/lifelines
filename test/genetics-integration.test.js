@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import * as game from '../engine.js';
-import { getBirthConditions } from '../birth-conditions.js';
+import { getBirthConditions, BIRTH_CONDITIONS, MAX_BIRTH_CONDITIONS } from '../birth-conditions.js';
 import { heightReference } from '../growth.js';
 import { avatar, genderBadge, parentLabel } from '../profile-view.js';
 
@@ -27,9 +27,9 @@ function assertMeanInheritance(child, parents) {
   for (const key of KEYS) {
     const rating = parents.reduce((sum, parent) => sum + parent.stats[key], 0) / parents.length;
     assert.equal(child.stats[key], rounded(rating), `${key} inherits the biological parents' base ratings`);
-    const affinity = symmetric(parents.reduce((sum, parent) => sum + parent.aptitudes[key], 0) / parents.length);
+    const affinity = clamp(symmetric(parents.reduce((sum, parent) => sum + parent.aptitudes[key], 0) / parents.length), -3, 3);
     const perk = perks.reduce((sum, condition) => sum + (condition.aptitudeChanges[key] || 0), 0);
-    assert.equal(child.aptitudes[key], clamp(affinity + perk, -3, 3), `${key} inherits both affinities before recorded perks`);
+    assert.equal(child.aptitudes[key], affinity + perk, `${key} inherits bounded natural affinity before adding every recorded perk`);
   }
   assert.equal(child.growthFactor, rounded(parents.reduce((sum, parent) => sum + parentalTendency(parent), 0) / parents.length, 4));
   assert.equal(child.adultHeight, null, 'inheritance supplies a tendency, never a predetermined adult endpoint');
@@ -123,6 +123,31 @@ test('a saved real pregnancy uses the captured biological co-parent after breaku
     assert.ok(child.growthFactor > 1, 'attained tall parental heights override both stale .8 tendencies');
     assert.equal(state.effects.find(effect => effect.id === 'saved-pregnancy-bonus').years, 1);
     reload(state);
+  } finally { game.GENETICS_BALANCE.randomness = previous; }
+});
+
+test('saved pregnancies inherit overflowing parental affinities before applying the newborn own perks once', () => {
+  const previous = game.GENETICS_BALANCE.randomness;
+  try {
+    game.GENETICS_BALANCE.randomness = 0;
+    for (const direction of [-1, 1]) {
+      const state = conceived();
+      state.conditions = BIRTH_CONDITIONS.filter(perk => perk.aptitudeChanges.intelligence === direction)
+        .slice(0, MAX_BIRTH_CONDITIONS).map(perk => perk.id);
+      state.aptitudes.intelligence = 8 * direction;
+      state.pregnancy.otherParent.aptitudes.intelligence = -3 * direction;
+      const captured = copy(state.pregnancy.otherParent);
+      reload(state);
+      const replay = game.migrateSave(copy(state));
+      assert.equal(game.advanceYear(state, calm).ok, true);
+      assert.equal(game.advanceYear(replay, calm).ok, true);
+      assert.deepEqual(state, replay);
+      const child = state.children.at(-1), perk = getBirthConditions(child).reduce((sum, condition) => sum + (condition.aptitudeChanges.intelligence || 0), 0);
+      assert.equal(child.aptitudes.intelligence, 3 * direction + perk, 'the parental mean uses ±8 rather than silently reducing it to ±3');
+      assertMeanInheritance(child, [state, captured]);
+      assert.equal(state.aptitudes.intelligence, 8 * direction, 'birth does not reapply or clip the player perks');
+      reload(state);
+    }
   } finally { game.GENETICS_BALANCE.randomness = previous; }
 });
 

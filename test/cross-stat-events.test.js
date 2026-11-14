@@ -43,6 +43,7 @@ test('rare aptitude experiences cover every ordered pair in both directions with
 
 test('rare odds respond only to the different source, respect aptitude limits, and stay rare in total', () => {
   const state = createGame({ seed: 73519 });
+  state.conditions = [];
   state.age = 10;
   for (const key of APTITUDE_EVENT_STATS) { state.stats[key] = 5; state.aptitudes[key] = 0; }
   const snapshot = structuredClone(state);

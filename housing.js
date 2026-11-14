@@ -1,5 +1,5 @@
-import { lifestyleFromResources } from './lifestyle.js?v=parent-colors-events';
-import { studentLivingLifestyle } from './college.js?v=parent-colors-events';
+import { lifestyleFromResources } from './lifestyle.js?v=perk-affinity-overflow';
+import { studentLivingLifestyle } from './college.js?v=perk-affinity-overflow';
 
 // Fictional annual household budgets. Keep housing consequences explicit and
 // separate from ability, employability, and a person's worth as a partner.

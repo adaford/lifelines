@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { GENETICS_BALANCE, inheritRatings, inheritAffinities, inheritedGrowthFactor } from '../genetics.js';
 import { heightReference } from '../growth.js';
+import { BIRTH_CONDITIONS, MAX_BIRTH_CONDITIONS, applyBirthConditions, perkAffinityBonus } from '../birth-conditions.js';
 
 const KEYS = ['intelligence', 'strength', 'attractiveness', 'social', 'creativity', 'health', 'stability'];
 const values = value => Object.fromEntries(KEYS.map(key => [key, value]));
@@ -62,6 +63,27 @@ test('inheritance reads parental base ratings rather than temporary effective ab
   assert.deepEqual(inheritRatings([first, second], () => 0), values(5));
   assert.deepEqual(inheritAffinities([first, second], () => 0), values(0));
   assert.deepEqual([first, second], before);
+});
+
+test('all seven parental perk totals affect inheritance before bounding the child natural affinity', () => {
+  for (const key of KEYS) for (const direction of [-1, 1]) {
+    const overflow = parent(5, 0), ordinary = parent(5, 0, 1, 'female');
+    overflow.conditions = BIRTH_CONDITIONS.filter(perk => perk.aptitudeChanges[key] === direction).slice(0, MAX_BIRTH_CONDITIONS).map(perk => perk.id);
+    overflow.aptitudes[key] = 3 * direction;
+    applyBirthConditions(overflow);
+    assert.equal(overflow.aptitudes[key], 8 * direction);
+    ordinary.aptitudes[key] = -3 * direction;
+    overflow.fame = { kind: 'personal', activityId: null, rating: 10, support: 0, startedAge: 18 };
+    const before = structuredClone([overflow, ordinary]); let calls = 0;
+    const child = inheritAffinities([overflow, ordinary], () => { calls++; return 0; }, 0);
+    assert.equal(child[key], 3 * direction, 'the mean of +8/-3 or -8/+3 rounds to the matching natural bound, rather than zero');
+    assert.equal(calls, 7);
+    assert.ok(Object.values(child).every(value => Number.isInteger(value) && value >= -3 && value <= 3));
+    assert.deepEqual([overflow, ordinary], before, 'inheritance never reapplies parental perks or includes Fame');
+    const newborn = { aptitudes: child, conditions: [...overflow.conditions] };
+    applyBirthConditions(newborn);
+    assert.equal(newborn.aptitudes[key], 3 * direction + perkAffinityBonus(newborn, key), 'the newborn own perks apply once after natural inheritance');
+  }
 });
 
 test('affinity rounding treats positive and negative residuals symmetrically, including exact half steps', () => {

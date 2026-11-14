@@ -227,6 +227,14 @@ export const BIRTH_CONDITIONS = [
 
 const byId = new Map(BIRTH_CONDITIONS.map(entry => [entry.id, entry]));
 export const getBirthConditions = person => (person?.conditions || []).map(id => byId.get(id)).filter(Boolean);
+// Stored affinity includes the birth perks already applied once at creation.
+// Sum opposing perks before deriving bounds; old saved values in -3..3 remain
+// valid even when a perk would now allow a larger positive or negative total.
+export const perkAffinityBonus = (person, key) => getBirthConditions(person).reduce((sum, entry) => sum + (entry.aptitudeChanges[key] || 0), 0);
+export function aptitudeBounds(person, key) {
+  const bonus = perkAffinityBonus(person, key);
+  return { min: -3 + Math.min(0, bonus), max: 3 + Math.max(0, bonus) };
+}
 export const validateBirthConditions = ids => Array.isArray(ids) && ids.length <= MAX_BIRTH_CONDITIONS && new Set(ids).size === ids.length && ids.every(id => byId.has(id));
 export const conditionFocusPoints = person => getBirthConditions(person).reduce((sum, entry) => sum + (entry.focusPoints || 0), 0);
 export function conditionFocusLimits(person, stage) {
@@ -262,7 +270,7 @@ export function applyBirthConditions(person) {
   const changes = {};
   for (const entry of getBirthConditions(person)) for (const [key, amount] of Object.entries(entry.aptitudeChanges)) changes[key] = (changes[key] || 0) + amount;
   person.aptitudes ??= {};
-  for (const [key, amount] of Object.entries(changes)) person.aptitudes[key] = Math.max(-3, Math.min(3, (person.aptitudes[key] ?? 0) + amount));
+  for (const [key, amount] of Object.entries(changes)) person.aptitudes[key] = (person.aptitudes[key] ?? 0) + amount;
   return person;
 }
 export function assignBirthConditions(person, seed = 0, parents = []) {

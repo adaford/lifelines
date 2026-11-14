@@ -1,5 +1,17 @@
 # Lifelines
 
+## Perks can extend affinity beyond ±3 (14 November 2026)
+
+Generated natural affinities remain integer -3 to +3. Sum the newborn's perk contributions and add them once without clipping: natural Health +3 with a +1 perk becomes +4, and -3 with a -1 perk becomes -4. Stored affinity is the displayed total. Gameplay response, forecasts, caregivers and activity training use that full total; Fame adds its separate Social learning bonus afterward. With at most five existing one-point perks, supported stored totals stay within -8 to +8, and valid response multipliers retain their signs even with Fame.
+
+Shared perkAffinityBonus and aptitudeBounds helpers in birth-conditions.js extend the appropriate side of the original range by the net perk contribution. Opposing perks cancel before bounds are derived. Save validation and rare affinity event eligibility/outcomes share those limits, so events cannot silently clip an existing +4 to +3 or create unsupported overflow. Player, relatives, dating prospects, pregnancy snapshots and lineage records retain the perks supporting their totals. Badges display the full signed value and help explains that perk effects are already included.
+
+Genetics uses both biological parents' complete valid affinities, including perk overflow, as its mean. The child's inherited natural result is still bounded to -3..3 before its own perks are applied. Random draw counts and GENETICS_BALANCE.randomness are unchanged. Ratings remain 0-10; no other balance formulas or perk definitions change.
+
+Schema remains 20. Existing saves retain their exact recorded affinity, ratings, focus, pending choices, history and RNG on load. Old clipped totals cannot reveal their lost pre-perk values, so they are preserved without guessed restoration or duplicate perk application. Pre-20 formats retain their original one-time capped migration. Future births and affinity events use the expanded rules. The observed percentile reference is regenerated without fitting. Cache token: perk-affinity-overflow. Browser/visual checks remain omitted by preference; automated, local HTTP and live deployment verification are retained.
+
+Validation: all 793 workspace tests pass with zero failures or skips; the isolated release passes 788 tests with five optional local-baseline checks skipped. All 149 UI tests pass, including signed overflow badges, complete dating/family profiles and pure help/reload reads. Tests cover supported ±8 totals across every saved actor location, all 148 perk IDs, actual births/pregnancies, two-way rare event changes, succession and Fame response signs. Fifty-five genuine pre-change checkpoints across 20 lives preserve every field, including 15 pending-choice snapshots and 49 clipped perk-bearing actor records. The independent 1,600-life cohort passes. The 4,000-life observed reference reproduces byte-for-byte without fitting (SHA-256 2b2d13f0f404dface62c0eca63878811d6a046ff9f6bb80f161f801504629c4b). All 39 local HTTP assets match source/cache tokens, and the temporary server is stopped. Logs: test-artifacts/perk-overflow-final-tests.txt and test-artifacts/perk-overflow-release-tests.txt.
+
 ## Parent review colors and consequential events (14 November 2026)
 
 Parent year-review changes use green for displayed increases, red for decreases and neutral text when the displayed endpoints are equal. This local fix was absent from the previously published b3291cb build and is included in this release.

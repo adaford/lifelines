@@ -6,24 +6,24 @@ import {
   offeredJobs, offeredColleges, joinCollegeSport, leaveCollegeSport, needsEducationChoice, pendingEventSubject, focusLimits, focusMinimums, focusLimitDetails, caregivers,
   relationshipOdds, meetingChances, datingPotential, proposalChance, pregnancyChance, oneNightChance,
   respondToEncounter, proposeMarriage, endRelationship, normalizeSurname, heightPercentile, statPercentiles
-} from './engine.js?v=parent-colors-events';
-import { LEGACY_EVENT_COPY } from './event-copy-history.js?v=parent-colors-events';
-import { formatEventCause } from './event-causes.js?v=parent-colors-events';
-import { eventDescriptionAtAge } from './life-events.js?v=parent-colors-events';
-import { annotateNarrative } from './narrative.js?v=parent-colors-events';
-import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome, focusCapLabel, escapeHTML as esc } from './display.js?v=parent-colors-events';
-import { avatar, genderBadge, parentLabel } from './profile-view.js?v=parent-colors-events';
+} from './engine.js?v=perk-affinity-overflow';
+import { LEGACY_EVENT_COPY } from './event-copy-history.js?v=perk-affinity-overflow';
+import { formatEventCause } from './event-causes.js?v=perk-affinity-overflow';
+import { eventDescriptionAtAge } from './life-events.js?v=perk-affinity-overflow';
+import { annotateNarrative } from './narrative.js?v=perk-affinity-overflow';
+import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome, focusCapLabel, escapeHTML as esc } from './display.js?v=perk-affinity-overflow';
+import { avatar, genderBadge, parentLabel } from './profile-view.js?v=perk-affinity-overflow';
 
-import { MAX_FOCUS, focusBudget, focusMaxFor, isSchoolActivityFocus } from './focus-rules.js?v=parent-colors-events';
-import { SPORTS, schoolActivity, currentSchoolEnrollment, gradeScore, gradeLetter, activityGradeLetter, activitySuccessAfterYear, activityEligible } from './school.js?v=parent-colors-events';
-import { COLLEGE_BALANCE, collegeById, collegeGradeScore, createCollegeOffers } from './college.js?v=parent-colors-events';
-import { collegeSportSuccessAfterYear } from './college-sports.js?v=parent-colors-events';
-import { housingDetails } from './housing.js?v=parent-colors-events';
-import { hasFame, fameFocusKey, fameFocusChange, fameLearningBonus, fameLossChance, fameLifestyleBonus } from './fame.js?v=parent-colors-events';
-import { getBirthConditions } from './birth-conditions.js?v=parent-colors-events';
-import { initialCareerProgress } from './career-rules.js?v=parent-colors-events';
-import { lifestyleDisplayValue } from './lifestyle.js?v=parent-colors-events';
-import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=parent-colors-events';
+import { MAX_FOCUS, focusBudget, focusMaxFor, isSchoolActivityFocus } from './focus-rules.js?v=perk-affinity-overflow';
+import { SPORTS, schoolActivity, currentSchoolEnrollment, gradeScore, gradeLetter, activityGradeLetter, activitySuccessAfterYear, activityEligible } from './school.js?v=perk-affinity-overflow';
+import { COLLEGE_BALANCE, collegeById, collegeGradeScore, createCollegeOffers } from './college.js?v=perk-affinity-overflow';
+import { collegeSportSuccessAfterYear } from './college-sports.js?v=perk-affinity-overflow';
+import { housingDetails } from './housing.js?v=perk-affinity-overflow';
+import { hasFame, fameFocusKey, fameFocusChange, fameLearningBonus, fameLossChance, fameLifestyleBonus } from './fame.js?v=perk-affinity-overflow';
+import { getBirthConditions } from './birth-conditions.js?v=perk-affinity-overflow';
+import { initialCareerProgress } from './career-rules.js?v=perk-affinity-overflow';
+import { lifestyleDisplayValue } from './lifestyle.js?v=perk-affinity-overflow';
+import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=perk-affinity-overflow';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const app = document.querySelector('#app');
@@ -110,7 +110,7 @@ const pct = value => `${Math.round((Number(value) || 0) * 100)}%`;
 const aptitude = value => value > 0 ? `+${value}` : String(value);
 const focusPointChange = value => `${value>0?'+':''}${value} focus point${Math.abs(value)===1?'':'s'}`;
 function aptitudeBadge(value, label = 'Natural aptitude') {
-  if (!Number.isInteger(value) || value === 0 || value < -3 || value > 3) return '';
+  if (!Number.isInteger(value) || value === 0) return '';
   const description = `${label} ${aptitude(value)}`;
   return `<span class="aptitude ${value>0?'positive':value<0?'negative':''}" role="img" aria-label="${esc(description)}" title="${esc(description)}"><span aria-hidden="true">${aptitude(value)}</span></span>`;
 }
@@ -865,7 +865,7 @@ function topicHelpModal(topic, id) {
     social: ['Social', ['Ease with people for your age; social practice can improve it.']],
     creativity: ['Creativity', ['Creative potential for your age, shaped by exploration and practice.']],
     attractiveness: ['Attractiveness', ['Starts near its adult value. During school years, Yourself focus can improve or reduce it, with aging losses after 30 for men and 22 for women.']],
-    affinity: ['Natural aptitude', ['This −3 to +3 trait is shaped by inheritance and perk affinities. It affects starting ability and responsiveness to activity or care; higher is stronger. Aptitude alone never changes a rating. Health and mental stability aptitude improve routine gains and soften losses. Rare experiences shaped by another stat can raise or lower aptitude by one. Birth profiles describe individual tendencies and support needs, not fixed outcomes or medical diagnoses. Conditions can involve many genes and environmental influences; bipolar predisposition is a risk, not an illness diagnosed at birth. Autism and specific learning disabilities do not determine general intelligence.']],
+    affinity: ['Natural aptitude', ['Generated base aptitude ranges from −3 to +3. Perks can take the total beyond that range, and the affinity badge already includes their effects. Each perk lists only its own contribution. Aptitude affects starting ability and responsiveness to activity or care; higher is stronger. Aptitude alone never changes a rating. Health and mental stability aptitude improve routine gains and soften losses. Rare experiences shaped by another stat can raise or lower aptitude by one. Birth profiles describe individual tendencies and support needs, not fixed outcomes or medical diagnoses. Conditions can involve many genes and environmental influences; bipolar predisposition is a risk, not an illness diagnosed at birth. Autism and specific learning disabilities do not determine general intelligence.']],
     forecast: ['Expected changes', ['Signs compare increases and decreases with the other choices for that stat. Zero changes are hidden. Infant stats show crying effects; adult stats show routine changes. Activities, care, events and aging cause changes. Yearly variation changes the size of routine effects without reversing them.']],
     health: ['Health', ['Self-care supports health; illness and aging reduce it. Poor health raises disease risk and reduces childhood height gains.']],
     stability: ['Mental stability', ['Higher means calmer; rest and relationships help. Low ratings increase disruptions; 2 or less can unlock major crises. Ratings of 7 or more unlock supportive opportunities. Treatment and recovery events can help at low ratings. These rules also apply to parental events affecting your childhood.']],
@@ -931,6 +931,7 @@ function topicHelpModal(topic, id) {
       : ['Career progress',['Progress measures advancement within your current role. Stronger performance supports progress; a change of role starts a new path. Progress within a role is separate from its advancement potential.']];
   }
   if (!entry) return;
+  if (DISPLAY_STATS.some(stat=>stat.key===topic)) entry=[entry[0],[...entry[1],'The affinity badge already includes perk effects. Generated base aptitude ranges from −3 to +3; perks can take the total beyond that range. Each perk lists only its own contribution.']];
   if (id===state.id && DISPLAY_STATS.some(stat=>stat.key===topic)) entry=[entry[0],[...entry[1],'Changes need activity, care, events or aging. Low ratings amplify existing gains without creating them. Gains slow near 10; losses slow near 0. Perk affinities adjust natural aptitude, not current ratings.']];
   if (id===state.id) entry=[entry[0],[...entry[1],...statEffects(topic).map(({effect,amount})=>`${effect.name}: ${signedModifier(amount)} ${skillLabel(topic)} (${effect.years} year${effect.years===1?'':'s'} remaining)`)]];
   openModal(esc(entry[0]),`${entry[1].map(paragraph=>`<p>${esc(paragraph)}</p>`).join('')}`);

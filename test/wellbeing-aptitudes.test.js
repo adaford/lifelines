@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createGame, annualForecast, migrateSave, validateSave, chooseEducation, haveChild, successionInfo, GENETICS_BALANCE } from '../engine.js';
 import { stripWellbeingAptitudes, neutralWellbeingAptitudes } from './helpers/legacy-height.js';
-import { getBirthConditions } from '../birth-conditions.js';
+import { getBirthConditions, aptitudeBounds } from '../birth-conditions.js';
 
 const copy = value => structuredClone(value);
 const wellbeing = ['health', 'stability'];
@@ -13,26 +13,30 @@ test('new lives inherit bounded wellbeing aptitudes and all generation routes re
   const symmetric = value => Math.sign(value) * Math.round(Math.abs(value)) || 0;
   const radius = 3 * GENETICS_BALANCE.affinityDeviation * GENETICS_BALANCE.randomness;
   let broaderThanOldVariation = false;
-  for (let seed = 1; seed <= 120; seed++) {
+  for (let seed = 1; seed <= 600; seed++) {
     const state = createGame({ seed });
     assert.equal(state.version, 20);
     for (const key of wellbeing) {
       const average = (state.parents[0].aptitudes[key] + state.parents[1].aptitudes[key]) / 2;
       const perkShift = getBirthConditions(state).reduce((sum, perk) => sum + (perk.aptitudeChanges[key] || 0), 0);
-      const lowest = bound(bound(symmetric(average - radius)) + perkShift), highest = bound(bound(symmetric(average + radius)) + perkShift);
+      const lowest = bound(symmetric(average - radius)) + perkShift, highest = bound(symmetric(average + radius)) + perkShift;
       assert.ok(state.aptitudes[key] >= lowest && state.aptitudes[key] <= highest,
         'a bounded normal residual varies the parental mean before rounding, clamping and the separate perk shift');
       const oldLow = bound(bound(symmetric(average) - 1) + perkShift), oldHigh = bound(bound(symmetric(average) + 1) + perkShift);
       if (state.aptitudes[key] < oldLow || state.aptitudes[key] > oldHigh) broaderThanOldVariation = true;
       for (const person of [state, ...state.parents]) {
         assert.ok(Number.isInteger(person.aptitudes[key]));
-        assert.ok(person.aptitudes[key] >= -3 && person.aptitudes[key] <= 3);
+        const { min, max } = aptitudeBounds(person, key);
+        assert.ok(person.aptitudes[key] >= min && person.aptitudes[key] <= max);
       }
       observed[key].add(state.aptitudes[key]);
     }
     assert.equal(validateSave(state), true);
   }
-  for (const values of Object.values(observed)) assert.equal(values.size, 7);
+  for (const values of Object.values(observed)) {
+    assert.ok(values.size >= 7, 'the natural range retains varied outcomes');
+    assert.ok([...values].some(value => value < -3 || value > 3), 'newborn perks can exceed the natural range');
+  }
   assert.equal(broaderThanOldVariation, true, 'the new spread permits more than the retired one-step residual');
   const previous = GENETICS_BALANCE.randomness;
   try {
@@ -42,7 +46,7 @@ test('new lives inherit bounded wellbeing aptitudes and all generation routes re
       for (const key of wellbeing) {
         const average = (state.parents[0].aptitudes[key] + state.parents[1].aptitudes[key]) / 2;
         const perkShift = getBirthConditions(state).reduce((sum, perk) => sum + (perk.aptitudeChanges[key] || 0), 0);
-        assert.equal(state.aptitudes[key], bound(symmetric(average) + perkShift), 'zero variation retains the rounded parental mean plus recorded perks');
+        assert.equal(state.aptitudes[key], bound(symmetric(average)) + perkShift, 'zero variation bounds the natural parental mean before adding recorded perks');
       }
     }
   } finally { GENETICS_BALANCE.randomness = previous; }
@@ -74,7 +78,8 @@ test('v11 migration adds neutral wellbeing aptitude without changing any saved p
   assert.equal(validateSave(migrated), true);
   assert.deepEqual(migrateSave(migrated), migrated);
   for (const key of wellbeing) {
-    for (const bad of [undefined, 3.1, -4, 4, '0', NaN]) {
+    const { min, max } = aptitudeBounds(migrated, key);
+    for (const bad of [undefined, 3.1, min - 1, max + 1, '0', NaN]) {
       const invalid = copy(migrated);
       invalid.aptitudes[key] = bad;
       assert.equal(validateSave(invalid), false);

@@ -1,7 +1,7 @@
 import { changedRating } from '../rating-changes.js';
 import { changedLifestyle } from '../lifestyle.js';
 import { createCollegeOffers } from '../college.js';
-import { getBirthConditions } from '../birth-conditions.js';
+import { getBirthConditions, aptitudeBounds } from '../birth-conditions.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { toLegacyCentimeters, neutralWellbeingAptitudes, integerLifestyleForLegacy, legacyRatingFloor } from './helpers/legacy-height.js';
@@ -76,7 +76,10 @@ test('a new life starts at zero with complete, bounded inherited traits and pare
   assert.equal(state.age, 0); assert.ok(state.height >= 40 / 2.54 && state.height <= 60 / 2.54); assert.equal(state.parents.length, 2);
   assert.equal(stage(state), 'baby'); assert.equal(validateSave(state), true);
   assert.equal(JOBS.length, 101); assert.ok(EVENTS.length >= 100);
-  for (const skill of SKILLS) assert.ok(state.aptitudes[skill.key] >= -3 && state.aptitudes[skill.key] <= 3);
+  for (const { key } of SKILLS) {
+    const { min, max } = aptitudeBounds(state, key);
+    assert.ok(state.aptitudes[key] >= min && state.aptitudes[key] <= max);
+  }
   assert.deepEqual(createGame({ seed: 12 }), createGame({ seed: 12 }));
 });
 
@@ -1253,8 +1256,8 @@ test('marriage raises pregnancy chances and a saved pregnancy produces an inheri
     // opposed parents. Perks apply afterward; exact parental means and outliers
     // are covered by the dedicated genetics integration and cohort tests.
     const perkAffinity = getBirthConditions(child).reduce((sum, perk) => sum + (perk.aptitudeChanges[key] || 0), 0);
-    const lower = Math.max(-3, Math.min(3, -3 + perkAffinity));
-    const upper = Math.max(-3, Math.min(3, 3 + perkAffinity));
+    const lower = -3 + perkAffinity;
+    const upper = 3 + perkAffinity;
     assert.ok(child.aptitudes[key]>=lower&&child.aptitudes[key]<=upper,'inherited affinities stay bounded after newborn perks');
   }
   assert.equal(validateSave(pregnant),true);
