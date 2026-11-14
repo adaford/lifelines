@@ -1,4 +1,4 @@
-import { lifestyleDisplayValue } from './lifestyle.js?v=perk-affinity-overflow';
+import { lifestyleDisplayValue } from './lifestyle.js?v=short-events-toddler-order';
 export const escapeHTML = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
 export const focusCapLabel = (label, maximum) => `'${String(label)}' focus max ${maximum}`;

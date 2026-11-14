@@ -1,5 +1,5 @@
-import { heightReference } from './growth.js?v=perk-affinity-overflow';
-import { aptitudeBounds } from './birth-conditions.js?v=perk-affinity-overflow';
+import { heightReference } from './growth.js?v=short-events-toddler-order';
+import { aptitudeBounds } from './birth-conditions.js?v=short-events-toddler-order';
 
 // Fictional inheritance settings for the game, not claims about human genetics.
 // One shared scalar controls the spread around the parents' mean. Zero removes

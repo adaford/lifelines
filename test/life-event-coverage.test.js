@@ -64,13 +64,20 @@ test('stories are age-appropriate, sustained, and selected without rewriting the
   assert.match(eventDescriptionAtAge(event, 0), /baby group.*reaching, rolling/s);
   assert.match(eventDescriptionAtAge(event, 2), /preschool.*climbing and balance/s);
   assert.match(eventDescriptionAtAge(event, 13), /youth program.*conditioning/s);
-  assert.match(eventDescriptionAtAge(event, 70), /older adults.*appropriate support/s);
+  assert.match(eventDescriptionAtAge(event, 70), /older adults.*Supported strength and balance.*safely/s);
   assert.equal(eventDescriptionAtAge({ description: 'An old story.' }, 70), 'An old story.');
   assert.deepEqual(event, snapshot);
-  for (const event of additions) for (const description of Object.values(event.descriptionsByStage)) {
+  const sentences = new Intl.Segmenter('en', { granularity: 'sentence' });
+  const words = new Intl.Segmenter('en', { granularity: 'word' });
+  for (const event of additions) for (const [stage, description] of Object.entries(event.descriptionsByStage)) {
     assert.ok(description.length > 100 && description.length <= 1000, event.id);
-    assert.doesNotMatch(description, /\{(?:who|poss)\}/, event.id);
-    if (targetOf(event) === 'stability') assert.match(description, /dependable|trusted|regular support|reliable visitor/, event.id);
+    assert.equal([...sentences.segment(description)].length, 2, `${event.id}/${stage}: two concise sentences`);
+    assert.ok([...words.segment(description)].filter(part => part.isWordLike).length <= 50, `${event.id}/${stage}: at most fifty template words`);
+    assert.doesNotMatch(description, /\{(?!name\})[^}]+\}/, event.id);
+    if (['infant', 'toddler'].includes(stage)) assert.match(description, /caregiver/i, `${event.id}: young children have caregiver support`);
+    if (targetOf(event) === 'stability') assert.match(description, /dependable|trusted|regular support|reliable visitor/i, event.id);
+    if (targetOf(event) === 'stability') assert.match(description, /months/i, `${event.id}: lasting wellbeing has a sustained cause`);
+    if (targetOf(event) === 'lifestyle') assert.match(description, /your household.*coming year/, `${event.id}: resource effects retain their household and duration`);
   }
 });
 

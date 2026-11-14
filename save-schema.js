@@ -1,16 +1,16 @@
 // Read-only validation for current and legacy saves. Migration stays in the
 // engine, where it can use the same generation and progression rules.
-import { JOBS } from './jobs.js?v=perk-affinity-overflow';
-import { EVENTS as PERSONAL_EVENTS } from './events.js?v=perk-affinity-overflow';
-import { FAMILY_EVENTS } from './family-events.js?v=perk-affinity-overflow';
-import { FAME_EVENTS } from './fame-events.js?v=perk-affinity-overflow';
-import { MAX_FOCUS, DEFAULT_FOCUS, SCHOOL_FOCUS_KEYS, focusMaxFor, focusBudget } from './focus-rules.js?v=perk-affinity-overflow';
-import { SCHOOL_OFFER_COUNT, MAX_SCHOOL_OFFERS, schoolActivity, currentSchoolEnrollment } from './school.js?v=perk-affinity-overflow';
-import { conditionFocusPoints, conditionFocusLimits, validateBirthConditions, aptitudeBounds } from './birth-conditions.js?v=perk-affinity-overflow';
-import { gestatingActor } from './relationships.js?v=perk-affinity-overflow';
-import { COLLEGES, COLLEGE_BALANCE, collegeById } from './college.js?v=perk-affinity-overflow';
-import { HOUSING_BALANCE } from './housing.js?v=perk-affinity-overflow';
-import { MAX_RESOURCES } from './lifestyle.js?v=perk-affinity-overflow';
+import { JOBS } from './jobs.js?v=short-events-toddler-order';
+import { EVENTS as PERSONAL_EVENTS } from './events.js?v=short-events-toddler-order';
+import { FAMILY_EVENTS } from './family-events.js?v=short-events-toddler-order';
+import { FAME_EVENTS } from './fame-events.js?v=short-events-toddler-order';
+import { MAX_FOCUS, DEFAULT_FOCUS, SCHOOL_FOCUS_KEYS, focusMaxFor, focusBudget } from './focus-rules.js?v=short-events-toddler-order';
+import { SCHOOL_OFFER_COUNT, MAX_SCHOOL_OFFERS, schoolActivity, currentSchoolEnrollment } from './school.js?v=short-events-toddler-order';
+import { conditionFocusPoints, conditionFocusLimits, validateBirthConditions, aptitudeBounds } from './birth-conditions.js?v=short-events-toddler-order';
+import { gestatingActor } from './relationships.js?v=short-events-toddler-order';
+import { COLLEGES, COLLEGE_BALANCE, collegeById } from './college.js?v=short-events-toddler-order';
+import { HOUSING_BALANCE } from './housing.js?v=short-events-toddler-order';
+import { MAX_RESOURCES } from './lifestyle.js?v=short-events-toddler-order';
 
 // Inject engine-owned helpers rather than importing the engine back here.
 // Keeping these references shared prevents validation rules from drifting.

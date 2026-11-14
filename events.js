@@ -1,12 +1,12 @@
 // Fictional life-sim probabilities and consequences, not real-world risk estimates.
 // Each eligible event gets an independent yearly roll. The engine caps a year at five.
 // Low/high factors are curved so extreme traits matter much more than small changes.
-import { legacyFocusValue, focusMaxFor } from './focus-rules.js?v=perk-affinity-overflow';
-import { APTITUDE_EVENTS } from './cross-aptitude-events.js?v=perk-affinity-overflow';
-import { schoolActivity, activityEligible, gradeScore } from './school.js?v=perk-affinity-overflow';
-import { boostLowStatRates } from './event-rates.js?v=perk-affinity-overflow';
-import { LIFE_PERSONAL_EVENTS } from './life-events.js?v=perk-affinity-overflow';
-import { aptitudeBounds } from './birth-conditions.js?v=perk-affinity-overflow';
+import { legacyFocusValue, focusMaxFor } from './focus-rules.js?v=short-events-toddler-order';
+import { APTITUDE_EVENTS } from './cross-aptitude-events.js?v=short-events-toddler-order';
+import { schoolActivity, activityEligible, gradeScore } from './school.js?v=short-events-toddler-order';
+import { boostLowStatRates } from './event-rates.js?v=short-events-toddler-order';
+import { LIFE_PERSONAL_EVENTS } from './life-events.js?v=short-events-toddler-order';
+import { aptitudeBounds } from './birth-conditions.js?v=short-events-toddler-order';
 
 const low = key => [key, 'low'];
 const high = key => [key, 'high'];

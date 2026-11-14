@@ -372,15 +372,15 @@ test('year reviews show one saved explanation while journals retain only titles 
   fixture.yearSummary.events = [entry];
   fixture.yearSummary.dismissed = false;
   const ui = await mount(fixture);
-  assert.equal(ui.query('.year-event-description').textContent, `${dad.name} (Dad) could not sleep after a <loud> storm.`);
+  assert.equal(ui.query('.year-event-description').textContent, `${dad.name} (Dad) could not sleep after a <loud> storm. The morning was difficult.`);
   assert.equal(ui.all('.year-event-description loud').length, 0, 'saved prose is escaped');
-  assert.doesNotMatch(ui.query('.year-review-events').textContent, /The morning was difficult/);
+  assert.match(ui.query('.year-review-events').textContent, /The morning was difficult/, 'a concise saved two-sentence explanation remains complete');
   assert.match(ui.query('.year-event-results').textContent, /5\.2 → 5\.0/);
   assert.doesNotMatch(ui.query('.journal-list').textContent, /storm|morning was difficult/);
   assert.match(ui.query('.journal-list').textContent, /A difficult night.*5\.2 → 5\.0/);
   assert.deepEqual(ui.saved(), fixture, 'adding review context changes neither saved history nor RNG');
   const reloaded = await mount(ui.saved());
-  assert.equal(reloaded.query('.year-event-description').textContent, `${dad.name} (Dad) could not sleep after a <loud> storm.`);
+  assert.equal(reloaded.query('.year-event-description').textContent, `${dad.name} (Dad) could not sleep after a <loud> storm. The morning was difficult.`);
 });
 
 test('saved automatic event causes render concise family explanations safely without rewriting detailed history', async () => {
@@ -2125,7 +2125,7 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
       if(year>=2 && year<=4) {
         assert.equal(ui.all('.cry-level').length,0);
         assert.match(ui.query('.focus-panel .panel-heading').textContent,/Toddler activities/);
-        assert.deepEqual(ui.all('.focus-copy h4').map(heading=>[...heading.firstChild.childNodes].filter(node=>node.nodeType===3).map(node=>node.textContent).join('')),['Play','Electronics','Family time','Rest','Arts & crafts']);
+        assert.deepEqual(ui.all('.focus-copy h4').map(heading=>[...heading.firstChild.childNodes].filter(node=>node.nodeType===3).map(node=>node.textContent).join('')),['Play','Electronics','Arts & crafts','Family time','Rest']);
         assert.match(ui.query('.profile-age .profile-stage').textContent,/Toddler/);
         assert.doesNotMatch(ui.query('.focus-panel').textContent,/School|Career/);
       }
@@ -2233,7 +2233,7 @@ describe('Lifelines DOM integration', { concurrency: false }, () => {
     }
     assert.equal(validateSave(ui.saved()),true);
     ui.click('.year-review-modal [data-action="close"]');
-    assert.deepEqual(ui.all('.focus-copy h4').map(heading=>[...heading.firstChild.childNodes].filter(node=>node.nodeType===3).map(node=>node.textContent).join('')),['Play','Electronics','Family time','Rest','Arts & crafts']);
+    assert.deepEqual(ui.all('.focus-copy h4').map(heading=>[...heading.firstChild.childNodes].filter(node=>node.nodeType===3).map(node=>node.textContent).join('')),['Play','Electronics','Arts & crafts','Family time','Rest']);
   });
 
   test('Social is the stat label throughout Year, Family, careers, and contextual help', async () => {

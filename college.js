@@ -1,7 +1,7 @@
-import { gradeScore } from './school.js?v=perk-affinity-overflow';
-import { incomeForLifestyle, lifestyleFromResources } from './lifestyle.js?v=perk-affinity-overflow';
-import { careerFit } from './career-rules.js?v=perk-affinity-overflow';
-import { JOBS } from './jobs.js?v=perk-affinity-overflow';
+import { gradeScore } from './school.js?v=short-events-toddler-order';
+import { incomeForLifestyle, lifestyleFromResources } from './lifestyle.js?v=short-events-toddler-order';
+import { careerFit } from './career-rules.js?v=short-events-toddler-order';
+import { JOBS } from './jobs.js?v=short-events-toddler-order';
 
 // Fictional four-year routes, not rankings of actual institutions. College
 // changes the distribution of opportunities, never a career's absolute cap.

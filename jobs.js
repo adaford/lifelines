@@ -1,5 +1,5 @@
-import { lifestyleFromResources } from './lifestyle.js?v=perk-affinity-overflow';
-import { CAREER_PROFILES } from './career-profiles.js?v=perk-affinity-overflow';
+import { lifestyleFromResources } from './lifestyle.js?v=short-events-toddler-order';
+import { CAREER_PROFILES } from './career-profiles.js?v=short-events-toddler-order';
 // Fictional career balance for Lifelines, not real-world salary guidance.
 // Job affinities describe skill importance (+1 useful, +2 important, +3 central).
 // Character affinities are separate learning traits; perks can extend their natural -3 to +3 range.

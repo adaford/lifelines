@@ -6,24 +6,25 @@ import {
   offeredJobs, offeredColleges, joinCollegeSport, leaveCollegeSport, needsEducationChoice, pendingEventSubject, focusLimits, focusMinimums, focusLimitDetails, caregivers,
   relationshipOdds, meetingChances, datingPotential, proposalChance, pregnancyChance, oneNightChance,
   respondToEncounter, proposeMarriage, endRelationship, normalizeSurname, heightPercentile, statPercentiles
-} from './engine.js?v=perk-affinity-overflow';
-import { LEGACY_EVENT_COPY } from './event-copy-history.js?v=perk-affinity-overflow';
-import { formatEventCause } from './event-causes.js?v=perk-affinity-overflow';
-import { eventDescriptionAtAge } from './life-events.js?v=perk-affinity-overflow';
-import { annotateNarrative } from './narrative.js?v=perk-affinity-overflow';
-import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome, focusCapLabel, escapeHTML as esc } from './display.js?v=perk-affinity-overflow';
-import { avatar, genderBadge, parentLabel } from './profile-view.js?v=perk-affinity-overflow';
+} from './engine.js?v=short-events-toddler-order';
+import { LEGACY_EVENT_COPY } from './event-copy-history.js?v=short-events-toddler-order';
+import { legacyLifeEventCopies } from './life-event-copy-history.js?v=short-events-toddler-order';
+import { formatEventCause } from './event-causes.js?v=short-events-toddler-order';
+import { eventDescriptionAtAge } from './life-events.js?v=short-events-toddler-order';
+import { annotateNarrative } from './narrative.js?v=short-events-toddler-order';
+import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome, focusCapLabel, escapeHTML as esc } from './display.js?v=short-events-toddler-order';
+import { avatar, genderBadge, parentLabel } from './profile-view.js?v=short-events-toddler-order';
 
-import { MAX_FOCUS, focusBudget, focusMaxFor, isSchoolActivityFocus } from './focus-rules.js?v=perk-affinity-overflow';
-import { SPORTS, schoolActivity, currentSchoolEnrollment, gradeScore, gradeLetter, activityGradeLetter, activitySuccessAfterYear, activityEligible } from './school.js?v=perk-affinity-overflow';
-import { COLLEGE_BALANCE, collegeById, collegeGradeScore, createCollegeOffers } from './college.js?v=perk-affinity-overflow';
-import { collegeSportSuccessAfterYear } from './college-sports.js?v=perk-affinity-overflow';
-import { housingDetails } from './housing.js?v=perk-affinity-overflow';
-import { hasFame, fameFocusKey, fameFocusChange, fameLearningBonus, fameLossChance, fameLifestyleBonus } from './fame.js?v=perk-affinity-overflow';
-import { getBirthConditions } from './birth-conditions.js?v=perk-affinity-overflow';
-import { initialCareerProgress } from './career-rules.js?v=perk-affinity-overflow';
-import { lifestyleDisplayValue } from './lifestyle.js?v=perk-affinity-overflow';
-import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=perk-affinity-overflow';
+import { MAX_FOCUS, focusBudget, focusMaxFor, isSchoolActivityFocus } from './focus-rules.js?v=short-events-toddler-order';
+import { SPORTS, schoolActivity, currentSchoolEnrollment, gradeScore, gradeLetter, activityGradeLetter, activitySuccessAfterYear, activityEligible } from './school.js?v=short-events-toddler-order';
+import { COLLEGE_BALANCE, collegeById, collegeGradeScore, createCollegeOffers } from './college.js?v=short-events-toddler-order';
+import { collegeSportSuccessAfterYear } from './college-sports.js?v=short-events-toddler-order';
+import { housingDetails } from './housing.js?v=short-events-toddler-order';
+import { hasFame, fameFocusKey, fameFocusChange, fameLearningBonus, fameLossChance, fameLifestyleBonus } from './fame.js?v=short-events-toddler-order';
+import { getBirthConditions } from './birth-conditions.js?v=short-events-toddler-order';
+import { initialCareerProgress } from './career-rules.js?v=short-events-toddler-order';
+import { lifestyleDisplayValue } from './lifestyle.js?v=short-events-toddler-order';
+import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=short-events-toddler-order';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const app = document.querySelector('#app');
@@ -123,7 +124,7 @@ const STAT_EMOJI = {
 const statEmoji = key => STAT_EMOJI[key] ? `<span class="stat-emoji" data-emoji="${STAT_EMOJI[key]}" aria-hidden="true"></span>` : '';
 const DISPLAY_STATS = [{ key:'health', label:'Health' }, { key:'stability', label:'Mental stability' }, ...SKILLS.filter(skill => skill.key === 'attractiveness'), ...SKILLS.filter(skill => skill.key !== 'attractiveness')];
 const stageNames = {baby:'The beginning',toddler:'',child:'Growing roots',teen:'Finding your way',adult:'A life of your own',elder:'What you leave behind'};
-const toddlerFocusRows = [['work','Play','sprout'],['social','Electronics','electronics'],['family','Family time','family'],['self','Rest','self'],['creative','Arts & crafts','spark']];
+const toddlerFocusRows = [['work','Play','sprout'],['social','Electronics','electronics'],['creative','Arts & crafts','spark'],['family','Family time','family'],['self','Rest','self']];
 const legacyToddlerFocusRows = [['work','Play'],['social','Explore'],['family','Family time'],['self','Rest']];
 const schoolFocusRows = [['work','School','school'],['social','Friends','social'],['family','Family','family'],['self','Yourself','self'],['sports','Sports','sports'],['extracurricular','Extracurriculars','spark']];
 const career = () => JOBS.find(j => j.id === state.jobId);
@@ -313,7 +314,7 @@ function eventCauseView(entry, age = state.age) {
   const event = EVENTS.find(event => event.id === (entry.eventId || recorded?.id));
   const subject = recorded && entry.title !== recorded.name ? entry.title.slice(0, -recorded.name.length - 2) : 'Your family member';
   const description = recorded?.description.replaceAll('{name}', subject);
-  const supersededStory = recorded && event && recorded !== event
+  const supersededStory = recorded && event && !recorded.copyOnly && recorded !== event
     && (recorded.name !== event.name || entry.description === description || entry.text?.startsWith(description));
   const cause = formatEventCause(entry.cause, supersededStory ? {} : event);
   return cause ? `<p class="event-cause form-note">${narrativeText(cause,age)}</p>` : '';
@@ -387,7 +388,9 @@ function yearDecisionsView(decisions) {
 }
 
 // Historical copy is render-only: old titles and exact prefixes keep their context.
-const eventCopiesFor = entry => [...LEGACY_EVENT_COPY, ...EVENTS].filter(event => entry.title===event.name || entry.title.endsWith(`: ${event.name}`));
+const eventCopiesFor = entry => [...LEGACY_EVENT_COPY, ...EVENTS]
+  .filter(event => entry.title===event.name || entry.title.endsWith(`: ${event.name}`))
+  .flatMap(event => [event, ...Object.values(event.descriptionsByStage || {}).map(description => ({...event,description,copyOnly:true})), ...legacyLifeEventCopies(event)]);
 const eventImpactTag = event => ['minor','moderate','major'].includes(event?.severity)
   ? `<small class="event-impact" data-severity="${event.severity}">${{minor:'Minor event',moderate:'Moderate event',major:'Major event'}[event.severity]}</small>` : '';
 const recordedEventImpact = entry => eventImpactTag(EVENTS.find(event => entry.title===event.name || entry.title.endsWith(`: ${event.name}`)));
@@ -444,7 +447,9 @@ function yearEventsView(summary) {
 
 function reviewEventDescription(entry) {
   const copies = eventCopiesFor(entry);
-  const event = copies.find(copy => {
+  const subjectFor = copy => entry.title===copy.name ? 'Your family member' : entry.title.slice(0,-copy.name.length-2);
+  const captured = copies.find(copy => entry.description === copy.description.replaceAll('{name}',subjectFor(copy)));
+  const event = captured || copies.find(copy => {
     const subject = entry.title===copy.name ? 'Your family member' : entry.title.slice(0,-copy.name.length-2);
     const choice = copy.choices?.find(choice=>entry.text.startsWith(`${choice.label}: `));
     const prefix = choice ? `${choice.label}: ${choice.description}` : copy.description;
@@ -452,12 +457,10 @@ function reviewEventDescription(entry) {
   }) || copies[0];
   const subject = event && entry.title!==event.name ? entry.title.slice(0,-event.name.length-2) : 'Your family member';
   const source = entry.description || event?.description?.replaceAll('{name}',subject) || '';
-  if (event?.severity) return source.trim();
-  // Saved context also covers events created during play, such as adoption.
-  // Catalog lookup lets existing reviews gain context without rewriting saves.
-  const template = event ? source.replaceAll(subject,'{name}') : source;
-  const sentence = template.match(/^.*?[.!?](?=\s|$)/s)?.[0] || template;
-  return sentence.replaceAll('{name}',subject).trim();
+  // Match the captured story itself, never today's age. Unknown prose and all
+  // numerical outcomes remain untouched; only exact old catalog copy is shortened.
+  if (event?.shortDescription && (!entry.description || captured)) return event.shortDescription.replaceAll('{name}',subject).trim();
+  return source.trim();
 }
 
 function eventOutcomeText(text, age) {
