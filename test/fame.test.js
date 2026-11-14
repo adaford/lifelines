@@ -1,3 +1,4 @@
+import { changedLifestyle, incomeForLifestyle, LIFESTYLE_BALANCE } from '../lifestyle.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EVENTS, JOBS, createGame, advanceYear, annualForecast, eventOdds,
@@ -138,7 +139,8 @@ test('an age-seventeen activity invitation survives the birthday and keeps its s
   assert.equal(resolveEventChoice(state, 'pursue', 'fame_sports_offer').ok, true);
   finishChoices(state);
   assert.equal(state.fame.startedAge, 18); assert.equal(state.focus.sports, 0);
-  assert.equal(state.school.sports.id, 'soccer'); assert.equal(focusLimits(state).sports, 3);
+  assert.equal(state.school.sports.id, 'soccer');
+  assert.equal(focusLimits({ ...state, effects: [] }).sports, 3, 'Fame grants three points before independent event restrictions');
   assert.equal(chooseEducation(state, 'work').ok, true);
   state.conditions = []; state.effects = [];
   state.stats.strength = 5; state.stats.social = 5; state.school.sports.success = 5;
@@ -149,7 +151,7 @@ test('an age-seventeen activity invitation survives the birthday and keeps its s
   const schoolReport = { gpa: state.school.gpa, reportedAge: state.school.reportedAge };
   state = rolledYear(state, candidate => candidate.lastYearEvents.length === 0).after;
   assert.equal(state.age, 19); assert.equal(state.focus.sports, 3);
-  assert.equal(state.school.sports.success, 6.2); assert.equal(state.fame.rating, 6.2);
+  assert.equal(state.school.sports.success, 6.2); assert.equal(state.fame.rating, 5.6);
   assert.deepEqual({ gpa: state.school.gpa, reportedAge: state.school.reportedAge }, schoolReport, 'adult activity practice does not rewrite the final school report');
   assert.ok(state.yearSummary.decisions.fame); reloadUnchanged(state);
 });
@@ -206,10 +208,10 @@ test('fame support benefits a child household without compounding or rewriting p
   const state = fixture(15, 'personal'); state.fame.rating = 8; state.fame.support = .5;
   state.lifestyle = householdLifestyle(state);
   const before = copy(state), parents = state.parents.map(parent => parent.lifestyle);
-  assert.equal(state.lifestyle, 5.5);
+  assert.equal(state.lifestyle, changedLifestyle(4, 1.5));
   for (let count = 0; count < 10; count++) {
-    assert.equal(householdLifestyle(state), 5.5);
-    assert.deepEqual(state.parents.map(parent => familyLifestyle(state, parent)), [5.5, 5.5]);
+    assert.equal(householdLifestyle(state), changedLifestyle(4, 1.5));
+    assert.deepEqual(state.parents.map(parent => familyLifestyle(state, parent)), [changedLifestyle(4, 1.5), changedLifestyle(4, 1.5)]);
     annualForecast(state);
   }
   assert.deepEqual(state, before);
@@ -217,11 +219,11 @@ test('fame support benefits a child household without compounding or rewriting p
     queued(state, 'fame_campaign_contract');
     const rng = state.rng;
     assert.equal(resolveEventChoice(state, 'travel', 'fame_campaign_contract').ok, true);
-    assert.equal(state.lifestyle, Math.round((4 + fameLifestyleBonus(state)) * 100) / 100);
+    assert.equal(state.lifestyle, changedLifestyle(4, fameLifestyleBonus(state)));
     assert.deepEqual(state.parents.map(parent => parent.lifestyle), parents, 'support never becomes a new parent resource baseline');
     assert.equal(state.rng, rng, 'authored support changes do not reroll fame'); reloadUnchanged(state);
   }
-  assert.equal(state.fame.support, 2); assert.equal(state.lifestyle, 7);
+  assert.equal(state.fame.support, 2); assert.equal(state.lifestyle, changedLifestyle(4, 3));
   const stats = copy(state.stats);
   assert.equal(quitFame(state).ok, true);
   assert.equal(state.lifestyle, 4); assert.deepEqual(state.parents.map(parent => familyLifestyle(state, parent)), [4, 4]);
@@ -283,7 +285,7 @@ test('switching away from a famous source checks the new activity against househ
 
 test('ending fame removes support for a child without caregivers while preserving the ordinary legacy fallback', () => {
   const state = fixture(15, 'sports');
-  state.parents = []; state.guardian = null; state.money = 375000; state.income = 0;
+  state.parents = []; state.guardian = null; state.money = incomeForLifestyle(5) / LIFESTYLE_BALANCE.reserveDrawRate; state.income = 0;
   state.fame.rating = 10;
   state.school.offers.sports = ['lacrosse'];
   state.lifestyle = householdLifestyle(state);

@@ -19,16 +19,10 @@ function child(age = 3) {
   return state;
 }
 function quietAdvance(state) {
-  for (let attempt = 0; attempt < 200; attempt++) {
-    const draft = copy(state);
-    draft.rng = (state.rng + Math.imul(attempt, 2654435761)) >>> 0;
-    assert.equal(advanceYear(draft, calmYear).ok, true);
-    if (draft.lastYearEvents.length) continue;
-    Object.assign(state, draft);
-    return;
-  }
-  assert.fail('could not find an ordinary-event-free year');
+  assert.equal(advanceYear(state, { ...calmYear, eventRandom: () => 1 }).ok, true);
+  assert.equal(state.lastYearEvents.length, 0);
 }
+
 function queuedTeam(state) {
   state.pendingEvents = [{ eventId: 'school_team', age: state.age }];
   state.lastYearEvents = ['school_team'];
@@ -89,7 +83,8 @@ test('a randomly rolled broken bone applies its Play cap to the newly playable t
     state.age = 2;
     state.focus = { work: 4, social: 1, family: 2, self: 1, creative: 2 };
     assert.equal(advanceYear(state, calmYear).ok, true);
-    if (state.lastYearEvents.includes('broken_bone')) { injured = state; break; }
+    // Isolate this injury's cap from independently rolled scheduling costs.
+    if (state.lastYearEvents.includes('broken_bone') && state.effects.every(effect => effect.id === 'broken_bone')) { injured = state; break; }
   }
   assert.ok(injured, 'the new automatic event must be eligible and rollable in toddler years');
   assert.equal(injured.age, 3);
@@ -97,7 +92,7 @@ test('a randomly rolled broken bone applies its Play cap to the newly playable t
   assert.equal(focusLimits(injured).work, 2);
   assert.equal(injured.focus.work, 2);
   assert.equal(injured.yearSummary.decisions.focus.work, 4, 'the completed year keeps the original decision');
-  assert.ok(injured.yearSummary.events.some(event => event.text.includes('Play max 2. Temporary effects: 1 year.')));
+  assert.ok(injured.yearSummary.events.some(event => event.text.includes('-2 Play focus capacity. Temporary effects: 1 year.')));
   assert.equal(validateSave(injured), true);
 });
 
@@ -114,7 +109,8 @@ test('a restriction-only event works and refreshed effects replace old caps', ()
     assert.equal(resolveEventChoice(state, 'cap', event.id).ok, true);
     assert.equal(state.focus.social, 0);
     assert.equal(focusLimits(state).social, 0);
-    assert.match(state.history[0].text, /No stat changes\. Friends max 0\. Temporary effects: 2 years\./);
+    assert.match(state.history[0].text, /Commit\. Friends max 0\. Temporary effects: 2 years\./);
+    assert.doesNotMatch(state.history[0].text, /No stat changes/);
     queuedTeam(state);
     assert.equal(resolveEventChoice(state, 'alternate', event.id).ok, true);
     assert.equal(state.effects.length, 1);

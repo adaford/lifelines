@@ -3,21 +3,27 @@ import {
   enrollSchoolActivity, leaveSchoolActivity, quitFame, familyLifestyle,
   canTakeJob, takeJob, quitJob, haveChild, successionInfo, succeed,
   effectiveStats, eventOdds, mortalityOdds, stage, migrateSave, chooseEducation,
-  offeredJobs, needsEducationChoice, pendingEventSubject, focusLimits, focusLimitDetails, caregivers,
-  relationshipOdds, meetingChances, proposalChance, pregnancyChance, oneNightChance,
+  offeredJobs, offeredColleges, joinCollegeSport, leaveCollegeSport, needsEducationChoice, pendingEventSubject, focusLimits, focusMinimums, focusLimitDetails, caregivers,
+  relationshipOdds, meetingChances, datingPotential, proposalChance, pregnancyChance, oneNightChance,
   respondToEncounter, proposeMarriage, endRelationship, normalizeSurname, heightPercentile, statPercentiles
-} from './engine.js?v=deadline-effect';
-import { LEGACY_EVENT_COPY } from './event-copy-history.js?v=deadline-effect';
-import { formatEventCause } from './event-causes.js?v=deadline-effect';
-import { annotateNarrative } from './narrative.js?v=deadline-effect';
-import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome, focusCapLabel, escapeHTML as esc } from './display.js?v=deadline-effect';
-import { avatar, genderBadge, parentLabel } from './profile-view.js?v=deadline-effect';
+} from './engine.js?v=parent-colors-events';
+import { LEGACY_EVENT_COPY } from './event-copy-history.js?v=parent-colors-events';
+import { formatEventCause } from './event-causes.js?v=parent-colors-events';
+import { eventDescriptionAtAge } from './life-events.js?v=parent-colors-events';
+import { annotateNarrative } from './narrative.js?v=parent-colors-events';
+import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome, focusCapLabel, escapeHTML as esc } from './display.js?v=parent-colors-events';
+import { avatar, genderBadge, parentLabel } from './profile-view.js?v=parent-colors-events';
 
-import { MAX_FOCUS, focusBudget, focusMaxFor, isSchoolActivityFocus } from './focus-rules.js?v=deadline-effect';
-import { schoolActivity, gradeScore, gradeLetter, activityGradeLetter, activitySuccessAfterYear, activityEligible } from './school.js?v=deadline-effect';
-import { hasFame, fameFocusKey, fameFocusChange, fameLearningBonus, fameLossChance, fameLifestyleBonus } from './fame.js?v=deadline-effect';
-import { getBirthConditions } from './birth-conditions.js?v=deadline-effect';
-import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=deadline-effect';
+import { MAX_FOCUS, focusBudget, focusMaxFor, isSchoolActivityFocus } from './focus-rules.js?v=parent-colors-events';
+import { SPORTS, schoolActivity, currentSchoolEnrollment, gradeScore, gradeLetter, activityGradeLetter, activitySuccessAfterYear, activityEligible } from './school.js?v=parent-colors-events';
+import { COLLEGE_BALANCE, collegeById, collegeGradeScore, createCollegeOffers } from './college.js?v=parent-colors-events';
+import { collegeSportSuccessAfterYear } from './college-sports.js?v=parent-colors-events';
+import { housingDetails } from './housing.js?v=parent-colors-events';
+import { hasFame, fameFocusKey, fameFocusChange, fameLearningBonus, fameLossChance, fameLifestyleBonus } from './fame.js?v=parent-colors-events';
+import { getBirthConditions } from './birth-conditions.js?v=parent-colors-events';
+import { initialCareerProgress } from './career-rules.js?v=parent-colors-events';
+import { lifestyleDisplayValue } from './lifestyle.js?v=parent-colors-events';
+import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=parent-colors-events';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const app = document.querySelector('#app');
@@ -82,7 +88,24 @@ const journalText = (value, age = state.age) => narrativeText(String(value ?? ''
   .replace(/\s*Your abilities and affinities carry over\./g, '')
   .trim(),age);
 const number = formatRating;
-const beforeAfter = ({before,after}) => `${number(before)} → ${number(after)}`;
+const lifestyleNumber = value => number(lifestyleDisplayValue(value));
+const beforeAfter = ({before,after}, format = number) => `${format(before)} → ${format(after)}`;
+const changeClass = change => change > 0 ? 'gain' : change < 0 ? 'loss' : 'unchanged';
+const statChangeText = (text, change) => `<span class="stat-change ${changeClass(change)}">${text}</span>`;
+const coloredBeforeAfter = (change, format = number) => statChangeText(beforeAfter(change,format), format(change.before) === format(change.after) ? 0 : change.after - change.before);
+// Color only recorded stat results. Narrative, names, durations and focus rules
+// remain ordinary text; the input has already been escaped for safe rendering.
+function colorStatChanges(text) {
+  const stat = '(?:Intelligence|Strength|Attractiveness|Social(?: ability)?|Creativity|Health|(?:Mental\\s+)?stability|Lifestyle|Relationships?)';
+  const value = '[+−-]?(?:\\d+(?:\\.\\d+)?|\\.\\d+)';
+  const pattern = new RegExp(`\\b(?:Your\\s+)?${stat}(?:\\s+learning ability|\\s+with\\s+.*?)?\\s+(?:(?<before>${value})\\s*(?:→|-&gt;)\\s*(?<after>${value})|(?<direction>increased|decreased|stayed steady))|(?<amount>[+−-](?:\\d+(?:\\.\\d+)?|\\.\\d+))\\s+${stat}\\b`, 'giu');
+  return text.replace(pattern, (...args) => {
+    const { before, after, direction, amount } = args.at(-1);
+    const numeric = value => Number(value.replace('−', '-'));
+    const change = amount !== undefined ? numeric(amount) : direction ? ({ increased: 1, decreased: -1, 'stayed steady': 0 }[direction.toLowerCase()]) : numeric(after) - numeric(before);
+    return statChangeText(args[0], change);
+  });
+}
 const pct = value => `${Math.round((Number(value) || 0) * 100)}%`;
 const aptitude = value => value > 0 ? `+${value}` : String(value);
 const focusPointChange = value => `${value>0?'+':''}${value} focus point${Math.abs(value)===1?'':'s'}`;
@@ -140,7 +163,7 @@ function birthConditionsView(person) {
   if (!conditions.length) return '';
   return `<ul class="birth-conditions" role="list" aria-label="${esc(person.name)}: perks">${conditions.map(condition=>{
     const effects=birthConditionEffects(condition);
-    return `<li class="birth-condition" data-condition-id="${esc(condition.id)}" aria-label="${esc(condition.name)}: ${esc(effects.join('; '))}"><strong class="birth-condition-name">${esc(condition.name)}</strong><div class="birth-condition-effects">${effects.map(effect=>`<span class="birth-condition-effect">${esc(effect)}</span>`).join('')}</div></li>`;
+    return `<li class="birth-condition" data-condition-id="${esc(condition.id)}" aria-label="${esc(condition.name)}: ${esc(effects.join('; '))}"><strong class="birth-condition-name">${esc(condition.name)}</strong>${condition.legacy?'':`<p class="perk-description">${esc(condition.description)}</p>`}<div class="birth-condition-effects">${effects.map(effect=>`<span class="birth-condition-effect">${esc(effect)}</span>`).join('')}</div></li>`;
   }).join('')}</ul>`;
 }
 
@@ -170,7 +193,7 @@ const signedModifier = value => {
 function statEffects(key) {
   if (!key || key==='height' || key==='lifestyle' && state.age<18) return [];
   return state.effects.filter(effect=>effect.years>0).map(effect=>({
-    effect, amount:key==='lifestyle'?effect.lifestyle:effect.modifiers?.[key],
+    effect, amount:key==='lifestyle'?(effect.lifestyle || 0)+(effect.householdLifestyle || 0):effect.modifiers?.[key],
   })).filter(({amount})=>Number.isFinite(amount) && amount!==0);
 }
 function statEffectDescription(key) {
@@ -183,15 +206,16 @@ function statEffectBadge(key) {
   return `<span class="stat-effect-indicator ${amount>0?'positive':'negative'}" data-direction="${amount>0?'buff':'debuff'}" role="img" aria-label="${esc(description)}" title="${esc(description)}"><span aria-hidden="true">${signedModifier(amount)}</span></span>`;
 }
 function ratingBar(label, value, statKey) {
+  const format = statKey==='lifestyle' || label==='Lifestyle' ? lifestyleNumber : number;
   const rating = Math.max(0, Math.min(10, Number(value)));
-  const displayed = Number(number(value));
+  const displayed = Number(format(value));
   const hue = Math.round(rating / 10 * 120);
   const effects = statEffectDescription(statKey);
-  return `<span class="rating-track" role="meter" aria-label="${esc(label)}" aria-valuemin="${Math.min(0,displayed)}" aria-valuemax="${Math.max(10,displayed)}" aria-valuenow="${number(value)}" aria-valuetext="${number(value)} out of 10.${effects?` ${esc(effects)}`:''}"><span class="rating-fill" style="width:${rating*10}%;background:hsl(${hue}, 60%, 40%)"></span></span>`;
+  return `<span class="rating-track" role="meter" aria-label="${esc(label)}" aria-valuemin="${Math.min(0,displayed)}" aria-valuemax="${Math.max(10,displayed)}" aria-valuenow="${format(value)}" aria-valuetext="${format(value)} out of 10.${effects?` ${esc(effects)}`:''}"><span class="rating-fill" style="width:${rating*10}%;background:hsl(${hue}, 60%, 40%)"></span></span>`;
 }
 
 function profileLifestyleView() {
-  return `<button class="status-pill profile-lifestyle" data-stat="lifestyle" data-action="topic-help" data-topic="lifestyle" data-id="${esc(state.id)}" aria-haspopup="dialog" aria-label="Lifestyle ${number(state.lifestyle)} out of 10. ${esc(statEffectDescription('lifestyle'))} Open help."><span class="profile-lifestyle-heading"><span class="status-label">Lifestyle${statEmoji('lifestyle')}</span><strong class="status-value">${number(state.lifestyle)}<small>/10</small></strong>${statEffectBadge('lifestyle')}</span>${ratingBar('Lifestyle',state.lifestyle,'lifestyle')}</button>`;
+  return `<button class="status-pill profile-lifestyle" data-stat="lifestyle" data-action="topic-help" data-topic="lifestyle" data-id="${esc(state.id)}" aria-haspopup="dialog" aria-label="Lifestyle ${lifestyleNumber(state.lifestyle)} out of 10. ${esc(statEffectDescription('lifestyle'))} Open help."><span class="profile-lifestyle-heading"><span class="status-label">Lifestyle${statEmoji('lifestyle')}</span><strong class="status-value">${lifestyleNumber(state.lifestyle)}<small>/10</small></strong>${statEffectBadge('lifestyle')}</span>${ratingBar('Lifestyle',state.lifestyle,'lifestyle')}</button>`;
 }
 
 function fameSource(fame) {
@@ -202,7 +226,13 @@ function fameView() {
   if (!hasFame(state)) return '';
   const support = fameLifestyleBonus(state);
   const blocked = state.ended || state.needsSuccession || state.pendingEvents.length > 0;
-  return `<section class="panel fame-card" aria-label="Fame"><div class="panel-heading"><h3>${labelWithHelp('Fame','fame')}</h3><strong class="fame-rating">${number(state.fame.rating)}<small>/10</small></strong></div>${ratingBar('Fame',state.fame.rating)}<p class="fame-source">${esc(fameSource(state.fame))}</p><p class="fame-maintenance">Maintain through ${esc(focusLabel(fameFocusKey(state)))} focus.</p><div class="fame-benefits"><span class="fame-learning-bonus">+${fameLearningBonus(state,'social')} Social learning ability <small>Fame bonus</small></span>${support?`<span class="fame-household-support">${signedModifier(support)} household Lifestyle <small>Fame support</small></span>`:''}</div><button class="button ghost small" data-action="quit-fame" ${blocked?'disabled':''}>Leave fame</button></section>`;
+  return `<section class="panel fame-card" aria-label="Fame"><div class="panel-heading"><h3>${labelWithHelp('Fame','fame')}</h3><strong class="fame-rating">${number(state.fame.rating)}<small>/10</small></strong></div>${ratingBar('Fame',state.fame.rating)}<p class="fame-source">${esc(fameSource(state.fame))}</p><p class="fame-maintenance">Maintain through ${esc(focusLabel(fameFocusKey(state)))} focus.</p><div class="fame-benefits"><span class="fame-learning-bonus">+${fameLearningBonus(state,'social')} Social learning ability <small>Fame bonus</small></span>${support?`<span class="fame-household-support">${signedModifier(support)} household Lifestyle support strength <small>Fame support</small></span>`:''}</div><button class="button ghost small" data-action="quit-fame" ${blocked?'disabled':''}>Leave fame</button></section>`;
+}
+
+function datingPotentialView() {
+  if (state.age<18) return '';
+  const value=datingPotential(state);
+  return `<section class="panel dating-potential" aria-label="Your dating potential"><div class="panel-heading"><h3>${labelWithHelp('Your dating potential','dating-potential')}</h3><strong class="dating-potential-value">${number(value)}<small>/10</small></strong></div>${ratingBar('Dating potential',value)}</section>`;
 }
 
 function render() {
@@ -220,7 +250,7 @@ function render() {
     <div class="status-strip" aria-label="At a glance">${DISPLAY_STATS.map(skill=>[skill.key,skill.label,stats[skill.key]]).map(([key,label,value])=>`<button class="status-pill" data-stat="${key}" data-action="topic-help" data-topic="${key}" data-id="${esc(state.id)}" aria-haspopup="dialog" aria-label="${label} ${number(value)} out of 10.${Number.isInteger(state.aptitudes[key]) && state.aptitudes[key]!==0?` Natural aptitude ${aptitude(state.aptitudes[key])}.`: ''} ${esc(statEffectDescription(key))} Open help."><span class="status-label">${label}${statEmoji(key)}</span><span class="status-reading"><strong class="status-value">${number(value)}<small>/10</small></strong>${aptitudeBadge(state.aptitudes[key])}${statEffectBadge(key)}</span>${ratingBar(label,value,key)}</button>`).join('')}</div>
     ` : ''}
       <main class="main-column" id="main-content">${activeTab==='career'||isYear&&!stageNames[lifeStage]?'':`<div class="chapter-heading"><h2>${isYear ? stageNames[lifeStage] : ({family:'A life, connected'}[activeTab])}<span style="color:var(--orange)">.</span></h2></div>`}
-      ${isYear?fameView():''}${isYear&&familyCareProfiles().length?`<section class="panel parent-status-panel">${parentStatusView()}</section>`:''}${eventDecisionView()}${state.ended ? endPanel() : ''}${state.needsSuccession ? successionPanel() : ''}
+      ${isYear?datingPotentialView()+fameView():''}${isYear&&familyCareProfiles().length?`<section class="panel parent-status-panel">${parentStatusView()}</section>`:''}${eventDecisionView()}${state.ended ? endPanel() : ''}${state.needsSuccession ? successionPanel() : ''}
       ${activeTab==='year' ? yearView() : activeTab==='career' ? careerView() : familyView()}</main>
     <footer class="bottom-dock" aria-label="Game controls">${isYear?advanceControls():''}<nav class="nav-list" aria-label="Game sections">${[['year','Year'],['career','Career'],['family','Family']].map(([id,label])=>`<button class="nav-button ${activeTab===id?'active':''}" data-action="tab" data-tab="${id}" ${activeTab===id?'aria-current="page"':''}><span class="nav-icon">${icon(id)}</span><span class="nav-label">${label}</span>${id==='family'&&state.children.length?`<span class="nav-count">${state.children.length}</span>`:''}</button>`).join('')}</nav></footer>
   </div>`;
@@ -243,32 +273,37 @@ function outcomeLimits(outcome) {
   const limits = { ...(state.age<2?{}:outcome.focusLimits?.[state.age<5?'toddler':'standard'] || {}) };
   if (isSchoolActivityFocus(state,'sports') && limits.self!==undefined && limits.self<MAX_FOCUS) limits.sports=Math.min(limits.sports ?? focusMaxFor(state,'sports'),Math.floor(limits.self/2));
   const active = focusLimits(state);
-  return Object.entries(limits).filter(([key,max])=>Object.hasOwn(active,key) && max<focusMaxFor(state,key)).map(([key,max])=>focusCapLabel(focusLabel(key),max));
+  const stage = state.age<2?null:state.age<5?'toddler':'standard';
+  const capacity = Object.entries(limits).filter(([key,max])=>Object.hasOwn(active,key) && max<focusMaxFor(state,key)).map(([key,max])=>focusCapLabel(focusLabel(key),max));
+  for (const [key,amount] of Object.entries(outcome.focusCapacity?.[stage] || {})) if (Object.hasOwn(active,key)) capacity.push(`${amount>0?'+':''}${amount} ${focusLabel(key)} focus capacity`);
+  for (const [key,amount] of Object.entries(outcome.focusMinimums?.[stage] || {})) if (Object.hasOwn(active,key)) capacity.push(`+${amount} ${focusLabel(key)} minimum focus`);
+  return capacity;
 }
 
 function outcomeLines(outcome, subject, pending) {
   if (!pending) {
-    return [...Object.entries(outcome.modifiers || {}).filter(([,amount])=>amount).map(([key,amount])=>`${signedModifier(amount)} ${skillLabel(key)}`), ...(outcome.lifestyle?[`${signedModifier(outcome.lifestyle)} Lifestyle`]:[]), ...(outcome.focusPoints?[focusPointChange(outcome.focusPoints)]:[]), ...outcomeLimits(outcome)];
+    return [...Object.entries(outcome.modifiers || {}).filter(([,amount])=>amount).map(([key,amount])=>`${signedModifier(amount)} ${skillLabel(key)}`), ...(outcome.lifestyle?[`${signedModifier(outcome.lifestyle)} Lifestyle`]:[]), ...(outcome.householdLifestyle?[`${signedModifier(outcome.householdLifestyle)} Household lifestyle support strength`]:[]), ...(outcome.focusPoints?[focusPointChange(outcome.focusPoints)]:[]), ...outcomeLimits(outcome)];
   }
   const preview = structuredClone(state);
   const result = resolveEventChoice(preview,outcome.id,pending.eventId,pending.subjectId || undefined);
   if (!result.ok) return [];
-  const change = (label,start,end) => `${label} ${beforeAfter({before:start,after:end})}`;
+  const change = (label,start,end) => `${label} ${beforeAfter({before:start,after:end},/lifestyle/i.test(label)?lifestyleNumber:number)}`;
   const permanentKeys = [...new Set([...Object.keys(outcome.statChanges || {}),...Object.keys(outcome.playerChanges || {}),...Object.keys(outcome.modifiers || {})])];
   const before = effectiveStats(state);
   const afterPermanent = effectiveStats({ ...preview, effects: state.effects });
   const changes = permanentKeys.map(key => change(skillLabel(key),before[key],afterPermanent[key]));
   if (outcome.fameAction === 'start' && preview.fame) changes.push(`Begin ${fameSource(preview.fame)}${preview.fame.kind==='personal'?'':' fame'}`);
   if (outcome.fameChange && state.fame && preview.fame) changes.push(change('Fame',state.fame.rating,preview.fame.rating));
-  if (outcome.fameSupport && state.fame && preview.fame) changes.push(`Fame household support ${state.fame.support>0?'+':''}${number(state.fame.support)} → ${preview.fame.support>0?'+':''}${number(preview.fame.support)}`);
+  if (outcome.fameSupport && state.fame && preview.fame) changes.push(`Fame household support strength ${state.fame.support>0?'+':''}${number(state.fame.support)} → ${preview.fame.support>0?'+':''}${number(preview.fame.support)}`);
   const signedAptitude = value => value > 0 ? `+${value}` : String(value);
   for (const key of Object.keys(outcome.aptitudeChanges || {})) changes.push(`${skillLabel(key)} learning ability ${signedAptitude(state.aptitudes[key])} → ${signedAptitude(preview.aptitudes[key])}`);
   const nextSubject = pendingEventSubject(preview,pending);
   for (const key of Object.keys(outcome.subjectChanges || {})) changes.push(change(`${subject?.name || 'Your loved one'}: ${skillLabel(key)}`,subject?.stats[key],nextSubject?.stats[key]));
   if (outcome.relationship) changes.push(change(`Relationship with ${subject?.name || 'your loved one'}`,subject?.relationship,nextSubject?.relationship));
+  if (outcome.householdLifestyle) changes.push(change('Household lifestyle',state.lifestyle,preview.lifestyle));
   if (outcome.focusPoints) changes.push(focusPointChange(outcome.focusPoints));
   changes.push(...outcomeLimits(outcome));
-  if (outcome.years && (outcome.focusLimits || outcome.focusPoints)) changes.push(`${outcome.years} year${outcome.years===1?'':'s'}`);
+  if (outcome.years && (outcome.focusLimits || outcome.focusCapacity || outcome.focusMinimums || outcome.focusPoints || outcome.householdLifestyle)) changes.push(`${outcome.years} year${outcome.years===1?'':'s'}`);
   return changes;
 }
 
@@ -290,7 +325,7 @@ function eventDecisionView() {
   const event = EVENTS.find(event => event.id===pending.eventId);
   const subject = pendingEventSubject(state,pending);
   const story = text => String(text).replaceAll('{name}',subject?.name || 'your loved one');
-  return `<section class="panel event-decision" aria-labelledby="event-title" data-event-id="${esc(event.id)}" data-subject-id="${esc(pending.subjectId || '')}"><div class="panel-heading"><span class="eyebrow">${pending.subjectId?'A FAMILY MOMENT':'A TURN IN YOUR STORY'}</span><span class="tag">${state.pendingEvents.length} CHOICE${state.pendingEvents.length===1?'':'S'} LEFT</span></div><h3 id="event-title" tabindex="-1">${journalText(event.name)}</h3><p class="event-context">${pending.subjectId?`${narrativeText(subject?.name)} · Age ${subject?.age} · Your age ${pending.age}`:`Age ${pending.age}`} · Year in review</p><p class="section-description">${journalText(story(event.description))}</p>${eventCauseView(pending,pending.age)}<div class="event-choices">${event.choices.map(choice=>`<button class="event-option" data-action="event-choice" data-event="${esc(event.id)}" data-subject="${esc(pending.subjectId || '')}" data-choice="${esc(choice.id)}"><strong>${journalText(choice.label)} ${icon('arrow')}</strong><span>${journalText(story(choice.description))}</span><span class="event-consequences">${outcomeLines(choice,subject,pending).map(line=>narrativeText(line)).join('<br>')}</span></button>`).join('')}</div><p class="decision-required">Choose before moving on.</p></section>`;
+  return `<section class="panel event-decision" aria-labelledby="event-title" data-event-id="${esc(event.id)}" data-subject-id="${esc(pending.subjectId || '')}"><div class="panel-heading"><span class="eyebrow">${pending.subjectId?'A FAMILY MOMENT':'A TURN IN YOUR STORY'}</span><span class="tag">${state.pendingEvents.length} CHOICE${state.pendingEvents.length===1?'':'S'} LEFT</span></div><h3 id="event-title" tabindex="-1">${journalText(event.name)}</h3><p class="event-context">${pending.subjectId?`${narrativeText(subject?.name)} · Age ${subject?.age} · Your age ${pending.age}`:`Age ${pending.age}`} · Year in review</p><p class="section-description">${journalText(story(eventDescriptionAtAge(event,(subject?.age ?? pending.age)-1)))}</p>${eventCauseView(pending,pending.age)}<div class="event-choices">${event.choices.map(choice=>`<button class="event-option" data-action="event-choice" data-event="${esc(event.id)}" data-subject="${esc(pending.subjectId || '')}" data-choice="${esc(choice.id)}"><strong>${journalText(choice.label)} ${icon('arrow')}</strong><span>${journalText(story(choice.description))}</span><span class="event-consequences">${outcomeLines(choice,subject,pending).map(line=>colorStatChanges(narrativeText(line))).join('<br>')}</span></button>`).join('')}</div><p class="decision-required">Choose before moving on.</p></section>`;
 }
 
 function focusEventDecision() {
@@ -303,7 +338,7 @@ function focusEventDecision() {
 function effectsView() {
   const activeEffects = state.effects.filter(effect=>effect.years>0);
   if (!activeEffects.length) return '';
-  return `<details class="panel active-effects"><summary>Active effects <span class="tag">${activeEffects.length}</span></summary><div class="effect-list">${activeEffects.map(effect => `<div class="effect-card ${Object.values(effect.modifiers || {}).some(value => value<0)||effect.lifestyle<0||effect.focusPoints<0||outcomeLimits(effect).length?'negative':'positive'}"><div class="effect-title">${icon('spark')} ${journalText(effect.name)}</div><div class="effect-meta">${outcomeLines(effect).map(esc).join('<br>')}<br>${effect.years} year${effect.years===1?'':'s'} remaining</div></div>`).join('')}</div><button class="button ghost small" data-action="odds">View this year’s odds ${icon('arrow')}</button></details>`;
+  return `<details class="panel active-effects"><summary>Active effects <span class="tag">${activeEffects.length}</span></summary><div class="effect-list">${activeEffects.map(effect => `<div class="effect-card ${Object.values(effect.modifiers || {}).some(value => value<0)||effect.lifestyle<0||effect.householdLifestyle<0||effect.focusPoints<0||outcomeLimits(effect).some(text=>text.startsWith('-')||text.includes('minimum focus')||text.includes('focus max'))?'negative':'positive'}"><div class="effect-title">${icon('spark')} ${journalText(effect.name)}</div><div class="effect-meta">${outcomeLines(effect).map(esc).join('<br>')}<br>${effect.years} year${effect.years===1?'':'s'} remaining</div></div>`).join('')}</div><button class="button ghost small" data-action="odds">View this year’s odds ${icon('arrow')}</button></details>`;
 }
 
 function yearView() {
@@ -312,7 +347,7 @@ function yearView() {
   const toddler = !baby && state.age < 5;
   const disabled = state.ended || state.needsSuccession || state.pendingEvents.length>0;
   const schoolGrade = state.school && (state.school.reportedAge===null?'N/A':gradeLetter(state.school.gpa));
-  return `${state.education.status==='college'?collegeProgressView():''}<section class="panel focus-panel"><div class="panel-heading"><h3>${labelWithHelp(baby?'Cry level':toddler?'Toddler activities':'Focus',baby?'cry':toddler?'toddler-focus':'focus')}</h3><span class="tag">${baby ? 'AGES 0–1' : `${focusUsed()} / ${focusBudget(state)} POINTS`}</span></div>
+  return `${state.education.status==='college'?collegeProgressView():''}${housingView()}<section class="panel focus-panel"><div class="panel-heading"><h3>${labelWithHelp(baby?'Cry level':toddler?'Toddler activities':'Focus',baby?'cry':toddler?'toddler-focus':'focus')}</h3><span class="tag">${baby ? 'AGES 0–1' : `${focusUsed()} / ${focusBudget(state)} POINTS`}</span></div>
     ${state.age>=5 && state.age<18 && state.school?`<div class="school-grade"><span>${labelWithHelp('School GPA','school-gpa')}<small>${state.school.reportedAge===null?'No report card yet':'Latest report card'}</small></span><strong aria-label="School GPA ${esc(schoolGrade)}">${esc(schoolGrade)}</strong></div>`:''}
     ${baby ? `<div class="cry-control" role="group" aria-label="Cry level"><div class="cry-levels">${[1,2,3,4,5].map(level=>`<button class="cry-level ${state.cryLevel===level?'selected':''}" data-action="baby" data-level="${level}" aria-label="Cry level ${level} of 5" aria-pressed="${state.cryLevel===level}" ${disabled?'disabled':''}>${level}</button>`).join('')}</div><div class="cry-scale-labels"><span>Low</span><span>High</span></div></div>` : focusView(disabled)}
     ${!baby&&(state.age<18||state.education.status==='college')?'':choiceImpactSummary()}
@@ -334,8 +369,8 @@ function parentStatusView() {
 function changesView(changes, lifestyle, height, fromAge, toAge) {
   const entries = [...Object.entries(changes || {}).sort(([a],[b]) => DISPLAY_STATS.findIndex(stat => stat.key === a) - DISPLAY_STATS.findIndex(stat => stat.key === b)), ...(lifestyle?[['lifestyle',lifestyle]]:[]), ...(height?[['height',height]]:[])];
   return `<div class="year-changes">${entries.map(([key,value]) => {
-    const before = key === 'height' ? formatHeight(value.before,fromAge) : number(value.before);
-    const after = key === 'height' ? formatHeight(value.after,toAge) : number(value.after);
+    const before = key === 'height' ? formatHeight(value.before,fromAge) : key === 'lifestyle' ? lifestyleNumber(value.before) : number(value.before);
+    const after = key === 'height' ? formatHeight(value.after,toAge) : key === 'lifestyle' ? lifestyleNumber(value.after) : number(value.after);
     const change = before === after ? 0 : value.after - value.before;
     return `<div class="year-change" data-stat="${esc(key)}"><span>${esc(skillLabel(key))}${statEmoji(key)}</span><strong class="${change>0?'gain':change<0?'loss':'unchanged'}">${before} → ${after}</strong></div>`;
   }).join('')}</div>`;
@@ -353,20 +388,38 @@ function yearDecisionsView(decisions) {
 
 // Historical copy is render-only: old titles and exact prefixes keep their context.
 const eventCopiesFor = entry => [...LEGACY_EVENT_COPY, ...EVENTS].filter(event => entry.title===event.name || entry.title.endsWith(`: ${event.name}`));
+const eventImpactTag = event => ['minor','moderate','major'].includes(event?.severity)
+  ? `<small class="event-impact" data-severity="${event.severity}">${{minor:'Minor event',moderate:'Moderate event',major:'Major event'}[event.severity]}</small>` : '';
+const recordedEventImpact = entry => eventImpactTag(EVENTS.find(event => entry.title===event.name || entry.title.endsWith(`: ${event.name}`)));
 const isNoEventEntry = entry => entry.title === 'A quiet year' || entry.kind === 'quiet' && entry.title === 'Events' && entry.text === 'None';
+function meaningfulFocusOutcome(entry, text) {
+  const lines=splitEventOutcome(text);
+  if(lines.length<2) return text;
+  const choice=eventCopiesFor(entry).flatMap(event=>event.choices || []).find(choice=>lines[0]===`${choice.label}. No stat changes.`);
+  if(lines[0]!=='No stat changes.' && !choice) return text;
+  const focusName='(?:Arts\\s*&\\s*crafts|Family\\s+time|Extracurriculars?|Electronics|Yourself|Friends|College|Career|School|Sports|Study|Family|Play|Rest|Work)';
+  const signed='[+\\-\u2212]\\d+';
+  const focus=new RegExp(`^(?:${signed} (?:total )?focus points?|${signed} ['"]?${focusName}['"]? (?:focus capacity|minimum focus)|['"]?${focusName}['"]? (?:focus )?(?:max|minimum|min|capacity) [+-]?\\d+)\\.?$`,'i');
+  const duration=/^(?:(?:Temporary effects|Duration):\s*)?\d+\s+years?\.?$/i;
+  const effects=lines.slice(1);
+  if(!effects.some(line=>focus.test(line)) || !effects.every(line=>focus.test(line) || duration.test(line))) return text;
+  return `${choice?`${choice.label}. `:''}${effects.join('\n')}`;
+}
 function completedEventCopy(entry) {
   if (isNoEventEntry(entry)) return { title: 'Events', text: 'None' };
   const milestones = {
-    'A bigger little world': ['Toddler activities unlocked','No stat changes.'],
-    'The first school year': ['School started','No stat changes.'],
-    'Your own way': ['Adulthood reached','College and career choices unlocked. No stat changes.'],
-    'Graduation day': ['College completed','Graduate job offers unlocked. No stat changes.'],
-    'The next chapter': ['Retirement unlocked','No stat changes.'],
+    'A bigger little world': ['Toddler activities unlocked','Toddler focus choices are now available.'],
+    'The first school year': ['School started','School focus and yearly activity offers unlocked.'],
+    'Your own way': ['Adulthood reached','College and career choices unlocked.'],
+    'Graduation day': ['College completed','Graduate job offers unlocked.'],
+    'The next chapter': ['Retirement unlocked','You can now retire and choose an heir.'],
   };
   if (entry.kind==='milestone' && milestones[entry.title]) {
     const [title,text] = milestones[entry.title];
     return {title,text};
   }
+  const knownMilestone=Object.values(milestones).find(([title])=>title===entry.title);
+  if(entry.kind==='milestone' && knownMilestone && /^(?:(?:College and career choices|Graduate job offers) unlocked\. )?No stat changes\.$/.test(entry.text)) return {title:entry.title,text:knownMilestone[1]};
   for (const event of eventCopiesFor(entry)) {
     const subject = entry.title===event.name?'Your family member':entry.title.slice(0,-event.name.length-2);
     const choice = event.choices?.find(choice=>entry.text.startsWith(`${choice.label}: `));
@@ -374,9 +427,9 @@ function completedEventCopy(entry) {
     const prefix = choice?`${choice.label}: ${description}`:description;
     if (!entry.text.startsWith(prefix)) continue;
     const changes = entry.text.slice(prefix.length).trim();
-    return {title:entry.title,text:`${choice?`${choice.label}. `:''}${changes || 'No stat changes.'}`};
+    return {title:entry.title,text:meaningfulFocusOutcome(entry,`${choice?`${choice.label}. `:''}${changes || 'No stat changes.'}`)};
   }
-  return entry;
+  return {...entry,text:meaningfulFocusOutcome(entry,entry.text)};
 }
 function yearEventsView(summary) {
   // Saved reviews follow the newest-first journal; show the year in occurrence order.
@@ -385,7 +438,7 @@ function yearEventsView(summary) {
     const copy = completedEventCopy(event);
     const description = reviewEventDescription(event);
     const result = event.kind==='choice' && description ? 'Choice offered.' : copy.text;
-    return `<li><strong>${journalText(copy.title,summary.toAge)}</strong>${description?`<p class="year-event-description">${narrativeText(description,summary.toAge)}</p>`:''}${eventCauseView(event,summary.toAge)}<p class="year-event-results">${eventOutcomeText(result,summary.toAge)}</p></li>`;
+    return `<li><strong>${journalText(copy.title,summary.toAge)}</strong>${recordedEventImpact(event)}${description?`<p class="year-event-description">${narrativeText(description,summary.toAge)}</p>`:''}${eventCauseView(event,summary.toAge)}<p class="year-event-results">${eventOutcomeText(result,summary.toAge)}</p></li>`;
   }).join('')}</ul>`:'<p>None</p>'}</details>`;
 }
 
@@ -399,6 +452,7 @@ function reviewEventDescription(entry) {
   }) || copies[0];
   const subject = event && entry.title!==event.name ? entry.title.slice(0,-event.name.length-2) : 'Your family member';
   const source = entry.description || event?.description?.replaceAll('{name}',subject) || '';
+  if (event?.severity) return source.trim();
   // Saved context also covers events created during play, such as adoption.
   // Catalog lookup lets existing reviews gain context without rewriting saves.
   const template = event ? source.replaceAll(subject,'{name}') : source;
@@ -407,7 +461,7 @@ function reviewEventDescription(entry) {
 }
 
 function eventOutcomeText(text, age) {
-  return splitEventOutcome(text).map(line=>journalText(line,age)).join('<br>');
+  return splitEventOutcome(text).map(line=>colorStatChanges(journalText(line,age))).join('<br>');
 }
 
 const activitySuccessLabel = activityGradeLetter;
@@ -431,7 +485,7 @@ function fameReviewView(report) {
 function yearSummaryModal() {
   const summary=state.yearSummary;
   if (!summary || summary.dismissed) return;
-  openModal(`Age ${summary.fromAge} → ${summary.toAge}`, `${schoolReportView(summary.school)}${fameReviewView(summary.fame)}${yearDecisionsView(summary.decisions)}${changesView(summary.stats,summary.lifestyle,summary.height,summary.fromAge,summary.toAge)}${summary.parents?.length?`<details class="forecast-parents" open><summary>Parents & guardians</summary>${summary.parents.map(parent=>`<p><strong>${narrativeText(parent.name)}</strong><span>Mental stability${statEmoji('stability')} ${beforeAfter(parent.stability)}<br>Relationship${statEmoji('relationship')} ${beforeAfter(parent.relationship)}${parent.lifestyle?`<span class="parent-review-lifestyle">Lifestyle${statEmoji('lifestyle')} ${beforeAfter(parent.lifestyle)}</span>`:''}</span></p>`).join('')}</details>`:''}${yearEventsView(summary)}${state.pendingEvents.length?'<p class="form-note">Decisions waiting.</p>':''}`, '<button class="button primary" data-action="close">Continue '+icon('arrow')+'</button>');
+  openModal(`Age ${summary.fromAge} → ${summary.toAge}`, `${schoolReportView(summary.school)}${fameReviewView(summary.fame)}${yearDecisionsView(summary.decisions)}${changesView(summary.stats,summary.lifestyle,summary.height,summary.fromAge,summary.toAge)}${summary.parents?.length?`<details class="forecast-parents" open><summary>Parents & guardians</summary>${summary.parents.map(parent=>`<p><strong>${narrativeText(parent.name)}</strong><span>Mental stability${statEmoji('stability')} ${coloredBeforeAfter(parent.stability)}<br>Relationship${statEmoji('relationship')} ${coloredBeforeAfter(parent.relationship)}${parent.lifestyle?`<span class="parent-review-lifestyle">Lifestyle${statEmoji('lifestyle')} ${coloredBeforeAfter(parent.lifestyle,lifestyleNumber)}</span>`:''}</span></p>`).join('')}</details>`:''}${yearEventsView(summary)}${state.pendingEvents.length?'<p class="form-note">Decisions waiting.</p>':''}`, '<button class="button primary" data-action="close">Continue '+icon('arrow')+'</button>');
   showingYearSummary=true;
   modalRoot.querySelector('.modal').classList.add('year-review-modal');
   modalRoot.querySelector('.modal-backdrop').classList.add('year-review-backdrop');
@@ -439,7 +493,7 @@ function yearSummaryModal() {
 
 function lifestyleView() {
   const descriptions = ['Basic needs unmet', 'The essentials', 'A little breathing room', 'Finding your footing', 'Everyday comfort', 'Living well', 'Room to enjoy life', 'A comfortable abundance', 'A taste of luxury', 'An exceptional life', 'Every comfort imaginable'];
-  return `<section class="lifestyle-summary" aria-label="Lifestyle"><div><span class="eyebrow">EVERYDAY COMFORT</span><h3>${labelWithHelp('Lifestyle','lifestyle')} <strong>${number(state.lifestyle)}<small>/10</small></strong></h3><p>${descriptions[Math.round(state.lifestyle)]}</p>${ratingBar('Lifestyle',state.lifestyle)}</div></section>`;
+  return `<section class="lifestyle-summary" aria-label="Lifestyle"><div><span class="eyebrow">EVERYDAY COMFORT</span><h3>${labelWithHelp('Lifestyle','lifestyle')} <strong>${lifestyleNumber(state.lifestyle)}<small>/10</small></strong></h3><p>${descriptions[state.lifestyle>=10?10:Math.min(9,Math.round(state.lifestyle))]}</p>${ratingBar('Lifestyle',state.lifestyle)}</div></section>`;
 }
 
 function choiceImpactGroups(changes) {
@@ -479,7 +533,7 @@ function activityEffectsView(activity, label) {
   }
   if (activity === fameFocusKey(state)) {
     const change = fameFocusChange(state);
-    if (change && (change>0?state.fame.rating<10:state.fame.rating>0)) entries.push({stat:'fame',change,level:Math.abs(change)<1?1:change<0 && state.fame.kind!=='personal'?2:3});
+    if (change && (change>0?state.fame.rating<10:state.fame.rating>0)) entries.push({stat:'fame',change,level:Math.abs(change)<.5?1:change<0 && state.fame.kind!=='personal'?2:3});
   }
   if (!entries.length) return '';
   return `<div class="activity-effects" aria-label="${esc(label)} expected changes"><ul class="choice-impact-list">${entries.map(({stat,change,level,parentIds}) => {
@@ -499,14 +553,14 @@ function schoolEnrollmentView(kind, disabled) {
   const eligible=activity && activityEligible(state,activity);
   const offerCount=state.school?.offers[kind]?.length || 0;
   const emptyNote=`No ${kind==='sports'?'sports':'extracurriculars'} offered this year.`;
-  return `<div class="school-enrollment" data-school-kind="${kind}">${activity?`<div class="school-enrollment-title"><strong>${esc(activity.name)}</strong><span>Success <strong>${activitySuccessLabel(enrolled.success)}</strong></span></div>${!eligible?`<p class="form-note">Requires Lifestyle ${number(activity.minLifestyle)}+. Participation is paused.</p>`:''}`:`<div class="school-enrollment-title"><span>Success N/A</span></div>${offerCount?'<p class="form-note">Sign up to spend focus points here.</p>':''}`}${!offerCount?`<p class="form-note">${emptyNote}</p>`:''}${activity || offerCount?`<button class="button ghost small" data-action="school-offers" data-kind="${kind}" ${disabled?'disabled':''}>${activity?(offerCount?'View this year’s options':'Manage current activity'):kind==='sports'?'Join a sport':'Join an extracurricular'}</button>`:''}</div>`;
+  return `<div class="school-enrollment" data-school-kind="${kind}">${activity?`<div class="school-enrollment-title"><strong>${esc(activity.name)}</strong><span>Success <strong>${activitySuccessLabel(enrolled.success)}</strong></span></div>${!eligible?`<p class="form-note">Requires Lifestyle ${lifestyleNumber(activity.minLifestyle)}+. Participation is paused.</p>`:''}`:`<div class="school-enrollment-title"><span>Success N/A</span></div>${offerCount?'<p class="form-note">Sign up to spend focus points here.</p>':''}`}${!offerCount?`<p class="form-note">${emptyNote}</p>`:''}${activity || offerCount?`<button class="button ghost small" data-action="school-offers" data-kind="${kind}" ${disabled?'disabled':''}>${activity?(offerCount?'View this year’s options':'Manage current activity'):kind==='sports'?'Join a sport':'Join an extracurricular'}</button>`:''}</div>`;
 }
 
 function fameActivityView(kind) {
-  const enrolled = state.school?.[kind];
+  const enrolled = currentSchoolEnrollment(state,kind);
   const activity = schoolActivity(kind,enrolled?.id);
   if (!activity) return '';
-  return `<div class="school-enrollment fame-activity" data-school-kind="${kind}"><div class="school-enrollment-title"><strong>${esc(activity.name)}</strong><span>Success <strong>${activitySuccessLabel(enrolled.success)}</strong></span></div>${!activityEligible(state,activity)?`<p class="form-note">Requires Lifestyle ${number(activity.minLifestyle)}+. Participation is paused.</p>`:''}</div>`;
+  return `<div class="school-enrollment fame-activity" data-school-kind="${kind}"><div class="school-enrollment-title"><strong>${esc(activity.name)}</strong><span>Success <strong>${activitySuccessLabel(enrolled.success)}</strong></span></div>${!activityEligible(state,activity)?`<p class="form-note">Requires Lifestyle ${lifestyleNumber(activity.minLifestyle)}+. Participation is paused.</p>`:''}</div>`;
 }
 
 function schoolOffersModal(kind) {
@@ -518,10 +572,13 @@ function schoolOffersModal(kind) {
   const cards=state.school.offers[kind].map(id=>{
     const activity=schoolActivity(kind,id);
     const eligible=activityEligible(state,activity);
-    const reason=!eligible?`Requires Lifestyle ${number(activity.minLifestyle)}+.`:freePoints<1?'Free one focus point to sign up.':'';
-    return `<article class="school-offer" data-offer-id="${esc(id)}"><h3>${esc(activity.name)}</h3><p>Performance: ${Object.keys(activity.weights).map(key=>key==='height'?(activity.heightPreference==='shorter'?'Shorter height':'Taller height'):skillLabel(key)).map(esc).join(', ')}.</p><p>Training: ${Object.keys(activity.training).map(skillLabel).map(esc).join(', ')}.</p>${activity.minLifestyle?`<p>Minimum Lifestyle ${number(activity.minLifestyle)}</p>`:''}${reason?`<p class="form-note">${esc(reason)}</p>`:''}<button class="button secondary small" data-action="school-enroll" data-kind="${kind}" data-id="${esc(id)}" ${blocked || !eligible || freePoints<1?'disabled':''}>Join ${esc(activity.name)}</button></article>`;
+    const candidate={...state,school:{...state.school,[kind]:{id,success:null}}};
+    const required=Math.max(1,focusMinimums(candidate)[kind]);
+    const restricted=focusLimits(candidate)[kind]<required;
+    const reason=!eligible?`Requires Lifestyle ${lifestyleNumber(activity.minLifestyle)}+.`:restricted?'Participation is restricted this year.':freePoints<required?`Free ${required===1?'one':required} focus ${required===1?'point':'points'} to sign up.`:'';
+    return `<article class="school-offer" data-offer-id="${esc(id)}"><h3>${esc(activity.name)}</h3><p>Performance: ${Object.keys(activity.weights).map(key=>key==='height'?(activity.heightPreference==='shorter'?'Shorter height':'Taller height'):skillLabel(key)).map(esc).join(', ')}.</p><p>Training: ${Object.keys(activity.training).map(skillLabel).map(esc).join(', ')}.</p>${activity.minLifestyle?`<p>Minimum Lifestyle ${lifestyleNumber(activity.minLifestyle)}</p>`:''}${reason?`<p class="form-note">${esc(reason)}</p>`:''}<button class="button secondary small" data-action="school-enroll" data-kind="${kind}" data-id="${esc(id)}" ${blocked || !eligible || restricted || freePoints<required?'disabled':''}>Join ${esc(activity.name)}</button></article>`;
   }).join('');
-  openModal(kind==='sports'?'Choose a sport':'Choose an extracurricular', `<p class="form-note">Higher Lifestyle brings more frequent offers and usually more choices. Each category rolls separately. At Lifestyle 1, each has a 28% yearly chance of 1-4 options, with a median of 2. At Lifestyle 10, both arrive every year with 8-10 options and a median of 10. Offers last this school year.</p><p class="form-note">Joining assigns 1 point. Success is N/A until your first completed year of participation, then graded F- through A+. Switching starts a new unrated activity.</p>${current?`<div class="school-current"><strong>Current: ${esc(current.name)} · ${activitySuccessLabel(enrolled.success)}</strong><button class="button secondary small" data-action="close">Keep ${esc(current.name)}</button><button class="button ghost small" data-action="school-leave" data-kind="${kind}" ${blocked?'disabled':''}>Leave ${esc(current.name)}</button></div>`:''}${!cards?`<p class="form-note">No ${kind==='sports'?'sports':'extracurriculars'} offered this year.${current?' You can keep or leave your current activity.':''}</p>`:''}<div class="school-offers">${cards}</div>`);
+  openModal(kind==='sports'?'Choose a sport':'Choose an extracurricular', `<p class="form-note">Higher Lifestyle brings more frequent offers and usually more choices. Each category rolls separately. At Lifestyle 1, each has a 28% yearly chance of 1-4 options, with a median of 2. At Lifestyle 10, both arrive every year with 8-10 options and a median of 10. Offers last this school year.</p><p class="form-note">Joining assigns 1 point. Success is N/A until your first completed year of participation, then graded F- through A+. Switching starts a new unrated activity.</p>${current?`<div class="school-current"><strong>Current: ${esc(current.name)} · ${activitySuccessLabel(enrolled.success)}</strong><button class="button secondary small" data-action="close">Keep ${esc(current.name)}</button><button class="button ghost small" data-action="school-leave" data-kind="${kind}" ${blocked || focusMinimums(state)[kind]>0?'disabled':''}>Leave ${esc(current.name)}</button></div>`:''}${!cards?`<p class="form-note">No ${kind==='sports'?'sports':'extracurriculars'} offered this year.${current?' You can keep or leave your current activity.':''}</p>`:''}<div class="school-offers">${cards}</div>`);
 }
 
 function focusView(disabled) {
@@ -529,44 +586,136 @@ function focusView(disabled) {
   const studying = state.age<18 || state.education.status==='college';
   const rows = toddler?toddlerFocusRows:state.age<18?schoolFocusRows:[['work',studying?'College':'Career',studying?'school':'career'],['social','Friends','social'],['family','Family','family'],['self','Yourself','self']];
   const famousActivity = hasFame(state) && state.fame.kind !== 'personal' ? state.fame.kind : null;
-  if (state.age>=18 && famousActivity) rows.push([famousActivity,focusLabel(famousActivity),famousActivity==='sports'?'sports':'spark']);
+  const collegeSport = state.education.status==='college' && state.education.sport;
+  if (collegeSport) rows.push(['sports','College sports','sports']);
+  if (state.age>=18 && famousActivity && !(collegeSport && famousActivity==='sports')) rows.push([famousActivity,focusLabel(famousActivity),famousActivity==='sports'?'sports':'spark']);
   const mode = toddler?'activity':'focus';
-  const limits = focusLimits(state), details = focusLimitDetails(state);
-  const schoolPerson = !disabled && state.alive!==false && state.age>=5 && (state.age<18 || famousActivity) && state.school
+  const limits = focusLimits(state), minimums = focusMinimums(state), details = focusLimitDetails(state);
+  const schoolPerson = !disabled && state.alive!==false && state.age>=5 && (state.age<18 || famousActivity || state.education.status==='college')
     ? { ...state, stats: effectiveStats(state) } : null;
-  const expectedGpa = schoolPerson && state.age<18 ? gradeLetter(gradeScore(state.focus.work,schoolPerson.stats.intelligence)) : null;
+  const selectedCollege = collegeById(state.education.collegeId);
+  const expectedGpa = schoolPerson && state.age<18 ? gradeLetter(gradeScore(state.focus.work,schoolPerson.stats.intelligence))
+    : schoolPerson && selectedCollege && state.education.status==='college' ? gradeLetter(collegeGradeScore(selectedCollege.difficulty,state.focus.work,schoolPerson.stats.intelligence)) : null;
   return `<div class="focus-list">${rows.map(([key,label,ico]) => {
     const maximum=focusMaxFor(state,key);
-    const enrollment = schoolPerson && ['sports','extracurricular'].includes(key) ? state.school[key] : null;
+    const enrollment = schoolPerson && ['sports','extracurricular'].includes(key) ? currentSchoolEnrollment(state,key) : null;
     const activity = enrollment && schoolActivity(key,enrollment.id);
     const expectedSuccess = activityEligible(schoolPerson,activity)
-      ? activityGradeLetter(activitySuccessAfterYear(schoolPerson,activity,enrollment.success,state.focus[key])) : null;
+      ? activityGradeLetter(collegeSport && key==='sports'
+        ? collegeSportSuccessAfterYear(schoolPerson,enrollment.success,state.focus[key])
+        : activitySuccessAfterYear(schoolPerson,activity,enrollment.success,state.focus[key])) : null;
     const restrictions = details.filter(limit=>limit.key===key);
-    const limitText = restrictions.length?'Max '+limits[key]+' · '+restrictions.map(limit=>limit.name+' ('+(limit.years===null?'lifelong':limit.years===1?'this year':limit.years+' years left')+')').join('; '):'';
-    return `<div class="focus-row" data-focus-key="${key}"><span class="focus-icon">${icon(ico)}</span><div class="focus-copy"><h4>${labelWithHelp(label,`${toddler?'toddler':'focus'}-${key}`)}</h4><div class="focus-scale" aria-hidden="true">${Array.from({length:maximum},(_,i)=>`<span class="${i<(state.focus[key] ?? 0)?'filled':i>=limits[key]?'limited':''}"></span>`).join('')}</div>${limitText?`<div class="focus-limit" id="focus-limit-${key}">${esc(limitText)}</div>`:''}</div><div class="stepper" role="group" aria-label="${esc(label)} ${mode}" ${limitText?`aria-describedby="focus-limit-${key}"`:''}><button data-action="focus" data-key="${key}" data-delta="-1" aria-label="Decrease ${esc(label.toLowerCase())} ${mode}" ${(state.focus[key] ?? 0)<=0||disabled?'disabled':''}>${icon('minus')}</button><output aria-label="${esc(label)} ${mode} level">${state.focus[key] ?? 0}</output><button data-action="focus" data-key="${key}" data-delta="1" aria-label="Increase ${esc(label.toLowerCase())} ${mode}" ${(state.focus[key] ?? 0)>=limits[key]||focusUsed()>=focusBudget(state)||disabled?'disabled':''}>${icon('plus')}</button></div>${key==='work' && expectedGpa!==null?`<div class="school-gpa-preview" role="status">Expected GPA <strong>${esc(expectedGpa)}</strong></div>`:''}${expectedSuccess!==null?`<div class="school-success-preview" role="status">Expected success <strong>${esc(expectedSuccess)}</strong></div>`:''}${(toddler||studying||key===fameFocusKey(state))&&!disabled?activityEffectsView(key,label):''}${state.age>=5 && state.age<18 && ['sports','extracurricular'].includes(key)?schoolEnrollmentView(key,disabled):state.age>=18 && key===famousActivity?fameActivityView(key):''}</div>`;
+    const limitText = restrictions.length?(minimums[key]?'Minimum '+minimums[key]+' · ':'')+restrictions.map(limit=>{
+      const change = limit.minimum ? `+${limit.minimum} minimum` : limit.capacity !== undefined ? `${limit.capacity>0?'+':''}${limit.capacity} capacity` : limit.permanent ? `Max ${limit.max}` : `${limit.max-maximum} capacity`;
+      return change+' · '+limit.name+' ('+(limit.years===null?'lifelong':limit.years===1?'this year':limit.years+' years left')+')';
+    }).join('; '):'';
+    return `<div class="focus-row" data-focus-key="${key}"><span class="focus-icon">${icon(ico)}</span><div class="focus-copy"><h4>${labelWithHelp(label,`${toddler?'toddler':'focus'}-${key}`)}</h4><div class="focus-scale" aria-hidden="true">${Array.from({length:maximum},(_,i)=>`<span class="${i<(state.focus[key] ?? 0)?'filled':i>=limits[key]?'limited':''}"></span>`).join('')}</div>${limitText?`<div class="focus-limit" id="focus-limit-${key}">${esc(limitText)}</div>`:''}</div><div class="stepper" role="group" aria-label="${esc(label)} ${mode}" ${limitText?`aria-describedby="focus-limit-${key}"`:''}><button data-action="focus" data-key="${key}" data-delta="-1" aria-label="Decrease ${esc(label.toLowerCase())} ${mode}" ${(state.focus[key] ?? 0)<=minimums[key]||disabled?'disabled':''}>${icon('minus')}</button><output aria-label="${esc(label)} ${mode} level">${state.focus[key] ?? 0}</output><button data-action="focus" data-key="${key}" data-delta="1" aria-label="Increase ${esc(label.toLowerCase())} ${mode}" ${(state.focus[key] ?? 0)>=limits[key]||focusUsed()>=focusBudget(state)||disabled?'disabled':''}>${icon('plus')}</button></div>${key==='work' && expectedGpa!==null?`<div class="school-gpa-preview" role="status">${state.education.status==='college'?'Expected yearly grade':'Expected GPA'} <strong>${esc(expectedGpa)}</strong></div>`:''}${expectedSuccess!==null?`<div class="school-success-preview" role="status">Expected success <strong>${esc(expectedSuccess)}</strong></div>`:''}${(toddler||studying||key===fameFocusKey(state))&&!disabled?activityEffectsView(key,label):''}${state.age>=5 && state.age<18 && ['sports','extracurricular'].includes(key)?schoolEnrollmentView(key,disabled):state.age>=18 && (key===famousActivity || collegeSport && key==='sports')?fameActivityView(key):''}</div>`;
   }).join('')}</div>`;
 }
 
 function journalView() {
   const entries = showAllHistory ? state.history : state.history.slice(0,8);
-  return `<section class="panel journal-panel"><div class="panel-heading"><h3>Journal</h3></div><div class="journal-list">${entries.map(entry => `<article class="journal-entry ${esc(entry.kind || 'neutral')}"><div class="journal-age"><strong>${entry.age}</strong><span>${entry.generation===state.generation?'AGE':`GEN ${entry.generation}`}</span></div><span class="journal-marker"></span><div class="journal-content"><h4>${journalText(completedEventCopy(entry).title,entry.age)}</h4>${eventCauseView(entry,entry.age)}<p>${eventOutcomeText(completedEventCopy(entry).text,entry.age)}</p></div></article>`).join('')}</div>${state.history.length>8?`<button class="button ghost small" data-action="history">${showAllHistory?'Recent years':'Show all'} ${icon('arrow')}</button>`:''}</section>`;
+  return `<section class="panel journal-panel"><div class="panel-heading"><h3>Journal</h3></div><div class="journal-list">${entries.map(entry => `<article class="journal-entry ${esc(entry.kind || 'neutral')}"><div class="journal-age"><strong>${entry.age}</strong><span>${entry.generation===state.generation?'AGE':`GEN ${entry.generation}`}</span></div><span class="journal-marker"></span><div class="journal-content"><h4>${journalText(completedEventCopy(entry).title,entry.age)}</h4>${recordedEventImpact(entry)}${eventCauseView(entry,entry.age)}<p>${eventOutcomeText(completedEventCopy(entry).text,entry.age)}</p></div></article>`).join('')}</div>${state.history.length>8?`<button class="button ghost small" data-action="history">${showAllHistory?'Recent years':'Show all'} ${icon('arrow')}</button>`:''}</section>`;
 }
 
 function collegeProgressView() {
   const years = state.education.years;
-  return `<section class="panel college-progress"><div class="panel-heading"><h3>${labelWithHelp('College','college')}</h3><span class="tag">${years}/4 YEARS COMPLETE</span></div><div class="budget-track" role="progressbar" aria-label="College progress" aria-valuemin="0" aria-valuemax="4" aria-valuenow="${years}"><span style="width:${years/4*100}%"></span></div><p class="game-status">${4-years} more year${years===3?'':'s'} to graduation.</p></section>`;
+  const college = collegeById(state.education.collegeId);
+  return `<section class="panel college-progress"><div class="panel-heading"><h3>${labelWithHelp(college?.name || 'College','college')}</h3><span class="tag">${years}/4 YEARS COMPLETE</span></div><div class="budget-track" role="progressbar" aria-label="College progress" aria-valuemin="0" aria-valuemax="4" aria-valuenow="${years}"><span style="width:${years/4*100}%"></span></div><p class="game-status">${4-years} more year${years===3?'':'s'} to graduation.</p>${college?`<div class="college-grades job-metrics"><span>${labelWithHelp('College GPA','college-grades')}</span><strong>${state.education.gpa==null?'N/A':esc(gradeLetter(state.education.gpa))}</strong></div>${collegeMetricsView(college)}`:''}${collegeSportView()}</section>`;
+}
+
+function collegeMeter(label, value, college) {
+  const bounded = Math.max(0,Math.min(10,Number(value)||0));
+  return `<div class="college-metric"><div class="job-metrics"><span>${esc(label)}</span><strong>${number(bounded)}<small>/10</small></strong></div><div class="potential-track" role="meter" aria-label="${esc(college.name)} ${esc(label.toLowerCase())}" aria-valuemin="0" aria-valuemax="10" aria-valuenow="${bounded}"><span style="width:${bounded*10}%"></span></div></div>`;
+}
+
+function collegeMetricsView(college) {
+  return `<div class="college-metrics">${collegeMeter('Academic difficulty',college.difficulty,college)}${collegeMeter('Career potential',college.careerPotential,college)}</div>`;
+}
+
+function collegeFundingView() {
+  const funding = state.collegeApplications?.funding || (needsEducationChoice(state) ? createCollegeOffers(state).funding : null);
+  if (!funding) return '';
+  const relatives = [...state.parents,state.guardian].filter(Boolean);
+  return `<div class="college-funding" aria-label="College funding"><div class="job-metrics"><span>Parents’ household Lifestyle</span><strong>${lifestyleNumber(funding.householdLifestyle)}<small>/10</small></strong></div>${funding.supporters.map(supporter=>{
+    const person=relatives.find(relative=>relative.id===supporter.id);
+    return `<p class="college-supporter"><span>${person?esc(parentLabel(person)): 'Family member'}</span><strong>${supporter.willing?'Willing to help':'Not contributing'}</strong></p>`;
+  }).join('')}<div class="job-metrics"><span>Family contribution capacity</span><strong>${lifestyleNumber(funding.familyContribution)}<small>/10</small></strong></div><div class="job-metrics"><span>Your contribution capacity</span><strong>${lifestyleNumber(funding.personalContribution)}<small>/10</small></strong></div><div class="job-metrics college-available"><span>Available college Lifestyle</span><strong>${lifestyleNumber(funding.availableLifestyle)}<small>/10</small></strong></div></div>`;
+}
+
+function collegeChoicesView() {
+  const blocked=state.ended || state.needsSuccession || state.pendingEvents.length>0;
+  const offers=offeredColleges(state);
+  return `<section class="panel education-choice"><div class="panel-heading"><h3>${labelWithHelp('College or a career?','college')}</h3><span class="tag">YOUR CHOICE</span></div>${collegeFundingView()}<div class="college-offers">${offers.map(offer=>{
+    const college=offer.college || collegeById(offer.collegeId);
+    if(!college) return '';
+    const scholarship=offer.scholarship;
+    const canFund=offer.affordable && offer.annualPersonalCost*COLLEGE_BALANCE.years<=state.money+.000001;
+    const award=scholarship?`${scholarship.coverage===1?'Full':`${Math.round(scholarship.coverage*100)}%`} ${({academic:'academic',sports:'sports',extracurricular:'extracurricular'})[scholarship.kind]} scholarship`:'No scholarship offered';
+    return `<article class="college-offer ${canFund?'affordable':'unaffordable'}" data-college-id="${esc(college.id)}"><h4>${labelWithHelp(college.name,'college-option',college.id)}</h4>${collegeMetricsView(college)}<div class="job-metrics"><span>Full Lifestyle requirement</span><strong>${lifestyleNumber(college.requiredLifestyle)}<small>/10</small></strong></div><p class="college-scholarship">${esc(award)}</p><div class="job-metrics"><span>After scholarship</span><strong>${lifestyleNumber(offer.requiredLifestyle)}<small>/10</small></strong></div><div class="job-metrics"><span>Available college Lifestyle</span><strong>${lifestyleNumber(offer.availableLifestyle)}<small>/10</small></strong></div><p class="college-affordability">${canFund?'Funding available':offer.affordable?'Your current reserves no longer cover the full course.':'More financial support needed'}</p><button class="button ${canFund?'primary':'secondary'} small" data-action="education" data-path="college" data-college="${esc(college.id)}" ${blocked || !canFund?'disabled':''}>Attend ${esc(college.name)} ${icon('arrow')}</button></article>`;
+  }).join('')}</div><div class="college-work-choice"><button class="button secondary" data-action="education" data-path="work" ${blocked?'disabled':''}>Skip college · look for work ${icon('arrow')}</button></div></section>`;
+}
+
+function collegeSportView() {
+  const enrolled=state.education.sport;
+  const sport=schoolActivity('sports',enrolled?.id);
+  if(state.education.status==='graduate' && sport) return `<section class="panel college-sport-result" aria-label="College sports result"><div class="panel-heading"><h3>${labelWithHelp('College sports','college-sports')}</h3><span class="tag">${esc(sport.name)}</span></div><p>Latest sport success <strong>${activitySuccessLabel(enrolled.success)}</strong> - ${enrolled.seasons}/4 college seasons</p><p>${enrolled.professionalOffer?'Professional recruitment offer earned. Choose Professional athlete from your career offers when qualified.':'No professional offer from college recruitment.'}</p></section>`;
+  if(state.education.status!=='college') return '';
+  const blocked=state.ended || state.needsSuccession || state.pendingEvents.length>0;
+  const committed=!!enrolled && focusMinimums(state).sports>0;
+  return `<div class="college-sport" aria-label="College sport"><div class="panel-heading"><h4>${labelWithHelp('College sports','college-sports')}</h4>${sport?`<span class="tag">${esc(sport.name)}</span>`:''}</div>${enrolled?`<p class="college-sport-success">College success <strong>${activitySuccessLabel(enrolled.success)}</strong><span>${enrolled.seasons}/4 seasons</span></p><button class="button ghost small" data-action="college-sport-leave" ${blocked || committed?'disabled':''}>Leave college ${esc(sport.name)}</button>`:'<p>College success N/A</p>'}<button class="button secondary small" data-action="college-sport-options" ${blocked || committed?'disabled':''}>${sport?'Change college sport':'Join a college sport'}</button>${committed?'<p class="college-sport-requirement">Your current sport has a required focus minimum this year.</p>':''}</div>`;
+}
+
+function collegeSportChoicesModal() {
+  if(state.education.status!=='college') return;
+  const blocked=state.ended || state.needsSuccession || state.pendingEvents.length>0;
+  const available=focusBudget(state)-focusUsed()+(state.focus.sports || 0);
+  const committed=!!state.education.sport && focusMinimums(state).sports>0;
+  const cards=SPORTS.map(sport=>{
+    const endsFame=hasFame(state) && state.fame.kind==='sports' && state.fame.activityId!==sport.id;
+    const candidate={...state,...(endsFame?{fame:null}:{}),education:{...state.education,sport:{id:sport.id,success:null,seasons:0,professionalOffer:false}}};
+    const required=Math.max(1,focusMinimums(candidate).sports || 0);
+    const selected=state.education.sport?.id===sport.id;
+    const reason=committed?'Your current sport has a required focus minimum this year.':focusLimits(candidate).sports<required?'Participation is restricted this year.':available<required?`Free ${required===1?'one':required} focus ${required===1?'point':'points'} to join.`:'';
+    return `<article class="school-offer" data-offer-id="${esc(sport.id)}"><h3>${esc(sport.name)}</h3><p>Performance: ${Object.keys(sport.weights).map(key=>key==='height'?(sport.heightPreference==='shorter'?'Shorter height':'Taller height'):skillLabel(key)).map(esc).join(', ')}.</p><p>Training: ${Object.keys(sport.training).map(skillLabel).map(esc).join(', ')}.</p>${reason?`<p class="form-note">${esc(reason)}</p>`:''}<button class="button secondary small" data-action="college-sport-join" data-id="${esc(sport.id)}" ${selected || blocked || !!reason?'disabled':''}>${selected?'Current sport':`Join ${esc(sport.name)}`}</button></article>`;
+  }).join('');
+  openModal('Choose a college sport', `<p class="form-note">College teams provide facilities and share your adult focus budget. Joining needs at least one point, including any required minimum. Switching keeps your allocation within the new limits, resets college success and seasons, and ends fame tied to the previous sport.</p><div class="school-offers">${cards}</div>`);
+}
+
+function housingView() {
+  if(state.age<18 || !state.housing) return '';
+  const housing=housingDetails(state);
+  const title=({parents:'Staying with family',campus:'College housing',independent:'Living independently',homeless:'Without stable housing'})[housing.status];
+  if(!title) return '';
+  const host=[...state.parents,state.guardian].filter(Boolean).find(person=>person.id===housing.hostId);
+  return `<section class="panel housing-panel ${housing.status}" aria-label="Housing"><div class="panel-heading"><h3>${labelWithHelp('Housing','housing')}</h3><span class="tag">${esc(title)}</span></div>${housing.status==='parents'?`<p class="housing-detail">${host?`${esc(parentLabel(host))} is helping while you get established. `:''}${housing.remainingYears} year${housing.remainingYears===1?'':'s'} of family support remaining.</p>`:housing.status==='homeless'?'<p class="housing-detail">Unstable shelter is affecting your health, social life and mental wellbeing.</p>':''}</section>`;
+}
+
+function jobStatFactorsView(job) {
+  return `<div class="job-affinities" aria-label="Stats that support job success">${Object.entries(job.affinities).sort((a,b)=>b[1]-a[1]).map(([key,value])=>`<span class="job-affinity" data-skill="${key}" aria-label="${esc(skillLabel(key))}: ${value===3?'central':value===2?'important':'useful'} for job success">${esc(skillLabel(key))}${statEmoji(key)} <strong>+${value}</strong></span>`).join('')}</div>`;
+}
+
+function careerPotentialView(job) {
+  const potential=Math.max(0,Math.min(10,Number(job.advancementPotential)||0));
+  return `<div class="career-potential" data-potential-job="${esc(job.id)}"><div class="job-metrics"><span>${labelWithHelp('Advancement potential','career-potential',job.id)}</span><strong>${number(potential)}<small>/10</small></strong></div><div class="potential-track" role="meter" aria-label="${esc(job.name)} advancement potential" aria-valuemin="0" aria-valuemax="10" aria-valuenow="${potential}" aria-valuetext="${number(potential)} out of 10"><span style="width:${potential*10}%"></span></div><div class="job-metrics career-ceiling"><span>Career Lifestyle ceiling</span><strong>${lifestyleNumber(job.maxLifestyle)}<small>/10</small></strong></div></div>`;
+}
+
+function careerProgressView(job) {
+  const progress=Math.max(0,Math.min(1,Number.isFinite(state.careerProgress)?state.careerProgress:initialCareerProgress(state.jobYears)));
+  return `<div class="career-progress"><div class="job-metrics"><span>${labelWithHelp('Career progress','career-progress',job.id)}</span><strong>${pct(progress)}</strong></div><div class="fit-track" role="progressbar" aria-label="Progress within ${esc(job.name)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(progress*100)}"><span style="width:${progress*100}%"></span></div></div>`;
 }
 
 function careerView() {
   if (state.age<18) return '<button class="career-locked-bar" type="button" disabled>Unlocks at age 18</button>';
-  if (state.education.status==='college') return `${collegeProgressView()}<section class="panel"><button class="button primary" data-action="tab" data-tab="year">Continue studying ${icon('arrow')}</button></section>`;
+  if (state.education.status==='college') return `${collegeProgressView()}${housingView()}<section class="panel"><button class="button primary" data-action="tab" data-tab="year">Continue studying ${icon('arrow')}</button></section>`;
   const current = career();
+  const blocked=state.ended || state.needsSuccession || state.pendingEvents.length>0;
   const offers = offeredJobs(state);
   const choosing = needsEducationChoice(state);
-  const intro = choosing ? `<section class="panel education-choice"><div class="panel-heading"><h3>${labelWithHelp('College or a career?','college')}</h3><span class="tag">YOUR CHOICE</span></div><button class="button primary" data-action="education" data-path="college">Go to college · 4 years ${icon('arrow')}</button></section>` : `<section class="panel"><div class="panel-heading"><h3>${labelWithHelp(current?current.name:'Choose your next role','career')}</h3>${current?'<button class="button ghost small" data-action="quit">Leave job</button>':`<span class="tag">${state.education.status==='graduate'?'COLLEGE GRADUATE':'WORKING LIFE'}</span>`}</div>${current?`<p class="game-status">${state.jobYears} year${state.jobYears===1?'':'s'} in this role.</p>`:''}${lifestyleView()}${current?`<div class="job-metrics"><span>Job performance</span><strong>${pct(state.performance)}</strong></div>`:''}</section>`;
+  const intro = choosing ? collegeChoicesView() : `<section class="panel current-career"><div class="panel-heading"><h3>${labelWithHelp(current?current.name:'Choose your next role','career')}</h3>${current?`<button class="button ghost small" data-action="quit" ${blocked?'disabled':''}>Leave job</button>`:`<span class="tag">${state.education.status==='graduate'?'COLLEGE GRADUATE':'WORKING LIFE'}</span>`}</div>${current?`<p class="game-status">${state.jobYears} year${state.jobYears===1?'':'s'} in this role.</p>${jobStatFactorsView(current)}`:''}${lifestyleView()}${current?`<div class="job-metrics career-performance"><span>Job performance</span><strong>${pct(state.performance)}</strong></div>${careerProgressView(current)}${careerPotentialView(current)}`:''}</section>${housingView()}${collegeSportView()}`;
   return `${intro}<div class="panel-heading career-offer-heading"><h3>${labelWithHelp(`Your ${offers.length} job offers`,'career')}</h3><span class="tag">${JOBS.length} CAREERS</span></div><div class="job-grid">${offers.map(job => {
     const eligibility = canTakeJob(state,job); const fit = jobFit(state,job); const selected = state.jobId===job.id;
-    return `<article class="job-card ${selected?'selected':''} ${!eligibility.ok&&!selected?'locked':''}" data-job-id="${esc(job.id)}"><div class="job-top"><span class="tag">${esc(job.category)}</span><span class="job-lifestyle"><small>Lifestyle${statEmoji('lifestyle')} </small>${number(job.baseLifestyle)}<small>/10</small></span></div><h3>${labelWithHelp(job.name,'job',job.id)}</h3>${selected?'<span class="tag current-role">YOUR ROLE</span>':''}<div class="job-affinities" aria-label="Skill affinities">${Object.entries(job.affinities).sort((a,b)=>b[1]-a[1]).map(([key,value])=>`<span class="job-affinity" data-skill="${key}">${esc(skillLabel(key))}${statEmoji(key)} <strong>+${value}</strong></span>`).join('')}</div><div class="job-metrics"><span>Your skill fit</span><strong>${pct(fit)}</strong></div><div class="fit-track"><span style="width:${fit*100}%"></span></div><p class="requirement">Age ${job.minAge}+${job.requiresCollege?' · College degree':''}${Object.entries(job.requirements).length?' · '+Object.entries(job.requirements).map(([key,value])=>`${esc(skillLabel(key))} ${number(value)}+`).join(' · '):' · No skill minimum'}</p><div class="job-actions"><button class="button ${selected?'ghost':'secondary'} small" data-action="job" data-id="${esc(job.id)}" ${selected||!eligibility.ok||state.ended||state.needsSuccession?'disabled':''}>${selected?'Currently employed':'Choose career'} ${selected?icon('check'):icon('arrow')}</button>${!eligibility.ok&&!selected?`<span class="muted">${esc(formatStatNarrative(eligibility.reason,state))}</span>`:''}</div></article>`;
+    return `<article class="job-card ${selected?'selected':''} ${!eligibility.ok&&!selected?'locked':''}" data-job-id="${esc(job.id)}"><div class="job-top"><span class="tag">${esc(job.category)}</span><span class="job-lifestyle"><small>Base Lifestyle${statEmoji('lifestyle')} </small>${lifestyleNumber(job.baseLifestyle)}<small>/10</small></span></div><h3>${labelWithHelp(job.name,'job',job.id)}</h3>${selected?'<span class="tag current-role">YOUR ROLE</span>':''}${jobStatFactorsView(job)}<div class="job-metrics"><span>Your skill fit</span><strong>${pct(fit)}</strong></div><div class="fit-track" role="meter" aria-label="Your skill fit for ${esc(job.name)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(fit*100)}"><span style="width:${fit*100}%"></span></div>${careerPotentialView(job)}<p class="requirement">Age ${job.minAge}+${job.requiresCollege?' · College degree':''}${Object.entries(job.requirements).length?' · '+Object.entries(job.requirements).map(([key,value])=>`${esc(skillLabel(key))} ${number(value)}+`).join(' · '):' · No skill minimum'}</p><div class="job-actions"><button class="button ${selected?'ghost':'secondary'} small" data-action="job" data-id="${esc(job.id)}" ${selected||!eligibility.ok||state.ended||state.needsSuccession?'disabled':''}>${selected?'Currently employed':'Choose career'} ${selected?icon('check'):icon('arrow')}</button>${!eligibility.ok&&!selected?`<span class="muted">${esc(formatStatNarrative(eligibility.reason,state))}</span>`:''}</div></article>`;
   }).join('')}</div>`;
 }
 
@@ -586,7 +735,7 @@ function relationshipView(person) {
 
 function profileStats(person, parent = false) {
   const stats = parent ? DISPLAY_STATS.filter(skill=>['health','stability'].includes(skill.key)) : DISPLAY_STATS;
-  return `<div class="profile-stats">${stats.map(skill=>`<div class="profile-stat" data-skill="${skill.key}"><span>${labelWithHelp(skill.label,skill.key)}</span><span class="stat-reading"><strong>${number(person.stats[skill.key])}<small>/10</small></strong>${aptitudeBadge(person.aptitudes[skill.key],`${skill.label} natural aptitude`)}</span>${ratingBar(skill.label,person.stats[skill.key])}</div>`).join('')}${parent?'':`<div class="profile-stat"><span>${labelWithHelp('Lifestyle','lifestyle')}</span><strong>${number(person.lifestyle)}<small>/10</small></strong>${ratingBar('Lifestyle',person.lifestyle)}</div>`}<div class="profile-stat"><span>${labelWithHelp('Height','height',person.id)}</span><strong aria-label="${heightDescription(person.height,person.age)}">${formatHeight(person.height,person.age)}</strong><span class="height-percentile">${heightLabel(person)}</span></div></div>`;
+  return `<div class="profile-stats">${stats.map(skill=>`<div class="profile-stat" data-skill="${skill.key}"><span>${labelWithHelp(skill.label,skill.key)}</span><span class="stat-reading"><strong>${number(person.stats[skill.key])}<small>/10</small></strong>${aptitudeBadge(person.aptitudes[skill.key],`${skill.label} natural aptitude`)}</span>${ratingBar(skill.label,person.stats[skill.key])}</div>`).join('')}${parent?'':`<div class="profile-stat"><span>${labelWithHelp('Lifestyle','lifestyle')}</span><strong>${lifestyleNumber(person.lifestyle)}<small>/10</small></strong>${ratingBar('Lifestyle',person.lifestyle)}</div>`}<div class="profile-stat"><span>${labelWithHelp('Height','height',person.id)}</span><strong aria-label="${heightDescription(person.height,person.age)}">${formatHeight(person.height,person.age)}</strong><span class="height-percentile">${heightLabel(person)}</span></div></div>`;
 }
 
 function pregnancyView() {
@@ -634,9 +783,10 @@ function retirementView() {
 }
 
 function personCard(person, role, child = false, parent = false) {
+  const parentJob = parent ? JOBS.find(job=>job.id===person.career?.jobId) : null;
   const employment = {employed:'Employed',unemployed:'Unemployed',retired:'Retired'}[person.career?.status] || 'Employed';
   const showLifestyle = !parent || hasFame(state) && state.age<18 && caregivers(state).some(caregiver=>caregiver.id===person.id);
-  return `<article class="family-card" data-person-id="${esc(person.id)}"><div class="family-header"><div class="family-avatar">${avatar(person,true)}</div><div class="family-meta"><span class="eyebrow">${esc(role)}</span><div class="profile-name-row"><h3>${esc(person.name)}</h3>${genderBadge(person)}</div><p>${person.age} years old${person.abandonedAt!=null?' · Left the family':person.guardianRole&&person.alive!==false?' · Guardian':''}${person.alive===false?' · Remembered':''}</p></div></div>${birthConditionsView(person)}${!showLifestyle?'':`<p class="family-lifestyle">${labelWithHelp('Lifestyle','lifestyle')} <strong>${number(familyLifestyle(state,person))}/10</strong>${person.age<18?' · Family household':''}</p>`}${parent?`<div class="parent-career"><span>${labelWithHelp('Career focus','parent-career')} <strong>${person.career?.focus ?? 0}/5</strong></span><span class="employment-status">${employment}</span></div>`:''}${Number.isFinite(person.relationship)?relationshipView(person):''}<details class="family-details" ${parent?'open':''}><summary>${parent?'Wellbeing':'Skills & wellbeing'}</summary>${profileStats(person,parent)}</details>${child&&person.alive===false?'<div class="family-card-footer"><span>Remembered with love</span></div>':''}</article>`;
+  return `<article class="family-card" data-person-id="${esc(person.id)}"><div class="family-header"><div class="family-avatar">${avatar(person,true)}</div><div class="family-meta"><span class="eyebrow">${esc(role)}</span><div class="profile-name-row"><h3>${esc(person.name)}</h3>${genderBadge(person)}</div><p>${person.age} years old${person.abandonedAt!=null?' · Left the family':person.guardianRole&&person.alive!==false?' · Guardian':''}${person.alive===false?' · Remembered':''}</p></div></div>${birthConditionsView(person)}${!showLifestyle?'':`<p class="family-lifestyle">${labelWithHelp('Lifestyle','lifestyle')} <strong>${lifestyleNumber(familyLifestyle(state,person))}/10</strong>${person.age<18?' · Family household':''}</p>`}${parent?`<div class="parent-career"><span>${labelWithHelp('Career focus','parent-career')} <strong>${person.career?.focus ?? 0}/5</strong></span><span class="employment-status">${employment}</span></div>`:''}${parentJob?`<div class="parent-career-role"><strong>${labelWithHelp(parentJob.name,'job',parentJob.id)}</strong>${careerPotentialView(parentJob)}</div>`:''}${Number.isFinite(person.relationship)?relationshipView(person):''}<details class="family-details" ${parent?'open':''}><summary>${parent?'Wellbeing':'Skills & wellbeing'}</summary>${profileStats(person,parent)}</details>${child&&person.alive===false?'<div class="family-card-footer"><span>Remembered with love</span></div>':''}</article>`;
 }
 
 function parentsView() {
@@ -646,7 +796,7 @@ function parentsView() {
 
 function familyView() {
   const childAllowed = !state.pendingEvents.length && state.age>=18 && state.children.length<(state.pregnancy?5:6) && state.lastChildAge!==state.age && !state.ended && !state.needsSuccession;
-  return `${state.age>=65||state.needsSuccession?retirementView():''}${loveView()}${parentsView()}
+  return `${state.age>=65||state.needsSuccession?retirementView():''}${datingPotentialView()}${loveView()}${parentsView()}
     <section class="panel"><div class="panel-heading"><h3>${labelWithHelp('The next generation','children')}</h3><button class="button secondary small" data-action="child" ${childAllowed?'':'disabled'}>${icon('plus')} Adopt a child</button></div>${state.age<18?'<p class="game-status">Parenthood · Age 18+</p>':state.lastChildAge===state.age?'<p class="game-status">A new arrival this year.</p>':''}${state.children.length?`<div class="family-grid child-grid">${state.children.map(c=>personCard(c,'YOUR CHILD',true)).join('')}</div>`:`<div class="empty-state">${icon('family')}<h4>A branch yet to grow</h4></div>`}</section>
     ${state.age<65&&!state.needsSuccession?retirementView():''}
     ${state.siblings.length?`<section class="panel"><div class="panel-heading"><h3>${labelWithHelp('Your siblings','inheritance')}</h3><span class="tag">FAMILY</span></div><div class="family-grid sibling-grid">${state.siblings.map(person=>personCard(person,'YOUR SIBLING')).join('')}</div></section>`:''}
@@ -709,21 +859,21 @@ function navigate(tab) {
 
 function topicHelpModal(topic, id) {
   const help = {
-    stats: ['Your stats', ['Ratings range from 0.0 to 10.0. Before 18, ability ratings compare you with others your age: high infant intelligence means strong natural potential. Activities, care, events and aging cause rating changes. Low ratings and aptitude change the size of those effects; they do not create passive growth.']],
+    stats: ['Your stats', ['Ratings range from 0.0 to 10.0. Before 18, ability ratings compare you with others your age: high infant intelligence means strong natural potential. Activities, care, events and aging cause rating changes. Yearly focus contributions now have half their previous magnitude, including losses. Low ratings and aptitude change the size of those effects; they do not create passive growth.']],
     intelligence: ['Intelligence', ['Reasoning ability for your age; school and mental practice can strengthen it.']],
     strength: ['Strength', ['A 7.0/10 baby is strong for a baby. Exercise can maintain or raise this rating; inactivity can lower it.']],
     social: ['Social', ['Ease with people for your age; social practice can improve it.']],
     creativity: ['Creativity', ['Creative potential for your age, shaped by exploration and practice.']],
     attractiveness: ['Attractiveness', ['Starts near its adult value. During school years, Yourself focus can improve or reduce it, with aging losses after 30 for men and 22 for women.']],
-    affinity: ['Natural aptitude', ['This −3 to +3 trait is shaped by inheritance and perk affinities. It affects starting ability and responsiveness to activity or care; higher is stronger. Aptitude alone never changes a rating. Health and mental stability aptitude improve routine gains and soften losses. Rare experiences shaped by another stat can raise or lower aptitude by one.']],
+    affinity: ['Natural aptitude', ['This −3 to +3 trait is shaped by inheritance and perk affinities. It affects starting ability and responsiveness to activity or care; higher is stronger. Aptitude alone never changes a rating. Health and mental stability aptitude improve routine gains and soften losses. Rare experiences shaped by another stat can raise or lower aptitude by one. Birth profiles describe individual tendencies and support needs, not fixed outcomes or medical diagnoses. Conditions can involve many genes and environmental influences; bipolar predisposition is a risk, not an illness diagnosed at birth. Autism and specific learning disabilities do not determine general intelligence.']],
     forecast: ['Expected changes', ['Signs compare increases and decreases with the other choices for that stat. Zero changes are hidden. Infant stats show crying effects; adult stats show routine changes. Activities, care, events and aging cause changes. Yearly variation changes the size of routine effects without reversing them.']],
     health: ['Health', ['Self-care supports health; illness and aging reduce it. Poor health raises disease risk and reduces childhood height gains.']],
-    stability: ['Mental stability', ['Higher means calmer; rest and relationships help. Low parental mental stability can lead to difficult childhood events.']],
-    lifestyle: ['Lifestyle', ['Until 18, you share your parents’ or guardian’s changing household lifestyle. As an adult, work, family and inheritance shape it.']],
+    stability: ['Mental stability', ['Higher means calmer; rest and relationships help. Low ratings increase disruptions; 2 or less can unlock major crises. Ratings of 7 or more unlock supportive opportunities. Treatment and recovery events can help at low ratings. These rules also apply to parental events affecting your childhood.']],
+    lifestyle: ['Lifestyle', ['Until 18, you share your parents’ or guardian’s changing household lifestyle. As an adult, work, family and inheritance shape it. Temporary support also helps. The logarithmic scale makes 9.9 to 10.0 far harder than an ordinary tenth. Gains slow near 10; losses slow near 0.']],
     height: ['Height', ['Final height emerges from yearly growth shaped by age, inheritance, health and chance, ending at 14–18. Poor health reduces new growth, never existing height.', 'Compared with Health 5, Health 3–4 costs roughly one height percentile point per growing year near average height.']],
     cry: ['Cry level', ['Less crying lowers your intelligence and mental stability; more crying raises them. Strength is unaffected. Parent relationships tend to fall at levels 1–2, stay steady at 3, and rise at 4–5, with yearly variation. Harder crying strains their mental stability more.']],
-    focus: ['Your focus', [state.age>=5 && state.age<18 ? `Share ${focusBudget(state)} points. School, Friends, Family and Yourself use 0–4, neutral at 2. Sports and Extracurriculars unlock after signup and use 0–2, starting at 1. Conditions and events can lower limits. More focus can increase related activity event chances.` : `Share ${focusBudget(state)} points across ${Object.keys(state.focus).length} focuses, up to ${MAX_FOCUS} each. The default 2 in each adds no focus-driven stat changes. Conditions and events can change your limits. More focus can increase related activity event chances.`, state.age>=5 && state.age<18 ? 'Most core effects show one sign at 1 or 3 points and three at 0 or 4. School Intelligence shows two signs at 1/3 and three at 0/4; School Creativity shows one and two. Active training gives + at 1 point and ++ at 2. Without participation, Sports gives - Strength and - Social; Extracurriculars gives - Creativity and - Intelligence. Aptitude, current ratings and events affect the final result.' : 'Points 1 and 3 show one sign per effect; 0 and 4 are three times as strong and show three. Combined effects can reach six signs. Aptitude and current ratings shape activity effects; events and aging can add changes. Zero effects are hidden.']],
-    'toddler-focus': ['Toddler activities', [`Share ${focusBudget(state)} points among five activities, up to 4 each. The default 2 in each adds no activity-driven stat changes. Conditions and events can change your limits.`, 'Most effects show one sign at 1 or 3 points and three at 0 or 4. Arts & crafts Intelligence shows one minus at 0, no effect at 1–3, and one plus at 4. Electronics Intelligence uses ----, --, none, ++, ++++ at 0 to 4 points; Social uses ++, +, none, -, --. Aptitude and current ratings shape activity effects; events and aging can add changes. Zero effects are hidden.']],
+    focus: ['Your focus', [state.age>=5 && state.age<18 ? `Share ${focusBudget(state)} points. School, Friends, Family and Yourself use 0–4, neutral at 2. Sports and Extracurriculars unlock after signup and use 0–2, starting at 1. Events can stack capacity changes or require minimum points; perks and enrollment still set limits. More focus can increase related activity event chances.` : `Share ${focusBudget(state)} points across ${Object.keys(state.focus).length} focuses, up to ${MAX_FOCUS} each. The default 2 in each adds no focus-driven stat changes. Events can stack capacity changes or require minimum points; perks still set limits. More focus can increase related activity event chances.`, state.age>=5 && state.age<18 ? 'Most core effects show one sign at 1 or 3 points and three at 0 or 4. School Intelligence shows two signs at 1/3 and three at 0/4; School Creativity shows one and two. Active training gives + at 1 point and ++ at 2. Without participation, Sports gives - Strength and - Social; Extracurriculars gives - Creativity and - Intelligence. Aptitude, current ratings and events affect the final result.' : 'Points 1 and 3 show one sign per effect; 0 and 4 are three times as strong and show three. Combined effects can reach six signs. Aptitude and current ratings shape activity effects; events and aging can add changes. Zero effects are hidden.']],
+    'toddler-focus': ['Toddler activities', [`Share ${focusBudget(state)} points among five activities, up to 4 each. The default 2 in each adds no activity-driven stat changes. Events can stack capacity changes or require minimum points; perks still set limits.`, 'Most effects show one sign at 1 or 3 points and three at 0 or 4. Arts & crafts Intelligence shows one minus at 0, no effect at 1–3, and one plus at 4. Electronics Intelligence uses ----, --, none, ++, ++++ at 0 to 4 points; Social uses ++, +, none, -, --. Aptitude and current ratings shape activity effects; events and aging can add changes. Zero effects are hidden.']],
     ...Object.fromEntries(toddlerFocusRows.map(([key,label]) => [`toddler-${key}`, [label,
       toddlerActivityImpacts(key).map(({stat,change,level,target}) => `${(change>0?'+':'-').repeat(level)}${target==='parents'?(caregivers(state).some(person=>person.guardianRole)?'Guardian relationship':'Parent relationships'):skillLabel(stat)}`)
     ]])),
@@ -734,30 +884,51 @@ function topicHelpModal(topic, id) {
     'school-gpa': ['School GPA', ['Study effort sets your yearly grade, with Intelligence adjusting it. Higher Intelligence can achieve the same grade with less study. The grade updates after each school year.', 'Good and poor grades can lead to family events. Your first grade arrives after completing your first school year. Expected GPA previews your next report with the current study focus and Intelligence.']],
     'focus-sports': ['Sports focus', ['Higher Lifestyle brings more frequent offers and more options. Sports and extracurriculars can both be offered in a year. Keep or leave your current activity even when no new ones are offered. Sign up to unlock 0–2 points, starting at 1. Every sport trains Strength and Social; some train an extra skill. Active training gives + at 1 point and ++ at 2. No sport, paused participation, or 0 points gives - Strength and - Social only. Success is N/A until your first year of participation, then graded F- through A+ based on abilities, focus and chance. Expected success estimates your next grade from current abilities, focus and success; chance can change the result. Performance varies by sport: endurance sports reward Health, archery rewards Mental stability, orienteering rewards Intelligence, and figure skating rewards Creativity. Wrestling rewards shorter height; swimming and basketball reward taller height for your age. Switching returns success to N/A.']],
     'focus-extracurricular': ['Extracurriculars focus', ['Higher Lifestyle brings more frequent offers and more options. Sports and extracurriculars can both be offered in a year. Keep or leave your current activity even when no new ones are offered. Sign up to unlock 0–2 points, starting at 1. Each activity trains its listed stats, with + at 1 point and ++ at 2. No extracurricular or 0 points gives - Creativity and - Intelligence only. Success is N/A until your first year of participation, then graded F- through A+ based on abilities, focus and chance. Expected success estimates your next grade from current abilities, focus and success; chance can change the result. Keep your activity or switch and return success to N/A.']],
-    parents: ['Parents & guardians', ['Their wellbeing and careers affect your childhood. Gains need care, activity or an event. Low ratings amplify existing gains; they do not recover by themselves. Zero Family time contributes a loss. Low mental stability and a weak relationship raise the rare chance of abandonment. The other parent takes over; if neither can care for you, an adult relative adopts you. Departures cause severe setbacks.']],
-    'parent-career': ['Parents’ careers', ['Higher career focus and experience tend to improve lifestyle; job loss can set it back.']],
+    parents: ['Parents & guardians', ['Their wellbeing and careers affect your childhood. Gains need care, activity or an event. Low ratings amplify existing gains; they do not recover by themselves. Zero Family time contributes a loss. Low mental stability can disrupt care; 2 or less unlocks major crises with larger effects on you. High stability can bring lasting support, and help can support recovery.', 'Low mental stability and a weak relationship raise the rare chance of abandonment. The other parent takes over; if neither can care for you, an adult relative adopts you. Departures cause severe setbacks.']],
+    'parent-career': ['Parents’ careers', ['The listed job uses its relevant abilities, career focus and experience to shape progress. Its advancement potential and career Lifestyle ceiling limit the path within that role. Job loss can set household support back; a new job can help rebuild it.']],
     relationship: ['Relationship', ['Higher means closer; family time and shared events change this rating. Partners support social and mental stability, but lower lifestyle.']],
-    career: ['Careers', ['Your skills determine job fit; career focus and experience improve performance and lifestyle. Start working at 18 or after college.']],
-    college: ['College or career', ['Four years of college open 15 offers and time to develop skills; starting work at 18 gives 10.']],
+    career: ['Careers', ['Each role uses its listed stats for success. +3 means central, +2 important and +1 useful; these are job demands, not automatic stat gains. Career focus and experience also affect performance.', 'Advancement potential describes the breadth of opportunities within a role. Career progress records how far you have developed along that path. A high ceiling is an opportunity, not a promised result.', 'Base Lifestyle is the role’s reference level before your performance and progress. The career ceiling limits support from that job; savings, inheritance, Fame and household responsibilities can make your actual Lifestyle different. Start working at 18 or after college.']],
+    college: ['College or career', ['Your final school grades influence college admissions. Excellent grades, sport or extracurricular success can earn partial or full scholarships. Parents’ means and willingness to help shape affordability.', 'Colleges take four years. Your personal contribution is reserved for the full course when you enroll. More demanding courses need more study for the same grade and generally lead to stronger career opportunities. College and grades influence the number and quality of job offers, but every career remains possible with the necessary qualifications.', 'You can skip college and choose a job immediately. Trades offer practical routes with their own advancement paths.']],
+    'college-grades': ['College GPA', ['Your college GPA records your completed years. Study focus and Intelligence shape each year’s grade; a harder college needs more effort for the same result. Expected yearly grade previews the next completed year, with chance able to change the result.', 'Grades and college career potential influence your graduate offers. A weaker record gives fewer and generally lower-potential opportunities, but it never rules out a particular career by itself.']],
+    'college-sports': ['College sports', ['Join a college sport while sharing your adult focus budget. Teams provide facilities, including for sports you did not play at school. College success begins unrated and is much harder to earn than high-school success. Strong abilities and consistent training matter; ordinary school success rarely translates into top college results.', 'After four college seasons, exceptional athletes have a small chance of a professional opportunity. College performance can also bring an invitation to pursue fame. Fame starts only if you accept.']],
+    housing: ['Housing', ['Work or sufficient reserves support independent housing. College funding includes a place to live. If you cannot support yourself, a willing parent or guardian with a good relationship may offer up to three years at home.', 'Family support can help mental wellbeing, while limited privacy reduces social and dating opportunities. Without stable housing, sustained disruption harms Health, Social and mental stability and reduces opportunities to meet people. Housing is checked as your circumstances change.']],
     children: ['Children', ['Adults can have up to six children, with one adoption per year. Family time helps them develop; dependent children lower lifestyle.']],
-    dating: ['People you meet', ['Attractiveness, social and lifestyle affect encounters. Invitations expire next year or when a relationship starts, and either approach can be declined.']],
+    dating: ['People you meet', ['Dating potential affects your chance of meeting someone and the typical qualities of new prospects. Height, Attractiveness and Lifestyle have the most weight; the other six ratings also contribute. Focus, housing and individual preferences still matter. Invitations expire next year or when a relationship starts, and either approach can be declined.']],
+    'dating-potential': ['Dating potential', ['Height, Attractiveness and Lifestyle each carry one full share. Intelligence, Strength, Social, Creativity, Health and Mental stability each carry one fifth of a share. The result is a weighted average from 0 to 10, using your current effective ratings.', 'Height uses your percentile among adults with the same growth profile, translated onto the 0-10 scale. Higher dating potential improves meeting chances and the typical qualities of new prospects. Chance and individual preferences still matter; no score guarantees a meeting or mutual attraction.']],
     marriage: ['Marriage', ['Propose once per year; a closer relationship and more years together improve acceptance.']],
     pregnancy: ['Pregnancy', ['Age, health and pregnancy capability affect the odds; marriage makes it more likely. A baby arrives the next year.']],
     inheritance: ['Retirement & inheritance', ['Succession opens at 65 or on death and is required at 85; choose a child, sibling or unrelated child, in that order. Eligible children share inheritance equally; otherwise the chosen heir receives it.']]
   };
   let entry = help[topic];
+  if(topic==='college-option') {
+    const college=collegeById(id);
+    if(college) entry=[college.name,[college.description,`Academic difficulty ${number(college.difficulty)}/10; career potential ${number(college.careerPotential)}/10. A more demanding course needs more study for the same grade.`, 'Scholarships reduce the required college Lifestyle. Family and personal resources are combined before being translated onto the Lifestyle scale, so the displayed contribution ratings do not add together.', 'Offers and scholarships are saved; viewing this screen or reloading cannot reroll them.']];
+  }
+  if(state.education.status==='college' && topic==='focus-work') entry=['College focus',help['college-grades'][1]];
+  if(state.education.status==='college' && state.education.sport && topic==='focus-sports') entry=help['college-sports'];
   if (topic==='fame') entry=['Fame',[
     `Maintain fame through ${focusLabel(fameFocusKey(state))} focus. More focus builds your rating; too little lowers it. Fame can end each year (${pct(fameLossChance(state.fame?.rating))} at your current rating). Lower ratings increase that risk.`,
-    'Fame adds +5 Social learning ability, separately from natural aptitude. High fame and contracts support household Lifestyle. Leaving fame ends these bonuses.'
+    'Fame adds +5 Social learning ability, separately from natural aptitude. High fame and contracts support household Lifestyle. Support strength has a smaller effect near the limits of the Lifestyle scale. Leaving fame ends these bonuses.'
   ]];
   if (topic==='social' && id===state.id && hasFame(state)) entry=[entry[0],[...entry[1],'+5 Social learning ability from fame is separate from natural aptitude. The bonus ends when fame ends.']];
   if (hasFame(state) && topic==='focus') entry=[entry[0],[...entry[1].map(text=>text.replace('use 0–2, starting at 1','normally use 0–2, starting at 1')),state.fame.kind==='personal'?'Yourself focus also maintains personal fame.':`Your famous ${focusLabel(fameFocusKey(state))} activity allows up to 3 points and continues after school.`]];
   if (hasFame(state) && state.fame.kind!=='personal' && state.age>=18 && topic==='focus') entry[1][0]=`Share ${focusBudget(state)} points. Core focuses use 0–4, neutral at 2. Your famous ${focusLabel(fameFocusKey(state))} activity uses 0–3. Events and perks can restrict these limits.`;
   if (hasFame(state) && topic===`focus-${fameFocusKey(state)}`) entry=[entry[0],state.fame.kind==='personal'?[...entry[1],'Yourself focus also maintains personal fame. Two points are neutral; higher builds fame and lower reduces it.']:['Your famous activity continues after school, using 0–3 focus points. Points 0–1 reduce fame; 2–3 build it. Training and success still follow your activity. Expected success estimates the next grade; chance can change the result. Leaving or switching the activity ends its fame.']];
+  if (state.education.status==='college' && state.education.sport && topic==='focus') {
+    entry[1][0]=`Share ${focusBudget(state)} points. Core focuses use 0-4, neutral at 2. College sports use 0-${focusMaxFor(state,'sports')}, starting at 1, within the same budget.${hasFame(state) && state.fame.kind==='extracurricular'?' Your famous extracurricular also shares this budget and allows up to 3 points.':''} Events and perks can restrict limits or require minimum points.`;
+    entry[1][1]='Core effects use the usual neutral-two scale. College sport training gives positive contributions with active focus; zero points gives Strength and Social inactivity losses. College success uses its more demanding competition scale. Aptitude, current ratings and chance shape the result.';
+  }
+  if (state.education.status==='college' && state.education.sport && hasFame(state) && state.fame.kind==='sports' && topic==='focus-sports') entry[1]=[...help['college-sports'][1],...entry[1]];
   if(topic==='height' && id===state.id && state.age<18) entry=[entry[0],[...entry[1],'Percentile compares simulated heights at your age.']];
   if (topic==='job') {
     const job = JOBS.find(candidate=>candidate.id===id);
-    if (job) entry = [job.name,[job.description,'+3 marks a core skill; skill fit reflects your current match.']];
+    if (job) entry = [job.name,[job.description,'+3 marks a core skill; skill fit reflects your current match. The listed stats influence success rather than providing automatic gains.',job.advancementDescription,`Base career Lifestyle ${lifestyleNumber(job.baseLifestyle)}/10. Career Lifestyle ceiling ${lifestyleNumber(job.maxLifestyle)}/10. Performance and progress shape the support from this role; savings, inheritance and Fame are separate.`].filter(Boolean)];
+  }
+  if (topic==='career-potential' || topic==='career-progress') {
+    const job=JOBS.find(candidate=>candidate.id===id);
+    if (job) entry=topic==='career-potential'
+      ? ['Advancement potential',[job.advancementDescription,`This role has advancement potential ${number(job.advancementPotential)}/10 and a career Lifestyle ceiling of ${lifestyleNumber(job.maxLifestyle)}/10. These describe the opportunities within the role, not a guaranteed outcome. Skills, focus and accumulated progress shape what you achieve.`, 'The career ceiling limits support from this job. Your household Lifestyle can differ because of savings, inheritance, Fame and family responsibilities.']]
+      : ['Career progress',['Progress measures advancement within your current role. Stronger performance supports progress; a change of role starts a new path. Progress within a role is separate from its advancement potential.']];
   }
   if (!entry) return;
   if (id===state.id && DISPLAY_STATS.some(stat=>stat.key===topic)) entry=[entry[0],[...entry[1],'Changes need activity, care, events or aging. Low ratings amplify existing gains without creating them. Gains slow near 10; losses slow near 0. Perk affinities adjust natural aptitude, not current ratings.']];
@@ -777,7 +948,7 @@ function oddsModal() {
   const odds = eventOdds(state).filter(event=>event.chance>0).sort((a,b)=>b.chance-a.chance);
   const quiet = odds.reduce((chance,event)=>chance*(1-event.chance),1);
   const mortality = mortalityOdds(state);
-  openModal('Yearly odds', `<p class="section-description">Each event rolls separately; at most five occur per year. School activity offers and death risks roll separately.</p><div class="chance-summary"><span>No events<strong>${(quiet*100).toFixed(1)}%</strong></span><span>At least one event<strong>${((1-quiet)*100).toFixed(1)}%</strong></span></div><details class="event-odds"><summary>${odds.length} possible events</summary><div class="odds-list">${odds.map(event=>`<div class="odds-row"><span>${journalText(event.name)}${EVENTS.find(candidate=>candidate.id===(event.eventId || event.id))?.choices?'<small>Choice</small>':''}</span><strong>${(event.chance*100).toFixed(2)}%</strong></div>`).join('')}</div></details><details class="mortality-odds"><summary>Annual death risks</summary><p class="form-note">Age-based game estimates; poor health raises disease risk, and adult mental stability affects accident risk.</p><div class="odds-list">${mortality.map(person=>`<div class="mortality-row"><span>${esc(person.name)}<small>Disease ${(person.disease*100).toFixed(3)}% &middot; Accident ${(person.accident*100).toFixed(3)}%</small></span><strong>${(person.total*100).toFixed(3)}%</strong></div>`).join('')}</div></details>`);
+  openModal('Yearly odds', `<p class="section-description">Each event rolls separately; at most five occur per year. Low ratings can increase related event chances. Events without possible effects are excluded; outcomes that would change nothing when they resolve are skipped. Major crises remain rarer. School activity offers and death risks roll separately.</p><div class="chance-summary"><span>No events<strong>${(quiet*100).toFixed(1)}%</strong></span><span>At least one event<strong>${((1-quiet)*100).toFixed(1)}%</strong></span></div><details class="event-odds"><summary>${odds.length} possible events</summary><div class="odds-list">${odds.map(event=>`<div class="odds-row"><span>${journalText(event.name)}${EVENTS.find(candidate=>candidate.id===(event.eventId || event.id))?.choices?'<small>Choice</small>':''}${eventImpactTag(EVENTS.find(candidate=>candidate.id===(event.eventId || event.id)))}</span><strong>${(event.chance*100).toFixed(2)}%</strong></div>`).join('')}</div></details><details class="mortality-odds"><summary>Annual death risks</summary><p class="form-note">Age-based game estimates; poor health raises disease risk, and adult mental stability affects accident risk.</p><div class="odds-list">${mortality.map(person=>`<div class="mortality-row"><span>${esc(person.name)}<small>Disease ${(person.disease*100).toFixed(3)}% &middot; Accident ${(person.accident*100).toFixed(3)}%</small></span><strong>${(person.total*100).toFixed(3)}%</strong></div>`).join('')}</div></details>`);
 }
 
 function update(action, successMessage) {
@@ -806,9 +977,15 @@ document.addEventListener('click', event => {
     }
   }
   if (action==='education') {
-    update(()=>chooseEducation(state,button.dataset.path),'Started college.');
+    update(()=>chooseEducation(state,button.dataset.path,button.dataset.college),button.dataset.path==='college'?'Started college.':'Your working life begins.');
     if (state.education.status==='college') navigate('year');
   }
+  if (action==='college-sport-options') collegeSportChoicesModal();
+  if (action==='college-sport-join') {
+    const result=update(()=>joinCollegeSport(state,button.dataset.id),'College sport joined.');
+    if (result?.ok) closeModal();
+  }
+  if (action==='college-sport-leave') update(()=>leaveCollegeSport(state),'College sport left.');
   if (action==='baby') {
     update(()=>setCryLevel(state,Number(button.dataset.level)));
     app.querySelector(`[data-action="baby"][data-level="${button.dataset.level}"]`)?.focus({preventScroll:true});

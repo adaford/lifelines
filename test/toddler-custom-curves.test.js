@@ -49,7 +49,7 @@ test('Electronics custom contributions reach the annual forecast and completed r
       const means = skillChanges(selected);
       for (const stat of ['intelligence', 'social']) {
         const raw = units[stat][points] * coefficients[stat];
-        const contribution = raw * .5 * 1.15 * (raw >= 0 ? 1 + aptitude * .08 : 1 - aptitude * .07);
+        const contribution = raw * .25 * 1.15 * (raw >= 0 ? 1 + aptitude * .08 : 1 - aptitude * .07);
         near(means[stat] - baseline[stat], contribution, `${stat} choice at age ${age}, aptitude ${aptitude}, points ${points}`);
         assert.equal(forecast.stats[stat].after, changedRating(5, baseline[stat] + contribution));
         const row = entries.find(entry => entry.stat === stat);

@@ -17,7 +17,7 @@ export function fameFocusKey(person) {
 export function fameActivityMatches(person, kind, id) {
   return hasFame(person) && ['sports', 'extracurricular'].includes(kind)
     && person.fame.kind === kind && typeof id === 'string' && person.fame.activityId === id
-    && person.school?.[kind]?.id === id;
+    && (person.school?.[kind]?.id === id || kind === 'sports' && person.education?.sport?.id === id);
 }
 
 export function fameLearningBonus(person, stat) {
@@ -26,7 +26,8 @@ export function fameLearningBonus(person, stat) {
 
 export function fameFocusChange(person, points = person?.focus?.[fameFocusKey(person)]) {
   if (!hasFame(person)) return 0;
-  const steps = person.fame.kind === 'personal' ? [-1.2, -.4, 0, .4, 1.2] : [-1.2, -.4, .4, 1.2];
+  // Focus-based rating movement is half its former annual magnitude.
+  const steps = person.fame.kind === 'personal' ? [-.6, -.2, 0, .2, .6] : [-.6, -.2, .2, .6];
   return steps[Math.round(clamp(finite(points), 0, steps.length - 1))];
 }
 

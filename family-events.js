@@ -1,5 +1,7 @@
-import { legacyFocusValue } from './focus-rules.js?v=deadline-effect';
-import { gradeScore } from './school.js?v=deadline-effect';
+import { legacyFocusValue } from './focus-rules.js?v=parent-colors-events';
+import { gradeScore } from './school.js?v=parent-colors-events';
+import { boostLowStatRates } from './event-rates.js?v=parent-colors-events';
+import { LIFE_FAMILY_EVENTS } from './life-events.js?v=parent-colors-events';
 // Fictional household events. Subject changes affect the named person; player
 // changes affect you. Relationship changes affect your bond with that person.
 // Individual rolls join the ordinary event pool and share its five-event cap.
@@ -8,7 +10,7 @@ const high = key => [key, 'high'];
 export const FAMILY_EVENT_RATE_MULTIPLIER = 2.5;
 const option = (id, label, description, outcome) => ({ id, label, description, ...outcome });
 function permanentOutcome(outcome) {
-  const result = { ...outcome, playerChanges: { ...outcome.playerChanges }, modifiers: {}, years: outcome.focusLimits ? outcome.years || 1 : 0 };
+  const result = { ...outcome, playerChanges: { ...outcome.playerChanges }, modifiers: {}, years: outcome.focusCapacity || outcome.focusMinimums || outcome.focusPoints ? outcome.years || 1 : 0 };
   for (const [key, amount] of Object.entries(outcome.modifiers || {})) result.playerChanges[key] = (result.playerChanges[key] || 0) + amount;
   result.playerChanges = Object.fromEntries(Object.entries(result.playerChanges).filter(([, amount]) => amount));
   if (!Object.keys(result.playerChanges).length) delete result.playerChanges;
@@ -22,11 +24,32 @@ const group = (subjectType, defaults, entries) => entries.map(event => permanent
 }));
 
 export const FAMILY_EVENTS = [
+  ...LIFE_FAMILY_EVENTS,
+  // Mental-stability bands are fictional gameplay gates, not diagnoses. Major
+  // disruptions are uncommon, and practical support can also have a large effect.
+  ...group('parent', { category: 'Parent mental stability', minAge: 18, maxAge: 200, minPlayerAge: 0, maxPlayerAge: 17, minStability: 7, statFactors: [high('stability')], severity: 'minor', baseChance: .008 }, [
+    { id: 'household_parent_reassuring_visit', name: 'A reassuring visit after a fright', description: 'After a frightening storm, {name} invites a familiar relative over and stays beside you while you settle, making home feel secure again.', playerChanges: { stability: .2 }, relationship: .2 },
+    { id: 'household_parent_friend_mediation', name: 'Help after a friendship dispute', description: '{name} calmly brings you and a friend together after a dispute, helping you explain what happened and rebuild trust.', minPlayerAge: 5, severity: 'moderate', playerChanges: { social: .4 }, relationship: .35 },
+    { id: 'household_parent_school_advocate', name: 'A parent speaks up at school', description: '{name} meets your teacher about a problem you were afraid to raise and arranges extra explanations, helping you return to class with more confidence.', minPlayerAge: 5, severity: 'moderate', baseChance: .006, playerChanges: { intelligence: .35 }, relationship: .4 },
+    { id: 'household_parent_support_network', name: 'A dependable circle of adults', description: '{name} organizes relatives and trusted neighbors to share regular meals and activities with you; their dependable presence gives you lasting reassurance and new connections.', minStability: 8, severity: 'major', baseChance: .004, playerChanges: { stability: .65, social: .45, health: .2 }, relationship: .55 },
+  ]),
+  ...group('parent', { category: 'Parent mental stability', minAge: 18, maxAge: 200, minPlayerAge: 0, maxPlayerAge: 17, maxStability: 4, statFactors: [low('stability')], severity: 'minor', kind: 'negative', baseChance: .008 }, [
+    { id: 'household_parent_cancelled_outing', name: 'An outing canceled at the door', description: '{name} becomes too overwhelmed to leave for a planned outing, and you miss an afternoon with other children.', minPlayerAge: 3, playerChanges: { social: -.1 }, relationship: -.1 },
+    { id: 'household_parent_missed_meeting', name: 'An empty chair at your school meeting', description: 'Overwhelmed by the day, {name} misses a school meeting you had prepared for; another adult takes you home while you struggle with the disappointment.', minPlayerAge: 5, baseChance: .007, relationship: -.2 },
+    { id: 'household_parent_withdrawn_months', name: 'Family visits keep being canceled', description: '{name} withdraws from visitors and repeatedly cancels family plans, leaving you isolated from familiar people for months.', minPlayerAge: 3, maxStability: 3, severity: 'moderate', baseChance: .007, playerChanges: { stability: -.5, social: -.35 }, relationship: -.3 },
+    { id: 'household_parent_psychiatric_admission', name: 'A parent is admitted for psychiatric care', description: 'During a severe mental-health crisis, {name} is admitted to a psychiatric unit. Treatment helps them stabilize, but the long separation and disrupted school and social plans leave a lasting mark on you.', minPlayerAge: 5, maxStability: 2, severity: 'major', baseChance: .004, subjectChanges: { social: -.4 }, playerChanges: { stability: -1, social: -.65 }, years: 1, focusCapacity: { standard: { work: -1, social: -1 } } },
+    { id: 'household_parent_care_disruption', name: 'A relative takes over the daily routine', description: '{name} becomes unable to manage meals, appointments, and time together during a severe crisis. A relative steps in at home, but the upheaval and lost contact with your parent unsettle you for a long time.', maxStability: 2, severity: 'major', baseChance: .0035, playerChanges: { stability: -1.1, social: -.7, health: -.25 }, relationship: -.4 },
+  ]),
+  ...group('parent', { category: 'Parent mental stability', minAge: 18, maxAge: 200, minPlayerAge: 0, maxPlayerAge: 17, maxStability: 4, statFactors: [low('stability')], severity: 'moderate', baseChance: .007 }, [
+    { id: 'household_parent_counselling_place', name: 'A parent starts regular counseling', description: '{name} seeks help with persistent distress and takes an available counseling place. Regular appointments help them reconnect with you at home.', playerChanges: { stability: .25 }, relationship: .2 },
+    { id: 'household_parent_respite_help', name: 'Practical help through a difficult spell', description: 'After {name} struggles to manage daily care, a family support worker arranges meals and regular respite. The help gives them room to recover and restores more comfortable routines for you.', baseChance: .008, subjectChanges: { health: .2 }, playerChanges: { stability: .35, health: .15 }, relationship: .15 },
+    { id: 'household_parent_family_care_plan', name: 'A family care plan takes shape', description: 'A care team meets {name} and trusted relatives to arrange regular appointments, help at home, and protected time together. Reliable support makes a substantial difference for both of you.', minPlayerAge: 3, maxStability: 3, severity: 'major', baseChance: .004, playerChanges: { stability: .65, social: .35 }, relationship: .5 },
+  ]),
   ...group('parent', { minAge: 18, maxAge: 200, minPlayerAge: 5, maxPlayerAge: 17, baseChance: .009 }, [
     { id: 'household_school_proud_parent', name: 'Your report goes on the fridge', description: '{name} pins up your excellent school report and tells relatives about your work, giving you both a lift.', conditions: ['excellentSchoolGrade'], playerChanges: { social: .15 }, relationship: .25 },
     { id: 'household_school_celebration', name: 'A report-card celebration', description: '{name} celebrates your excellent report with a homemade meal and an afternoon at the park together.', conditions: ['excellentSchoolGrade'], playerChanges: { health: .15 }, relationship: .2 },
     { id: 'household_school_disappointment', name: 'A difficult report-card conversation', description: '{name} reacts angrily to your poor report, and an evening of criticism leaves you both upset.', conditions: ['poorSchoolGrade'], kind: 'negative', playerChanges: { health: -.1 }, relationship: -.25 },
-    { id: 'household_school_grounding', name: 'Grounded after a poor report', description: '{name} grounds you after a poor school report, cutting back your time with friends for the coming year.', conditions: ['poorSchoolGrade'], kind: 'negative', playerChanges: { social: -.15 }, relationship: -.2, years: 1, focusLimits: { standard: { social: 1 } } },
+    { id: 'household_school_grounding', name: 'Grounded after a poor report', description: '{name} grounds you after a poor school report, cutting back your time with friends for the coming year.', conditions: ['poorSchoolGrade'], kind: 'negative', playerChanges: { social: -.15 }, relationship: -.2, years: 1, focusCapacity: { standard: { social: -3 } } },
   ]),
   ...group('parent', { minAge: 18, maxAge: 200, minPlayerAge: 0, maxPlayerAge: 17, baseChance: .00005 }, [
     { id: 'household_parent_abandonment', name: 'Abandons you', description: '{name} leaves the family. Your remaining parent takes over; otherwise an adult relative adopts you.', kind: 'negative', years: 3, modifiers: { stability: -3, social: -1.5, health: -1 } },
@@ -127,30 +150,30 @@ export const FAMILY_EVENTS = [
   ]),
   ...group('partner', { minAge: 18, maxAge: 84, minPlayerAge: 18, baseChance: .006 }, [
     { id: 'household_partner_language_course', name: 'A language course', description: '{name} invites you to evening language classes.', focusFactors: ['family'], choices: [
-      option('join', 'Attend together', 'Classes replace some evenings with friends.', { subjectChanges: { intelligence: .35 }, playerChanges: { intelligence: .35 }, relationship: .3, years: 1, focusLimits: { standard: { social: 2 } } }),
+      option('join', 'Attend together', 'Classes replace some evenings with friends.', { subjectChanges: { intelligence: .35 }, playerChanges: { intelligence: .35 }, relationship: .3, years: 1, focusCapacity: { standard: { social: -2 } } }),
       option('separate', 'Keep separate schedules', '{name} takes the course while you keep your plans.', { subjectChanges: { intelligence: .35 }, playerChanges: { social: .15 }, relationship: .1 }),
     ] },
     { id: 'household_partner_roof_leak', name: 'A leaking roof', description: 'A roof leak disrupts your home with {name}.', kind: 'negative', baseChance: .005, choices: [
-      option('repair', 'Handle the repairs together', 'Repair work uses your spare evenings.', { subjectChanges: { strength: .2 }, playerChanges: { strength: .25, health: -.15 }, relationship: .25, years: 1, focusLimits: { standard: { social: 1 } } }),
+      option('repair', 'Handle the repairs together', 'Repair work uses your spare evenings.', { subjectChanges: { strength: .2 }, playerChanges: { strength: .25, health: -.15 }, relationship: .25, years: 1, focusCapacity: { standard: { social: -3 } } }),
       option('hire', 'Hire repair help', 'Outside help protects your time, though arranging it is stressful.', { lifestyle: -1, years: 1 }),
     ] },
     { id: 'household_partner_travel_plans', name: 'Two trips on the same dates', description: '{name} is invited on an art retreat during a history tour you want to take, and you need to decide whether to travel together.', kind: 'neutral', choices: [
-      option('together', 'Plan a shared trip', 'A longer trip leaves less time for work.', { playerChanges: { creativity: .25 }, relationship: .4, years: 1, focusLimits: { standard: { work: 3 } } }),
+      option('together', 'Plan a shared trip', 'A longer trip leaves less time for work.', { playerChanges: { creativity: .25 }, relationship: .4, years: 1, focusCapacity: { standard: { work: -1 } } }),
       option('apart', 'Travel separately', 'You pursue different interests and spend less time together.', { subjectChanges: { creativity: .3 }, playerChanges: { intelligence: .3 }, relationship: -.2 }),
     ] },
     { id: 'household_partner_lost_keys', name: 'Lost house keys', description: '{name} loses the house keys during a busy day.', kind: 'negative', relationship: -.1 },
   ]),
   ...group('child', { minAge: 0, maxAge: 17, minPlayerAge: 18, baseChance: .007 }, [
     { id: 'household_child_care_closure', name: 'Childcare closes', description: "{name}'s childcare provider closes unexpectedly.", maxAge: 4, kind: 'negative', choices: [
-      option('home', 'Provide care yourself', 'Caregiving leaves less time for work.', { playerChanges: { stability: -.15 }, relationship: .3, years: 1, focusLimits: { standard: { work: 2 } } }),
+      option('home', 'Provide care yourself', 'Caregiving leaves less time for work.', { playerChanges: { stability: -.15 }, relationship: .3, years: 1, focusCapacity: { standard: { work: -2 } } }),
       option('replace', 'Arrange replacement care', 'New care protects your schedule, though the transition brings worry.', { subjectChanges: { social: .2 }, relationship: .1, lifestyle: -1, years: 1 }),
     ] },
     { id: 'household_child_science_fair', name: 'A science fair', description: '{name} asks for help building a science exhibit.', minAge: 6, maxAge: 16, choices: [
-      option('build', 'Build it together', 'The project takes time from your own activities.', { subjectChanges: { intelligence: .35, creativity: .25 }, playerChanges: { intelligence: .15 }, relationship: .3, years: 1, focusLimits: { standard: { self: 2 } } }),
+      option('build', 'Build it together', 'The project takes time from your own activities.', { subjectChanges: { intelligence: .35, creativity: .25 }, playerChanges: { intelligence: .15 }, relationship: .3, years: 1, focusCapacity: { standard: { self: -2, sports: -1 } } }),
       option('advise', 'Offer occasional advice', '{name} builds independently with a little guidance.', { subjectChanges: { intelligence: .2 }, relationship: .15 }),
     ] },
     { id: 'household_child_driving', name: 'Driving practice', description: '{name} wants help learning to drive.', minAge: 16, maxAge: 17, kind: 'neutral', choices: [
-      option('teach', 'Practice together', 'Driving sessions replace some time with friends.', { subjectChanges: { intelligence: .3 }, relationship: .35, years: 1, focusLimits: { standard: { social: 2 } } }),
+      option('teach', 'Practice together', 'Driving sessions replace some time with friends.', { subjectChanges: { intelligence: .3 }, relationship: .35, years: 1, focusCapacity: { standard: { social: -2 } } }),
       option('instructor', 'Arrange driving lessons', 'Lessons protect your time, though arranging them is stressful.', { subjectChanges: { intelligence: .35 }, relationship: .1, lifestyle: -1, years: 1 }),
     ] },
     { id: 'household_child_rescued_stray', name: 'A rescued stray', description: '{name} helps a lost animal reach its owner.', minAge: 6, subjectChanges: { social: .25 }, relationship: .15 },
@@ -168,6 +191,10 @@ function eligible(event, state, subject, playerStats = state.stats) {
   if (event.id === 'household_parent_abandonment' && !(state.parents || []).includes(subject)) return false;
   if (state.age < (event.minPlayerAge ?? 0) || state.age > (event.maxPlayerAge ?? Infinity)) return false;
   if (event.subjectType === 'partner' && state.age < 18) return false;
+  if (event.minStability !== undefined || event.maxStability !== undefined) {
+    const stability = subject.stats.stability;
+    if (!Number.isFinite(stability) || stability < (event.minStability ?? -Infinity) || stability > (event.maxStability ?? Infinity)) return false;
+  }
   return (event.conditions || []).every(condition => {
     if (condition === 'married') return subject.married === true;
     if (condition === 'dating') return subject.married === false;
@@ -194,19 +221,25 @@ export function familyEventChances(state, playerStats = state.stats) {
     ...(state.guardian && !(state.parents || []).some(person => person.alive !== false && person.abandonedAt === undefined) ? [{ subjectType: 'parent', person: state.guardian }] : []),
     ...(state.partner ? [{ subjectType: 'partner', person: state.partner }] : []),
     ...(state.children || []).map(person => ({ subjectType: 'child', person })),
+    ...(state.siblings || []).map(person => ({ subjectType: 'sibling', person })),
   ];
   const focus = Object.fromEntries(['work', 'social', 'family', 'self'].map(key => [key, legacyFocusValue(state.focus?.[key], state.age >= 2 && state.age < 5 && !['work', 'self'].includes(key) ? 2 : 3)]));
   const result = [];
   for (const { subjectType, person } of actors) {
+    // Housing and access describe the player's household, not a relative's
+    // individual earnings or a child's personal rating.
     const eventStats = { ...person.stats, lifestyle: state.lifestyle };
-    for (const event of FAMILY_EVENTS.filter(event => event.subjectType === subjectType)) {
+    const catalog = FAMILY_EVENTS.filter(event => event.subjectType === subjectType);
+    const rates = [];
+    for (const event of catalog) {
       let chance = eligible(event, state, person, playerStats) ? event.id === 'household_parent_abandonment' ? abandonmentChance(state, person) : event.baseChance * FAMILY_EVENT_RATE_MULTIPLIER : 0;
-      for (const [key, direction] of event.statFactors || []) chance *= traitFactor(eventStats[key], direction);
+      for (const [key, direction] of chance > 0 ? event.statFactors || [] : []) chance *= traitFactor(eventStats[key], direction);
       for (const key of event.focusFactors || []) chance *= .4 + focus[key] * .25;
       for (const key of event.neglectFactors || []) chance *= .25 + (5 - focus[key]) * .35;
       if (event.relationshipFactor) chance *= traitFactor(person.relationship ?? 5, event.relationshipFactor);
-      result.push({ id: `${event.id}:${person.id}`, eventId: event.id, name: `${person.name}: ${event.name}`, chance: clamp(chance, 0, .12), subjectType, subjectId: person.id });
+      rates.push({ id: `${event.id}:${person.id}`, eventId: event.id, name: `${person.name}: ${event.name}`, chance: clamp(chance, 0, .12), subjectType, subjectId: person.id });
     }
+    result.push(...boostLowStatRates(catalog, rates, eventStats));
   }
   return result;
 }

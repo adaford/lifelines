@@ -19,7 +19,7 @@ test('fame progression uses its focus curve, bounded magnitude variation, and ex
     const state = person(kind), before = structuredClone(state), key = kind === 'personal' ? 'self' : kind;
     assert.equal(hasFame(state), true);
     assert.equal(fameFocusKey(state), key);
-    const expected = kind === 'personal' ? [-1.2, -.4, 0, .4, 1.2] : [-1.2, -.4, .4, 1.2];
+    const expected = kind === 'personal' ? [-.6, -.2, 0, .2, .6] : [-.6, -.2, .2, .6];
     for (let points = 0; points < expected.length; points++) assert.equal(fameFocusChange(state, points), expected[points]);
     assert.equal(fameLearningBonus(state, 'social'), 5);
     for (const stat of ['intelligence', 'strength', 'creativity', 'attractiveness', 'health', 'stability']) assert.equal(fameLearningBonus(state, stat), 0);
@@ -33,9 +33,9 @@ test('fame progression uses its focus curve, bounded magnitude variation, and ex
   const state = person('personal');
   for (const draw of [-100, -3, 0, 3, 100]) assert.equal(fameNextRating(state, draw), 5, 'zero focus contribution cannot acquire random drift');
   state.focus.self = 4;
-  assert.equal(fameNextRating(state, -100), 5.5);
-  assert.equal(fameNextRating(state, 0), 6.2);
-  assert.equal(fameNextRating(state, 100), 6.9);
+  assert.equal(fameNextRating(state, -100), 5.2);
+  assert.equal(fameNextRating(state, 0), 5.6);
+  assert.equal(fameNextRating(state, 100), 6);
   state.fame.rating = 9.9; assert.equal(fameNextRating(state, 3), 10);
   state.fame.rating = .1; state.focus.self = 0; assert.equal(fameNextRating(state, 3), 0);
   for (const draw of [-20, -3, -2, -.5, 0, .5, 2, 3, 20]) {

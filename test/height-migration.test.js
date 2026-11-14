@@ -26,7 +26,7 @@ test('v9 centimetre saves convert every family measurement and review while pres
   const state = lifeAt(35);
   // V9 predates focus-limit effects; isolate the height migration from newly
   // rolled restrictions that cannot be represented in that older schema.
-  state.effects = state.effects.filter(effect => !effect.focusLimits);
+  state.effects = state.effects.filter(effect => !effect.focusLimits && !effect.focusCapacity && !effect.focusMinimums && !effect.focusPoints);
   assert.equal(haveChild(state).ok, true);
   const adult = { ...copy(state.parents[1]), id: 'unit-adult', name: 'Summer Reed', age: 30, money: 0, gender: 'female', canGestate: true, attractedTo: ['male'] };
   state.siblings = [{ ...copy(adult), id: 'unit-sibling', name: 'Casey Reed' }];
@@ -73,6 +73,9 @@ test('v9 migration rounds inches once and recomputes review growth from converte
 
 test('old age-two cry reviews and queued childhood choices survive the new age boundaries', () => {
   const legacy = toLegacyCentimeters(lifeAt(3));
+  // A modern seeded life can roll scheduling records unavailable in schema 9.
+  // Construct only the historical effect format before exercising migration.
+  legacy.effects = legacy.effects.filter(effect => !effect.focusLimits && !effect.focusCapacity && !effect.focusMinimums && !effect.focusPoints);
   legacy.version = 9;
   delete legacy.focus.creative;
   legacy.yearSummary.decisions = { cryLevel: 4 };
@@ -81,6 +84,8 @@ test('old age-two cry reviews and queued childhood choices survive the new age b
   assert.deepEqual(migrated.yearSummary.decisions, { cryLevel: 4 });
 
   const pending = toLegacyCentimeters(lifeAt(4));
+  // Schema 9 cannot represent later focus restrictions.
+  pending.effects = pending.effects.filter(effect => !effect.focusLimits && !effect.focusCapacity && !effect.focusMinimums && !effect.focusPoints);
   pending.version = 9;
   delete pending.focus.creative;
   delete pending.yearSummary.decisions.focus.creative;

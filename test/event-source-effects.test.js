@@ -36,6 +36,7 @@ function directEffects(outcome) {
   }
   if (outcome.relationship) effects.push({ key: 'subject:relationship', field: 'relationship' });
   if (outcome.lifestyle) effects.push({ key: 'household:lifestyle', field: 'lifestyle' });
+  if (outcome.householdLifestyle) effects.push({ key: 'household:lifestyle', field: 'householdLifestyle' });
   if (outcome.fameSupport) effects.push({ key: 'household:lifestyle', field: 'fameSupport' });
   if (outcome.fameChange) effects.push({ key: 'player:fame', field: 'fameChange' });
   return effects;

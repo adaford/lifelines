@@ -42,9 +42,9 @@ test('under-18 ranks cover all own stats and never change a saved life', () => {
 
 test('a strong baby ranks above same-age peers and changing focus only changes the forecast', () => {
   const state = createGame({ seed: 14 });
-  state.stats.strength = 7;
+  state.stats.strength = 5 + PERCENTILE_REFERENCE.stats.strength.ages[0].sd;
   const babyRank = statPercentiles(state).strength;
-  assert.ok(babyRank.percentile > 80);
+  assert.ok(Math.abs(babyRank.percentile - 84.13) < .1, 'one observed standard deviation above the rating center, allowing two-decimal effective-rating rounding');
   assert.equal(babyRank.sd, PERCENTILE_REFERENCE.stats.strength.ages[0].sd);
   const louder = structuredClone(state);
   setCryLevel(louder, 5);

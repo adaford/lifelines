@@ -24,10 +24,10 @@ test('toddler Family time has neutral parent relationships and mental stability 
     const before = structuredClone(state);
     const forecast = annualForecast(state);
     for (const parent of forecast.parents) {
-      assert.equal(parent.relationship.after, round(5 + focusEffect(points) * .04), `age ${age}, Family ${points}, relationship`);
-      assert.equal(parent.relationship.change, round(focusEffect(points) * .04));
-      assert.equal(parent.stability.after, round(5 + focusEffect(points) * .0125), `age ${age}, Family ${points}, mental stability`);
-      assert.equal(parent.stability.change, round(round(5 + focusEffect(points) * .0125) - 5));
+      assert.equal(parent.relationship.after, round(5 + focusEffect(points) * .02), `age ${age}, Family ${points}, relationship`);
+      assert.equal(parent.relationship.change, round(focusEffect(points) * .02));
+      assert.equal(parent.stability.after, round(5 + focusEffect(points) * .00625), `age ${age}, Family ${points}, mental stability`);
+      assert.equal(parent.stability.change, round(round(5 + focusEffect(points) * .00625) - 5));
     }
     assert.deepEqual(state, before, 'the mean forecast never mutates a saved life or RNG');
   }
@@ -37,8 +37,8 @@ test('school-age Family uses the same two-point neutral and triple endpoints', (
   for (const age of [5, 17]) for (let points = 0; points <= 4; points++) {
     const forecast = annualForecast(familyTime(age, points));
     for (const parent of forecast.parents) {
-      assert.equal(parent.relationship.after, round(5 + focusEffect(points) * .04));
-      assert.equal(parent.stability.after, round(5 + focusEffect(points) * .0125));
+      assert.equal(parent.relationship.after, round(5 + focusEffect(points) * .02));
+      assert.equal(parent.stability.after, round(5 + focusEffect(points) * .00625));
     }
   }
 });

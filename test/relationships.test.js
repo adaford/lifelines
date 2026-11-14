@@ -20,12 +20,12 @@ function seededHelpers(seed) {
 
 test('meeting frequency runs from a rare single opportunity to at most five',()=>{
   const low=actor(1), high=actor(10);
-  assert.equal(desirability(low),1);
+  assert.ok(desirability(low)>1 && desirability(low)<2, 'missing historical height uses a neutral height input');
   assert.equal(meetingChances(low).slots,1);
-  assert.ok(Math.abs(meetingChances(low).expected-.22)<1e-10);
+  assert.ok(meetingChances(low).expected>.22 && meetingChances(low).expected<.4);
   assert.equal(meetingChances(high).slots,5);
-  assert.ok(Math.abs(meetingChances(high).expected-4.6)<1e-10);
-  for(const key of ['attractiveness','social']) {
+  assert.ok(meetingChances(high).expected>4 && meetingChances(high).expected<=4.6);
+  for(const key of traits) {
     const changed=actor(1);changed.stats[key]=10;
     assert.ok(meetingChances(changed).expected>meetingChances(low).expected);
   }

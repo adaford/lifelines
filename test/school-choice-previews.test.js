@@ -73,12 +73,12 @@ test('school contribution magnitudes include stronger practice and stress withou
   const state = student();
   const low = selected(state, 'work', 0);
   let effects = schoolFocusEffects(low, 'work');
-  assert.ok(Math.abs(effects.intelligence + .388125) < 1e-10);
-  assert.ok(Math.abs(effects.stability - .45) < 1e-10, 'less School relieves only its own stress');
+  assert.ok(Math.abs(effects.intelligence + .1940625) < 1e-10);
+  assert.ok(Math.abs(effects.stability - .225) < 1e-10, 'less School relieves only its own stress');
   assert.equal(effects.health, 0);
   const high = selected(state, 'self', 4);
   effects = schoolFocusEffects(high, 'self');
-  for (const [stat, amount] of Object.entries({ attractiveness: .388125, intelligence: 0, strength: 0, creativity: 0, health: .1575, stability: .45 })) {
+  for (const [stat, amount] of Object.entries({ attractiveness: .1940625, intelligence: 0, strength: 0, creativity: 0, health: .07875, stability: .225 })) {
     assert.ok(Math.abs(effects[stat] - amount) < 1e-10, `${stat} uses rebalanced self-focus`);
   }
   const initial = schoolChoiceImpacts(low, 'work');
@@ -92,8 +92,8 @@ test('school contribution magnitudes include stronger practice and stress withou
     initial.map(({ stat, change, level }) => ({ stat, change: Math.round(change * 100), level })), 'household decline, reversion, and spare points stay out of the School row');
   const college = selected(student(19), 'work', 4);
   const collegeEffects = schoolFocusEffects(college, 'work');
-  assert.ok(Math.abs(collegeEffects.intelligence - .3375) < 1e-10);
-  assert.ok(Math.abs(collegeEffects.stability + .45) < 1e-10);
+  assert.ok(Math.abs(collegeEffects.intelligence - .16875) < 1e-10);
+  assert.ok(Math.abs(collegeEffects.stability + .225) < 1e-10);
 });
 
 test('Family previews retain school caregiver neutral points and follow guardians', () => {
@@ -105,12 +105,12 @@ test('Family previews retain school caregiver neutral points and follow guardian
       const relationship = entries.find(entry => entry.parentId === parent.id && entry.stat === 'relationship');
       if (points === 2) assert.equal(stability, undefined);
       else {
-        assert.ok(Math.abs(stability.change - (Math.round((5 + (focusEffect(points)) * .0125) * 100) / 100 - 5)) < 1e-10);
+        assert.ok(Math.abs(stability.change - (Math.round((5 + (focusEffect(points)) * .00625) * 100) / 100 - 5)) < 1e-10);
         assert.equal(stability.level, [3, 1, 0, 1, 3][points]);
       }
       if (points === 2) assert.equal(relationship, undefined);
       else {
-        assert.ok(Math.abs(relationship.change - (focusEffect(points)) * .04) < 1e-10);
+        assert.ok(Math.abs(relationship.change - (focusEffect(points)) * .02) < 1e-10);
         assert.equal(relationship.level, [3, 1, 0, 1, 3][points]);
       }
     }

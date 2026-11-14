@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { initialParentCareer, careerForecast, advanceParentCareer } from '../parent-careers.js';
+import { initialParentCareer, careerForecast, advanceParentCareer, parentCareerJob } from '../parent-careers.js';
+import { JOBS } from '../jobs.js';
 
 const parent = (overrides = {}) => ({ name: 'Alex Morgan', age: 30, alive: true, lifestyle: 4, stats: { health: 5, stability: 5 }, ...overrides });
 function seeded(seed) {
@@ -63,13 +64,13 @@ test('job loss reduces support and recovery rebuilds it without erasing the setb
   const person = parent({ career: initialParentCareer(parent()) });
   const lost = advanceParentCareer(person, { random: sequence(0, .5), normal: () => assert.fail('loss does not need a normal draw') });
   assert.equal(lost.career.status, 'unemployed');
-  assert.equal(lost.career.progress, 2.5);
+  assert.equal(lost.career.progress, 2.723, 'loss slows toward the lower Lifestyle pole');
   assert.equal(lost.event.title, 'A parent lost their job');
   person.career = lost.career;
-  assert.equal(careerForecast(person).progress, 2.455);
+  assert.equal(careerForecast(person).progress, 2.6947);
   const recovered = advanceParentCareer(person, { random: sequence(0, .5) });
   assert.equal(recovered.career.status, 'employed');
-  assert.equal(recovered.career.progress, 3.05);
+  assert.equal(recovered.career.progress, 3.4276);
   assert.equal(recovered.event.title, 'Back at work');
   assert.ok(recovered.career.progress < 4);
 });
@@ -99,10 +100,10 @@ test('career progress is bounded and promotions are separate from ordinary growt
   const person = parent({ lifestyle: 9.9 });
   person.career = initialParentCareer(person, 5);
   const promoted = advanceParentCareer(person, { random: sequence(.9, 0, 1), normal: () => 3 });
-  assert.equal(promoted.career.progress, 10);
+  assert.equal(promoted.career.progress, 9.9, 'an inherited high household rating cannot grow beyond the job ceiling');
   assert.equal(promoted.event.title, 'A parent moved ahead at work');
   person.career = { ...person.career, progress: 1.1 };
-  assert.equal(advanceParentCareer(person, { random: sequence(0, 1) }).career.progress, 0);
+  assert.equal(advanceParentCareer(person, { random: sequence(0, 1) }).career.progress, .5671, 'loss slows near zero rather than immediately exhausting support');
   person.career = { ...person.career, progress: 0, status: 'unemployed' };
   assert.equal(careerForecast(person).progress, 0);
   assert.equal(advanceParentCareer(person, { random: sequence(.9), normal: () => -3 }).career.progress, 0);
@@ -122,4 +123,53 @@ test('dead and retired parents preserve support without consuming random draws',
   }
   const turning65 = parent({ age: 65, career: initialParentCareer(parent({ age: 64 })) });
   assert.equal(advanceParentCareer(turning65, rng).career.status, 'retired');
+});
+
+test('new parents receive deterministic eligible occupations while legacy records stay untouched until a future year', () => {
+  const person = parent({ id: 'parent-deterministic', stats: { intelligence: 5, social: 5, strength: 5, creativity: 5, attractiveness: 5, health: 5, stability: 5 } });
+  const before = structuredClone(person);
+  const first = initialParentCareer(person, 3, { assignJob: true });
+  assert.deepEqual(initialParentCareer(person, 3, { assignJob: true }), first);
+  assert.deepEqual(person, before);
+  const job = JOBS.find(job => job.id === first.jobId);
+  assert.ok(job.minAge <= person.age);
+  for (const [stat, minimum] of Object.entries(job.requirements)) assert.ok(person.stats[stat] >= minimum);
+  assert.equal(first.progress, person.lifestyle);
+  assert.equal(first.advancement, .2);
+  person.career = initialParentCareer(person);
+  const saved = structuredClone(person);
+  const future = careerForecast(person);
+  assert.equal(future.jobId, first.jobId);
+  assert.ok(future.advancement >= first.advancement);
+  assert.deepEqual(person, saved, 'previewing a future occupation does not materialize it into the save');
+});
+
+test('parent advancement uses actual job skill weights and preserves the same random branch schedule', () => {
+  const job = JOBS.find(job => job.id === 'sales');
+  const setup = value => parent({ stats: { intelligence: value, social: value, health: 5, stability: 5 },
+    career: { focus: 4, status: 'employed', progress: 4, years: 4, jobId: job.id, advancement: .1 } });
+  const weak = setup(2), strong = setup(8);
+  assert.ok(careerForecast(strong).progress > careerForecast(weak).progress);
+  assert.ok(careerForecast(strong).advancement > careerForecast(weak).advancement);
+  let uniforms = 0, normals = 0;
+  const result = advanceParentCareer(strong, { random: () => { uniforms++; return 1; }, normal: () => { normals++; return 0; } });
+  assert.equal(uniforms, 2, 'job-loss and promotion checks retain their separate rolls');
+  assert.equal(normals, 1, 'ordinary yearly variation retains its draw');
+  assert.deepEqual(result.career, careerForecast(strong));
+  weak.career.focus = 0;
+  const noContribution = advanceParentCareer(weak, { random: () => 1, normal: () => 3 }).career;
+  assert.equal(noContribution.progress, weak.career.progress);
+  assert.equal(noContribution.advancement, weak.career.advancement);
+});
+
+test('parent role ceilings restrict new gains without confiscating inherited household support', () => {
+  const person = parent({ stats: { intelligence: 10, strength: 10, social: 10, creativity: 10, attractiveness: 10 },
+    career: { focus: 5, status: 'employed', progress: 9, years: 20, jobId: 'plumber', advancement: .7 } });
+  const cap = parentCareerJob(person).maxLifestyle;
+  assert.ok(cap < person.career.progress);
+  assert.equal(careerForecast(person).progress, 9);
+  assert.equal(advanceParentCareer(person, { random: sequence(1, 0, 1), normal: () => 3 }).career.progress, 9);
+  person.career.progress = cap - .001;
+  const promoted = advanceParentCareer(person, { random: sequence(1, 0, 1), normal: () => 3 }).career;
+  assert.equal(promoted.progress, cap);
 });

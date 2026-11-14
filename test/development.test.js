@@ -17,15 +17,10 @@ const median = values => [...values].sort((a, b) => a - b)[Math.floor(values.len
 const average = values => values.reduce((a, b) => a + b, 0) / values.length;
 const standardDeviation = values => Math.sqrt(average(values.map(value => (value - average(values)) ** 2)));
 function advanceQuietMean(state) {
-  for (let rng = 1; rng <= 300; rng++) {
-    const candidate = { ...copy(state), rng };
-    assert.equal(advanceYear(candidate, { ...meanYear, parentCareerRandom: () => 1 }).ok, true);
-    if (candidate.lastYearEvents.length) continue;
-    Object.assign(state, candidate);
-    return;
-  }
-  assert.fail('Could not find a quiet mean-development fixture');
+  assert.equal(advanceYear(state, { ...meanYear, parentCareerRandom: () => 1, eventRandom: () => 1 }).ok, true);
+  assert.equal(state.lastYearEvents.length, 0);
 }
+
 function finishChoices(state) {
   while (state.pendingEvents.length) {
     const pending = state.pendingEvents[0];
@@ -47,7 +42,7 @@ function aged(age, seed = 43, gender = 'male') {
 function legacyV7(state) {
   const legacy = toLegacyCentimeters(copy(state));
   legacy.version = 7;
-  for (const effect of legacy.effects) delete effect.focusLimits;
+  for (const effect of legacy.effects) { delete effect.focusLimits; delete effect.focusCapacity; delete effect.focusMinimums; delete effect.focusPoints; }
   for (const person of [legacy, ...legacy.parents, ...legacy.children, ...legacy.siblings, ...legacy.lineage, legacy.partner, ...legacy.encounters, legacy.pregnancy?.otherParent].filter(Boolean)) {
     if (person.adultHeight === null) person.adultHeight = 170;
     for (const key of ['growthSex', 'growthFactor', 'maturityAge', 'birthHeight', 'growthAnchor', 'parentRole', 'career']) delete person[key];
@@ -60,6 +55,8 @@ test('new families have mom and dad relationships with mean seven and standard d
   const relationships = [];
   const relationshipsByRole = { mom: [], dad: [] };
   const appearances = [];
+  const parentalAppearances = [];
+  const higherParentAppearances = [], lowerParentAppearances = [];
   const heights = new Set();
   for (let seed = 1; seed <= 1000; seed++) {
     const state = createGame({ seed });
@@ -69,6 +66,10 @@ test('new families have mom and dad relationships with mean seven and standard d
     relationships.push(...state.parents.map(parent => parent.relationship));
     for (const parent of state.parents) relationshipsByRole[parent.parentRole].push(parent.relationship);
     appearances.push(state.stats.attractiveness);
+    const parentalAppearance = average(state.parents.map(parent => parent.stats.attractiveness));
+    parentalAppearances.push(parentalAppearance);
+    if (parentalAppearance >= 6) higherParentAppearances.push(state.stats.attractiveness);
+    if (parentalAppearance <= 4) lowerParentAppearances.push(state.stats.attractiveness);
     heights.add(state.height);
     assert.equal(validateSave(state), true, `seed ${seed}`);
   }
@@ -82,7 +83,10 @@ test('new families have mom and dad relationships with mean seven and standard d
   assert.ok(new Set(relationships).size > 100, 'relationships vary across families');
   assert.ok(appearances.every(value => value >= 0 && value <= 10));
   assert.ok(median(appearances) >= 4 && median(appearances) <= 8);
-  assert.ok(standardDeviation(appearances) > 1.7 && standardDeviation(appearances) < 2.4, 'appearance starts with a broad spread');
+  assert.ok(standardDeviation(appearances) > standardDeviation(parentalAppearances), 'appearance has variation beyond the parental mean');
+  assert.ok(higherParentAppearances.length > 100 && lowerParentAppearances.length > 100);
+  assert.ok(average(higherParentAppearances) > average(lowerParentAppearances) + 2.5, 'appearance inherits a tendency from both parents');
+  assert.ok(higherParentAppearances.some(value => value < 3) && lowerParentAppearances.some(value => value > 7), 'parental appearance does not predetermine the child');
   assert.ok(appearances.some(value => value <= 2) && appearances.some(value => value >= 9));
   assert.ok(heights.size > 50, 'newborn length varies instead of always being 50cm');
 });
@@ -214,6 +218,9 @@ test('low and high crying have meaningful Intelligence changes even across the f
 
 test('annual development varies around the pure mean forecast and is reproducible from a saved seed', () => {
   const template = createGame({ seed: 76 });
+  // Isolate routine variation from the deliberately frequent low-stat events.
+  for (const person of [template, ...template.parents]) for (const key of Object.keys(person.stats)) person.stats[key] = 5;
+  template.lifestyle = 5;
   template.aptitudes.intelligence = 0;
   template.stats.intelligence = 5;
   template.parents.forEach(parent => { parent.stats.stability = 7; parent.relationship = 7; });
@@ -249,6 +256,9 @@ test('annual development varies around the pure mean forecast and is reproducibl
 
 test('neutral focus leaves ratings unchanged without consuming RNG in previews', () => {
   const template = createGame({ seed: 76 });
+  // Isolate routine variation from the deliberately frequent low-stat events.
+  for (const person of [template, ...template.parents]) for (const key of Object.keys(person.stats)) person.stats[key] = 5;
+  template.lifestyle = 5;
   template.age = 3;
   template.conditions = [];
   template.effects = [];

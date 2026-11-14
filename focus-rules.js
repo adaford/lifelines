@@ -1,5 +1,6 @@
-import { conditionFocusPoints } from './birth-conditions.js?v=deadline-effect';
-import { fameFocusKey, fameActivityMatches } from './fame.js?v=deadline-effect';
+import { conditionFocusPoints } from './birth-conditions.js?v=parent-colors-events';
+import { fameFocusKey, fameActivityMatches } from './fame.js?v=parent-colors-events';
+import { currentSchoolEnrollment } from './school.js?v=parent-colors-events';
 
 // One shared allocation scale for all playable focus stages.
 export const MAX_FOCUS = 4;
@@ -8,17 +9,21 @@ export const STANDARD_FOCUS_KEYS = ['work', 'social', 'family', 'self'];
 export const TODDLER_FOCUS_KEYS = [...STANDARD_FOCUS_KEYS, 'creative'];
 export const SCHOOL_FOCUS_KEYS = [...STANDARD_FOCUS_KEYS, 'sports', 'extracurricular'];
 const ageOf = ageOrPerson => ageOrPerson && typeof ageOrPerson === 'object' ? ageOrPerson.age : ageOrPerson;
-const famousActivityFocus = (person, key) => fameActivityMatches(person, key, person?.school?.[key]?.id);
+const famousActivityFocus = (person, key) => fameActivityMatches(person, key, currentSchoolEnrollment(person, key)?.id);
+const collegeSportsFocus = person => person?.age >= 18 && person.education?.status === 'college' && Boolean(person.education.sport?.id);
 export function focusKeysForAge(ageOrPerson) {
   const age = ageOf(ageOrPerson);
   if (age >= 2 && age < 5) return [...TODDLER_FOCUS_KEYS];
   if (age >= 5 && age < 18) return [...SCHOOL_FOCUS_KEYS];
   const source = fameFocusKey(ageOrPerson);
-  return [...STANDARD_FOCUS_KEYS, ...(age >= 18 && famousActivityFocus(ageOrPerson, source) ? [source] : [])];
+  return [...new Set([...STANDARD_FOCUS_KEYS,
+    ...(collegeSportsFocus(ageOrPerson) ? ['sports'] : []),
+    ...(age >= 18 && famousActivityFocus(ageOrPerson, source) ? [source] : [])])];
 }
 // The original school activity scale also follows a famous source into adulthood.
 export const isSchoolActivityFocus = (ageOrPerson, key) => ageOf(ageOrPerson) >= 5
-  && (ageOf(ageOrPerson) < 18 && ['sports', 'extracurricular'].includes(key) || famousActivityFocus(ageOrPerson, key));
+  && (ageOf(ageOrPerson) < 18 && ['sports', 'extracurricular'].includes(key)
+    || key === 'sports' && collegeSportsFocus(ageOrPerson) || famousActivityFocus(ageOrPerson, key));
 export const focusMaxFor = (ageOrPerson, key) => isSchoolActivityFocus(ageOrPerson, key)
   ? famousActivityFocus(ageOrPerson, key) ? 3 : 2 : MAX_FOCUS;
 export const focusNeutralFor = (ageOrPerson, key) => isSchoolActivityFocus(ageOrPerson, key) ? 1 : DEFAULT_FOCUS;
@@ -46,7 +51,7 @@ export function legacyFocusValue(points = DEFAULT_FOCUS, oldNeutral = 3) {
 // Pure allocation normalization for balanced simulations and stage changes.
 export function fitFocusBudget(person, allocation) {
   const defaults = defaultFocus(person);
-  const result = Object.fromEntries(focusKeysForAge(person).map(key => [key, Math.max(0, Math.min(isSchoolActivityFocus(person, key) && !person.school?.[key] ? 0 : focusMaxFor(person, key), allocation[key] ?? defaults[key]))]));
+  const result = Object.fromEntries(focusKeysForAge(person).map(key => [key, Math.max(0, Math.min(isSchoolActivityFocus(person, key) && !currentSchoolEnrollment(person, key) ? 0 : focusMaxFor(person, key), allocation[key] ?? defaults[key]))]));
   const keys = Object.keys(result);
   let excess = Object.values(result).reduce((sum, points) => sum + points, 0) - focusBudget(person);
   while (excess > 0) {

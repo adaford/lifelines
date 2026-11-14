@@ -54,12 +54,16 @@ test('expiring adult lifestyle buffs and debuffs do not add expected-change entr
   for (const age of [18, 30, 70]) {
     for (const modifier of [-1, 1]) {
       const state = fixture(age);
-      state.money = 0;
+      state.money = 50000;
       state.jobId = null;
-      state.lifestyle = 1 + modifier;
+      state.housing = { status: 'independent', hostId: null, yearsWithFamily: 0 };
+      // Keep this expiry check independently housed. Its expected baseline
+      // comes from the same annual reserve spending as the actual forecast.
+      const baseline = annualForecast(state).lifestyle.after;
+      state.lifestyle = baseline + modifier;
       state.effects = [{ id: 'temporary-lifestyle', name: 'Household change', description: '', years: 1, modifiers: {}, lifestyle: modifier, kind: modifier > 0 ? 'positive' : 'negative' }];
       const forecast = assertHiddenWithoutMutation(state);
-      assert.deepEqual(forecast.lifestyle, { before: 1 + modifier, after: 1, change: -modifier });
+      assert.deepEqual(forecast.lifestyle, { before: baseline + modifier, after: baseline, change: -modifier });
     }
   }
 });

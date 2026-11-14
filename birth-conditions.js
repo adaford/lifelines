@@ -2,8 +2,11 @@
 // Affinity shifts apply once at creation without changing ratings; focus effects persist.
 const condition = (id, name, description, aptitudeChanges = {}, extra = {}) => ({ id, name, description, birthChance: .012, aptitudeChanges, ...extra });
 export const MAX_BIRTH_CONDITIONS = 5;
-export const INHERITANCE_CHANCE_MULTIPLIER = 1.5;
-export const BIRTH_CONDITIONS = [
+export const INHERITANCE_CHANCE_BOOST_PER_PARENT = .25;
+export const LEGACY_INHERITANCE_CHANCE_PER_PARENT = .003;
+// Compatibility export: this is now the maximum boost with two carrying parents.
+export const INHERITANCE_CHANCE_MULTIPLIER = 1 + 2 * INHERITANCE_CHANCE_BOOST_PER_PARENT;
+const LEGACY_BIRTH_CONDITIONS = [
   condition('autism', 'Autism', 'A different pattern of learning and social energy.', { intelligence: 1 }, { focusLimits: { standard: { social: 1 } }, birthChance: .008 }),
   condition('high_energy', 'High energy', 'More energy available for yearly activities.', {}, { focusPoints: 1, group: 'energy' }),
   condition('low_energy', 'Low energy', 'Less energy available for yearly activities.', {}, { focusPoints: -1, group: 'energy' }),
@@ -105,6 +108,123 @@ export const BIRTH_CONDITIONS = [
   condition('measured_pace', 'Measured pace', 'Fewer plans support a more settled starting point.', { stability: 1, health: 1 }, { focusPoints: -1 }),
   condition('adaptable', 'Adaptable', 'New situations and approaches feel easier to explore.', { creativity: 1, stability: 1 }),
 ];
+
+// New lives use specific profiles rather than fixed stereotypes or arbitrary opposites.
+// Gameplay affinities and probabilities are abstractions, not IQ, prevalence or
+// Mendelian inheritance. Predispositions do not guarantee a later diagnosis.
+// Clinical framing reviewed against:
+// https://www.nimh.nih.gov/health/publications/autism-spectrum-disorder
+// https://www.nichd.nih.gov/health/topics/learning/conditioninfo
+// https://www.nimh.nih.gov/health/publications/bipolar-disorder
+const profile = (id, name, description, kind, aptitudeChanges = {}, extra = {}) =>
+  condition(id, name, description, aptitudeChanges, { birthChance: .025, kind, ...extra });
+export const ACTIVE_BIRTH_CONDITIONS = [
+  profile('rapid_processing', 'Quick processing', 'New information is usually easier for you to process during learning.', 'positive', { intelligence: 1 }, { group: 'processing' }),
+  profile('strong_working_memory', 'Strong working memory', 'Holding several pieces of information in mind supports learning.', 'positive', { intelligence: 1 }, { group: 'working_memory' }),
+  profile('verbal_aptitude', 'Verbal aptitude', 'Learning and using language comes readily.', 'positive', { intelligence: 1, social: 1 }, { group: 'language' }),
+  profile('spatial_reasoning', 'Spatial reasoning', 'Visualizing shapes and layouts supports problem solving and design.', 'positive', { intelligence: 1, creativity: 1 }, { group: 'spatial' }),
+  profile('number_sense', 'Number sense', 'Recognizing quantities and numerical patterns comes readily.', 'positive', { intelligence: 1 }, { group: 'numeracy_support' }),
+  profile('pitch_memory', 'Pitch memory', 'Remembering pitch supports musical learning and expression.', 'positive', { creativity: 1 }, { group: 'pitch' }),
+  profile('visual_imagination', 'Visual imagination', 'Clear mental images support visual ideas and creative practice.', 'positive', { creativity: 1 }),
+  profile('motor_coordination', 'Motor coordination', 'Coordinating movements makes physical skills easier to learn.', 'positive', { strength: 1 }, { group: 'coordination' }),
+  profile('aerobic_capacity', 'Aerobic potential', 'Your physical makeup supports building endurance through activity.', 'positive', { strength: 1, health: 1 }, { group: 'endurance' }),
+  profile('muscle_response', 'Strong training response', 'Your muscles respond readily to appropriate physical training.', 'positive', { strength: 1 }),
+  profile('physical_resilience', 'Physical resilience', 'Your constitution supports recovery when care and rest are available.', 'positive', { health: 1 }, { group: 'recovery' }),
+  profile('settled_sleep', 'Settled sleep', 'Sleep is less easily disrupted, supporting rest and coping.', 'positive', { health: 1, stability: 1 }, { group: 'sleep_profile' }),
+  profile('emotion_regulation', 'Steady emotional regulation', 'Settling strong feelings comes more readily with practice and support.', 'positive', { stability: 1 }, { group: 'regulation' }),
+  profile('social_approach', 'Outgoing temperament', 'Approaching unfamiliar people feels relatively comfortable.', 'positive', { social: 1 }, { group: 'social_approach' }),
+  profile('expressive_communication', 'Expressive communication', 'Coordinating voice and expression helps others understand you.', 'positive', { social: 1 }, { group: 'speech' }),
+  profile('skin_barrier', 'Resilient skin barrier', 'Your skin is less prone to irritation and needs less recovery care.', 'positive', { health: 1 }, { group: 'skin' }),
+  profile('enamel_resilience', 'Resilient enamel', 'Your tooth enamel offers a helpful foundation alongside ordinary dental care.', 'positive', { health: 1 }, { group: 'dental' }),
+  profile('steady_appetite', 'Steady appetite', 'Reliable appetite signals make regular nourishment easier.', 'positive', { health: 1 }, { group: 'appetite' }),
+  profile('attention_flexibility', 'Flexible attention', 'Shifting attention between tasks takes relatively little effort.', 'positive', { intelligence: 1 }, { group: 'attention' }),
+  profile('task_initiative', 'Easy task initiation', 'Starting and organizing daily tasks uses less of your available time.', 'positive', {}, { focusPoints: 1, group: 'initiation' }),
+  profile('exceptional_reasoning', 'Exceptional reasoning', 'Unusually strong reasoning supports learning; it does not imply mental illness or mastery without practice.', 'positive', { intelligence: 1 }, { birthChance: .005 }),
+  profile('sensory_tolerance', 'Sensory tolerance', 'Ordinary noise and other sensations are less likely to exhaust your attention.', 'positive', { stability: 1 }, { group: 'sensory' }),
+  profile('deliberate_processing', 'Deliberate processing', 'Processing unfamiliar information takes extra time; this does not determine your eventual achievements.', 'negative', { intelligence: -1 }, { group: 'processing' }),
+  profile('working_memory_difficulty', 'Working-memory difficulty', 'Keeping several instructions in mind takes extra practice and external reminders.', 'negative', { intelligence: -1 }, { group: 'working_memory' }),
+  profile('language_processing_difficulty', 'Language-processing difficulty', 'Following rapid conversation takes extra effort and communication support.', 'negative', { social: -1 }, { group: 'language' }),
+  profile('spatial_processing_difficulty', 'Spatial-processing difficulty', 'Learning layouts and visual construction takes extra practice.', 'negative', { creativity: -1 }, { group: 'spatial' }),
+  profile('dyscalculia', 'Dyscalculia', 'This specific learning disability makes number tasks harder. Tools and support take planning time; general intelligence is unchanged.', 'negative', {}, { focusPoints: -1, group: 'numeracy_support' }),
+  profile('pitch_discrimination_difficulty', 'Pitch-discrimination difficulty', 'Distinguishing pitch makes some musical practice harder; other creative interests remain open.', 'negative', { creativity: -1 }, { group: 'pitch' }),
+  profile('developmental_coordination', 'Coordination difficulty', 'Learning coordinated movement takes more practice and adapted instruction.', 'negative', { strength: -1 }, { group: 'coordination' }),
+  profile('limited_endurance', 'Limited endurance', 'Physical effort requires more recovery and careful pacing.', 'negative', { strength: -1, health: -1 }, { group: 'endurance' }),
+  profile('connective_tissue_vulnerability', 'Joint vulnerability', 'Your joints need additional protection and paced physical training.', 'negative', { health: -1, strength: -1 }),
+  profile('slow_recovery', 'Slow physical recovery', 'Recovery after exertion or illness tends to take more care and rest.', 'negative', { health: -1 }, { group: 'recovery' }),
+  profile('interrupted_sleep', 'Interrupted-sleep tendency', 'Sleep is easily disturbed, making rest and coping harder.', 'negative', { health: -1, stability: -1 }, { group: 'sleep_profile' }),
+  profile('stress_reactivity', 'High stress reactivity', 'Strong stress responses can take more time and support to settle.', 'negative', { stability: -1 }, { group: 'regulation' }),
+  profile('inhibited_temperament', 'Inhibited temperament', 'Unfamiliar social situations take more time to feel comfortable.', 'negative', { social: -1 }, { group: 'social_approach' }),
+  profile('speech_motor_difficulty', 'Speech-motor difficulty', 'Coordinating speech takes extra practice and communication support; intelligence is unchanged.', 'negative', { social: -1 }, { group: 'speech' }),
+  profile('eczema_predisposition', 'Eczema predisposition', 'A tendency toward skin irritation can make physical care more demanding.', 'negative', { health: -1 }, { group: 'skin' }),
+  profile('enamel_vulnerability', 'Enamel vulnerability', 'Your teeth need additional preventive care and may recover less easily from damage.', 'negative', { health: -1 }, { group: 'dental' }),
+  profile('low_appetite_signals', 'Low appetite signals', 'Regular nourishment can require additional attention and support.', 'negative', { health: -1 }, { group: 'appetite' }),
+  profile('distractible_attention', 'Distractible attention', 'Managing interruptions takes planning time; this is not a measure of intelligence.', 'negative', {}, { focusPoints: -1, group: 'attention' }),
+  profile('initiation_difficulty', 'Task-initiation difficulty', 'Getting tasks underway uses extra planning time and practical support.', 'negative', {}, { focusPoints: -1, group: 'initiation' }),
+  profile('dyslexia', 'Dyslexia', 'This specific learning disability affects reading and spelling. Accessible tools take planning time; general intelligence is unchanged.', 'negative', {}, { focusPoints: -1, group: 'reading_support' }),
+  profile('bipolar_predisposition', 'Bipolar predisposition', 'An inherited vulnerability can make mood regulation harder. This is a risk profile, not a diagnosis at birth or a guarantee of later illness.', 'negative', { stability: -1 }, { birthChance: .008 }),
+  profile('autism_individual', 'Autism: sensory support', 'For this person, sensory and communication differences make busy interactions harder. Strengths vary independently; autism does not set intelligence.', 'negative', { social: -1 }, { birthChance: .008, group: 'autism_profile', inheritanceIds: ['autism', 'autism_individual', 'autism_pattern_profile'] }),
+  profile('autism_pattern_profile', 'Autism: pattern strengths', 'This person has strong pattern learning and needs extra planning for sensory comfort. This is one individual profile, not a universal autistic trait.', 'mixed', { intelligence: 1 }, { focusPoints: -1, birthChance: .008, group: 'autism_profile', inheritanceIds: ['autism', 'autism_individual', 'autism_pattern_profile'] }),
+  profile('gifted_dyslexic_profile', 'Strong reasoning with dyslexia', 'Strong reasoning and a specific reading disability coexist. Accessible reading tools take extra planning time.', 'mixed', { intelligence: 1 }, { focusPoints: -1, group: 'reading_support', birthChance: .008 }),
+  profile('musical_sensory_profile', 'Musical ear with sound sensitivity', 'For this person, sensitive hearing supports musical detail but managing noisy surroundings uses extra time.', 'mixed', { creativity: 1 }, { focusPoints: -1, group: 'sensory' }),
+  profile('energetic_sensitive_profile', 'Energetic, sensitive temperament', 'This person has energy for extra plans and strong stress responses that take more support to settle.', 'mixed', { stability: -1 }, { focusPoints: 1, group: 'regulation' }),
+];
+// Explicit successor profiles keep old parental traits relevant without drawing
+// both the retired perk and its replacement. These are fictional trait-family
+// links, not claims that one named clinical condition causes another.
+export const LEGACY_INHERITANCE_SUCCESSORS = Object.freeze(Object.fromEntries(Object.entries({
+  autism: ['autism_individual', 'autism_pattern_profile'],
+  quick_learner: ['rapid_processing'],
+  slow_learner: ['deliberate_processing'],
+  vivid_imagination: ['visual_imagination'],
+  social_ease: ['social_approach'],
+  social_hesitancy: ['inhibited_temperament'],
+  robust_constitution: ['physical_resilience'],
+  delicate_constitution: ['slow_recovery'],
+  even_tempered: ['emotion_regulation'],
+  volatile_temper: ['stress_reactivity'],
+  sharp_memory: ['strong_working_memory'],
+  forgetful: ['working_memory_difficulty'],
+  musical_ear: ['pitch_memory'],
+  steady_hands: ['motor_coordination'],
+  deep_sleeper: ['settled_sleep'],
+  light_sleeper: ['interrupted_sleep'],
+  sensitive_hearing: ['musical_sensory_profile'],
+  sensory_resilience: ['sensory_tolerance'],
+  spatial_talent: ['spatial_reasoning'],
+  spatial_difficulty: ['spatial_processing_difficulty'],
+  verbal_fluency: ['verbal_aptitude'],
+  word_finding_difficulty: ['language_processing_difficulty'],
+  expressive_face: ['expressive_communication'],
+  natural_balance: ['motor_coordination'],
+  clumsy: ['developmental_coordination'],
+  stiff_joints: ['connective_tissue_vulnerability'],
+  resilient_skin: ['skin_barrier'],
+  sensitive_skin: ['eczema_predisposition'],
+  dental_difficulties: ['enamel_vulnerability'],
+  strong_endurance: ['aerobic_capacity'],
+  low_endurance: ['limited_endurance'],
+  wandering_attention: ['distractible_attention'],
+  self_starter: ['task_initiative'],
+  slow_to_start: ['initiation_difficulty'],
+  bold: ['social_approach'],
+  timid: ['inhibited_temperament'],
+  calm_under_pressure: ['emotion_regulation'],
+  easily_startled: ['stress_reactivity'],
+  strong_appetite: ['steady_appetite'],
+  low_appetite: ['low_appetite_signals'],
+  movement_sensitive: ['developmental_coordination'],
+  restless: ['energetic_sensitive_profile'],
+  overcommitter: ['energetic_sensitive_profile'],
+}).map(([id, successors]) => [id, Object.freeze(successors)])));
+
+// Retain every legacy ID and its mechanics for historical saves, including old
+// schema affinity migration and lifelong focus caps. Unmapped legacy traits have
+// only a rare parental-inheritance route, never an independent birth chance.
+export const BIRTH_CONDITIONS = [
+  ...ACTIVE_BIRTH_CONDITIONS,
+  ...LEGACY_BIRTH_CONDITIONS.map(entry => ({ ...entry, legacy: true, birthChance: 0 })),
+];
+
 const byId = new Map(BIRTH_CONDITIONS.map(entry => [entry.id, entry]));
 export const getBirthConditions = person => (person?.conditions || []).map(id => byId.get(id)).filter(Boolean);
 export const validateBirthConditions = ids => Array.isArray(ids) && ids.length <= MAX_BIRTH_CONDITIONS && new Set(ids).size === ids.length && ids.every(id => byId.has(id));
@@ -115,8 +235,16 @@ export function conditionFocusLimits(person, stage) {
   return limits;
 }
 export function generateBirthConditions(random, parentConditions = []) {
-  const inherited = new Set(parentConditions.flat());
-  const candidates = BIRTH_CONDITIONS.filter(entry => random() < entry.birthChance * (inherited.has(entry.id) ? INHERITANCE_CHANCE_MULTIPLIER : 1));
+  const parents = parentConditions.slice(0, 2).map(ids => new Set(ids.flatMap(id =>
+    [id, ...(LEGACY_INHERITANCE_SUCCESSORS[id] || [])])));
+  const carryingParents = ids => parents.filter(parent => ids.some(id => parent.has(id))).length;
+  const candidates = ACTIVE_BIRTH_CONDITIONS.filter(entry => random() < entry.birthChance
+    * (1 + INHERITANCE_CHANCE_BOOST_PER_PARENT * carryingParents([entry.id, ...(entry.inheritanceIds || [])])));
+  for (const entry of LEGACY_BIRTH_CONDITIONS) {
+    if (LEGACY_INHERITANCE_SUCCESSORS[entry.id]) continue;
+    const parentCount = carryingParents([entry.id]);
+    if (parentCount && random() < LEGACY_INHERITANCE_CHANCE_PER_PARENT * parentCount) candidates.push(entry);
+  }
   // Shuffle before truncating so the five-condition cap never favors catalog order.
   for (let i = candidates.length - 1; i > 0; i--) {
     const j = Math.min(i, Math.floor(random() * (i + 1)));

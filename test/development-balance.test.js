@@ -1,8 +1,7 @@
-import { fitFocusBudget } from '../focus-rules.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { naturalSkillRating, skillChanges, childhoodWellbeing, infantChoiceEffects, wellbeingResponse, TODDLER_FOCUS } from '../development.js';
-import { createGame, advanceYear, resolveEventChoice, EVENTS, effectiveStats, focusLimits } from '../engine.js';
+import { createGame, advanceYear, resolveEventChoice, EVENTS, effectiveStats, fitFocusAllocation, GENETICS_BALANCE } from '../engine.js';
 import { eventChances } from '../events.js';
 import { PERCENTILE_REFERENCE } from '../percentile-reference.js';
 
@@ -32,32 +31,40 @@ test('childhood skill changes come only from chosen practice, without background
     { intelligence: 0, strength: 0, social: 0, creativity: 0 }, 'adults have no childhood adjustment');
 });
 
-test('newborn ratings span the scale around five with broad variation and aptitude correlation', () => {
+test('all seven newborn ratings follow parental ratings with broad variation and contrary outliers', () => {
   const learned = ['intelligence', 'strength', 'social', 'creativity'];
   const keys = [...learned, 'attractiveness', 'health', 'stability'];
-  const samples = Object.fromEntries(keys.map(key => [key, { all: [], high: [], low: [] }]));
+  const samples = Object.fromEntries(keys.map(key => [key, { all: [], parents: [], high: [], low: [] }]));
   for (let seed = 820001; seed < 822001; seed++) {
     const state = createGame({ seed });
     for (const key of keys) {
       const value = state.stats[key];
+      const parentMean = state.parents.reduce((sum, parent) => sum + parent.stats[key], 0) / state.parents.length;
       samples[key].all.push(value);
-      if (state.aptitudes[key] >= 2) samples[key].high.push(value);
-      if (state.aptitudes[key] <= -2) samples[key].low.push(value);
+      samples[key].parents.push(parentMean);
+      if (parentMean >= 6) samples[key].high.push(value);
+      if (parentMean <= 4) samples[key].low.push(value);
     }
   }
   const mean = values => values.reduce((sum, value) => sum + value, 0) / values.length;
   for (const [key, values] of Object.entries(samples)) {
     const average = mean(values.all);
     const sd = Math.sqrt(mean(values.all.map(value => (value - average) ** 2)));
+    const parentMean = mean(values.parents);
+    const parentVariance = mean(values.parents.map(value => (value - parentMean) ** 2));
     assert.ok(Math.abs(average - 5) < .2, `${key} starts around five: ${average}`);
-    assert.ok(sd > 1.75 && sd < 2.7, `${key} has broad variation: ${sd}`);
+    assert.ok(sd > GENETICS_BALANCE.ratingDeviation * .85, `${key} retains broad newborn variation: ${sd}`);
+    // An independent normal residual adds variance; clipping at 0/10 can only
+    // reduce its population spread. Allow sampling error rather than keeping the
+    // old independent newborn distribution's standard-deviation ceiling.
+    assert.ok(sd ** 2 > parentVariance, `${key} varies beyond the parents' mean alone`);
+    assert.ok(sd ** 2 < parentVariance + GENETICS_BALANCE.ratingDeviation ** 2 + .7, `${key} spread fits parental variation plus inheritance randomness`);
     assert.equal(Math.min(...values.all), 0, `${key} can start at the bottom of the scale`);
     assert.equal(Math.max(...values.all), 10, `${key} can start at the top of the scale`);
-    if (learned.includes(key) || ['health', 'stability'].includes(key)) {
-      assert.ok(mean(values.high) > mean(values.low) + 2, `${key} aptitude shifts the distribution`);
-      assert.ok(values.high.some(value => value < 5), `${key} high aptitude does not fix the starting score`);
-      assert.ok(values.low.some(value => value > 5), `${key} low aptitude does not fix the starting score`);
-    }
+    assert.ok(values.high.length > 300 && values.low.length > 300, `${key} has substantial parental comparison groups`);
+    assert.ok(mean(values.high) > mean(values.low) + 2.5, `${key} higher-rated parents shift the distribution`);
+    assert.ok(values.high.some(value => value < 3), `${key} high-rated parents can have a low-rated newborn`);
+    assert.ok(values.low.some(value => value > 7), `${key} low-rated parents can have a high-rated newborn`);
   }
 });
 
@@ -86,7 +93,7 @@ test('lifetime focus produces substantial gains, losses, and reversals without f
   const previous = trained.stats.intelligence;
   advance(trained, neglect, 10);
   assert.ok(trained.stats.intelligence < previous - .9);
-  assert.ok(trained.stats.intelligence < 5);
+  assert.ok(Math.abs(trained.stats.intelligence - 5) < 1e-10, 'equal opposite practice reverses the gain without reaching a bound');
   assert.deepEqual(person.stats, { intelligence: 5, strength: 5, social: 5, creativity: 5 });
 });
 
@@ -114,11 +121,11 @@ test('aptitude has a gentler influence on starting ratings, practice and routine
   assert.equal(naturalSkillRating(3), 6.8);
   for (const aptitude of [-3, 0, 3]) {
     const person = { age: 25, stats: { strength: naturalSkillRating(aptitude) }, aptitudes: { strength: aptitude, health: aptitude }, focus: { self: 4 } };
-    assert.ok(Math.abs(skillChanges(person).strength - .45 * (1 + aptitude * .08)) < 1e-12);
+    assert.ok(Math.abs(skillChanges(person).strength - .225 * (1 + aptitude * .08)) < 1e-12);
     person.focus.self = 1;
-    assert.ok(Math.abs(skillChanges(person).strength + .15 * (1 - aptitude * .07)) < 1e-12);
-    assert.ok(Math.abs(wellbeingResponse(person, 'health', .2) - .1 * (1 + aptitude * .08)) < 1e-12);
-    assert.ok(Math.abs(wellbeingResponse(person, 'health', -.2) + .1 * (1 - aptitude * .07)) < 1e-12);
+    assert.ok(Math.abs(skillChanges(person).strength + .075 * (1 - aptitude * .07)) < 1e-12);
+    assert.ok(Math.abs(wellbeingResponse(person, 'health', .2) - .05 * (1 + aptitude * .08)) < 1e-12);
+    assert.ok(Math.abs(wellbeingResponse(person, 'health', -.2) + .05 * (1 - aptitude * .07)) < 1e-12);
   }
 });
 
@@ -173,13 +180,13 @@ test('crying choice effects isolate the selected level from background developme
 
 test('natural resilience boosts caused wellbeing gains and buffers caused losses', () => {
   for (const key of ['health', 'stability']) {
-    assert.equal(wellbeingResponse({}, key, .2), .1, 'missing legacy aptitude is neutral with half-strength decisions');
-    assert.equal(wellbeingResponse({ aptitudes: { [key]: 0 } }, key, -.2), -.1);
+    assert.equal(wellbeingResponse({}, key, .2), .05, 'missing legacy aptitude is neutral with half-strength decisions');
+    assert.equal(wellbeingResponse({ aptitudes: { [key]: 0 } }, key, -.2), -.05);
     assert.equal(wellbeingResponse({ aptitudes: { [key]: 3 } }, key, 0), 0);
-    assert.ok(wellbeingResponse({ aptitudes: { [key]: 3 } }, key, .2) > .1);
-    assert.ok(wellbeingResponse({ aptitudes: { [key]: -3 } }, key, .2) < .1);
-    assert.ok(wellbeingResponse({ aptitudes: { [key]: 3 } }, key, -.2) > -.1);
-    assert.ok(wellbeingResponse({ aptitudes: { [key]: -3 } }, key, -.2) < -.1);
+    assert.ok(wellbeingResponse({ aptitudes: { [key]: 3 } }, key, .2) > .05);
+    assert.ok(wellbeingResponse({ aptitudes: { [key]: -3 } }, key, .2) < .05);
+    assert.ok(wellbeingResponse({ aptitudes: { [key]: 3 } }, key, -.2) > -.05);
+    assert.ok(wellbeingResponse({ aptitudes: { [key]: -3 } }, key, -.2) < -.05);
   }
   for (const age of [2, 4, 5, 10, 17]) {
     const toddler = age < 5;
@@ -247,10 +254,10 @@ test('toddler events follow play, electronics and crafts while school events beg
   assert.ok(play.stamina_gain > rest.stamina_gain);
   assert.ok(crafts.child_library > rest.child_library);
   assert.equal(explore.child_library, rest.child_library, 'screen time does not increase hands-on storytelling opportunities');
-  assert.ok(odds({ ...state, age: 5 }).good_grades > 0);
+  assert.ok(odds({ ...state, age: 5, focus: { ...state.focus, work: 4 } }).good_grades > 0);
 });
 
-test('independent game lives match the reduced-deduction reference while retaining wellbeing balance and variation', () => {
+test('independent game lives match the measured event-rate reference while retaining variation', () => {
   const keys = ['intelligence', 'strength', 'attractiveness', 'social', 'creativity', 'health', 'stability'];
   const samples = Object.fromEntries(keys.map(key => [key, []]));
   const events = new Map(EVENTS.map(event => [event.id, event]));
@@ -264,8 +271,7 @@ test('independent game lives match the reduced-deduction reference while retaini
     let choiceSeed = (seed ^ 0xA5A5A5A5) >>> 0;
     while (state.age < 18 && state.alive) {
       const target = state.age >= 2 && state.age < 5 ? TODDLER_FOCUS : { work: 2, social: 2, family: 2, self: 2 };
-      const limits = focusLimits(state);
-      state.focus = fitFocusBudget(state, Object.fromEntries(Object.entries(target).map(([key, points]) => [key, Math.min(points, limits[key] ?? 4)])));
+      state.focus = fitFocusAllocation(state, target);
       assert.equal(advanceYear(state).ok, true);
       while (state.pendingEvents.length) {
         const pending = state.pendingEvents[0];
@@ -283,7 +289,8 @@ test('independent game lives match the reduced-deduction reference while retaini
     assert.ok(values.length > samplesPerProfile * 2 * .95);
     const average = values.reduce((sum, value) => sum + value, 0) / values.length;
     const sd = Math.sqrt(values.reduce((sum, value) => sum + (value - average) ** 2, 0) / values.length);
-    // Compare every stat with observed lives; no passive target holds wellbeing at five.
+    // More frequent low-stat events intentionally change achieved population
+    // means; compare an independent cohort with the unfitted simulation reference.
     const target = PERCENTILE_REFERENCE.stats[key].observedMean;
     assert.ok(Math.abs(average - target) < .2, `${key} mean ${average}, expected near ${target}`);
     // Outcomes reflect play and events, with no target pulling the cohort toward five.

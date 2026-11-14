@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { BIRTH_CONDITIONS, MAX_BIRTH_CONDITIONS, generateBirthConditions, assignBirthConditions, applyBirthConditions, validateBirthConditions } from '../birth-conditions.js';
+import { BIRTH_CONDITIONS, ACTIVE_BIRTH_CONDITIONS, MAX_BIRTH_CONDITIONS,
+  INHERITANCE_CHANCE_BOOST_PER_PARENT, LEGACY_INHERITANCE_CHANCE_PER_PARENT, LEGACY_INHERITANCE_SUCCESSORS,
+  generateBirthConditions, assignBirthConditions, applyBirthConditions, validateBirthConditions } from '../birth-conditions.js';
 import { createGame, advanceYear, chooseEducation, resolveEventChoice, EVENTS, haveChild, focusLimits, focusLimitDetails, setFocus, validateSave, migrateSave, successionInfo, succeed } from '../engine.js';
 import { defaultFocus, focusBudget, fitFocusBudget } from '../focus-rules.js';
 import { createSchoolRecord } from '../school.js';
@@ -23,11 +25,13 @@ function adult(seed = 80319) {
   return state;
 }
 
-test('all 100 birth conditions are reachable without parents and either parent modestly increases their chance', () => {
-  assert.equal(BIRTH_CONDITIONS.length, 100);
-  assert.equal(new Set(BIRTH_CONDITIONS.map(entry => entry.id)).size, 100);
+test('all active birth profiles retain independent odds with a 25 percent relative boost per carrying parent', () => {
+  assert.equal(BIRTH_CONDITIONS.length, 148);
+  assert.equal(ACTIVE_BIRTH_CONDITIONS.length, 48);
+  assert.equal(new Set(BIRTH_CONDITIONS.map(entry => entry.id)).size, 148);
   assert.equal(MAX_BIRTH_CONDITIONS, 5);
-  for (const [target, entry] of BIRTH_CONDITIONS.entries()) {
+  assert.equal(INHERITANCE_CHANCE_BOOST_PER_PARENT, .25);
+  for (const [target, entry] of ACTIVE_BIRTH_CONDITIONS.entries()) {
     assert.ok(entry.birthChance > 0 && entry.birthChance < .05);
     assert.equal(entry.statChanges, undefined, `${entry.id} has no direct rating changes`);
     assert.ok(Object.keys(entry.aptitudeChanges).length || entry.focusPoints || entry.focusLimits, entry.id);
@@ -37,10 +41,15 @@ test('all 100 birth conditions are reachable without parents and either parent m
     }
     const roll = fraction => { let index = 0; return () => index++ === target ? entry.birthChance * fraction : .999; };
     assert.deepEqual(generateBirthConditions(roll(.5)), [entry.id], `${entry.id} can occur spontaneously`);
-    assert.deepEqual(generateBirthConditions(roll(1.25)), []);
-    assert.deepEqual(generateBirthConditions(roll(1.25), [[entry.id], []]), [entry.id]);
-    assert.deepEqual(generateBirthConditions(roll(1.25), [[], [entry.id]]), [entry.id]);
-    assert.deepEqual(generateBirthConditions(roll(1.75), [[entry.id], [entry.id]]), [], 'two parents do not compound the boost');
+    assert.deepEqual(generateBirthConditions(roll(1.1)), []);
+    assert.deepEqual(generateBirthConditions(roll(1.1), [[entry.id], []]), [entry.id]);
+    assert.deepEqual(generateBirthConditions(roll(1.1), [[], [entry.id]]), [entry.id]);
+    assert.deepEqual(generateBirthConditions(roll(1.25), [[entry.id], []]), [], 'one-parent boundary is strict');
+    assert.deepEqual(generateBirthConditions(roll(1.35), [[entry.id], []]), []);
+    assert.deepEqual(generateBirthConditions(roll(1.35), [[entry.id], [entry.id]]), [entry.id]);
+    assert.deepEqual(generateBirthConditions(roll(1.5), [[entry.id], [entry.id]]), [], 'two-parent boost is 50 percent, not multiplicative');
+    assert.deepEqual(generateBirthConditions(roll(1.35), [[entry.id, entry.id], []]), [], 'duplicate IDs in one parent count once');
+    assert.deepEqual(generateBirthConditions(roll(1.1), [[], [], [entry.id]]), [], 'at most two biological parent slots contribute');
   }
 });
 
@@ -153,6 +162,7 @@ test('new parents, players, and dating prospects carry saved conditions with the
 test('biological births use both parents while adoption uses the independent birth pool', () => {
   const state = adult();
   state.conditions = ['high_energy', 'quick_learner'];
+  state.effects = []; // Isolate inheritance from independently rolled school injuries.
   state.yearSummary = null;
   state.focus = defaultFocus(state.age);
   state.partner = { ...clone(state.parents.find(person => person.gender === 'female')), id: 'co-parent', age: 25, conditions: ['autism', 'vivid_imagination'], relationship: 5, yearsTogether: 1, married: true, lastProposalAge: -1 };
@@ -205,7 +215,11 @@ test('succession keeps the chosen childs conditions and applies their budget wit
 test('older saves receive empty condition lists without changing existing ratings, history, or RNG', () => {
   const state = adult();
   assert.equal(haveChild(state).ok, true);
+  // Schema 16 predates the newer focus restrictions and point modifiers.
+  state.effects = state.effects.filter(effect => !effect.focusLimits && !effect.focusCapacity && !effect.focusMinimums && !effect.focusPoints);
   state.version = 16;
+  delete state.collegeApplications;
+  delete state.housing;
   delete state.school;
   state.focus = { work: 3, social: 3, family: 3, self: 3 };
   state.yearSummary = null;
@@ -239,4 +253,154 @@ test('invalid, repeated, missing, and more-than-five saved conditions are reject
       assert.equal(migrateSave(malformed), null);
     }
   }
+});
+
+
+test('new birth profiles balance helpful and challenging mechanics without forcing every profile into either category', () => {
+  const counts = Object.fromEntries(['positive', 'negative', 'mixed'].map(kind =>
+    [kind, ACTIVE_BIRTH_CONDITIONS.filter(entry => entry.kind === kind).length]));
+  assert.deepEqual(counts, { positive: 22, negative: 22, mixed: 4 });
+  for (const entry of ACTIVE_BIRTH_CONDITIONS) {
+    const effects = [...Object.values(entry.aptitudeChanges), entry.focusPoints || 0].filter(Boolean);
+    assert.ok(effects.length);
+    if (entry.kind === 'positive') assert.ok(effects.every(value => value > 0), entry.id);
+    if (entry.kind === 'negative') assert.ok(effects.every(value => value < 0), entry.id);
+    if (entry.kind === 'mixed') assert.ok(effects.some(value => value > 0) && effects.some(value => value < 0), entry.id);
+  }
+  const weight = kind => ACTIVE_BIRTH_CONDITIONS.filter(entry => entry.kind === kind)
+    .reduce((sum, entry) => sum + entry.birthChance, 0);
+  const positiveShare = weight('positive') / (weight('positive') + weight('negative'));
+  assert.ok(positiveShare >= .45 && positiveShare <= .55);
+  let seed = 81203;
+  const random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
+  const sampled = { positive: 0, negative: 0, mixed: 0 };
+  for (let i = 0; i < 10000; i++) {
+    const generated = generateBirthConditions(random);
+    assert.equal(validateBirthConditions(generated), true);
+    const selected = generated.map(id => ACTIVE_BIRTH_CONDITIONS.find(entry => entry.id === id));
+    assert.ok(selected.every(Boolean), 'new births never receive a legacy-only profile');
+    const groups = selected.map(entry => entry.group).filter(Boolean);
+    assert.equal(new Set(groups).size, groups.length, 'incompatible profiles cannot coexist');
+    for (const entry of selected) sampled[entry.kind]++;
+  }
+  const observedShare = sampled.positive / (sampled.positive + sampled.negative);
+  assert.ok(observedShare >= .45 && observedShare <= .55, JSON.stringify(sampled));
+  assert.ok(sampled.mixed > 100);
+});
+
+test('clinical profiles distinguish individual strengths, specific learning disabilities and later illness risk', () => {
+  const lookup = id => ACTIVE_BIRTH_CONDITIONS.find(entry => entry.id === id);
+  assert.equal(lookup('autism_individual').aptitudeChanges.intelligence, undefined);
+  assert.equal(lookup('autism_individual').focusLimits, undefined, 'new profiles do not forbid friendships');
+  assert.equal(lookup('autism_pattern_profile').aptitudeChanges.intelligence, 1);
+  assert.equal(lookup('autism_pattern_profile').group, lookup('autism_individual').group);
+  for (const id of ['dyslexia', 'dyscalculia']) {
+    assert.equal(lookup(id).aptitudeChanges.intelligence, undefined, `${id} is not a general intelligence penalty`);
+    assert.equal(lookup(id).focusPoints, -1, 'extra planning has a time cost');
+  }
+  assert.notEqual(lookup('dyslexia').group, lookup('dyscalculia').group, 'different learning disabilities can coexist');
+  assert.match(lookup('bipolar_predisposition').description, /risk profile, not a diagnosis at birth/);
+  assert.equal(lookup('bipolar_predisposition').aptitudeChanges.intelligence, undefined);
+  assert.deepEqual(lookup('exceptional_reasoning').aptitudeChanges, { intelligence: 1 });
+  assert.ok(ACTIVE_BIRTH_CONDITIONS.every(entry => !/crazy|insane|mad genius/i.test(entry.name)));
+});
+
+test('all 100 legacy perks remain valid with their original affinity and lifelong focus mechanics', () => {
+  const legacy = BIRTH_CONDITIONS.filter(entry => entry.legacy);
+  assert.equal(legacy.length, 100);
+  assert.ok(legacy.every(entry => entry.birthChance === 0));
+  const autism = legacy.find(entry => entry.id === 'autism');
+  assert.deepEqual(autism.aptitudeChanges, { intelligence: 1 });
+  assert.deepEqual(autism.focusLimits, { standard: { social: 1 } });
+  for (const entry of legacy) {
+    assert.equal(validateBirthConditions([entry.id]), true);
+    const person = { id: 'saved-person', conditions: [entry.id], stats: stats(), aptitudes: aptitudes() };
+    const before = clone(person);
+    assignBirthConditions(person, 781, []);
+    assert.deepEqual(person, before, 'loading/assignment never substitutes a revised perk or reapplies modifiers');
+  }
+});
+
+test('legacy autism in either parent still modestly raises the chance of the new individual profiles', () => {
+  for (const [index, entry] of ACTIVE_BIRTH_CONDITIONS.entries()) {
+    if (entry.group !== 'autism_profile') continue;
+    const roll = () => { let current = 0; return () => current++ === index ? entry.birthChance * 1.1 : .999; };
+    assert.deepEqual(generateBirthConditions(roll()), []);
+    assert.deepEqual(generateBirthConditions(roll(), [['autism'], []]), [entry.id]);
+    assert.deepEqual(generateBirthConditions(roll(), [[], ['autism']]), [entry.id]);
+  }
+});
+
+test('every parental legacy perk has either an active successor or a rare inheritance-only route', () => {
+  const legacy = BIRTH_CONDITIONS.filter(entry => entry.legacy);
+  const activeById = new Map(ACTIVE_BIRTH_CONDITIONS.map((entry, index) => [entry.id, { entry, index }]));
+  assert.equal(LEGACY_INHERITANCE_CHANCE_PER_PARENT, .003);
+  for (const id of Object.keys(LEGACY_INHERITANCE_SUCCESSORS)) assert.ok(legacy.some(entry => entry.id === id), id);
+  for (const retired of legacy) {
+    const successors = LEGACY_INHERITANCE_SUCCESSORS[retired.id];
+    if (successors) {
+      assert.ok(successors.length > 0 && new Set(successors).size === successors.length);
+      for (const id of successors) {
+        const target = activeById.get(id);
+        assert.ok(target, `${retired.id} has a known active successor`);
+        const roll = fraction => { let call = 0; return () => call++ === target.index ? target.entry.birthChance * fraction : .999; };
+        assert.deepEqual(generateBirthConditions(roll(1.1), [[retired.id], []]), [id]);
+        assert.deepEqual(generateBirthConditions(roll(1.1), [[], [retired.id]]), [id]);
+        assert.deepEqual(generateBirthConditions(roll(1.35), [[retired.id], [retired.id]]), [id]);
+        assert.deepEqual(generateBirthConditions(roll(1.35), [[retired.id, id], []]), [], 'one parent cannot stack alias and successor');
+      }
+      let calls = 0;
+      generateBirthConditions(() => { calls++; return .999; }, [[retired.id], [retired.id]]);
+      assert.equal(calls, ACTIVE_BIRTH_CONDITIONS.length, `${retired.id} does not receive a duplicate legacy draw`);
+    } else {
+      const roll = value => { let call = 0; return () => call++ < ACTIVE_BIRTH_CONDITIONS.length ? .999 : value; };
+      assert.deepEqual(generateBirthConditions(roll(.0029), [[retired.id], []]), [retired.id]);
+      assert.deepEqual(generateBirthConditions(roll(.0029), [[], [retired.id]]), [retired.id]);
+      assert.deepEqual(generateBirthConditions(roll(.003), [[retired.id], []]), [], 'one-parent legacy boundary');
+      assert.deepEqual(generateBirthConditions(roll(.0045), [[retired.id], [retired.id]]), [retired.id]);
+      assert.deepEqual(generateBirthConditions(roll(.006), [[retired.id], [retired.id]]), [], 'two-parent legacy boundary');
+      assert.deepEqual(generateBirthConditions(roll(.0045), [[retired.id, retired.id], []]), [], 'duplicate parental perk cannot amplify legacy odds');
+      assert.deepEqual(generateBirthConditions(roll(0)), [], `${retired.id} has no independent birth route`);
+    }
+  }
+});
+
+test('equivalent parental profiles count once per parent and inheritance still respects groups and the five-perk cap', () => {
+  const target = ACTIVE_BIRTH_CONDITIONS.findIndex(entry => entry.id === 'autism_individual');
+  const chance = ACTIVE_BIRTH_CONDITIONS[target].birthChance;
+  const roll = fraction => { let call = 0; return () => call++ === target ? chance * fraction : .999; };
+  assert.deepEqual(generateBirthConditions(roll(1.35), [['autism', 'autism_individual', 'autism_pattern_profile'], []]), []);
+  assert.deepEqual(generateBirthConditions(roll(1.35), [['autism_pattern_profile'], ['autism_individual']]), ['autism_individual']);
+  let calls = 0;
+  const siblings = generateBirthConditions(() => calls++ < ACTIVE_BIRTH_CONDITIONS.length ? .999 : .001,
+    [['high_energy'], ['low_energy']]);
+  assert.equal(siblings.length, 1, 'opposite legacy energy perks retain their exclusion group');
+  const inherited = generateBirthConditions(() => 0, [['high_energy', 'light_build', 'striking_features', 'patient', 'competitive'],
+    ['low_energy', 'unassuming_features', 'unhurried', 'optimistic', 'analytical']]);
+  assert.equal(inherited.length, MAX_BIRTH_CONDITIONS);
+  assert.equal(validateBirthConditions(inherited), true);
+  const groups = inherited.map(id => BIRTH_CONDITIONS.find(entry => entry.id === id).group).filter(Boolean);
+  assert.equal(new Set(groups).size, groups.length);
+});
+
+test('independent assignment remains parent-free and saved legacy perks reload without remapping or rerolling', () => {
+  const legacyParents = [{ conditions: ['high_energy', 'striking_features', 'patient'] }, { conditions: ['quick_learner', 'autism'] }];
+  for (let seed = 1; seed <= 40; seed++) {
+    const adopted = { id: 'independent-child', stats: stats(), aptitudes: aptitudes(), rng: 884 };
+    const repeated = clone(adopted);
+    assignBirthConditions(adopted, seed, []);
+    assignBirthConditions(repeated, seed);
+    assert.deepEqual(adopted, repeated);
+    assert.ok(adopted.conditions.every(id => ACTIVE_BIRTH_CONDITIONS.some(entry => entry.id === id)));
+    const saved = clone(adopted);
+    assignBirthConditions(adopted, seed + 100, legacyParents);
+    assert.deepEqual(adopted, saved, 'existing assignments ignore changed parents and seeds');
+  }
+  const state = createGame({ seed: 121 });
+  state.conditions = ['high_energy', 'striking_features', 'patient'];
+  state.parents[0].conditions = ['quick_learner', 'autism'];
+  const before = clone(state);
+  assert.equal(validateSave(state), true);
+  assert.deepEqual(migrateSave(clone(state)), before);
+  assert.deepEqual(state, before);
 });

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createGame, annualForecast, migrateSave, validateSave, chooseEducation, haveChild, successionInfo } from '../engine.js';
+import { createGame, annualForecast, migrateSave, validateSave, chooseEducation, haveChild, successionInfo, GENETICS_BALANCE } from '../engine.js';
 import { stripWellbeingAptitudes, neutralWellbeingAptitudes } from './helpers/legacy-height.js';
 import { getBirthConditions } from '../birth-conditions.js';
 
@@ -9,17 +9,21 @@ const wellbeing = ['health', 'stability'];
 
 test('new lives inherit bounded wellbeing aptitudes and all generation routes retain them', () => {
   const observed = { health: new Set(), stability: new Set() };
+  const bound = value => Math.max(-3, Math.min(3, value));
+  const symmetric = value => Math.sign(value) * Math.round(Math.abs(value)) || 0;
+  const radius = 3 * GENETICS_BALANCE.affinityDeviation * GENETICS_BALANCE.randomness;
+  let broaderThanOldVariation = false;
   for (let seed = 1; seed <= 120; seed++) {
     const state = createGame({ seed });
     assert.equal(state.version, 20);
     for (const key of wellbeing) {
       const average = (state.parents[0].aptitudes[key] + state.parents[1].aptitudes[key]) / 2;
-      const inherited = Math.sign(average) * Math.round(Math.abs(average));
       const perkShift = getBirthConditions(state).reduce((sum, perk) => sum + (perk.aptitudeChanges[key] || 0), 0);
-      const bound = value => Math.max(-3, Math.min(3, value));
-      const lowest = bound(bound(inherited - 1) + perkShift), highest = bound(bound(inherited + 1) + perkShift);
+      const lowest = bound(bound(symmetric(average - radius)) + perkShift), highest = bound(bound(symmetric(average + radius)) + perkShift);
       assert.ok(state.aptitudes[key] >= lowest && state.aptitudes[key] <= highest,
-        'inherited variation stays within one step before the separate perk affinity shift');
+        'a bounded normal residual varies the parental mean before rounding, clamping and the separate perk shift');
+      const oldLow = bound(bound(symmetric(average) - 1) + perkShift), oldHigh = bound(bound(symmetric(average) + 1) + perkShift);
+      if (state.aptitudes[key] < oldLow || state.aptitudes[key] > oldHigh) broaderThanOldVariation = true;
       for (const person of [state, ...state.parents]) {
         assert.ok(Number.isInteger(person.aptitudes[key]));
         assert.ok(person.aptitudes[key] >= -3 && person.aptitudes[key] <= 3);
@@ -29,6 +33,19 @@ test('new lives inherit bounded wellbeing aptitudes and all generation routes re
     assert.equal(validateSave(state), true);
   }
   for (const values of Object.values(observed)) assert.equal(values.size, 7);
+  assert.equal(broaderThanOldVariation, true, 'the new spread permits more than the retired one-step residual');
+  const previous = GENETICS_BALANCE.randomness;
+  try {
+    GENETICS_BALANCE.randomness = 0;
+    for (let seed = 1; seed <= 24; seed++) {
+      const state = createGame({ seed });
+      for (const key of wellbeing) {
+        const average = (state.parents[0].aptitudes[key] + state.parents[1].aptitudes[key]) / 2;
+        const perkShift = getBirthConditions(state).reduce((sum, perk) => sum + (perk.aptitudeChanges[key] || 0), 0);
+        assert.equal(state.aptitudes[key], bound(symmetric(average) + perkShift), 'zero variation retains the rounded parental mean plus recorded perks');
+      }
+    }
+  } finally { GENETICS_BALANCE.randomness = previous; }
   const adult = createGame({ seed: 391 });
   adult.age = 65;
   const preview = successionInfo(adult).candidates[0];

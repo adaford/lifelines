@@ -122,14 +122,14 @@ test('fame adds five to effective Social learning above the natural cap without 
   assert.equal(effectiveAptitude(state, 'intelligence'), 0);
   assert.ok(Object.values(skillChanges(state)).every(value => value === 0), 'fame alone creates no Social gain');
   const before = copy(state);
-  for (const [points, expected] of [[3, .24 * .5 * 1.64], [1, -.24 * .5 * .44]]) {
+  for (const [points, expected] of [[3, .24 * .25 * 1.64], [1, -.24 * .25 * .44]]) {
     const candidate = { ...state, focus: { ...state.focus, social: points } };
     near(skillChanges(candidate).social, expected, 'routine Social learning uses aptitude 8');
     near(focusChoiceEffects(candidate).social, expected, 'preview uses the same effective learning ability');
   }
   const practice = { ...state, focus: { ...state.focus, self: 3 } };
   assert.equal(standardFocusCoefficients(practice).self.social, .24);
-  near(skillChanges(practice).social, .24 * .5 * 1.64, 'personal fame adds Social training to Yourself');
+  near(skillChanges(practice).social, .24 * .25 * 1.64, 'personal fame adds Social training to Yourself');
   assert.deepEqual(state, before);
   assert.equal(state.aptitudes.social, 3);
   assert.equal(effectiveAptitude({ ...state, fame: null }, 'social'), 3);
@@ -151,10 +151,10 @@ test('source previews match the third-point routine contribution, including adul
   }
   const model = person(18, 'extracurricular', 'modeling');
   model.focus = { work: 0, social: 1, family: 2, self: 2, extracurricular: 3 };
-  near(schoolAppearanceChange(model), .225 * 3 * .5, 'adult Modeling trains appearance');
-  near(focusChoiceEffects(model).attractiveness, .225 * 3 * .5, 'combined preview includes adult Modeling');
+  near(schoolAppearanceChange(model), .225 * 3 * .25, 'adult Modeling trains appearance');
+  near(focusChoiceEffects(model).attractiveness, .225 * 3 * .25, 'combined preview includes adult Modeling');
   const before = copy(model), forecast = annualForecast(model);
-  assert.equal(forecast.stats.attractiveness.after, changedRating(5, .225 * 3 * .5));
+  assert.equal(forecast.stats.attractiveness.after, changedRating(5, .225 * 3 * .25));
   assert.deepEqual(model, before, 'annual preview preserves stored fame, aptitude, enrollment, and RNG');
   model.stats.attractiveness = 10;
   assert.equal(schoolChoiceImpacts(model, 'extracurricular').some(entry => entry.stat === 'attractiveness'), false);

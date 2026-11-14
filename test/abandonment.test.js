@@ -14,9 +14,35 @@ function child() {
   for (const parent of state.parents) { parent.stats.stability = 0; parent.relationship = 0; }
   return state;
 }
+// Find actual seeded independent rolls, isolating care changes from unrelated
+// outcomes without binding these assertions to a particular catalog ordering.
+function departureSeed(state, count) {
+  const candidates = eventOdds(state).filter(roll => roll.chance > 0);
+  for (let seed = 0; seed < 200000; seed++) {
+    let rng = seed;
+    const random = () => {
+      rng = (rng + 0x6D2B79F5) >>> 0;
+      let value = rng;
+      value = Math.imul(value ^ value >>> 15, value | 1);
+      value ^= value + Math.imul(value ^ value >>> 7, value | 61);
+      return ((value ^ value >>> 14) >>> 0) / 4294967296;
+    };
+    const odds = [...candidates];
+    for (let index = odds.length - 1; index > 0; index--) {
+      const other = Math.floor(random() * (index + 1));
+      [odds[index], odds[other]] = [odds[other], odds[index]];
+    }
+    const selected = odds.filter(roll => random() < roll.chance).slice(0, 5);
+    if (selected.length === count && selected.every(roll => roll.eventId === 'household_parent_abandonment')
+      && (count === 2 || selected[0].subjectId === state.parents[0].id)) return seed;
+  }
+  assert.fail('The seeded cohort must contain the required isolated departures');
+}
+let adoptedSeed;
 function adopted() {
   const state = child();
-  state.rng = 558;
+  adoptedSeed ??= departureSeed(state, 2);
+  state.rng = adoptedSeed;
   assert.equal(advanceYear(state, noVariation).ok, true);
   assert.equal(state.parents.filter(parent => parent.abandonedAt !== undefined).length, 2);
   return state;
@@ -86,7 +112,7 @@ test('abandonment odds are rare, depend on both parent traits, and never reroll 
 test('one parent leaves once, the other takes over, and both receive the recorded consequences', () => {
   const state = child();
   state.parents[1].stats.stability = 8; state.parents[1].relationship = 8;
-  state.rng = 351;
+  state.rng = departureSeed(state, 1);
   const forecast = annualForecast(state);
   assert.equal(advanceYear(state, noVariation).ok, true);
   const [departed, remaining] = state.parents;

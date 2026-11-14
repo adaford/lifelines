@@ -1,3 +1,4 @@
+import { changedLifestyle, incomeForLifestyle, LIFESTYLE_BALANCE, lifestyleFromResources } from '../lifestyle.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createGame, advanceYear, resolveEventChoice, effectiveStats, validateSave, migrateSave, JOBS, EVENTS } from '../engine.js';
@@ -104,7 +105,8 @@ test('paid repair help and driving lessons have no hidden material-to-mental pen
     ['household_child_driving', 'instructor', 'child', 17],
   ]) {
     const state = fixture(40), subject = addRelative(state, type, age);
-    state.money = 775000; // Reserves support Lifestyle 5 after one dependent/partner.
+    state.money = incomeForLifestyle(6) / LIFESTYLE_BALANCE.reserveDrawRate;
+    state.lifestyle = changedLifestyle(lifestyleFromResources(0, state.money), -1); // Consistent resources and one dependent/partner.
     queue(state, id, subject);
     const before = copy(state);
     assert.equal(resolveEventChoice(state, choice, id, subject.id).ok, true);
@@ -119,7 +121,7 @@ test('paid repair help and driving lessons have no hidden material-to-mental pen
       assert.equal(subject.relationship, 5.1);
     } else {
       assert.deepEqual(subject.stats, before.partner.stats);
-      assert.match(state.history[0].text, /No stat changes/);
+      assert.match(state.history[0].text, /No additional effects/);
     }
     assert.doesNotMatch(state.history[0].text, /mental stability|Stability/i);
     assert.equal(validateSave(state), true);

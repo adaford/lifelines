@@ -9,6 +9,8 @@ const copy = value => structuredClone(value);
 const toddler = () => {
   const state = createGame({ seed: 42110 });
   state.age = 2;
+  state.conditions = [];
+  state.effects = [];
   state.focus = { ...TODDLER_FOCUS };
   return state;
 };
@@ -42,7 +44,7 @@ test('rest uses the stronger toddler health response and crafts spend the shared
   const state = toddler();
   state.aptitudes.health = 0;
   const higher = { ...state, focus: { ...state.focus, self: 4 } };
-  assert.ok(Math.abs(childhoodWellbeing(higher).health - childhoodWellbeing(state).health - .45) < 1e-12);
+  assert.ok(Math.abs(childhoodWellbeing(higher).health - childhoodWellbeing(state).health - .225) < 1e-12);
   assert.equal(setFocus(state, 'creative', 3).ok, false);
   assert.equal(setFocus(state, 'work', 1).ok, true);
   assert.equal(setFocus(state, 'creative', 3).ok, true);
@@ -106,7 +108,7 @@ test('toddler social practice has equal signed units while family time builds pa
     for (const parent of neutral.parents) {
       const next = closer.parents.find(person => person.id === parent.id);
       assert.equal(parent.relationship.change, 0);
-      assert.equal(next.relationship.change, .04);
+      assert.equal(next.relationship.change, .02);
     }
     assert.deepEqual(state, before, 'practice and forecast reads preserve the save and RNG');
   }
@@ -115,6 +117,8 @@ test('toddler social practice has equal signed units while family time builds pa
 test('age two unlocks five activities and the school transition preserves the completed choices', () => {
   const infant = createGame({ seed: 42111 });
   infant.age = 1;
+  infant.conditions = [];
+  infant.effects = [];
   assert.equal(advanceYear(infant, survives).ok, true);
   assert.deepEqual(infant.focus, TODDLER_FOCUS);
   const state = toddler();
@@ -137,6 +141,8 @@ test('v10 toddler saves gain an empty crafts allocation without rewriting progre
   state.age = 3;
   state.focus = defaultFocus(3);
   advanceYear(state, survives);
+  // Schema 10 predates the scheduling records a current annual roll may add.
+  state.effects = state.effects.filter(effect => !effect.focusLimits && !effect.focusCapacity && !effect.focusMinimums && !effect.focusPoints);
   stripWellbeingAptitudes(state);
   state.version = 10;
   delete state.focus.creative;

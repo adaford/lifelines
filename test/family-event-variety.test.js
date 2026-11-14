@@ -87,7 +87,9 @@ test('every new household choice applies to its named relative and preserves a v
       assert.equal(subject.relationship,rounded(subjectBefore.relationship+(choice.relationship || 0)));
       assert.equal(state.age,before.age);
       assert.equal(state.rng,before.rng,'resolving authored consequences must not reroll randomness');
-      for (const [key,max] of Object.entries(choice.focusLimits?.standard || {})) {
+      for (const [key,delta] of Object.entries(choice.focusCapacity?.standard || {})) {
+        if (!Object.hasOwn(state.focus, key)) continue;
+        const max = 4 + delta;
         assert.equal(focusLimits(state)[key],max,`${id}/${choice.id} restricts the player's time`);
         assert.equal(state.focus[key],Math.min(before.focus[key],max));
       }
@@ -120,7 +122,7 @@ test('ongoing caregiving retains strain while repairs and lessons keep only thei
     assert.equal(focusLimits(branches[0])[key],max);
     assert.equal(focusLimits(branches[1])[key],4);
     assert.equal(branches[0].lifestyle,branches[1].lifestyle,'help has no temporary lifestyle modifier');
-    assert.ok(branches[0].effects.some(effect=>effect.years===1 && effect.focusLimits));
+    assert.ok(branches[0].effects.some(effect=>effect.years===1 && effect.focusCapacity));
     assert.equal(branches[1].effects.length,0);
     assert.equal(branches[0].stats.stability,rounded(original.state.stats.stability+(id==='household_child_care_closure'?-.15:0)),
       'only taking over ongoing childcare retains a player stability cost');

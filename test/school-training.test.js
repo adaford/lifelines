@@ -54,7 +54,7 @@ test('unjoined activities incur their fixed penalties and default enrolled alloc
     assert.deepEqual(penalties.map(entry => entry.stat).sort(), Object.keys(inactivity[area]).sort());
     for (const entry of penalties) {
       assert.equal(entry.level, 1);
-      near(entry.change, changedRating(5, -inactivity[area][entry.stat] * .575) - 5, 'unjoined activity retains one negative unit');
+      near(entry.change, changedRating(5, -inactivity[area][entry.stat] * .2875) - 5, 'unjoined activity retains one negative unit');
     }
   }
   join(state, 'sports', 'basketball');
@@ -102,7 +102,7 @@ test('basketball, chess, instruments, and modeling use fixed zero-point losses a
         const units = [-1, 1, 2][points];
         const raw = coefficient * units;
         const baselineRaw = -(inactivity[kind === 'sports' ? 'extracurricular' : 'sports'][stat] || 0);
-        const response = amount => amount * .575 * (amount >= 0 ? 1 + aptitude * .08 : 1 - aptitude * .07);
+        const response = amount => amount * .2875 * (amount >= 0 ? 1 + aptitude * .08 : 1 - aptitude * .07);
         const mean = response(baselineRaw + raw) - response(baselineRaw);
         near(standardFocusPractice(state)[stat] - standardFocusPractice(state, null, kind)[stat], raw, `${id} training has exactly ${units} raw units`);
         near(contribution[stat], mean, `${id} ${stat} keeps the single yearly and aptitude response`);
@@ -121,7 +121,7 @@ test('both unjoined activity penalties affect the actual year and forecast witho
   const forecast = annualForecast(state);
   for (const [stat, coefficient] of Object.entries({ ...inactivity.sports, ...inactivity.extracurricular })) {
     near(standardFocusPractice(state)[stat], -coefficient, `${stat} has one raw negative unit without enrollment`);
-    const expected = changedRating(5, -coefficient * .575);
+    const expected = changedRating(5, -coefficient * .2875);
     assert.equal(forecast.stats[stat].after, expected);
   }
   assert.deepEqual(state, before, 'previewing the default penalty preserves RNG and saves');
@@ -211,7 +211,7 @@ test('zero-point restrictions replace specialty training with generic inactivity
     assert.deepEqual(penalties.map(entry => entry.stat).sort(), Object.keys(inactivity[kind]).sort());
     for (const entry of penalties) {
       assert.equal(entry.level, 1);
-      near(entry.change, changedRating(5, -inactivity[kind][entry.stat] * .575) - 5, 'zero-cap preview uses exactly one generic loss unit');
+      near(entry.change, changedRating(5, -inactivity[kind][entry.stat] * .2875) - 5, 'zero-cap preview uses exactly one generic loss unit');
     }
     assert.deepEqual(state, before, 'reading limits never resets focus or success');
     for (const stat of Object.keys(inactivity[kind])) state.stats[stat] = 0;
@@ -233,7 +233,7 @@ test('Yourself and modeling combine appearance once before response, with consis
   state.focus.work = 0;
   state.focus.self = 4;
   state.focus.extracurricular = 2;
-  near(schoolAppearanceChange(state), (.225 * 3 + .225 * 2) * .5 * 1.15, 'combined positive appearance uses a single yearly response');
+  near(schoolAppearanceChange(state), (.225 * 3 + .225 * 2) * .25 * 1.15, 'combined positive appearance uses a single yearly response');
 });
 
 test('enrolled training forecasts match completed mean years and preserve activity choices through reload', () => {

@@ -31,6 +31,7 @@ function lifeAt(age, college = false) {
   const key = `${age}:${college}`;
   if (!cache.has(key)) {
     const state = createGame({ seed: 84021 });
+    if (college) state.money = 1000000;
     while (state.age < age) {
       if (needsEducationChoice(state)) assert.equal(chooseEducation(state, college ? 'college' : 'work').ok, true);
       assert.equal(advanceYear(state, calm).ok, true);
@@ -88,7 +89,9 @@ test('every new decision applies distinct recorded outcomes and preserves them t
         assert.equal(state.stats[key], expected, `${event.id}/${choice.id}/${key}`);
         assert.equal(effectiveStats(state)[key], Math.round(Math.max(1, Math.min(10, expected + (choice.modifiers?.[key] || 0))) * 100) / 100);
       }
-      for (const [key, cap] of Object.entries(choice.focusLimits?.[state.age < 5 ? 'toddler' : 'standard'] || {})) {
+      for (const [key, delta] of Object.entries(choice.focusCapacity?.[state.age < 5 ? 'toddler' : 'standard'] || {})) {
+        if (!Object.hasOwn(state.focus, key)) continue;
+        const cap = ['sports', 'extracurricular'].includes(key) && !state.school?.[key] ? 0 : (['sports', 'extracurricular'].includes(key) ? 2 : 4) + delta;
         assert.equal(focusLimits(state)[key], cap);
         assert.ok(state.focus[key] <= cap);
       }
@@ -114,10 +117,10 @@ test('new automatic experiences can actually roll and record their consequences'
     }
     assert.ok(found, `${event.id} rolls under its intended conditions`);
     assert.ok(found.yearSummary.events.some(entry => entry.title === event.name));
-    if (Object.keys(event.modifiers).length || event.focusLimits) {
+    if (Object.keys(event.modifiers).length || event.focusCapacity) {
       const effect = found.effects.find(effect => effect.id === event.id);
       assert.equal(effect?.years, event.years, `${event.id} begins with its full duration`);
-      assert.deepEqual(effect.focusLimits, event.focusLimits);
+      assert.deepEqual(effect.focusCapacity, event.focusCapacity);
     }
     assert.equal(validateSave(found), true);
   }

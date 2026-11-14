@@ -2,10 +2,10 @@
 // Reproduce: node scripts/calibrate-percentiles.mjs --samples 2000 --seed 200001
 // Regenerate observed references only; no passive rating targets are fitted.
 import { writeFile } from 'node:fs/promises';
-import { defaultFocus, MAX_FOCUS, fitFocusBudget } from '../focus-rules.js';
+import { defaultFocus } from '../focus-rules.js';
 import { BIRTH_VARIATION, TODDLER_FOCUS, CHOICE_STAT_MULTIPLIER, INFANT_STABILITY_MULTIPLIER, SKILL_VARIATION } from '../development.js';
 import {
-  createGame, advanceYear, resolveEventChoice, EVENTS, effectiveStats, focusLimits,
+  createGame, advanceYear, resolveEventChoice, EVENTS, effectiveStats, fitFocusAllocation,
   DEVELOPMENT_BALANCE,
 } from '../engine.js';
 
@@ -48,8 +48,7 @@ function cohort(measureAges) {
       const choose = choiceRng(seed);
       while (state.age < 18 && state.alive) {
         const desired = state.age >= 2 && state.age < 5 ? TODDLER_FOCUS : focus;
-        const limits = focusLimits(state);
-        state.focus = fitFocusBudget(state, Object.fromEntries(Object.entries(desired).map(([key, points]) => [key, Math.min(points, limits[key] ?? MAX_FOCUS)])));
+        state.focus = fitFocusAllocation(state, desired);
         // Same-age peers include everyone currently alive, irrespective of
         // whether they survive later years. No future projection is involved.
         if (measureAges) {
@@ -85,7 +84,7 @@ const reference = {
   calibration: {
     samplesPerSex: samples, seedStart, survivors: result.survivors,
     cryLevel: 3, cryThroughAge: 1, focus, toddlerFocus: TODDLER_FOCUS, choices: 'uniform, independent seeded draws',
-    focusPolicy: 'core two-point targets with optional school activities unenrolled and both sports and extracurricular inactivity penalties active; fitted to birth-condition budgets and active condition/event caps; spare points left unused',
+    focusPolicy: 'core two-point targets with optional school activities unenrolled and both sports and extracurricular inactivity penalties active; fitted to birth-condition budgets and active condition/event caps, stacked capacity changes and required minima; spare points left unused',
     heightUnit: 'inches',
     conditionedOn: 'alive at the observed age',
     observationsByAge: [...result.ageStats.map(stats => stats.health.count), result.stats.health.count],

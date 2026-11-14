@@ -7,7 +7,7 @@ import {
 import { TODDLER_FOCUS } from '../development.js';
 import { createProspects } from '../relationships.js';
 
-const ordinaryYear = { mortalityRandom: () => 1, growthRandom: () => 0, parentCareerRandom: () => 1 };
+const ordinaryYear = { mortalityRandom: () => 1, growthRandom: () => 0, parentCareerRandom: () => 1, eventRandom: () => 1 };
 const round = value => Math.round(value * 100) / 100;
 function finishChoices(state) {
   while (state.pendingEvents.length) {
@@ -17,13 +17,13 @@ function finishChoices(state) {
   }
 }
 
-test('lifestyle responds continuously to resources and retains hundredths within the rating bounds', () => {
-  assert.equal(lifestyleFromResources(11000), 1.5);
-  assert.equal(lifestyleFromResources(11220), 1.51);
-  assert.equal(lifestyleFromResources(11330), 1.52);
-  assert.equal(lifestyleFromResources(0, 12500), 1.58);
-  assert.equal(lifestyleFromResources(0, 25000), 2);
-  assert.equal(lifestyleFromResources(66000, 0), 4);
+test('lifestyle responds logarithmically to resources and retains precision within the rating bounds', () => {
+  assert.equal(lifestyleFromResources(11000), 2.0521);
+  assert.equal(lifestyleFromResources(11220), 2.0697);
+  assert.equal(lifestyleFromResources(11330), 2.0785);
+  assert.equal(lifestyleFromResources(0, 12500), 1.0571);
+  assert.equal(lifestyleFromResources(0, 25000), 1.1132);
+  assert.equal(lifestyleFromResources(66000, 0), 5.0678);
   assert.equal(lifestyleFromResources(-100, NaN), 1);
   assert.equal(lifestyleFromResources(1e15), 10);
   assert.equal(lifestyleFromResources(0, 1e15), 10);
@@ -44,13 +44,13 @@ test('routine household progress changes lifestyle by fractions and its forecast
   const before = structuredClone(state);
   assert.equal(householdLifestyle(state), 4.2);
   const forecast = annualForecast(state);
-  assert.deepEqual(forecast.lifestyle, { before: 4.2, after: 4.35, change: .15 });
-  assert.ok(forecast.parents.every(parent => parent.lifestyle.after === 4.35));
+  assert.deepEqual(forecast.lifestyle, { before: 4.2, after: 4.2253, change: .03 });
+  assert.ok(forecast.parents.every(parent => parent.lifestyle.after === 4.2253));
   assert.deepEqual(state, before, 'forecast must not alter saved ratings or RNG');
   assert.equal(advanceYear(state, ordinaryYear).ok, true);
-  assert.equal(state.lifestyle, 4.35);
-  assert.ok(state.parents.every(parent => parent.lifestyle === 4.35));
-  assert.equal(state.siblings[0].lifestyle, 4.35);
+  assert.equal(state.lifestyle, 4.2253);
+  assert.ok(state.parents.every(parent => parent.lifestyle === 4.2253));
+  assert.equal(state.siblings[0].lifestyle, 4.2253);
   assert.deepEqual(state.yearSummary.lifestyle, forecast.lifestyle);
 });
 
@@ -65,11 +65,12 @@ test('dependent family costs preserve the fractional part of adult lifestyle', (
   state.effects = [];
   state.money = 0;
   state.income = 123456;
+  state.housing = { status: 'independent', hostId: null, yearsWithFamily: state.housing?.yearsWithFamily || 0 };
   state.lifestyle = lifestyleFromResources(state.income);
-  assert.equal(state.lifestyle, 6.61);
+  assert.equal(state.lifestyle, 6.3511);
   assert.equal(haveChild(state).ok, true);
-  assert.equal(state.lifestyle, 5.61);
-  assert.equal(state.children[0].lifestyle, 5.61);
+  assert.equal(state.lifestyle, 5.1763);
+  assert.equal(state.children[0].lifestyle, 5.1763);
 });
 
 test('new prospective partners have bounded lifestyle ratings with hundredth precision', () => {

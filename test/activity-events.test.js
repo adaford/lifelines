@@ -91,7 +91,7 @@ test('a rolled club deadline removes one total point for the next full year, inc
     assert.equal(Object.values(received.focus).reduce((sum, points) => sum + points, 0), focusBudget(received));
     if (age === 12) assert.deepEqual(received.effects.find(effect => effect.id === event.id), { ...legacy, years: 2 }, 'the point loss coexists with the old stat effect');
     const entry = received.history.find(entry => entry.title === event.name);
-    assert.equal(entry.text, 'No stat changes. -1 focus point. Temporary effects: 1 year.');
+    assert.equal(entry.text, '-1 focus point. Temporary effects: 1 year.');
     assert.equal(received.yearSummary.events.find(entry => entry.title === event.name).text, entry.text);
     assert.deepEqual(migrateSave(copy(received)), received);
     if (age === 17) assert.equal(chooseEducation(received, 'work').ok, true);

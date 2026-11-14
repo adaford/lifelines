@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createGame, advanceYear, EVENTS, resolveEventChoice, pendingEventSubject, validateSave, migrateSave } from '../engine.js';
+import { createGame, advanceYear, eventOdds, EVENTS, resolveEventChoice, pendingEventSubject, validateSave, migrateSave } from '../engine.js';
 
 const copy = value => structuredClone(value);
 const steadyYear = { mortalityRandom: () => 1, growthRandom: () => 0, parentCareerRandom: () => 1 };
@@ -64,8 +64,25 @@ test('abandonment, transferred care, and adoption retain their distinct explanat
   const state = toddler();
   for (const person of [state, ...state.parents]) for (const key in person.stats) person.stats[key] = 5;
   for (const parent of state.parents) { parent.stats.stability = 0; parent.relationship = 0; }
-  state.rng = 558;
-  assert.equal(advanceYear(state, steadyYear).ok, true);
+  // Select the two real departure rolls by their identities after the seeded
+  // shuffle; unrelated ordinary outcomes cannot obscure the care explanations.
+  const odds = eventOdds(state).filter(roll => roll.chance > 0);
+  let rng = state.rng;
+  const random = () => {
+    rng = (rng + 0x6D2B79F5) >>> 0;
+    let value = rng;
+    value = Math.imul(value ^ value >>> 15, value | 1);
+    value ^= value + Math.imul(value ^ value >>> 7, value | 61);
+    return ((value ^ value >>> 14) >>> 0) / 4294967296;
+  };
+  for (let index = odds.length - 1; index > 0; index--) {
+    const other = Math.floor(random() * (index + 1));
+    [odds[index], odds[other]] = [odds[other], odds[index]];
+  }
+  assert.equal(odds.filter(roll => roll.eventId === 'household_parent_abandonment').length, 2);
+  let calls = 0;
+  assert.equal(advanceYear(state, { ...steadyYear, eventRandom: () => odds[calls++].eventId === 'household_parent_abandonment' ? 0 : 1 }).ok, true);
+  assert.equal(calls, odds.length, 'all eligible events retain their independent roll');
   assert.ok(state.guardian);
   const events = state.yearSummary.events;
   assert.equal(events.filter(event => event.title.endsWith(': Abandons you')).length, 2);

@@ -168,7 +168,7 @@ test('old same-stat rewards and active modifiers survive unchanged loads while n
   assert.equal(loaded.rng, before.rng);
   assert.deepEqual(loaded.history.find(entry => entry.id === 'old-same-stat-reward'), before.history.find(entry => entry.id === 'old-same-stat-reward'));
   assert.ok(loaded.yearSummary.events.some(entry => entry.text === historical.text && entry.cause === cause));
-  assert.match(loaded.history[0].text, /No stat changes/);
+  assert.match(loaded.history[0].text, /No additional effects/);
   assert.doesNotMatch(loaded.history[0].text, /social/i);
   assert.deepEqual(migrateSave(copy(loaded)), loaded);
 });

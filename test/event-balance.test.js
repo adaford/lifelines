@@ -27,9 +27,9 @@ test('new wellbeing and material events are permanent while injuries retain acti
   assert.deepEqual(event('healthy_stretch').statChanges, { strength: .2 });
   assert.equal(event('work_idea').lifestyle, undefined);
   assert.equal(event('work_idea').years, 0);
-  assert.equal(event('broken_bone').focusLimits.toddler.work, 2);
+  assert.equal(event('broken_bone').focusCapacity.toddler.work, -2);
   assert.deepEqual(event('injury').statChanges, { attractiveness: -.1 });
-  assert.equal(event('injury').focusLimits.toddler.work, 2);
+  assert.equal(event('injury').focusCapacity.toddler.work, -2);
   assert.deepEqual(FAMILY_EVENTS.find(entry => entry.id === 'household_parent_abandonment').playerChanges,
     { stability: -3, social: -1.5, health: -1 });
 });

@@ -1,3 +1,4 @@
+import { lifestyleDisplayValue } from './lifestyle.js?v=parent-colors-events';
 export const escapeHTML = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
 export const focusCapLabel = (label, maximum) => `'${String(label)}' focus max ${maximum}`;
@@ -7,6 +8,10 @@ const numeric = value => value !== null && value !== undefined && value !== '' &
 export function formatRating(value) {
   const rating = numeric(value);
   return rating === null ? '—' : rating.toFixed(1);
+}
+export function formatLifestyleRating(value) {
+  const rating = numeric(value);
+  return rating === null ? '—' : lifestyleDisplayValue(rating).toFixed(1);
 }
 
 function heightParts(valueInches) {
@@ -120,7 +125,8 @@ function formatValues(text, age) {
       // Singles outside the base range may be ordinary prose. Explicit rating
       // transitions also describe effective totals beyond the base bounds.
       if (separator === undefined && values.some(value => value < 0 || value > 10)) return match;
-      return `${prefix}${formatRating(before)}${separator === undefined ? '' : `${separator}${formatRating(after)}`}`;
+      const format = /lifestyle/i.test(prefix) ? formatLifestyleRating : formatRating;
+      return `${prefix}${format(before)}${separator === undefined ? '' : `${separator}${format(after)}`}`;
     });
 }
 

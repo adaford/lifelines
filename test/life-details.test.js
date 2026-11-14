@@ -12,19 +12,10 @@ const copy = value => structuredClone(value);
 const meanYear = { mortalityRandom: () => 1, growthRandom: () => 0, parentCareerRandom: () => 1 };
 const people = state => [state, ...state.parents, ...state.children, ...state.siblings, ...state.lineage, state.partner, ...state.encounters, state.pregnancy?.otherParent].filter(Boolean);
 
-// Find a reproducible ordinary-event-free year without changing the event
-// catalog. Discrete parent career events remain controlled independently.
+// Isolate routine growth and finance from independently rolled events.
 function quietYear(state, options = {}) {
-  const originalRng = state.rng;
-  for (let attempt = 0; attempt < 200; attempt++) {
-    const next = copy(state);
-    next.rng = (originalRng + Math.imul(attempt, 2654435761)) >>> 0;
-    assert.equal(advanceYear(next, { ...meanYear, ...options }).ok, true);
-    if (next.lastYearEvents.length) continue;
-    Object.assign(state, next);
-    return;
-  }
-  assert.fail('could not find a quiet year for the annual dynamics check');
+  assert.equal(advanceYear(state, { ...meanYear, ...options, eventRandom: () => 1 }).ok, true);
+  assert.deepEqual(state.lastYearEvents, []);
 }
 
 function legacyV8(state) {
@@ -143,6 +134,11 @@ test('poor health reduces annual growth, saves retain growth genetics, and matur
   const poor = copy(healthy);
   const genetics = healthy.growthFactor;
   while (healthy.age < healthy.maturityAge) {
+    // Isolate health-driven growth from events for other neglected ratings.
+    for (const state of [healthy, poor]) {
+      for (const person of [state, ...state.parents]) for (const key of Object.keys(person.stats)) person.stats[key] = 5;
+      state.lifestyle = 5;
+    }
     healthy.stats.health = 9;
     poor.stats.health = 1;
     const healthyBefore = healthy.height, poorBefore = poor.height;
@@ -229,11 +225,11 @@ test('parent career growth previews and updates shared household lifestyle for m
   const before = copy(state);
   const preview = annualForecast(state);
   assert.equal(preview.lifestyle.before, 4);
-  assert.equal(preview.lifestyle.after, 4.66);
+  assert.equal(preview.lifestyle.after, 4.5432);
   assert.deepEqual(state, before, 'career forecasting never changes RNG, household support, or parent career state');
   quietYear(state);
-  assert.equal(state.lifestyle, 4.66);
-  assert.equal(householdLifestyle(state), 4.66);
+  assert.equal(state.lifestyle, 4.5432);
+  assert.equal(householdLifestyle(state), 4.5432);
   assert.ok(state.parents.every(parent => parent.lifestyle === state.lifestyle && parent.career.progress > 4.45));
   assert.deepEqual(state.yearSummary.lifestyle, preview.lifestyle);
   assert.equal(validateSave(state), true);
@@ -249,10 +245,10 @@ test('injected parent job losses reduce household support and appear in the year
   const before = copy(state);
   quietYear(state, { parentCareerRandom: () => 0 });
   assert.ok(state.parents.every(parent => parent.career.status === 'unemployed' && parent.career.progress < 6));
-  assert.equal(state.lifestyle, 5);
+  assert.equal(state.lifestyle, 4.8682);
   assert.ok(state.parents.every(parent => parent.lifestyle === state.lifestyle));
   assert.equal(state.yearSummary.lifestyle.before, 6);
-  assert.equal(state.yearSummary.lifestyle.after, 5);
+  assert.equal(state.yearSummary.lifestyle.after, 4.8682);
   assert.ok(state.yearSummary.events.some(event => /lost.*job/i.test(`${event.title} ${event.text}`)));
   for (const change of state.yearSummary.parents) {
     const old = before.parents.find(parent => parent.id === change.id);
@@ -279,13 +275,16 @@ test('household career support ends when the player becomes financially independ
   quietYear(state);
   assert.equal(state.age, 18);
   assert.equal(state.lifestyle, 1);
-  assert.equal(householdLifestyle(state), 8.08);
+  assert.equal(householdLifestyle(state), 8, 'support already above these jobs? ceilings is retained without further career gain');
   assert.equal(validateSave(state), true);
 });
 
 test('a child handoff preserves household support when the known co-parent had a different lifestyle', () => {
   const state = createGame({ seed: 695, surname: 'Handoff' });
   while (state.age < 65) {
+    // This fixture tests succession support, not unmanaged low-stat events.
+    for (const person of people(state)) for (const key of Object.keys(person.stats)) person.stats[key] = 5;
+    state.lifestyle = 5;
     if (needsEducationChoice(state)) assert.equal(chooseEducation(state, 'work').ok, true);
     quietYear(state);
   }

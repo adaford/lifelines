@@ -1,3 +1,5 @@
+import { JOBS } from '../../jobs.js';
+
 function legacyFocusFixture(value) {
   if (!(value.version >= 17) || !value.focus) return;
   delete value.focus.sports;
@@ -13,6 +15,20 @@ function removeNewFocusMetadata(value) {
   // recorded decisions. Production migrations must preserve those old reviews.
   if (value.focus) { delete value.focus.sports; delete value.focus.extracurricular; }
   if (value.focus && value.workLabel) { delete value.focusMax; delete value.focusBudget; delete value.focusCaps; }
+  delete value.collegeSport;
+  // Modern adult simulations capture funding and housing. They did not exist
+  // in these explicitly downgraded fixtures and must not masquerade as old data.
+  delete value.collegeApplications;
+  delete value.housing;
+  if (value.education?.collegeId !== undefined) {
+    if (value.education.status === 'graduate') {
+      value.jobOffers = [...new Set([...(value.jobId ? [value.jobId] : []), 'retail',
+        ...value.jobOffers, ...JOBS.map(job => job.id)])].slice(0, 15);
+    }
+    delete value.education.collegeId;
+    delete value.education.gpa;
+  }
+  if (value.education) delete value.education.sport;
   if (value.fromAge !== undefined) delete value.school;
   else if (value.school !== undefined) value.school = null;
 }

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EVENTS, eventChances } from '../events.js';
-import { familyEventChances } from '../family-events.js';
+import { FAMILY_EVENTS, familyEventChances } from '../family-events.js';
 import { JOBS } from '../jobs.js';
 
 const keys = ['health', 'stability', 'intelligence', 'strength', 'social', 'creativity', 'attractiveness'];
@@ -52,8 +52,17 @@ test('higher rates retain hard probability caps and inactive or ineligible event
     for (const person of [state, ...state.parents]) for (const key of keys) person.stats[key] = rating;
     const personal = chances(state);
     const household = familyEventChances(state);
-    assert.ok(personal.every(event => Number.isFinite(event.chance) && event.chance >= 0 && event.chance <= .18));
-    assert.ok(household.every(event => Number.isFinite(event.chance) && event.chance >= 0 && event.chance <= .12));
+    assert.ok(personal.every(event => Number.isFinite(event.chance) && event.chance >= 0 && event.chance <= .6));
+    assert.ok(household.every(event => Number.isFinite(event.chance) && event.chance >= 0 && event.chance <= .6));
+    for (const roll of personal) {
+      const definition = EVENTS.find(event => event.id === roll.id);
+      if (definition.rare) assert.ok(roll.chance <= .0006);
+      else if (definition.severity === 'major' || !definition.statFactors?.some(([,direction]) => direction === 'low')) assert.ok(roll.chance <= .18);
+    }
+    for (const roll of household) {
+      const definition = FAMILY_EVENTS.find(event => event.id === roll.eventId);
+      if (definition.severity === 'major' || !definition.statFactors?.some(([,direction]) => direction === 'low')) assert.ok(roll.chance <= .12);
+    }
     state.ended = true;
     assert.ok(chances(state).every(event => event.chance === 0));
     assert.deepEqual(familyEventChances(state), []);
@@ -81,25 +90,25 @@ test('new toddler and school decisions resolve before their activity labels chan
 
 test('changing-plan outcomes offer distinct rewards and enforceable one-year commitments', () => {
   const fracture = EVENTS.find(event => event.id === 'broken_bone');
-  assert.equal(fracture.focusLimits.toddler.work, 2);
-  assert.equal(fracture.focusLimits.standard.social, 2);
+  assert.equal(fracture.focusCapacity.toddler.work, -2);
+  assert.equal(fracture.focusCapacity.standard.social, -2);
   assert.ok(fracture.statChanges.stability < 0);
   assert.deepEqual(fracture.modifiers, {});
   for (const event of EVENTS.filter(event => event.category === 'Changing plans')) {
     const outcomes = event.choices || [event];
-    assert.ok(outcomes.some(outcome => outcome.focusLimits), event.id);
+    assert.ok(outcomes.some(outcome => outcome.focusCapacity), event.id);
     if (event.choices) {
-      assert.notDeepEqual(event.choices[0].focusLimits, event.choices[1].focusLimits, event.id);
+      assert.notDeepEqual(event.choices[0].focusCapacity, event.choices[1].focusCapacity, event.id);
       assert.ok(event.choices.some(choice => Object.values(choice.statChanges || {}).some(amount => amount > 0)), event.id);
     }
-    for (const outcome of outcomes.filter(outcome => outcome.focusLimits)) {
+    for (const outcome of outcomes.filter(outcome => outcome.focusCapacity)) {
       assert.equal(outcome.years, 1, event.id);
-      for (const [stage, caps] of Object.entries(outcome.focusLimits)) {
+      for (const [stage, caps] of Object.entries(outcome.focusCapacity)) {
         assert.ok(['toddler', 'standard'].includes(stage));
         assert.ok(Object.keys(caps).length);
         for (const [key, cap] of Object.entries(caps)) {
-          assert.ok((stage === 'toddler' ? ['work', 'social', 'family', 'self', 'creative'] : ['work', 'social', 'family', 'self']).includes(key));
-          assert.ok(Number.isInteger(cap) && cap >= 0 && cap < 5);
+          assert.ok((stage === 'toddler' ? ['work', 'social', 'family', 'self', 'creative'] : ['work', 'social', 'family', 'self', 'sports', 'extracurricular']).includes(key));
+          assert.ok(Number.isInteger(cap) && cap >= -4 && cap < 0);
         }
       }
     }

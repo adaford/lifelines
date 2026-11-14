@@ -94,6 +94,9 @@ test('cry level three has no routine relationship change even with yearly variat
   for (let seed = 1; seed <= 180; seed++) {
     const state = createGame({ seed });
     setCryLevel(state, 3);
+    // Isolate the routine bond change from events driven by unrelated low stats.
+    for (const person of [state, ...state.parents]) for (const key of Object.keys(person.stats)) person.stats[key] = 5;
+    state.lifestyle = 5;
     state.parents.forEach(parent => { parent.relationship = 7; });
     advanceYear(state, { ...survives, growthRandom: () => 3, parentCareerRandom: () => 1 });
     if (state.lastYearEvents.length) continue;
@@ -186,6 +189,9 @@ test('year reviews retain the completed year decisions across age and education 
   assert.ok(migrateSave(older), 'older reviews still load without inventing choices');
 
   const student = survivorAt(17, 406);
+  student.money = 1000000;
+  student.conditions = [];
+  student.effects = [];
   const schoolFocus = clone(student.focus);
   advanceYear(student, survives);
   assert.deepEqual(student.yearSummary.decisions, { focus: schoolFocus, workLabel: 'School', focusMax: 4, focusBudget: 10, focusCaps: { sports: 2, extracurricular: 2 } });
@@ -221,6 +227,7 @@ test('malformed saved year decisions are rejected without changing the original 
 test('v6 saves gain cry level and parent bonds without rerolling progress or queued decisions', () => {
   const legacy = toLegacyCentimeters(survivorAt(8, 70));
   legacy.version = 6;
+  legacy.effects = legacy.effects.filter(effect => effect.householdLifestyle === undefined && effect.focusCapacity === undefined && effect.focusMinimums === undefined && effect.focusPoints === undefined);
   legacy.effects.forEach(effect => { delete effect.focusLimits; });
   legacy.adultHeight ??= 170;
   for (const person of [legacy, ...legacy.parents, ...legacy.children, ...legacy.siblings, legacy.partner, ...legacy.encounters, legacy.pregnancy?.otherParent].filter(Boolean)) person.appearancePeakAge = 30;

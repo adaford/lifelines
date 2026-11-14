@@ -50,7 +50,8 @@ test('aptitude events change only the target, respect both bounds and survive sa
       resolve(state, choice);
       const expected = Math.max(-3, Math.min(3, current + direction));
       assert.deepEqual(state.aptitudes, { ...before, social: expected });
-      assert.match(state.history[0].text, /social learning ability .* → /);
+      if (expected !== current) assert.match(state.history[0].text, /social learning ability .* → /);
+      else assert.doesNotMatch(state.history[0].text, /social learning ability/, 'a clipped affinity component is omitted while its real rating change remains');
       assert.equal(validateSave(state), true);
       assert.deepEqual(migrateSave(structuredClone(state)).aptitudes, state.aptitudes);
     }
@@ -119,5 +120,8 @@ test('a full legacy effect history can coexist with new restrictions and still r
   assert.equal(migrateSave(oldVersion), null, 'older versions retain their original capacity contract');
   state.effects.push(...Array.from({ length: 37 }, (_, index) => ({ id: `restriction-${index}`, name: 'Restriction', description: '', years: 1, modifiers: {}, focusLimits: { toddler: { work: 2 } }, kind: 'negative' })));
   assert.equal(state.effects.length, 65);
-  assert.equal(validateSave(state), false, 'malformed oversized arrays remain rejected');
+  assert.equal(validateSave(state), true, 'scheduling records do not consume the legacy modifier allowance');
+  assert.deepEqual(migrateSave(structuredClone(state)), state);
+  state.effects.push(...Array.from({ length: 38 }, (_, index) => ({ id: `excess-legacy-${index}`, name: 'Saved bonus', description: '', years: 1, modifiers: { social: .1 } })));
+  assert.equal(validateSave(state), false, 'more than 64 additive legacy records remain rejected');
 });

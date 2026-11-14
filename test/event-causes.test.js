@@ -30,12 +30,12 @@ function fixture(age = 3) {
   }
   return state;
 }
-function rolled(original, eventId, subjectId = '') {
+function rolled(original, eventId, subjectId = '', forceEligibleRolls = false) {
   const id = subjectId ? `${eventId}:${subjectId}` : eventId;
   for (let index = 1; index <= 2000; index++) {
     const state = copy(original);
     state.rng = Math.imul(index, 2654435761) >>> 0;
-    assert.equal(advanceYear(state, steady).ok, true);
+    assert.equal(advanceYear(state, { ...steady, ...(forceEligibleRolls ? { eventRandom: () => 0 } : {}) }).ok, true);
     if (state.lastYearEvents.includes(id)) return state;
   }
   assert.fail(`No actual seeded roll for ${id}`);
@@ -133,14 +133,15 @@ test('automatic events record starting effective ratings before routine growth a
   assert.deepEqual(migrateSave(copy(result)), result);
 });
 
-test('Lifestyle causes read the supplied household rating rather than a same-named stat field', () => {
+test('player Lifestyle causes use the starting household rating even when annual careers change it', () => {
   const original = fixture();
   original.lifestyle = 1.23;
-  const event = { statFactors: [['lifestyle', 'low']] };
-  const suppliedStats = { ...effectiveStats(original), lifestyle: 9.5 };
-  const before = copy([original, suppliedStats]);
-  assert.equal(eventStatCause(event, original, suppliedStats), 'Your low Lifestyle (1.2/10) contributed to this event (start-of-year ratings).');
-  assert.deepEqual([original, suppliedStats], before, 'capturing a cause leaves the supplied starting state untouched');
+  for (const parent of original.parents) { parent.lifestyle = 1.23; parent.career.progress = 1.23; }
+  const event = EVENTS.find(event => event.id === 'low_stat_missed_playgroup');
+  const result = rolled(original, event.id);
+  const cause = result.history.find(entry => entry.title === event.name).cause;
+  assert.match(cause, /low Lifestyle \(1.2\/10\)/);
+  assert.notEqual(result.lifestyle, original.lifestyle);
 });
 
 test('actual parent, guardian, partner and child events capture the named relative ratings', () => {
@@ -162,11 +163,17 @@ test('actual parent, guardian, partner and child events capture the named relati
       original.children = [person];
     }
     const stat = ['parent', 'guardian'].includes(role) ? 'stability' : 'health';
-    eventId = ['parent', 'guardian'].includes(role) ? 'household_parent_overloaded' : role === 'partner' ? 'household_partner_illness' : 'household_child_illness';
+    // Keep the same low-stat causes and actor ownership, using incidents that
+    // still have a consequence after empty legacy definitions were retired.
+    eventId = ['parent', 'guardian'].includes(role) ? 'household_parent_missed_pickup'
+      : role === 'partner' ? 'life_partner_health_intelligence_setback' : 'life_child_health_intelligence_setback';
     person.stats[stat] = 2.3;
     original.stats[stat] = 9;
     const event = EVENTS.find(event => event.id === eventId), expected = eventStatCause(event, person);
-    const result = rolled(original, eventId, person.id);
+    // Supplemental replacements are deliberately rare. Exercise their actual
+    // selection/capture path with successful eligible rolls, keeping the seeded
+    // shuffle and shared five-event limit rather than increasing probabilities.
+    const result = rolled(original, eventId, person.id, true);
     const entry = result.history.find(entry => entry.title === `${person.name}: ${event.name}`);
     assert.equal(entry.cause, expected, role);
     assert.ok(entry.cause.startsWith(person.name));

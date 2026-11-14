@@ -7,19 +7,19 @@ import { APTITUDE_EVENTS, APTITUDE_EVENT_STATS } from '../cross-aptitude-events.
 import { createGame, advanceYear, validateSave, migrateSave } from '../engine.js';
 import { changedRating } from '../rating-changes.js';
 
-test('all new event ratings are permanent and only activity limits or point changes retain durations', () => {
+test('personal ratings are permanent while activity restrictions and explicit household access effects retain durations', () => {
   for (const event of [...EVENTS, ...FAMILY_EVENTS]) {
     for (const outcome of [event, ...(event.choices || [])]) {
       assert.deepEqual(outcome.modifiers || {}, {}, event.id);
       assert.equal(outcome.lifestyle, undefined, event.id);
-      assert.equal(outcome.years > 0, Boolean(outcome.focusLimits || outcome.focusPoints), `${event.id}:${outcome.id}`);
+      assert.equal(outcome.years > 0, Boolean(outcome.focusCapacity || outcome.focusMinimums || outcome.focusPoints || outcome.householdLifestyle), `${event.id}:${outcome.id}`);
     }
   }
   const gossip = EVENTS.find(event => event.id === 'gossip_choice').choices.find(choice => choice.id === 'spread');
   assert.ok(Math.abs(gossip.statChanges.social - (-.4)) < 1e-10, 'lasting and formerly timed effects merge before applying');
   const lesson = EVENTS.find(event => event.id === 'extra_lessons').choices.find(choice => choice.id === 'study');
   assert.deepEqual(lesson.statChanges, { intelligence: .5 });
-  assert.deepEqual(lesson.focusLimits, { standard: { social: 2 } });
+  assert.deepEqual(lesson.focusCapacity, { standard: { social: -2 } });
 });
 
 test('rare aptitude experiences cover every ordered pair in both directions without changing the source', () => {
@@ -81,7 +81,7 @@ test('trait-driven experiences change different stats and injuries still limit a
   }
   for (const id of ['broken_bone', 'playground_fall', 'injury', 'sports_sprain', 'unsafe_lift', 'minor_strain', 'elder_fall']) {
     const event = EVENTS.find(event => event.id === id);
-    assert.ok(event.focusLimits, id);
+    assert.ok(event.focusCapacity, id);
     if (id === 'minor_strain') assert.equal(event.statChanges, undefined, 'minor soreness restricts activity without a permanent mental penalty');
     else assert.ok(event.statChanges.attractiveness < 0 || event.statChanges.stability < 0, id);
     assert.equal(event.statChanges?.strength, undefined, id);

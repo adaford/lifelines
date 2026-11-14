@@ -85,7 +85,7 @@ test('School uses its specified Intelligence, Creativity, and Social curves in p
       const forecast = annualForecast(selected);
       const rows = schoolChoiceImpacts(selected, 'work');
       for (const stat of Object.keys(units)) {
-        const contribution = units[stat][points] * coefficients[stat] * .5 * 1.15;
+        const contribution = units[stat][points] * coefficients[stat] * .25 * 1.15;
         near(skillChanges(selected)[stat] - mean[stat], contribution, `${age}: ${points} School, ${stat}`);
         assert.equal(forecast.stats[stat].after, changedRating(5, mean[stat] + contribution));
         const row = rows.find(entry => entry.stat === stat && !entry.parentId);
@@ -95,7 +95,7 @@ test('School uses its specified Intelligence, Creativity, and Social curves in p
           assert.equal(row.level, Math.abs(units[stat][points]));
         }
       }
-      near(schoolFocusEffects(selected, 'work').stability, -.3 * ordinary[points] * .5, 'School retains its existing mental strain');
+      near(schoolFocusEffects(selected, 'work').stability, -.3 * ordinary[points] * .25, 'School strain uses the halved focus response');
       assert.deepEqual(selected, before, 'neither forecast nor row rendering consumes RNG or mutates the save');
     }
   }
@@ -121,7 +121,7 @@ test('Yourself, Sports, and Extracurricular activities have distinct effects in 
     const rows = schoolChoiceImpacts(selected, area).filter(entry => !entry.parentId);
     assert.deepEqual(rows.map(entry => entry.stat).sort(), Object.keys(coefficients).sort(), `${area} only affects its own listed stats`);
     for (const [stat, coefficient] of Object.entries(coefficients)) {
-      const contribution = coefficient * units * .5 * (learned.includes(stat) || stat === 'attractiveness' ? 1.15 : 1);
+      const contribution = coefficient * units * .25 * (learned.includes(stat) || stat === 'attractiveness' ? 1.15 : 1);
       const actual = learned.includes(stat) ? skillChanges(selected)[stat] - means[stat]
         : stat === 'attractiveness' ? schoolAppearanceChange(selected) - schoolAppearanceChange(baseline)
           : childhoodWellbeing(selected)[stat] - wellbeing[stat];
@@ -155,7 +155,7 @@ test('school signs retain their custom units under caps and clipping, and bonuse
     candidate.focus.self = points;
     candidate.aptitudes.attractiveness = aptitude;
     const raw = .225 * ordinary[points];
-    near(schoolAppearanceChange(candidate), raw * .5 * 1.15 * (raw > 0 ? 1 + aptitude * .08 : 1 - aptitude * .07), 'school appearance uses aptitude and yearly response once');
+    near(schoolAppearanceChange(candidate), raw * .25 * 1.15 * (raw > 0 ? 1 + aptitude * .08 : 1 - aptitude * .07), 'school appearance uses aptitude and yearly response once');
   }
   for (const age of [4, 18, 19, 30]) assert.equal(schoolAppearanceChange({ ...student(age), focus: { ...defaultFocus(age), self: 4 } }), 0);
 });

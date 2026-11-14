@@ -69,7 +69,7 @@ test('school inactivity uses category losses while positive points retain each e
     const effects = schoolFocusEffects(state, kind), rows = schoolChoiceImpacts(state, kind);
     assert.deepEqual(rows.map(row => row.stat).sort(), Object.keys(expected).sort(), `${id} at ${points} affects only the selected map`);
     for (const row of rows) {
-      near(effects[row.stat], expected[row.stat] * units * .5 * 1.15);
+      near(effects[row.stat], expected[row.stat] * units * .25 * 1.15);
       near(row.change, changedRating(5, effects[row.stat]) - 5);
       assert.equal(row.level, Math.abs(units));
       assert.equal(Math.sign(row.change), Math.sign(units));
@@ -85,7 +85,7 @@ test('unjoined and paused school activities apply one general loss unit without 
   const state = pupil(), before = copy(state), forecast = annualForecast(state);
   const inputs = { strength: -.3, social: -.24, creativity: -.24, intelligence: -.225 };
   for (const [stat, amount] of Object.entries(inputs)) {
-    const expected = changedRating(5, amount * .5 * 1.15);
+    const expected = changedRating(5, amount * .25 * 1.15);
     assert.equal(forecast.stats[stat].after, expected, `${stat} includes exactly one category inactivity contribution`);
   }
   assert.deepEqual(state, before);
@@ -245,6 +245,8 @@ test('five-offer schema nineteen saves trim only their shortlists and keep selec
     saved.lastYearEvents = ['school_team'];
     assert.equal(validateSave(saved), true);
     saved.version = 19;
+    delete saved.collegeApplications;
+    delete saved.housing;
     for (const person of [saved, ...saved.parents, ...saved.encounters]) person.conditions = [];
     saved.school.offers = {
       sports: ['soccer', 'football', 'tennis', 'basketball', 'cheerleading'],
@@ -510,6 +512,7 @@ test('school begins with unjoined activities and the final school report survive
   assert.equal(secondReport.yearSummary.school.previousGpa, firstGrade);
   assert.deepEqual(child, beforeFirstReport);
   const teen = pupil(17);
+  teen.money = 1000000;
   join(teen, 'sports', 'soccer');
   const adult = quietYear(teen);
   assert.equal(adult.age, 18);

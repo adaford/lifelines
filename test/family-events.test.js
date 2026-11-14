@@ -30,7 +30,7 @@ test('household catalog keeps distinct choices without replacing removed causal-
     }
     for (const outcome of event.choices || [event]) {
       const changes = [...Object.entries(outcome.subjectChanges || {}), ...Object.entries(outcome.playerChanges || {})];
-      if (!(changes.length || outcome.relationship || outcome.lifestyle)) outcomesWithoutChanges.push(`${event.id}:${outcome.id || 'automatic'}`);
+      if (!(changes.length || outcome.relationship || outcome.lifestyle || outcome.householdLifestyle)) outcomesWithoutChanges.push(`${event.id}:${outcome.id || 'automatic'}`);
       for (const [key, value] of changes) {
         assert.ok(traits.includes(key), `unknown trait ${key}`);
         assert.ok(Number.isFinite(value) && value !== 0);
@@ -125,7 +125,7 @@ test('all retained subject traits influence events, with more frequent but bound
     const rolls = familyEventChances(state);
     assert.equal(JSON.stringify(state), before, 'viewing chances does not mutate the save');
     assert.ok(rolls.every(roll => Number.isFinite(roll.chance) && roll.chance >= 0 && roll.chance <= .12));
-    const expected = rolls.reduce((sum, roll) => sum + roll.chance, 0);
+    const expected = rolls.filter(roll => !roll.eventId.startsWith('life_')).reduce((sum, roll) => sum + roll.chance, 0);
     assert.ok(expected >= .35 && expected <= .75, `ordinary household expectation ${expected}`);
   }
 });
@@ -137,7 +137,7 @@ function childhood(age = 0) {
 }
 
 test('parent experiences respect the child age and never require a baby to manage a parent', () => {
-  const events = FAMILY_EVENTS.filter(event => event.subjectType === 'parent');
+  const events = FAMILY_EVENTS.filter(event => event.subjectType === 'parent' && !event.supplemental);
   assert.ok(events.length >= 6);
   for (const event of events) {
     assert.ok(event.minPlayerAge >= 0 && event.maxPlayerAge <= 17);
@@ -145,7 +145,7 @@ test('parent experiences respect the child age and never require a baby to manag
   }
   for (const age of [0, 1, 2, 3, 10, 17, 18, 40]) {
     const state = childhood(age);
-    for (const roll of familyEventChances(state).filter(roll => roll.chance > 0)) {
+    for (const roll of familyEventChances(state).filter(roll => roll.chance > 0 && !roll.eventId.startsWith('life_'))) {
       const event = events.find(event => event.id === roll.eventId);
       assert.ok(event && age >= event.minPlayerAge && age <= event.maxPlayerAge);
     }
@@ -179,13 +179,13 @@ test('parent stress, health and bonds influence their own childhood events', () 
   const rolls = familyEventChances(state);
   assert.equal(JSON.stringify(state), before);
   assert.equal(new Set(rolls.map(roll => roll.id)).size, rolls.length);
-  assert.ok(rolls.every(roll => roll.chance >= 0 && roll.chance <= .12));
+  assert.ok(rolls.every(roll => roll.chance >= 0 && roll.chance <= .6));
 });
 
 test('more frequent childhood experiences still include support and recovery', () => {
   for (const age of [0, 2, 3, 10, 17]) {
     const state = childhood(age);
-    const rolls = familyEventChances(state);
+    const rolls = familyEventChances(state).filter(roll => !roll.eventId.startsWith('life_'));
     const expected = rolls.reduce((sum, roll) => sum + roll.chance, 0);
     assert.ok(expected > .125 && expected < .5, `ordinary parent experience expectation ${expected}`);
     const positive = rolls.filter(roll => FAMILY_EVENTS.find(event => event.id === roll.eventId).kind === 'positive').reduce((sum, roll) => sum + roll.chance, 0);

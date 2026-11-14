@@ -1,5 +1,5 @@
-import { heightReference } from './growth.js?v=deadline-effect';
-import { fameActivityMatches } from './fame.js?v=deadline-effect';
+import { heightReference } from './growth.js?v=parent-colors-events';
+import { fameActivityMatches } from './fame.js?v=parent-colors-events';
 
 // Fictional school activities and success rules, independent of save mutation
 // and the gameplay RNG. The engine supplies effective ratings and any draw.
@@ -82,6 +82,13 @@ export const EXTRACURRICULARS = Object.freeze([
 const catalog = kind => kind === 'sports' ? SPORTS : kind === 'extracurricular' ? EXTRACURRICULARS : [];
 export const schoolActivity = (kind, id) => catalog(kind).find(entry => entry.id === id) || null;
 
+// College seasons have their own report. Retain the high-school record as the
+// evidence used for recruitment and scholarships rather than overwriting it.
+export const currentSchoolEnrollment = (person, kind) => kind === 'sports'
+  && ['college', 'graduate'].includes(person?.education?.status) && person.education.sport
+  ? person.education.sport : person?.school?.[kind];
+export const currentSchoolActivity = (person, kind) => schoolActivity(kind, currentSchoolEnrollment(person, kind)?.id);
+
 const STUDY_GRADE_BASELINES = [50, 65, 80, 90, 97];
 export function gradeScore(study, intelligence) {
   const points = clamp(finite(study), 0, 4);
@@ -138,9 +145,12 @@ export function activitySuccessChange(person, selected, points, randomDraw = 0) 
 }
 
 export function activityEligible(person, selected) {
+  const collegeSport = person?.age >= 18 && person.education?.status === 'college'
+    && person.education.sport?.id === selected?.id && Boolean(schoolActivity('sports', selected?.id));
   return Boolean(selected && person?.age >= 5
-    && (person.age < 18 || ['sports', 'extracurricular'].some(kind => fameActivityMatches(person, kind, selected.id)))
-    && finite(person.lifestyle) >= (selected.minLifestyle ?? 0));
+    && (person.age < 18 || collegeSport || ['sports', 'extracurricular'].some(kind => fameActivityMatches(person, kind, selected.id)))
+    // A funded college team provides its facilities and equipment.
+    && (collegeSport || finite(person.lifestyle) >= (selected.minLifestyle ?? 0)));
 }
 
 // Previews use zero noise; completed reports supply their existing annual draw.

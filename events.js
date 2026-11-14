@@ -1,9 +1,11 @@
 // Fictional life-sim probabilities and consequences, not real-world risk estimates.
 // Each eligible event gets an independent yearly roll. The engine caps a year at five.
 // Low/high factors are curved so extreme traits matter much more than small changes.
-import { legacyFocusValue, focusMaxFor } from './focus-rules.js?v=deadline-effect';
-import { APTITUDE_EVENTS } from './cross-aptitude-events.js?v=deadline-effect';
-import { schoolActivity, activityEligible } from './school.js?v=deadline-effect';
+import { legacyFocusValue, focusMaxFor } from './focus-rules.js?v=parent-colors-events';
+import { APTITUDE_EVENTS } from './cross-aptitude-events.js?v=parent-colors-events';
+import { schoolActivity, activityEligible, gradeScore } from './school.js?v=parent-colors-events';
+import { boostLowStatRates } from './event-rates.js?v=parent-colors-events';
+import { LIFE_PERSONAL_EVENTS } from './life-events.js?v=parent-colors-events';
 
 const low = key => [key, 'low'];
 const high = key => [key, 'high'];
@@ -13,7 +15,7 @@ const temporary = (modifiers, years = 1, lifestyle = 0) => ({ modifiers, years, 
 const change = statChanges => ({ statChanges });
 const choice = (id, label, description, outcome) => ({ id, label, description, ...outcome });
 function permanentOutcome(outcome) {
-  const result = { ...outcome, statChanges: { ...outcome.statChanges }, modifiers: {}, years: outcome.focusLimits || outcome.focusPoints ? outcome.years || 1 : 0 };
+  const result = { ...outcome, statChanges: { ...outcome.statChanges }, modifiers: {}, years: outcome.focusCapacity || outcome.focusMinimums || outcome.focusPoints ? outcome.years || 1 : 0 };
   for (const [key, amount] of Object.entries(outcome.modifiers || {})) result.statChanges[key] = (result.statChanges[key] || 0) + amount;
   // Legacy material fields do not imply a permanent mental-stability change.
   result.statChanges = Object.fromEntries(Object.entries(result.statChanges).filter(([, amount]) => amount));
@@ -26,32 +28,41 @@ const group = (category, defaults, entries) => entries.map(entry => permanentOut
 export const PERSONAL_EVENT_RATE_MULTIPLIER = 3;
 
 export const EVENTS = [
+  ...LIFE_PERSONAL_EVENTS,
   ...APTITUDE_EVENTS,
+  ...group('Everyday setbacks', { minAge: 0, maxAge: 4, baseChance: .006, kind: 'negative', severity: 'minor' }, [
+    { id: 'low_stat_confusing_toy', name: 'An unfamiliar toy at a visit', description: 'A visitor brings a toy with unfamiliar sounds and patterns, then changes the game too quickly for you to follow; the confusing visit leaves you unsettled.', maxStats: { intelligence: 4 }, statFactors: [low('intelligence')], ...change({}) },
+    { id: 'low_stat_unfamiliar_visitor', name: 'A visitor overwhelms playtime', description: 'An unfamiliar visitor keeps trying to draw you into a noisy game; you become upset and the visit ends before you can settle into playing together.', maxAge: 1, maxStats: { social: 4 }, statFactors: [low('social')], ...change({}) },
+    { id: 'low_stat_changed_play_game', name: 'A familiar game changes suddenly', description: 'A visitor tries a new way of playing with your familiar toys, but you struggle to join in and the shared game ends early.', maxStats: { creativity: 4 }, statFactors: [low('creativity')], ...change({ social: -.15 }) },
+    { id: 'low_stat_unkind_appearance_remark', name: 'An unkind remark cuts a visit short', description: 'During a visit, an adult makes an unkind comment about your appearance; your caregiver ends the visit early, cutting short time playing together.', maxStats: { attractiveness: 4 }, statFactors: [low('attractiveness')], ...change({ social: -.15 }) },
+    { id: 'low_stat_missed_playgroup', name: 'A playgroup place is out of reach', description: 'The local playgroup introduces a charge your household cannot cover, so you miss sessions with other children.', maxStats: { lifestyle: 4 }, statFactors: [low('lifestyle')], ...change({ social: -.15 }) },
+    { id: 'low_stat_missing_materials', name: 'Missing materials for a group project', description: 'A group project calls for materials you cannot obtain, and you miss part of the shared work and time with the group.', minAge: 5, maxAge: 84, maxStats: { lifestyle: 4 }, statFactors: [low('lifestyle')], ...change({ creativity: -.15, social: -.1 }) },
+  ]),
   ...group('Changing plans', { minAge: 2, baseChance: .018, kind: 'neutral' }, [
-    { id: 'broken_bone', name: 'Broken bone', description: 'During active play or exercise, a fall on steps breaks a bone, cutting short active outings while it heals.', schoolFocusFactors: ['sports'], kind: 'negative', focusFactors: ['self'], toddlerFocusFactors: ['work'], ...change({ stability: -.15 }), years: 1, focusLimits: { toddler: { work: 2 }, standard: { social: 2, self: 2 } } },
+    { id: 'broken_bone', name: 'Broken bone', description: 'During active play or exercise, a fall on steps breaks a bone, cutting short active outings while it heals.', schoolFocusFactors: ['sports'], kind: 'negative', focusFactors: ['self'], toddlerFocusFactors: ['work'], ...change({ stability: -.15 }), years: 1, focusCapacity: { toddler: { work: -2 }, standard: { social: -2, self: -2, sports: -1 } } },
     { id: 'broken_tablet', name: 'Broken tablet', description: 'Your tablet stops working.', maxAge: 3, kind: 'negative', toddlerFocusFactors: ['social'], choices: [
-      choice('borrow', 'Borrow a shared tablet', 'Sharing limits your screen time.', { ...temporary({}), focusLimits: { toddler: { social: 2 } } }),
-      choice('screen_break', 'Take a screen break', 'Put screen time into other activities.', { ...change({ health: .2 }), ...temporary({}), focusLimits: { toddler: { social: 0 } } }),
+      choice('borrow', 'Borrow a shared tablet', 'Sharing limits your screen time.', { ...temporary({}), focusCapacity: { toddler: { social: -2 } } }),
+      choice('screen_break', 'Take a screen break', 'Put screen time into other activities.', { ...change({ health: .2 }), ...temporary({}), focusCapacity: { toddler: { social: -4 } } }),
     ] },
     { id: 'art_workshop', name: 'An artist visits the nursery', description: 'A visiting artist offers clay workshops during your usual playtime.', maxAge: 3, kind: 'positive', toddlerFocusFactors: ['creative'], choices: [
-      choice('join', 'Join the workshop', 'Develop your art skills with less time for play.', { ...change({ creativity: .5, intelligence: .15 }), ...temporary({}), focusLimits: { toddler: { work: 2 } } }),
+      choice('join', 'Join the workshop', 'Develop your art skills with less time for play.', { ...change({ creativity: .5, intelligence: .15 }), ...temporary({}), focusCapacity: { toddler: { work: -2 } } }),
       choice('skip', 'Keep your playtime', 'Spend the time playing with others.', change({ social: .2 })),
     ] },
     { id: 'extra_lessons', name: 'A teacher offers extra lessons', description: 'A teacher offers you a place in a small tutoring group that meets when your friends get together.', minAge: 5, maxAge: 16, conditions: ['school'], focusFactors: ['work'], choices: [
-      choice('study', 'Take the lessons', 'Study more with less time for friends.', { ...change({ intelligence: .5 }), ...temporary({}), focusLimits: { standard: { social: 2 } } }),
+      choice('study', 'Take the lessons', 'Study more with less time for friends.', { ...change({ intelligence: .5 }), ...temporary({}), focusCapacity: { standard: { social: -2 } } }),
       choice('decline', 'Keep your schedule', 'Keep your free time.', change({})),
     ] },
     { id: 'rehearsal_commitment', name: 'A place in the holiday show', description: 'The school director offers you a part in the holiday show, with rehearsals during study time.', minAge: 5, maxAge: 16, conditions: ['school'], focusFactors: ['social'], choices: [
-      choice('perform', 'Commit to rehearsals', 'Practice performing with less time for schoolwork.', { ...change({ creativity: .5, social: .2 }), ...temporary({}), focusLimits: { standard: { work: 2 } } }),
+      choice('perform', 'Commit to rehearsals', 'Practice performing with less time for schoolwork.', { ...change({ creativity: .5, social: .2 }), ...temporary({}), focusCapacity: { standard: { work: -2 } } }),
       choice('backstage', 'Help at one performance', 'Contribute without regular rehearsals.', change({ creativity: .2 })),
     ] },
     { id: 'demanding_project', name: 'Asked to lead a project', description: 'Your manager asks you to rescue a delayed project, with meetings that would cut into family time.', minAge: 18, conditions: ['employed'], focusFactors: ['work'], choices: [
-      choice('lead', 'Lead the project', 'Build skills with less time for family.', { ...change({ intelligence: .4, social: .2 }), ...temporary({ stability: -.2 }), focusLimits: { standard: { family: 2 } } }),
+      choice('lead', 'Lead the project', 'Build skills with less time for family.', { ...change({ intelligence: .4, social: .2 }), ...temporary({ stability: -.2 }), focusCapacity: { standard: { family: -2 } } }),
       choice('share', 'Share the workload', 'Develop your skills with a lighter commitment.', change({ intelligence: .2 })),
     ] },
-    { id: 'disrupted_sleep', name: 'Construction outside your window', description: 'Early construction noise carries through your poorly insulated home, and you have no affordable quieter place to sleep. Repeated waking leaves less energy for school or work.', minAge: 5, baseChance: .012, kind: 'negative', statFactors: [low('lifestyle')], ...temporary({ health: -.3 }), focusLimits: { standard: { work: 2 } } },
+    { id: 'disrupted_sleep', name: 'Construction outside your window', description: 'Early construction noise carries through your poorly insulated home, and you have no affordable quieter place to sleep. Repeated waking leaves less energy for school or work.', minAge: 5, baseChance: .012, kind: 'negative', statFactors: [low('lifestyle')], ...temporary({ health: -.3 }), focusCapacity: { standard: { work: -2 } } },
     { id: 'relative_needs_help', name: 'A relative needs help after surgery', description: 'A relative recovering from surgery asks for regular help during your usual working hours.', minAge: 18, focusFactors: ['family'], choices: [
-      choice('help', 'Help regularly', 'Support your relative with less time for work.', { ...change({ social: .4 }), ...temporary({}), focusLimits: { standard: { work: 2 } } }),
+      choice('help', 'Help regularly', 'Support your relative with less time for work.', { ...change({ social: .4 }), ...temporary({}), focusCapacity: { standard: { work: -2 } } }),
       choice('arrange', 'Arrange other support', 'Find help while keeping your routine.', change({ social: .15 })),
     ] },
   ]),
@@ -72,7 +83,7 @@ export const EVENTS = [
   ...group('Growing up', { minAge: 2, maxAge: 12, baseChance: .011, kind: 'positive' }, [
     { id: 'treehouse', name: 'A backyard invention', description: 'Your imaginative playhouse design catches a neighbor\'s interest. They bring spare cardboard and help you build tunnels and opening windows.', schoolFocusFactors: ['extracurricular'], focusFactors: ['self'], toddlerFocusFactors: ['creative'], statFactors: [high('creativity')], ...change({ intelligence: .2 }) },
     { id: 'learning_bike', name: 'Invited on a neighborhood ride', description: 'After seeing you keep up during outdoor games, older children invite you on a gentle bike ride and stay beside you until you feel part of the group.', schoolFocusFactors: ['sports'], minAge: 5, focusFactors: ['self'], statFactors: [high('strength')], ...change({ social: .2 }) },
-    { id: 'playground_fall', name: 'A playground fall', description: 'You struggle to hold yourself on playground equipment and fall against a rough edge, leaving a small scar and interrupting active play.', kind: 'negative', statFactors: [low('strength')], focusFactors: ['social'], toddlerFocusFactors: ['work'], ...change({ attractiveness: -.1 }), years: 1, focusLimits: { toddler: { work: 2 }, standard: { self: 2 } } },
+    { id: 'playground_fall', name: 'A playground fall', description: 'You struggle to hold yourself on playground equipment and fall against a rough edge, leaving a small scar and interrupting active play.', kind: 'negative', statFactors: [low('strength')], focusFactors: ['social'], toddlerFocusFactors: ['work'], ...change({ attractiveness: -.1 }), years: 1, focusCapacity: { toddler: { work: -2 }, standard: { self: -2, sports: -1 } } },
     { id: 'lost_toy', name: 'Struggling after a favorite toy is lost', description: 'After your favorite make-believe toy goes missing on an outing, you struggle to settle into any replacement game. The distress repeatedly interrupts imaginative play.', kind: 'negative', statFactors: [low('stability')], ...temporary({ creativity: -.2 }) },
     { id: 'child_library', name: 'A storyteller visits the library', description: 'A visiting storyteller notices how quickly you follow the story, asks you to invent an ending, and acts it out with puppets.', schoolFocusFactors: ['extracurricular'], focusFactors: ['self'], toddlerFocusFactors: ['creative'], statFactors: [high('intelligence')], ...change({ creativity: .2 }) },
     { id: 'school_play', name: 'A part in the play', description: 'You are offered a small part in a community performance.', minAge: 3, conditions: ['schoolAge'], focusFactors: ['social'], choices: [choice('perform', 'Take the part', 'The stage stretches your confidence, but rehearsals feel stressful.', { ...change({ social: .4, creativity: .3 }), ...temporary({}) }), choice('backstage', 'Help backstage', 'You find a quieter way to contribute.', change({ creativity: .3, intelligence: .2 }))] },
@@ -147,12 +158,12 @@ export const EVENTS = [
     { id: 'work_friend', name: 'A colleague takes you under their wing', description: 'An experienced colleague starts inviting you to lunch, sharing useful techniques and helping you settle in.', focusFactors: ['social'], statFactors: [high('social')], ...change({ intelligence: .2 }) },
     { id: 'work_error', name: 'A mistake reaches a customer', description: 'A customer spots an error in your work and sends it back, with your manager copied into the complaint.', kind: 'negative', statFactors: [low('intelligence')], neglectFactors: ['work'], ...temporary({}) },
     { id: 'work_conflict', name: 'A tense meeting', description: 'When a missed deadline comes up at a meeting, you struggle to explain your role calmly. Misunderstandings and frustrated replies turn the discussion into a personal argument.', kind: 'negative', statFactors: [low('social'), low('stability')], choices: [choice('listen', 'Ask for a calmer conversation', 'Working through it improves your ability to handle disagreement.', change({})), choice('defend', 'Push your point harder', 'You make yourself heard but strain the relationship.', change({}))] },
-    { id: 'overtime_offer', name: 'Asked to cover an absent colleague', description: 'Your manager asks you to take over an absent colleague\'s duties alongside your own work.', kind: 'neutral', focusFactors: ['work'], choices: [choice('accept', 'Take it on', 'The extra responsibility develops your understanding and adds pressure.', { ...change({ intelligence: .3, stability: -.3, health: -.2 }), years: 1, focusLimits: { standard: { self: 2 } } }), choice('decline', 'Protect your balance', 'Maintaining your limits helps you feel steadier.', change({}))] },
+    { id: 'overtime_offer', name: 'Asked to cover an absent colleague', description: 'Your manager asks you to take over an absent colleague\'s duties alongside your own work.', kind: 'neutral', focusFactors: ['work'], choices: [choice('accept', 'Take it on', 'The extra responsibility develops your understanding and adds pressure.', { ...change({ intelligence: .3, stability: -.3, health: -.2 }), years: 1, focusCapacity: { standard: { self: -2, sports: -1 } } }), choice('decline', 'Protect your balance', 'Maintaining your limits helps you feel steadier.', change({}))] },
     { id: 'work_idea', name: 'A failed system needs a workaround', description: 'A system failure stalls the team until your improvised workaround gets the work moving again.', statFactors: [high('creativity')], focusFactors: ['work'], ...change({ intelligence: .2 }), ...temporary({}, 2, 1) },
     { id: 'work_training', name: 'A specialist visits your workplace', description: 'A visiting specialist gives you hands-on training with unfamiliar equipment and answers your questions.', focusFactors: ['work'], ...change({ intelligence: .25 }) },
     { id: 'professional_network', name: 'A professional introduction', description: 'A colleague introduces you to an experienced contact who reviews your work and shares practical advice.', focusFactors: ['social'], statFactors: [high('social')], ...change({ intelligence: .2 }), ...temporary({}, 2, 1) },
     { id: 'work_overlooked', name: 'Your contribution goes unheard', description: 'You struggle to explain your contribution at a team meeting. The manager credits the most visible work without recognizing your part, leaving you discouraged.', kind: 'negative', statFactors: [low('social')], ...temporary({}, 1, -1) },
-    { id: 'unsafe_lift', name: 'A strain on the job', description: 'You strain your back moving a heavy load at work and have to reduce physical duties while it heals.', kind: 'negative', conditions: ['physicalJob'], statFactors: [low('strength')], focusFactors: ['work'], ...change({ stability: -.2 }), years: 2, focusLimits: { standard: { work: 2, self: 2 } } },
+    { id: 'unsafe_lift', name: 'A strain on the job', description: 'You strain your back moving a heavy load at work and have to reduce physical duties while it heals.', kind: 'negative', conditions: ['physicalJob'], statFactors: [low('strength')], focusFactors: ['work'], ...change({ stability: -.2 }), years: 2, focusCapacity: { standard: { work: -2, self: -2, sports: -1 } } },
     { id: 'client_impression', name: 'Chosen to welcome visitors', description: 'Your manager asks you to welcome visiting clients, whose friendly response helps the conversation flow.', statFactors: [high('social')], focusFactors: ['work'], ...change({}), ...temporary({}, 1, 1) },
     { id: 'work_boundaries', name: 'After-hours calls from your manager', description: 'Your manager starts calling with work requests during evenings you had set aside for yourself.', kind: 'neutral', focusFactors: ['work'], neglectFactors: ['self'], choices: [choice('boundaries', 'Set a clearer boundary', 'A difficult conversation protects your peace.', change({ stability: .4, social: .15 })), choice('continue', 'Keep pushing this year', 'The effort stretches your skills and your wellbeing.', { ...change({ intelligence: .3 }), ...temporary({ health: -.4, stability: -.5 }) })] },
   ]),
@@ -179,13 +190,13 @@ export const EVENTS = [
     { id: 'friend_repair', name: 'An apology from an old friend', description: 'A friend sends an apology for an old argument and asks to meet so you can clear the air.', focusFactors: ['social'], kind: 'neutral', choices: [choice('apologize', 'Own your part', 'A sincere conversation makes connection easier.', change({ social: .4 })), choice('space', 'Ask for more time', 'You create room to settle your thoughts, though distance remains.', change({ social: -.15 }))] },
   ]),
   ...group('Health and movement', { minAge: 2, baseChance: .007, kind: 'negative' }, [
-    { id: 'injury', name: 'A fall on a rough path', description: 'Feeling weak and lightheaded on an outing, you stumble on a rough path and scrape your face. You have to cut back on active outings while you recover.', statFactors: [low('health')], jobFactors: { athlete: 5, dance_instructor: 3, firefighter: 2 }, ...change({ attractiveness: -.1 }), years: 2, focusLimits: { toddler: { work: 2 }, standard: { self: 2 } } },
+    { id: 'injury', name: 'A fall on a rough path', description: 'Feeling weak and lightheaded on an outing, you stumble on a rough path and scrape your face. You have to cut back on active outings while you recover.', statFactors: [low('health')], jobFactors: { athlete: 5, dance_instructor: 3, firefighter: 2 }, ...change({ attractiveness: -.1 }), years: 2, focusCapacity: { toddler: { work: -2 }, standard: { self: -2, sports: -1 } } },
     { id: 'illness', name: 'A difficult infection recovery', description: 'After an infection reaches your household, you become ill and struggle to recover. The prolonged illness leaves you weak and unsettled.', minAge: 0, statFactors: [low('health')], ...temporary({ strength: -.3, stability: -.2 }) },
-    { id: 'sports_sprain', name: 'A training sprain', description: 'During a sudden turn in training, you struggle to support your weight and sprain a joint, leaving it tender.', minAge: 18, conditions: ['sportsJob'], focusFactors: ['work'], statFactors: [low('strength')], jobFactors: { athlete: 3 }, ...change({ stability: -.2 }), years: 2, focusLimits: { standard: { work: 2, self: 2 } } },
+    { id: 'sports_sprain', name: 'A training sprain', description: 'During a sudden turn in training, you struggle to support your weight and sprain a joint, leaving it tender.', minAge: 18, conditions: ['sportsJob'], focusFactors: ['work'], statFactors: [low('strength')], jobFactors: { athlete: 3 }, ...change({ stability: -.2 }), years: 2, focusCapacity: { standard: { work: -2, self: -2, sports: -1 } } },
     { id: 'overtraining', name: 'A coach pushes past your limits', description: 'A coach adds extra drills despite your fatigue, and your performance drops as exhaustion builds.', minAge: 18, conditions: ['sportsJob'], focusFactors: ['work'], neglectFactors: ['self'], statFactors: [low('health')], ...temporary({ strength: -.3 }) },
     { id: 'stamina_gain', name: 'A community activity pass', description: 'A local center gives you a pass for supervised pool sessions, with staff helping you stay active at your own pace.', schoolFocusFactors: ['sports'], kind: 'positive', focusFactors: ['self'], toddlerFocusFactors: ['work'], ...change({ health: .2 }) },
     { id: 'healthy_stretch', name: 'Keeping up with neighborhood games', description: 'You feel well enough to keep up with regular outdoor games organized by a neighbor. Sustained play helps build your strength and leaves you more settled.', toddlerFocusFactors: ['work'], schoolFocusFactors: ['sports'], kind: 'positive', statFactors: [high('health')], focusFactors: ['self'], ...temporary({ strength: .2 }, 2) },
-    { id: 'minor_strain', name: 'A heavy door catches your arm', description: 'You struggle to hold a heavy door open and it catches your arm, leaving it sore and making daily activities frustrating.', statFactors: [low('strength')], ...change({}), years: 1, focusLimits: { toddler: { work: 3 }, standard: { self: 3 } } },
+    { id: 'minor_strain', name: 'A heavy door catches your arm', description: 'You struggle to hold a heavy door open and it catches your arm, leaving it sore and making daily activities frustrating.', statFactors: [low('strength')], ...change({}), years: 1, focusCapacity: { toddler: { work: -1 }, standard: { self: -1, sports: -1 } } },
     { id: 'health_check', name: 'A clinician spots a useful change', description: 'At a check-up, a clinician spots a problem in your daily habits and shows you how to address it.', minAge: 18, kind: 'positive', focusFactors: ['self'], ...change({ health: .3, intelligence: .15 }) },
     { id: 'sport_triumph', name: 'A prize at a sporting event', description: 'You win recognition at a sporting event, and other participants come over to congratulate you.', minAge: 18, conditions: ['sportsJob'], kind: 'positive', statFactors: [high('strength')], focusFactors: ['work'], ...temporary({ social: .2 }, 2, 1) },
     { id: 'low_energy', name: 'A stomach bug disrupts your plans', description: 'A stomach bug leaves you exhausted and missing the activities where you usually see people.', statFactors: [low('health')], ...temporary({ strength: -.5, social: -.3 }) },
@@ -210,7 +221,7 @@ export const EVENTS = [
     { id: 'elder_loneliness', name: 'Withdrawing after a visitor moves away', description: 'After a regular visitor moves away, you struggle to manage the loss of contact. With little other company in your routine, you stop reaching out and spend more time alone.', kind: 'negative', neglectFactors: ['social', 'family'], statFactors: [low('stability')], ...temporary({ social: -.3 }) },
     { id: 'elder_reunion', name: 'An invitation to an old reunion', description: 'Former neighbors invite you to a reunion and bring photographs of the years you lived nearby.', focusFactors: ['social'], ...change({ social: .15 }) },
     { id: 'elder_hobby', name: 'A place at a community workshop', description: 'The community center offers you a place in either a woodworking workshop or a local-history class.', focusFactors: ['self'], choices: [choice('make', 'Make something with your hands', 'Learning a craft renews your imagination.', change({ creativity: .4 })), choice('learn', 'Explore a subject', 'Fresh ideas keep you curious.', change({ intelligence: .4 }))] },
-    { id: 'elder_fall', name: 'A fall at home', description: 'A loss of balance means slowing down while you recover.', kind: 'negative', statFactors: [low('strength'), low('health')], ...change({ attractiveness: -.3, stability: -.2 }), years: 2, focusLimits: { standard: { self: 2 } } },
+    { id: 'elder_fall', name: 'A fall at home', description: 'A loss of balance means slowing down while you recover.', kind: 'negative', statFactors: [low('strength'), low('health')], ...change({ attractiveness: -.3, stability: -.2 }), years: 2, focusCapacity: { standard: { self: -2, sports: -1 } } },
     { id: 'elder_perspective', name: 'Talking through an old disagreement', description: 'An old friend asks to revisit a long-standing disagreement. You keep the conversation calm, listen without rushing to defend yourself, and find a way to reconnect.', statFactors: [high('stability')], ...change({ social: .2 }) },
     { id: 'elder_record', name: 'Keeping a piece of your story', description: 'Your family suggests recording some of your memories.', focusFactors: ['family'], choices: [choice('write', 'Write them down', 'Putting memories into words becomes a creative project.', change({ creativity: .4, intelligence: .15 })), choice('tell', 'Share the stories together', 'An afternoon of conversation brings everyone closer.', change({ social: .35 }))] },
   ]),
@@ -223,7 +234,7 @@ export const EVENTS = [
   ]),
   ...group('Growing up', { minAge: 2, maxAge: 3, baseChance: .008, kind: 'neutral' }, [
     { id: 'toddler_swim_class', name: 'A place in swimming lessons', description: 'The local pool offers you a place in supervised swimming lessons during your usual screen time.', toddlerFocusFactors: ['work'], choices: [
-      choice('swim', 'Take the lessons', 'Practice swimming instead of using electronics.', { ...change({ strength: .4, health: .15 }), ...temporary({}), focusLimits: { toddler: { social: 1 } } }),
+      choice('swim', 'Take the lessons', 'Practice swimming instead of using electronics.', { ...change({ strength: .4, health: .15 }), ...temporary({}), focusCapacity: { toddler: { social: -3 } } }),
       choice('watch', 'Watch and meet others', 'Meet other children without joining the lessons.', change({ social: .2 })),
     ] },
     { id: 'toddler_messy_paint', name: 'Invited to paint a nursery mural', description: 'A visiting artist invites you to add a picture to the nursery mural using finger paints or shape stamps.', toddlerFocusFactors: ['creative'], choices: [
@@ -235,10 +246,10 @@ export const EVENTS = [
       choice('separate', 'Play separately', 'Keep your own toys but miss time together.', change({ social: -.15 })),
     ] },
     { id: 'toddler_nursery_days', name: 'A nursery place opens up', description: 'A local nursery offers you longer days with its play group, which would reduce your time at home.', choices: [
-      choice('full_days', 'Try full days', 'Spend more time playing with other children.', { ...change({ social: .4, strength: .2 }), ...temporary({}), focusLimits: { toddler: { family: 1 } } }),
+      choice('full_days', 'Try full days', 'Spend more time playing with other children.', { ...change({ social: .4, strength: .2 }), ...temporary({}), focusCapacity: { toddler: { family: -3 } } }),
       choice('short_days', 'Keep shorter days', 'Meet other children while keeping time at home.', change({ social: .15 })),
     ] },
-    { id: 'toddler_sore_fingers', name: 'Fingers caught in a drawer', description: 'While reaching into a drawer for craft supplies, you catch your fingers as it closes, leaving them too sore for drawing and crafts.', kind: 'negative', toddlerFocusFactors: ['creative'], ...temporary({ health: -.2 }), focusLimits: { toddler: { creative: 1 } } },
+    { id: 'toddler_sore_fingers', name: 'Fingers caught in a drawer', description: 'While reaching into a drawer for craft supplies, you catch your fingers as it closes, leaving them too sore for drawing and crafts.', kind: 'negative', toddlerFocusFactors: ['creative'], ...temporary({ health: -.2 }), focusCapacity: { toddler: { creative: -3 } } },
     { id: 'toddler_puzzle_box', name: 'A puzzle box from a neighbor', description: 'A neighbor gives you a handmade puzzle box, but one stubborn piece refuses to fit.', toddlerFocusFactors: ['creative'], choices: [
       choice('persist', 'Keep trying alone', 'Solve more of the puzzle through frustrating trial and error.', change({ intelligence: .35 })),
       choice('ask', 'Ask someone to help', 'Solve the puzzle together.', change({ intelligence: .2, social: .15 })),
@@ -246,7 +257,7 @@ export const EVENTS = [
   ]),
   ...group('School', { minAge: 5, maxAge: 12, conditions: ['school'], baseChance: .006, kind: 'neutral' }, [
     { id: 'school_garden', name: 'School garden', description: 'The school garden needs a planting crew and a design.', choices: [
-      choice('plant', 'Join the planting crew', 'Work outdoors during your usual free time.', { ...change({ strength: .3, health: .2 }), ...temporary({}), focusLimits: { standard: { self: 2 } } }),
+      choice('plant', 'Join the planting crew', 'Work outdoors during your usual free time.', { ...change({ strength: .3, health: .2 }), ...temporary({}), focusCapacity: { standard: { self: -2, sports: -1 } } }),
       choice('design', 'Design the planting plan', 'Plan where the plants should grow.', change({ intelligence: .25, creativity: .2 })),
     ] },
     { id: 'school_friend_moves', name: 'A friend moves away', description: 'A close friend leaves your school.', kind: 'negative', focusFactors: ['social'], ...temporary({ social: -.4, stability: -.3 }, 2) },
@@ -255,7 +266,7 @@ export const EVENTS = [
       choice('explain', 'Explain what happened', 'Ask for help and accept an incomplete result.', change({ social: .2, intelligence: -.15 })),
     ] },
     { id: 'school_class_representative', name: 'Class representative', description: 'Your class needs someone to speak at school meetings.', focusFactors: ['social'], choices: [
-      choice('stand', 'Stand for the role', 'Practice speaking while meetings reduce family time.', { ...change({ social: .45 }), ...temporary({}), focusLimits: { standard: { family: 2 } } }),
+      choice('stand', 'Stand for the role', 'Practice speaking while meetings reduce family time.', { ...change({ social: .45 }), ...temporary({}), focusCapacity: { standard: { family: -2 } } }),
       choice('poster', 'Design a campaign poster', 'Help a classmate communicate their ideas.', change({ creativity: .3, social: .1 })),
     ] },
   ]),
@@ -269,37 +280,44 @@ export const EVENTS = [
       choice('solo', 'Make music alone', 'Keep creative control with less time around friends.', change({ social: -.2 })),
     ] },
     { id: 'teen_group_chat', name: 'An overwhelming group chat', description: 'Constant messages interrupt your downtime.', focusFactors: ['social'], kind: 'negative', choices: [
-      choice('mute', 'Mute the chat', 'Protect your downtime and step back from the group.', { ...change({}), ...temporary({}), focusLimits: { standard: { social: 1 } } }),
+      choice('mute', 'Mute the chat', 'Protect your downtime and step back from the group.', { ...change({}), ...temporary({}), focusCapacity: { standard: { social: -3 } } }),
       choice('reply', 'Keep replying', 'Stay involved while the interruptions continue.', { ...change({ social: .3 }), ...temporary({}) }),
     ] },
     { id: 'teen_first_aid', name: 'A first-aid course at the fire station', description: 'The fire station offers a first-aid course during your free afternoons.', focusFactors: ['self'], choices: [
-      choice('train', 'Take the course', 'Learn practical skills during your usual personal time.', { ...change({ intelligence: .35, health: .25 }), ...temporary({}), focusLimits: { standard: { self: 2 } } }),
+      choice('train', 'Take the course', 'Learn practical skills during your usual personal time.', { ...change({ intelligence: .35, health: .25 }), ...temporary({}), focusCapacity: { standard: { self: -2, sports: -1 } } }),
       choice('decline', 'Keep the afternoons free', 'Protect time to rest.', change({})),
     ] },
   ]),
   ...group('Everyday life', { minAge: 18, maxAge: 59, baseChance: .007, kind: 'neutral' }, [
     { id: 'college_noisy_housing', name: 'Noisy student housing', description: 'Noise carries through your poorly insulated student housing, and a quieter room is beyond your budget. The interruptions disrupt study and sleep.', statFactors: [low('lifestyle')], conditions: ['college'], kind: 'negative', ...temporary({ intelligence: -.25, stability: -.35 }) },
     { id: 'college_field_study', name: 'Field study offer', description: 'A field study placement would take you away from home.', conditions: ['college'], focusFactors: ['work'], choices: [
-      choice('travel', 'Take the placement', 'Learn through fieldwork while spending less time with family.', { ...change({ intelligence: .45, strength: .2 }), ...temporary({}), focusLimits: { standard: { family: 1 } } }),
+      choice('travel', 'Take the placement', 'Learn through fieldwork while spending less time with family.', { ...change({ intelligence: .45, strength: .2 }), ...temporary({}), focusCapacity: { standard: { family: -3 } } }),
       choice('local', 'Research locally', 'Study the same topic close to home.', change({ intelligence: .25, creativity: .1 })),
     ] },
-    { id: 'work_commute_disrupted', name: 'Your usual route closes', description: 'Repairs close your usual route to work. With no affordable alternative transport, the long detour cuts into your working time.', statFactors: [low('lifestyle')], conditions: ['employed'], kind: 'negative', ...temporary({}), focusLimits: { standard: { work: 3 } } },
+    { id: 'work_commute_disrupted', name: 'Your usual route closes', description: 'Repairs close your usual route to work. With no affordable alternative transport, the long detour cuts into your working time.', statFactors: [low('lifestyle')], conditions: ['employed'], kind: 'negative', ...temporary({}), focusCapacity: { standard: { work: -1 } } },
     { id: 'community_kitchen', name: 'Community kitchen', description: 'A community kitchen needs organizers and cooks.', focusFactors: ['social'], choices: [
-      choice('organize', 'Organize the shifts', 'Coordinate volunteers while giving up some family time.', { ...change({ social: .4, strength: .2 }), ...temporary({}), focusLimits: { standard: { family: 2 } } }),
+      choice('organize', 'Organize the shifts', 'Coordinate volunteers while giving up some family time.', { ...change({ social: .4, strength: .2 }), ...temporary({}), focusCapacity: { standard: { family: -2 } } }),
       choice('cook', 'Learn to cook there', 'Practice cooking without a regular commitment.', change({ health: .25, intelligence: .15 })),
     ] },
   ]),
   ...group('Later years', { minAge: 60, maxAge: 83, baseChance: .008, kind: 'neutral' }, [
     { id: 'elder_safer_home', name: 'Volunteers make your home safer', description: 'A volunteer team installs brighter lights and clears awkward walkways, making it easier to move around your home.', kind: 'positive', ...temporary({ health: .3, strength: .15 }, 2) },
     { id: 'elder_walking_group', name: 'Walking group', description: 'A regular walking group meets during family visiting time.', focusFactors: ['self'], choices: [
-      choice('regular', 'Join the regular walks', 'Build a routine with the group.', { ...change({ strength: .3, health: .2 }), ...temporary({}), focusLimits: { standard: { family: 2 } } }),
+      choice('regular', 'Join the regular walks', 'Build a routine with the group.', { ...change({ strength: .3, health: .2 }), ...temporary({}), focusCapacity: { standard: { family: -2 } } }),
       choice('occasional', 'Walk when you can', 'Stay active without a fixed schedule.', change({ health: .15, social: .1 })),
     ] },
     { id: 'elder_photo_archive', name: 'A box of family photographs arrives', description: 'A relative brings you a box of old family photographs and asks for help identifying and preserving them.', focusFactors: ['family'], choices: [
-      choice('digitize', 'Create a digital archive', 'Learn new tools while spending less time out with friends.', { ...change({ intelligence: .3, creativity: .35 }), ...temporary({}), focusLimits: { standard: { social: 2 } } }),
+      choice('digitize', 'Create a digital archive', 'Learn new tools while spending less time out with friends.', { ...change({ intelligence: .3, creativity: .35 }), ...temporary({}), focusCapacity: { standard: { social: -2 } } }),
       choice('gather', 'Invite people to identify them', 'Share the work and the memories.', change({ social: .3 })),
     ] },
-    { id: 'elder_heatwave', name: 'Struggling through a heatwave', description: 'During a heatwave, you become weak and unwell in the heat. The difficulty tolerating it limits outings and disrupts sleep.', kind: 'negative', statFactors: [low('health')], ...temporary({ stability: -.2 }), focusLimits: { standard: { social: 3 } } },
+    { id: 'elder_heatwave', name: 'Struggling through a heatwave', description: 'During a heatwave, you become weak and unwell in the heat. The difficulty tolerating it limits outings and disrupts sleep.', kind: 'negative', statFactors: [low('health')], ...temporary({ stability: -.2 }), focusCapacity: { standard: { social: -1 } } },
+  ]),
+  ...group('Time commitments', { baseChance: .006, kind: 'neutral' }, [
+    { id: 'school_catch_up_sessions', name: 'Required catch-up sessions', description: 'Your teacher schedules regular catch-up sessions after unfinished assignments, reserving study time in the coming year.', minAge: 5, maxAge: 16, conditions: ['school', 'poorSchoolGrade'], focusMinimums: { standard: { work: 2 } }, years: 1 },
+    { id: 'family_recovery_visits', name: 'A relative needs recovery visits', description: 'A relative returns home after surgery, and you take a regular turn bringing meals and helping around the house.', minAge: 18, maxAge: 83, focusMinimums: { standard: { family: 1 } }, years: 1 },
+    { id: 'toddler_rest_schedule', name: 'A prescribed rest schedule', description: 'After an exhausting illness, a doctor asks your caregivers to protect a daily rest period while you recover.', minAge: 2, maxAge: 3, focusMinimums: { toddler: { self: 1 } }, years: 1 },
+    { id: 'school_quiet_study_room', name: 'A quiet room for studying', description: 'The library gives you a regular quiet-room slot, making it easier to study around disruptions to your usual schedule.', minAge: 5, maxAge: 16, conditions: ['school'], kind: 'positive', focusCapacity: { standard: { work: 1 } }, years: 1 },
+    { id: 'family_shared_errands', name: 'A relative shares the errands', description: 'A relative offers to share routine errands, easing the scheduling problems that have limited your family time.', minAge: 18, maxAge: 83, kind: 'positive', focusCapacity: { standard: { family: 1 } }, years: 1 },
   ]),
   ...group('School activities', { minAge: 5, maxAge: 17, conditions: ['school'], baseChance: .008, minFocus: 1, kind: 'positive' }, [
     { id: 'school_sports_injury', name: 'An accident at practice', description: 'You hit your face during sports practice and are left with a small scar.', activityFocus: 'sports', kind: 'negative', ...change({ attractiveness: -.3 }) },
@@ -311,6 +329,26 @@ export const EVENTS = [
     { id: 'school_friends_outing', name: 'Friends invite you on an outing', description: 'Friends include you in a weekend outing, and shared games and conversation bring you closer.', activityFocus: 'social', ...change({ social: .2 }) },
     { id: 'family_recipe_lesson', name: 'A relative teaches you a family recipe', description: 'A relative invites you into the kitchen to prepare a family recipe and encourages you to invent your own variation.', activityFocus: 'family', ...change({ creativity: .2 }) },
   ]),
+  // These bands describe fictional gameplay states, not diagnoses. Everyday
+  // setbacks, major disruptions, and help have different sizes and odds.
+  ...group('Mental stability', { minAge: 5, maxAge: 84, minStability: 7, baseChance: .008, kind: 'positive', severity: 'minor', statFactors: [high('stability')] }, [
+    { id: 'mental_newcomer_welcome', name: 'A newcomer joins your table', description: 'A newcomer sits alone at a group activity. You introduce yourself and help them join the conversation, giving you both someone to talk to.', ...change({ social: .2 }) },
+    { id: 'mental_friend_mediation', name: 'Friends ask you to settle a disagreement', description: 'Two friends ask you to sit with them after a disagreement. You keep the conversation calm and help them hear each other out.', minAge: 8, baseChance: .006, ...change({ social: .2 }) },
+    { id: 'mental_community_host', name: 'Asked to host the community evening', description: 'An organizer notices how calmly you handle a last-minute change and asks you to host a community evening. Planning introductions and activities gives you practice bringing people together.', minAge: 13, baseChance: .005, severity: 'moderate', ...change({ social: .45, creativity: .2 }) },
+    { id: 'mental_emergency_volunteer', name: 'Coordinating help after a flood', description: 'After flooding closes a local meeting hall, volunteers notice your calm response and ask you to coordinate a temporary gathering place. You organize deliveries and keep worried neighbors informed, building lasting confidence and connections.', minAge: 18, minStability: 8, baseChance: .003, severity: 'major', ...change({ social: .7, intelligence: .3 }) },
+  ]),
+  ...group('Mental stability', { minAge: 5, maxAge: 84, maxStability: 4, baseChance: .008, kind: 'negative', severity: 'minor', statFactors: [low('stability')] }, [
+    { id: 'mental_leave_gathering', name: 'Leaving a gathering early', description: 'Anxiety becomes overwhelming during a gathering, and you leave before the shared games begin. Missing the conversations leaves you feeling less connected.', baseChance: .009, ...change({ social: -.2 }) },
+    { id: 'mental_missed_meetup', name: 'A missed meeting with a friend', description: 'You become too overwhelmed to answer messages about a planned meetup. Your friend waits, then leaves, and the missed chance to talk puts distance between you.', minAge: 13, ...change({ social: -.25 }) },
+    { id: 'mental_missed_deadline', name: 'A project slips out of reach', description: 'Persistent distress interrupts your work on a group project. You miss the final preparation sessions and deadline, losing practice and facing a difficult conversation about what happened.', minAge: 13, maxStability: 3, baseChance: .006, severity: 'moderate', ...change({ intelligence: -.35 }), focusCapacity: { standard: { work: -1 } }, years: 1 },
+    { id: 'mental_inpatient_admission', name: 'An involuntary psychiatric admission', description: 'During an acute mental-health crisis, you are admitted to a secure psychiatric ward against your wishes. Treatment helps you regain stability, but an extended stay away from friends interrupts your social life and usual commitments.', minAge: 13, maxStability: 2, baseChance: .003, severity: 'major', ...change({ social: -1.1 }), focusCapacity: { standard: { work: -2, social: -2 } }, focusMinimums: { standard: { self: 2 } }, years: 1 },
+    { id: 'mental_long_withdrawal', name: 'A group moves on without you', description: 'During a prolonged period of severe distress, you withdraw from a creative group and stop answering invitations. After months of missed sessions, the group gives your place to someone else, costing you friendships and creative practice.', minAge: 13, maxStability: 2, baseChance: .004, severity: 'major', ...change({ social: -.9, creativity: -.4 }), focusCapacity: { standard: { social: -1, work: -1 } }, years: 1 },
+  ]),
+  ...group('Mental stability', { minAge: 8, maxAge: 84, maxStability: 4, baseChance: .008, kind: 'positive', severity: 'minor', statFactors: [low('stability')] }, [
+    { id: 'mental_friend_check_in', name: 'A friend checks in after your absence', description: 'After distress keeps you away from a familiar activity, a friend comes to see you and listens without rushing you. A quiet conversation makes it easier to stay in touch.', ...change({ social: .15 }) },
+    { id: 'mental_counseling_place', name: 'A counselor offers regular support', description: 'After you seek help for distress disrupting your days, a counselor offers regular appointments and helps you make a plan. The sessions bring relief and reserve time for your recovery.', minAge: 13, baseChance: .006, severity: 'moderate', ...change({}), focusMinimums: { standard: { self: 1 } }, years: 1 },
+    { id: 'mental_supported_return', name: 'Support for returning to a group', description: 'A support worker and a trusted friend arrange to accompany you back to a community group after a difficult period. Regular check-ins and a welcoming place to return to help you rebuild stability and connections.', minAge: 13, maxStability: 3, baseChance: .003, severity: 'major', ...change({ social: .45 }), focusCapacity: { standard: { social: 1 } }, years: 1 },
+  ]),
 ];
 
 const SPORTS_JOBS = new Set(['athlete', 'personal_trainer', 'sports_coach', 'yoga_instructor', 'lifeguard', 'dance_instructor', 'outdoor_guide']);
@@ -321,8 +359,20 @@ function activityFocusPoints(event, state) {
   return Number.isFinite(points) ? Math.max(0, Math.min(focusMaxFor(state, event.activityFocus), points)) : 0;
 }
 
-function eligible(event, state, job) {
+function eligible(event, state, job, stats) {
   if (state.age < event.minAge || state.age > (event.maxAge ?? Infinity)) return false;
+  for (const [key, maximum] of Object.entries(event.maxStats || {})) {
+    const value = key === 'lifestyle' ? state.lifestyle : stats?.[key];
+    if (!Number.isFinite(value) || value > maximum) return false;
+  }
+  // Grade gates must precede low-stat pool adjustment so unavailable outcomes
+  // cannot take probability away from events that can actually occur.
+  if (event.id === 'good_grades' || event.id === 'poor_grades') {
+    const score = state.age >= 5 && state.age < 18 ? gradeScore(state.focus.work, stats.intelligence) : null;
+    if (event.id === 'good_grades' ? !(score >= 90) : !(score !== null && score < 70)) return false;
+  }
+  if ((event.minStability !== undefined || event.maxStability !== undefined)
+      && (!Number.isFinite(stats?.stability) || stats.stability < (event.minStability ?? -Infinity) || stats.stability > (event.maxStability ?? Infinity))) return false;
   if (Object.entries(event.aptitudeChanges || {}).some(([key, amount]) => amount > 0 ? (state.aptitudes?.[key] || 0) >= 3 : (state.aptitudes?.[key] || 0) <= -3)) return false;
   if (event.activityFocus) {
     if (activityFocusPoints(event, state) < (event.minFocus || 1)) return false;
@@ -331,6 +381,7 @@ function eligible(event, state, job) {
   }
   return (event.conditions || []).every(condition => {
     if (condition === 'school') return state.age >= 5 && state.age < 18;
+    if (condition === 'poorSchoolGrade') return Boolean(state.school) && gradeScore(state.focus.work, stats.intelligence) < 70;
     // Keep old minAge metadata valid for choices already queued in saved lives.
     if (condition === 'schoolAge') return state.age >= 5;
     if (condition === 'college') return state.education?.status === 'college';
@@ -349,8 +400,9 @@ export function eventChances(state, stats, job) {
   const focus = state.age < 2 ? { work: 0, social: 0, family: 0, self: 0 } : Object.fromEntries(Object.entries(state.focus || {}).map(([key, value]) => [key,
     legacyFocusValue(state.age >= 5 && state.age < 18 && ['sports', 'extracurricular'].includes(key) ? value * 2 : value,
       state.age < 5 && !['work', 'self'].includes(key) ? 2 : 3)]));
-  return EVENTS.map(event => {
-    let chance = inactive || !eligible(event, state, job) ? 0 : event.baseChance * (event.rare ? 1 : PERSONAL_EVENT_RATE_MULTIPLIER);
+  const rates = EVENTS.map(event => {
+    let chance = inactive || !eligible(event, state, job, stats) ? 0 : event.baseChance * (event.rare ? 1 : PERSONAL_EVENT_RATE_MULTIPLIER);
+    if (!chance) return { id: event.id, name: event.name, chance: 0 };
     if (event.activityFocus) chance *= activityFocusPoints(event, state);
     const focusFactors = state.age < 5 && event.toddlerFocusFactors
       || state.age >= 5 && state.age < 18 && event.schoolFocusFactors || event.focusFactors || [];
@@ -364,4 +416,5 @@ export function eventChances(state, stats, job) {
     if (job && event.jobFactors?.[job.id]) chance *= event.jobFactors[job.id];
     return { id: event.id, name: event.name, chance: Math.min(event.rare ? .0006 : .18, chance) };
   });
+  return boostLowStatRates(EVENTS, rates, { ...stats, lifestyle: state.lifestyle });
 }

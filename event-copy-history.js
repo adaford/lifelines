@@ -266,7 +266,7 @@ export const LEGACY_EVENT_COPY = [
   {"name":"Cooking together","description":"{name} teaches you to prepare a simple meal."},
   {"name":"Changed household schedule","description":"A schedule change leaves {name} with less time at home."},
   {"name":"Separate travel plans","description":"You and {name} want different trips.","choices":[{"label":"Plan a shared trip","description":"A longer trip leaves less time for work."},{"label":"Travel separately","description":"You pursue different interests and spend less time together."}]},
-  // Authored copy retained from before the event-causality audit.
+  // Copies retained by the event-causality review; ids link old titles to corrected factors.
   {"id":"aptitude_health_stability_gain","name":"A storm on the trail","description":"A sudden storm strands your walking group; a ranger guides you to shelter and teaches you how to stay calm under pressure."},
   {"id":"aptitude_health_stability_loss","name":"Another cancelled hospital visit","description":"An understaffed clinic repeatedly cancels your follow-up visits during an illness, leaving you frightened of facing another setback."},
   {"id":"aptitude_health_attractiveness_gain","name":"A place in the outdoor portrait project","description":"A photographer recruits you during a community walk and spends several sessions helping you with posture and presentation."},
@@ -361,6 +361,11 @@ export const LEGACY_EVENT_COPY = [
   {"id":"college_noisy_housing","name":"Noisy student housing","description":"Noise in your building interrupts study and sleep."},
   {"id":"work_commute_disrupted","name":"Your usual route closes","description":"Repairs close your usual route to work, and the long detour cuts into your working time."},
   {"id":"elder_heatwave","name":"A difficult heatwave","description":"Persistent heat limits outings and disrupts sleep."},
+  {"id":"mental_emergency_volunteer","name":"Coordinating help after a flood","description":"When flooding closes a local meeting hall, volunteers ask you to coordinate a temporary gathering place. You organize deliveries and keep worried neighbors informed, building lasting confidence and connections."},
+  {"id":"mental_friend_check_in","name":"A friend checks in after your absence","description":"After you miss a familiar activity, a friend comes to see you and listens without rushing you. A quiet conversation makes it easier to stay in touch."},
+  {"id":"mental_counseling_place","name":"A counseling place becomes available","description":"A counselor offers you a regular appointment and helps you make a plan for the problems disrupting your days. The sessions bring relief and reserve time for your recovery."},
+  {"id":"household_parent_counselling_place","name":"A parent starts regular counseling","description":"A canceled appointment opens a place for {name} in regular counseling. Talking through their difficulties helps them reconnect with you at home."},
+  {"id":"household_parent_respite_help","name":"Practical help through a difficult spell","description":"A family support worker arranges meals and regular respite for {name}, giving them room to recover and restoring more comfortable routines for you."},
   {"id":"household_parent_sleepless","name":"Night works outside your window","description":"Overnight road repairs keep waking you and {name}; lost sleep leaves home tense and exhausting."},
   {"id":"household_parent_support","name":"A neighbor brings meals","description":"A neighbor brings cooked meals and helps {name} with the laundry for a few weeks, giving you both a calmer home."},
   {"id":"household_partner_learning","name":"A tutor offers extra sessions","description":"A volunteer tutor invites {name} to a small study group, helping them tackle difficult material with more confidence."},

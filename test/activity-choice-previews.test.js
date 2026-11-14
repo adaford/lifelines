@@ -36,14 +36,14 @@ function selected(state, activity, points) {
 
 test('activity previews show stronger gains and losses without changing relative signs', () => {
   const cases = [
-    ['work', 4, 'strength', .52, 3],
-    ['work', 0, 'strength', -.52, 3],
-    ['social', 0, 'social', .19, 2],
-    ['social', 4, 'intelligence', .62, 4],
-    ['creative', 0, 'intelligence', -.16, 1],
-    ['creative', 4, 'creativity', .57, 3],
-    ['self', 4, 'health', .45, 3],
-    ['self', 0, 'stability', -.36, 3],
+    ['work', 4, 'strength', .26, 3],
+    ['work', 0, 'strength', -.26, 3],
+    ['social', 0, 'social', .09, 2],
+    ['social', 4, 'intelligence', .31, 4],
+    ['creative', 0, 'intelligence', -.08, 1],
+    ['creative', 4, 'creativity', .28, 3],
+    ['self', 4, 'health', .23, 3],
+    ['self', 0, 'stability', -.18, 3],
   ];
   for (const [activity, points, stat, expected, level] of cases) {
     const entries = toddlerChoiceImpacts(selected(toddler(), activity, points), activity);
@@ -59,9 +59,9 @@ test('activity previews show stronger gains and losses without changing relative
       const relationship = entries.find(entry => entry.parentId === parent.id && entry.stat === 'relationship');
       const stability = entries.find(entry => entry.parentId === parent.id && entry.stat === 'stability');
       if (points === 2) assert.equal(relationship, undefined);
-      else assert.ok(Math.abs(relationship.change - focusEffect(points) * .04) < 1e-10);
+      else assert.ok(Math.abs(relationship.change - focusEffect(points) * .02) < 1e-10);
       if (points === 2) assert.equal(stability, undefined);
-      else assert.ok(Math.abs(stability.change - (Math.round((5 + focusEffect(points) * .0125) * 100) / 100 - 5)) < 1e-10);
+      else assert.ok(Math.abs(stability.change - (Math.round((5 + focusEffect(points) * .00625) * 100) / 100 - 5)) < 1e-10);
     }
   }
 });
@@ -151,7 +151,7 @@ test('toddler skill changes are proportional to displayed signs before aptitude 
         const actual = skillChanges(candidate)[stat] - neutral;
         const entry = toddlerChoiceImpacts(candidate, activity).find(entry => entry.stat === stat);
         if (!entry) assert.ok(Math.abs(actual) < 1e-10, `${activity} ${points}: hidden effect is neutral`);
-        else assert.ok(Math.abs(actual / (Math.sign(entry.change) * entry.level) - Math.abs(coefficients[stat]) * .5 * 1.15 / toddlerActivityImpacts(activity).find(item => item.stat === stat).level) < 1e-10,
+        else assert.ok(Math.abs(actual / (Math.sign(entry.change) * entry.level) - Math.abs(coefficients[stat]) * .25 * 1.15 / toddlerActivityImpacts(activity).find(item => item.stat === stat).level) < 1e-10,
           `${activity} ${points}: each displayed sign has one equal raw skill contribution`);
       }
     }
@@ -172,7 +172,10 @@ test('every activity follows reduced-point ranks and increased-point endpoints a
         const steps = stat => activity === 'social' ? (points - 2) * (stat === 'intelligence' ? 2 : 1) : activity === 'creative' && stat === 'intelligence' ? [-1, 0, 0, 0, 1][points] : focusEffect(points);
         const expected = Object.entries(coefficients).map(([stat, coefficient]) => ({ stat, direction: Math.sign(coefficient) }));
         if (activity === 'family') for (const parent of state.parents) {
-          expected.push({ stat: 'stability', parentId: parent.id, direction: 1 });
+          const raw = steps('stability') * .00625;
+          const aptitude = parent.aptitudes.stability;
+          const response = raw * (raw >= 0 ? 1 + aptitude * .08 : 1 - aptitude * .07);
+          if (Math.round((5 + response) * 100) / 100 !== 5) expected.push({ stat: 'stability', parentId: parent.id, direction: 1 });
           expected.push({ stat: 'relationship', parentId: parent.id, direction: 1 });
         }
         for (const { stat, parentId, direction } of expected) {

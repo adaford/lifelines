@@ -1,10 +1,12 @@
+import { lifestyleFromResources } from './lifestyle.js?v=parent-colors-events';
+import { CAREER_PROFILES } from './career-profiles.js?v=parent-colors-events';
 // Fictional career balance for Lifelines, not real-world salary guidance.
 // Job affinities describe skill importance (+1 useful, +2 important, +3 central).
 // Character affinities remain the separate -3 to +3 learning-rate trait.
 // College gates are simplified game qualifications, not licensing advice.
 const COLLEGE_ROLES = new Set([
   'engineer', 'data_analyst', 'cybersecurity_analyst', 'network_engineer',
-  'game_developer', 'robotics_engineer', 'cloud_architect', 'ai_researcher',
+  'game_developer', 'robotics_engineer', 'cloud_architect', 'ai_researcher', 'computer_scientist',
   'doctor', 'nurse', 'pharmacist', 'dentist', 'physiotherapist', 'veterinarian',
   'psychologist', 'surgeon', 'medical_lab_technician',
   'accountant', 'financial_analyst', 'hr_specialist', 'marketing_manager',
@@ -18,12 +20,15 @@ const COLLEGE_ROLES = new Set([
 
 function category(name, rows) {
   return rows.map(([id, title, baseSalary, minAge, affinities, requirements, description]) => {
+    const career = CAREER_PROFILES[id];
+    if (!career) throw new Error(`Missing career profile: ${id}`);
     const total = Object.values(affinities).reduce((sum, value) => sum + value, 0);
     return {
       id, name: title, category: name, description, minAge, requirements, affinities,
       requiresCollege: COLLEGE_ROLES.has(id),
       weights: Object.fromEntries(Object.entries(affinities).map(([skill, value]) => [skill, value / total])),
-      baseLifestyle: Math.round(Math.max(0, Math.min(10, 1 + baseSalary / 22000)) * 100) / 100,
+      baseLifestyle: lifestyleFromResources(baseSalary, 0),
+      ...career, maxLifestyle: lifestyleFromResources(career.maxSalary, 0),
       baseSalary,
     };
   });
@@ -46,12 +51,12 @@ export const JOBS = [
     ['builder', 'Construction worker', 46000, 18, { strength: 3, intelligence: 2 }, { strength: 3 }, 'Build solid foundations through physical effort and reliable teamwork.'],
     ['electrician', 'Electrician', 58000, 21, { intelligence: 3, strength: 1, creativity: 1 }, { intelligence: 4 }, 'Find faults and bring power to homes, workshops, and buildings.'],
     ['plumber', 'Plumber', 56000, 21, { intelligence: 3, strength: 2, social: 1 }, { intelligence: 4, strength: 3 }, 'Solve practical problems that keep water flowing where it belongs.'],
-    ['carpenter', 'Carpenter', 48000, 18, { strength: 2, creativity: 3, intelligence: 1 }, { creativity: 3, strength: 3 }, 'Shape timber into useful things with care and a practiced eye.'],
+    ['carpenter', 'Carpenter', 48000, 18, { intelligence: 3, strength: 2, creativity: 1 }, { creativity: 3, strength: 3 }, 'Shape timber into useful things with care and a practiced eye.'],
     ['mechanic', 'Vehicle mechanic', 50000, 18, { intelligence: 3, strength: 2, creativity: 1 }, { intelligence: 3 }, 'Diagnose a strange noise and get the wheels turning again.'],
-    ['welder', 'Welder', 52000, 18, { strength: 3, intelligence: 2, creativity: 1 }, { intelligence: 4, strength: 3 }, 'Join metal with patience, steady technique, and attention to detail.'],
+    ['welder', 'Welder', 52000, 18, { intelligence: 3, strength: 2 }, { intelligence: 4, strength: 3 }, 'Join metal with patience, steady technique, and attention to detail.'],
     ['truck_driver', 'Truck driver', 45000, 21, { intelligence: 3, strength: 1, social: 1 }, { intelligence: 4 }, 'Keep goods moving across long routes and changing conditions.'],
     ['warehouse_associate', 'Warehouse associate', 28000, 18, { strength: 3, intelligence: 2 }, {}, 'Keep stock organized and deliveries moving on a tight schedule.'],
-    ['crane_operator', 'Crane operator', 72000, 21, { intelligence: 3, strength: 1, social: 1 }, { intelligence: 5 }, 'Place heavy loads exactly where a construction team needs them.'],
+    ['crane_operator', 'Crane operator', 72000, 21, { intelligence: 3, social: 2 }, { intelligence: 5 }, 'Place heavy loads exactly where a construction team needs them.'],
     ['aircraft_technician', 'Aircraft technician', 82000, 21, { intelligence: 3, strength: 1, creativity: 1 }, { intelligence: 5 }, 'Inspect complex systems and keep aircraft ready for the next flight.'],
   ]),
   ...category('Technology', [
@@ -60,9 +65,10 @@ export const JOBS = [
     ['cybersecurity_analyst', 'Cybersecurity analyst', 98000, 21, { intelligence: 3, creativity: 2, social: 1 }, { intelligence: 6, creativity: 5 }, 'Spot weak points and protect systems from digital threats.'],
     ['network_engineer', 'Network engineer', 78000, 21, { intelligence: 3, social: 2 }, { intelligence: 5, social: 3 }, 'Keep devices connected and untangle problems when connections fail.'],
     ['game_developer', 'Game developer', 76000, 21, { intelligence: 3, creativity: 3, social: 1 }, { intelligence: 5, creativity: 5 }, 'Turn rules, worlds, and ideas into something people can play.'],
-    ['robotics_engineer', 'Robotics engineer', 108000, 25, { intelligence: 3, creativity: 2, strength: 1 }, { intelligence: 7, creativity: 5 }, 'Give machines the precision and intelligence to act in the real world.'],
+    ['robotics_engineer', 'Robotics engineer', 108000, 25, { intelligence: 3, creativity: 2, social: 1 }, { intelligence: 7, creativity: 5 }, 'Give machines the precision and intelligence to act in the real world.'],
     ['cloud_architect', 'Cloud architect', 140000, 25, { intelligence: 3, creativity: 2, social: 1 }, { intelligence: 7, creativity: 5 }, 'Design reliable digital infrastructure that can grow with demand.'],
     ['ai_researcher', 'AI researcher', 158000, 25, { intelligence: 3, creativity: 3, social: 1 }, { intelligence: 8, creativity: 6 }, 'Explore new ways for software to learn and solve difficult problems.'],
+    ['computer_scientist', 'Computer scientist', 112000, 25, { intelligence: 3, creativity: 3, social: 1 }, { intelligence: 7, creativity: 5 }, 'Investigate computing problems, test new methods and explain research findings to colleagues.'],
     ['qa_tester', 'Software tester', 48000, 18, { intelligence: 3, creativity: 2 }, { intelligence: 3, creativity: 3 }, 'Find the overlooked bugs before they become someone else’s problem.'],
     ['technical_support', 'Technical support specialist', 40000, 18, { intelligence: 2, social: 3 }, { intelligence: 3, social: 2 }, 'Translate frustrating technical problems into clear next steps.'],
   ]),
@@ -75,18 +81,18 @@ export const JOBS = [
     ['physiotherapist', 'Physiotherapist', 74000, 21, { intelligence: 2, social: 3, strength: 2 }, { intelligence: 4, social: 4 }, 'Help people rebuild movement through patient, practical coaching.'],
     ['veterinarian', 'Veterinarian', 92000, 25, { intelligence: 3, social: 2, strength: 1 }, { intelligence: 6, social: 4 }, 'Care for animals while helping their owners understand what comes next.'],
     ['psychologist', 'Psychologist', 90000, 25, { intelligence: 3, social: 3 }, { intelligence: 6, social: 6 }, 'Listen closely and help people understand difficult patterns in their lives.'],
-    ['surgeon', 'Surgeon', 184000, 30, { intelligence: 3, strength: 1, social: 1, creativity: 1 }, { intelligence: 8, strength: 4 }, 'Bring exceptional focus and precision to complex operations.'],
+    ['surgeon', 'Surgeon', 184000, 30, { intelligence: 3, social: 2, creativity: 1 }, { intelligence: 8, strength: 4 }, 'Bring exceptional focus and precision to complex operations.'],
     ['medical_lab_technician', 'Medical laboratory technician', 54000, 21, { intelligence: 3, creativity: 1 }, { intelligence: 4, creativity: 2 }, 'Produce reliable test results from careful laboratory work.'],
   ]),
   ...category('Business & finance', [
-    ['sales', 'Sales representative', 54000, 18, { social: 3, attractiveness: 2, intelligence: 1 }, { social: 4 }, 'Build trust and connect people with something they can use.'],
+    ['sales', 'Sales representative', 54000, 18, { social: 3, intelligence: 3 }, { social: 4 }, 'Build trust and connect people with something they can use.'],
     ['accountant', 'Accountant', 60000, 21, { intelligence: 3, social: 1 }, { intelligence: 4 }, 'Make the numbers add up and turn records into dependable reports.'],
     ['financial_analyst', 'Financial analyst', 78000, 21, { intelligence: 3, social: 2 }, { intelligence: 5, social: 3 }, 'Compare possibilities and explain the tradeoffs behind financial decisions.'],
     ['insurance_broker', 'Insurance broker', 64000, 21, { social: 3, intelligence: 2 }, { social: 4, intelligence: 3 }, 'Help clients understand risks and choose protection that fits their needs.'],
     ['hr_specialist', 'Human resources specialist', 56000, 21, { social: 3, intelligence: 2 }, { social: 4, intelligence: 3 }, 'Support people through hiring, workplace questions, and difficult conversations.'],
     ['marketing_manager', 'Marketing manager', 92000, 25, { creativity: 3, social: 3, intelligence: 2 }, { creativity: 5, social: 5 }, 'Turn an audience’s interests into a campaign people remember.'],
     ['management_consultant', 'Management consultant', 110000, 25, { intelligence: 3, social: 3, creativity: 2 }, { intelligence: 6, social: 5 }, 'Untangle organizational problems and help teams put better plans into practice.'],
-    ['real_estate_agent', 'Real estate agent', 72000, 21, { social: 3, intelligence: 2, attractiveness: 1 }, { social: 4, intelligence: 3 }, 'Match people with places and guide them through a major decision.'],
+    ['real_estate_agent', 'Real estate agent', 72000, 21, { social: 3, intelligence: 2 }, { social: 4, intelligence: 3 }, 'Match people with places and guide them through a major decision.'],
     ['investment_banker', 'Investment banker', 150000, 25, { intelligence: 3, social: 3 }, { intelligence: 7, social: 5 }, 'Coordinate complex deals under intense pressure and tight deadlines.'],
     ['actuary', 'Actuary', 116000, 25, { intelligence: 3, creativity: 1, social: 1 }, { intelligence: 7, creativity: 4 }, 'Use mathematical judgment to understand uncertain futures.'],
   ]),
@@ -97,7 +103,7 @@ export const JOBS = [
     ['journalist', 'Journalist', 52000, 21, { intelligence: 2, social: 3, creativity: 2 }, { intelligence: 4, social: 3 }, 'Ask useful questions and turn verified details into a clear story.'],
     ['photographer', 'Photographer', 44000, 18, { creativity: 3, intelligence: 2, social: 1 }, { creativity: 3 }, 'Catch a moment through patient observation and a distinctive eye.'],
     ['film_director', 'Film director', 132000, 25, { creativity: 3, social: 3, intelligence: 2 }, { creativity: 7, social: 6 }, 'Bring a cast and crew together around a shared visual story.'],
-    ['musician', 'Musician', 58000, 18, { creativity: 3, social: 2, attractiveness: 1 }, { creativity: 4, social: 3 }, 'Turn practice, emotion, and a musical idea into a performance.'],
+    ['musician', 'Musician', 58000, 18, { creativity: 3, social: 2, intelligence: 1 }, { creativity: 4, social: 3 }, 'Turn practice, emotion, and a musical idea into a performance.'],
     ['animator', 'Animator', 66000, 21, { creativity: 3, intelligence: 2 }, { creativity: 5, intelligence: 4 }, 'Give characters and worlds a sense of movement and life.'],
     ['fashion_model', 'Fashion model', 88000, 18, { attractiveness: 3, social: 2, creativity: 1 }, { attractiveness: 7, social: 4 }, 'Express a visual idea through presence, movement, and reliable preparation.'],
     ['interior_designer', 'Interior designer', 68000, 21, { creativity: 3, social: 2, intelligence: 1 }, { creativity: 4, social: 3 }, 'Shape rooms around how people want to live and feel.'],
@@ -115,7 +121,7 @@ export const JOBS = [
     ['astronomer', 'Astronomer', 98000, 25, { intelligence: 3, creativity: 3 }, { intelligence: 7, creativity: 5 }, 'Look beyond familiar horizons to understand stars and distant worlds.'],
   ]),
   ...category('Public service', [
-    ['firefighter', 'Firefighter', 56000, 21, { strength: 3, social: 2, intelligence: 1 }, { strength: 5, social: 3 }, 'Bring physical courage and practiced teamwork to dangerous emergencies.'],
+    ['firefighter', 'Firefighter', 56000, 21, { strength: 3, intelligence: 2, social: 2 }, { strength: 5, social: 3 }, 'Bring physical courage and practiced teamwork to dangerous emergencies.'],
     ['police_officer', 'Police officer', 58000, 21, { intelligence: 3, social: 2, strength: 2 }, { intelligence: 4, social: 3 }, 'Handle tense situations with sound judgment and a sense of responsibility.'],
     ['social_worker', 'Social worker', 48000, 21, { social: 3, intelligence: 2 }, { social: 4, intelligence: 3 }, 'Help people navigate difficult circumstances and find practical support.'],
     ['urban_planner', 'Urban planner', 76000, 21, { intelligence: 3, creativity: 2, social: 2 }, { intelligence: 5, creativity: 3 }, 'Balance community needs in the places people share every day.'],
@@ -127,7 +133,7 @@ export const JOBS = [
     ['emergency_dispatcher', 'Emergency dispatcher', 44000, 18, { intelligence: 3, social: 3 }, { intelligence: 4, social: 3 }, 'Listen carefully and coordinate help when every detail matters.'],
   ]),
   ...category('Sports & wellness', [
-    ['athlete', 'Professional athlete', 75000, 18, { strength: 3, social: 2, attractiveness: 1 }, { strength: 6, social: 3 }, 'Build a competitive career through physical ability and relentless practice.'],
+    ['athlete', 'Professional athlete', 75000, 18, { strength: 3, intelligence: 2, social: 1 }, { strength: 6, social: 3 }, 'Build a competitive career through physical ability and relentless practice.'],
     ['personal_trainer', 'Personal trainer', 46000, 18, { strength: 3, social: 2, intelligence: 1 }, { strength: 4, social: 3 }, 'Help clients turn consistent effort into strength and confidence.'],
     ['sports_coach', 'Sports coach', 60000, 21, { social: 3, intelligence: 2 }, { social: 4, intelligence: 4 }, 'Recognize what a team needs and bring out its best performance.'],
     ['yoga_instructor', 'Yoga instructor', 34000, 18, { strength: 3, social: 2, creativity: 1 }, { strength: 3 }, 'Guide steady movement and make space for people to reconnect with themselves.'],
@@ -143,7 +149,7 @@ export const JOBS = [
     ['chief_executive', 'Chief executive', 215000, 30, { social: 3, intelligence: 3, creativity: 2 }, { social: 8, intelligence: 7 }, 'Set a direction and take responsibility for a large organization’s future.'],
     ['judge', 'Judge', 176000, 30, { intelligence: 3, social: 2 }, { intelligence: 8, social: 6 }, 'Weigh competing arguments with care, consistency, and patient attention.'],
     ['airline_pilot', 'Airline pilot', 136000, 25, { intelligence: 3, social: 2 }, { intelligence: 6, social: 4 }, 'Guide aircraft and crew through changing conditions with steady judgment.'],
-    ['ship_captain', 'Ship captain', 120000, 25, { intelligence: 3, social: 3, strength: 1 }, { intelligence: 5, social: 4 }, 'Keep a vessel, its cargo, and its crew moving toward a safe arrival.'],
+    ['ship_captain', 'Ship captain', 120000, 25, { intelligence: 3, social: 3 }, { intelligence: 5, social: 4 }, 'Keep a vessel, its cargo, and its crew moving toward a safe arrival.'],
     ['architect', 'Architect', 104000, 25, { creativity: 3, intelligence: 3, social: 1 }, { creativity: 6, intelligence: 6 }, 'Bring imagination and structural thinking together in places people inhabit.'],
     ['product_manager', 'Product manager', 116000, 25, { social: 3, intelligence: 3, creativity: 2 }, { social: 6, intelligence: 5 }, 'Help a team decide what to build and why it will matter.'],
     ['venture_capitalist', 'Venture capitalist', 188000, 30, { intelligence: 3, social: 3, creativity: 2 }, { intelligence: 8, social: 7, creativity: 6 }, 'Recognize promising ideas and help ambitious founders find their next step.'],

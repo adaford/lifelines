@@ -55,7 +55,8 @@ test('a point-only choice immediately reduces the budget for one complete turn a
   assert.equal(state.rng, before.rng);
   assert.equal(state.age, before.age);
   assert.deepEqual(state.effects.find(entry => entry.id === id).modifiers, {});
-  assert.match(state.history[0].text, /No stat changes\. -1 focus point\. Temporary effects: 1 year\./);
+  assert.match(state.history[0].text, /Adjust the schedule\. -1 focus point\. Temporary effects: 1 year\./);
+  assert.doesNotMatch(state.history[0].text, /No stat changes/);
   assert.equal(setFocus(state, 'work', 4).ok, false);
   const saved = copy(state);
   const forecast = annualForecast(state);

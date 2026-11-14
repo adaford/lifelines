@@ -1,6 +1,9 @@
-import { assignBirthConditions } from './birth-conditions.js?v=deadline-effect';
-import { legacyFocusValue } from './focus-rules.js?v=deadline-effect';
-import { naturalSkillRating, BIRTH_VARIATION } from './development.js?v=deadline-effect';
+import { assignBirthConditions } from './birth-conditions.js?v=parent-colors-events';
+import { legacyFocusValue } from './focus-rules.js?v=parent-colors-events';
+import { naturalSkillRating, BIRTH_VARIATION } from './development.js?v=parent-colors-events';
+import { housingMeetingMultiplier } from './housing.js?v=parent-colors-events';
+import { heightReference } from './growth.js?v=parent-colors-events';
+import { normalPercentile } from './percentiles.js?v=parent-colors-events';
 // Fictional relationship balance. These are game rules, not real-world estimates.
 // Actor identity and pregnancy capability are separate so future playable genders
 // can use the same relationship system. The current default is men meeting women.
@@ -10,24 +13,47 @@ const clamp = (value, minimum, maximum) => Math.max(minimum, Math.min(maximum, v
 const round = value => Math.round(value * 100) / 100;
 const rating = value => clamp(Number.isFinite(value) ? value : 1, 0, 10);
 
-export function desirability(state, stats = state.stats) {
-  return (rating(stats.attractiveness) + rating(stats.social) + rating(state.lifestyle)) / 3;
+export const DATING_BALANCE = {
+  primaryWeight: 1,
+  otherStatWeight: .2,
+  maximumProspects: 5,
+};
+
+// Adult stature is compared with the person's own growth reference. This is a
+// fictional dating input, separate from the childhood-only height display.
+export function datingHeightRating(person) {
+  if (!Number.isFinite(person.height) || person.height <= 0) return 5;
+  const sex = person.growthSex ?? (person.gender === 'female' ? 'female' : 'male');
+  const reference = heightReference(20, sex);
+  return round(normalPercentile(person.height * 2.54, reference.median, reference.sd) / 10);
 }
+
+export function datingPotential(state, stats = state.stats) {
+  const { primaryWeight, otherStatWeight } = DATING_BALANCE;
+  const otherStats = TRAITS.filter(key => key !== 'attractiveness');
+  const primary = datingHeightRating(state) + rating(stats?.attractiveness) + rating(state.lifestyle);
+  const secondary = otherStats.reduce((sum, key) => sum + rating(stats?.[key]), 0);
+  return clamp((primary * primaryWeight + secondary * otherStatWeight)
+    / (3 * primaryWeight + otherStats.length * otherStatWeight), 0, 10);
+}
+
+// Keep the public legacy name for callers and saved-review tooling.
+export const desirability = datingPotential;
 
 export function meetingChances(state, stats = state.stats) {
   const score = desirability(state, stats);
-  if (state.age < 18 || state.age >= 85 || (state.partner && state.partner.alive !== false) || state.ended || state.needsSuccession) {
+  if (state.age < 18 || state.age >= 85 || state.alive === false || (state.partner && state.partner.alive !== false) || state.ended || state.needsSuccession) {
     return { desirability: score, slots: 0, chance: 0, expected: 0 };
   }
   const strength = clamp((score - 1) / 9, 0, 1);
-  const slots = 1 + Math.floor(strength * 4 + 1e-9);
+  const slots = Math.min(DATING_BALANCE.maximumProspects, 1 + Math.floor(strength * DATING_BALANCE.maximumProspects));
   const socialFocus = legacyFocusValue(state.focus?.social);
-  const chance = clamp((.22 + .7 * strength) * (.7 + socialFocus * .1), .05, .95);
+  const chance = clamp((.22 + .7 * strength) * (.7 + socialFocus * .1), .05, .95) * housingMeetingMultiplier(state);
   return { desirability: score, slots, chance, expected: slots * chance };
 }
 
 // A profile's overall abilities shape pursuit difficulty. This is deliberately
-// distinct from the three player traits which generate meeting opportunities.
+// distinct from the weighted player potential which generates opportunities.
 export function prospectQuality(person) {
   return (TRAITS.reduce((total, key) => total + rating(person.stats[key]), 0) + rating(person.lifestyle)) / 8;
 }
