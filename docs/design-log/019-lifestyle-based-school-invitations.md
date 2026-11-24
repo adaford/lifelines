@@ -1,0 +1,13 @@
+# Lifestyle-based school invitations (12 November 2026)
+
+Sports and extracurricular offers now roll independently at the start of each playable school year (ages 5-17), using current effective household Lifestyle. For rating L clamped to 0-10, each category has chance 20% + 8% * L and, when offered, max(2, round(L)) choices. Lifestyle 1 gives a 28% yearly chance of two choices per category (about once every 3.6 years); 5 gives 60% and five choices; 10 guarantees ten of each. Both, either, or neither category can appear. These are fictional gameplay settings.
+
+Offer lists exclude the previous year's list and current enrollment. Each category uses a local deterministic roll/shuffle, consuming no gameplay RNG. Generated lists stay saved for that year; opening menus, changing Lifestyle, forecasts, and reloads never reroll them. Keep existing enrollment and success regardless of invitations. With no offers, there is no joining control; enrolled players can still keep or leave, subject to existing commitments. Joining still requires one free focus point and activity eligibility.
+
+Each nonempty category adds a named invitation notice to the year review and journal, listing its activities. School entry and school-age succession also receive invitations. Invitation rolls are separate from the five ordinary-event slots; empty years add no offer notice. Schema 20 now accepts 0-10 unique known offers per category, preserving existing saved lists, ratings, focus, success, effects, pending choices, history, and RNG on load. Legacy schema-19 fixed-three/five validation and five-to-three migration remain unchanged.
+
+Parent recovery is unchanged. A caregiver at Mental stability 2.3 with neutral affinity and zero Family time has +.216 raw recovery toward 5 and -.0375 Family input, yielding 2.50 after directional response. Zero Family time is a negative contribution, not a guarantee that the full-year total decreases. Parent help now explains this.
+
+Validation in the existing workspace: all 535 tests pass, including 40,000 sampled offer pairs. All 25 local HTTP assets match source. The 4,000-life percentile reference reproduces unchanged without fitting, and the independent cohort passes. Cache token: `lifestyle-offers`. Browser/visual checks remain omitted by preference.
+
+Published this change separately from the pre-existing local edits as commit `594720e353a8b6b66b43ac70baa87c6533ad543b`. The isolated release passed all 495 tests; GitHub Pages built that commit and all 24 live HTTP assets matched it. Local main now points to this release, with all existing workspace files preserved.

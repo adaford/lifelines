@@ -1,6 +1,6 @@
 // Render-only recognition of exact stories saved before the concise-copy update.
 // These frozen templates never enter the event catalog or change saved data.
-import { causalBridge } from './life-event-bridges-history.js?v=short-events-toddler-order';
+import { causalBridge } from './life-event-bridges-history.js?v=stat-driven-events';
 const LIFE_EVENT_STAGES = [{"id":"infant","min":0,"max":1,"place":"At a baby group"},{"id":"toddler","min":2,"max":4,"place":"At a preschool play session"},{"id":"child","min":5,"max":12,"place":"At a neighborhood children's program"},{"id":"teen","min":13,"max":17,"place":"At a youth program"},{"id":"adult","min":18,"max":39,"place":"At a community program"},{"id":"midlife","min":40,"max":64,"place":"At a local adult learning center"},{"id":"senior","min":65,"max":120,"place":"At an older adults' community group"}];
 const activities = {
   intelligence: [

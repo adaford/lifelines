@@ -1,5 +1,5 @@
-import { schoolActivity, activityPerformance } from './school.js?v=short-events-toddler-order';
-import { fameActivityMatches, hasFame } from './fame.js?v=short-events-toddler-order';
+import { schoolActivity, activityPerformance } from './school.js?v=stat-driven-events';
+import { fameActivityMatches, hasFame } from './fame.js?v=stat-driven-events';
 
 // Fictional competition settings, not estimates of real recruitment odds.
 // College success is relative to a much more selective field than high school.

@@ -78,7 +78,7 @@ test('Fame and college sports share one row while a separate famous extracurricu
   state.fame = { kind: 'sports', activityId: 'soccer', rating: 5, support: 0, startedAge: 17 };
   assert.deepEqual(focusKeysForAge(state), [...core, 'sports']);
   assert.equal(focusMaxFor(state, 'sports'), 3);
-  assert.equal(standardFocusCoefficients(state).sports.social, .48, 'one ordinary and one Fame contribution');
+  assert.deepEqual(standardFocusCoefficients(state).sports, { strength: .3, social: .24 }, 'soccer trains Strength; the Social unit is the Fame contribution');
   state.fame = { ...state.fame, kind: 'extracurricular', activityId: 'chess' };
   state.school.extracurricular = { id: 'chess', success: 8 };
   state.focus.extracurricular = 1;
@@ -86,18 +86,18 @@ test('Fame and college sports share one row while a separate famous extracurricu
   assert.equal(focusBudget(state), 8);
   assert.equal(focusMaxFor(state, 'sports'), 2);
   assert.equal(focusMaxFor(state, 'extracurricular'), 3);
-  assert.equal(standardFocusCoefficients(state).sports.social, .24);
-  assert.equal(standardFocusCoefficients(state).extracurricular.social, .24);
+  assert.deepEqual(standardFocusCoefficients(state).sports, { strength: .3 }, 'Fame moved to the extracurricular');
+  assert.deepEqual(standardFocusCoefficients(state).extracurricular, { intelligence: .225, social: .24 });
 });
 
 test('college athletic training uses the selected sport and the existing halved choice scale', () => {
   const state = player(5, 'fencing');
-  assert.deepEqual(standardFocusCoefficients(state).sports, { strength: .3, social: .24, intelligence: .225 });
+  assert.deepEqual(standardFocusCoefficients(state).sports, { strength: .15, intelligence: .1125 }, 'fencing shares its units between its two graded stats');
   const without = { ...state, focus: { ...state.focus, sports: 0 } };
   assert.deepEqual(standardFocusCoefficients(without).sports, { strength: .3, social: .24 });
   const practice = standardFocusPractice(state), inactive = standardFocusPractice(without);
-  assert.ok(Math.abs(practice.strength - inactive.strength - .9) < 1e-12);
-  assert.ok(Math.abs(skillChanges(state).strength - skillChanges(without).strength - .9 * YEARLY_DECISION_SCALE) < 1e-12);
+  assert.ok(Math.abs(practice.strength - inactive.strength - .6) < 1e-12, 'two training units of .15 replace one .3 inactivity loss');
+  assert.ok(Math.abs(skillChanges(state).strength - skillChanges(without).strength - .6 * YEARLY_DECISION_SCALE) < 1e-12);
   const ended = { ...state, education: { ...state.education, status: 'graduate' } };
   assert.equal(Object.hasOwn(standardFocusCoefficients(ended), 'sports'), false);
 });

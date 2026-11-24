@@ -1,6 +1,6 @@
 // Ordinary, fictional experiences connecting causes to different consequences.
 // A definition has age-specific stories, rather than seven near-identical rolls.
-import { causalBridge } from './life-event-bridges.js?v=short-events-toddler-order';
+import { causalBridge } from './life-event-bridges.js?v=stat-driven-events';
 export const LIFE_EVENT_STATS = ['intelligence', 'strength', 'attractiveness', 'social', 'creativity', 'health', 'stability', 'lifestyle'];
 export const LIFE_EVENT_STAGES = [
   { id: 'infant', min: 0, max: 1, place: 'At a baby group' },
@@ -152,10 +152,11 @@ function entry(source, target, positive, subjectType) {
     ...(subjectType === 'partner' || subjectType === 'child' ? { minPlayerAge: 18 } : {}),
     kind: positive ? 'positive' : 'negative', severity: target === 'stability' ? 'moderate' : 'minor',
     // Tiny per-entry base rates keep the full matrix from dominating older
-    // encounters. Supplemental entries do not multiply low-stat hazard floors.
+    // encounters. They share the stat pools (record 042), which spreads a
+    // pool's chance across many events instead of repeating a few.
     baseChance: family ? .00012 : .0003, supplemental: true,
     ...(source === 'relationship' ? { relationshipFactor: positive ? 'high' : 'low' }
-      : { statFactors: [[source, positive && source !== 'attractiveness' ? 'high' : 'low']] }),
+      : { statFactors: [[source, positive ? 'high' : 'low']] }),
     years: target === 'lifestyle' ? 1 : 0, modifiers: {},
     ...(target === 'lifestyle' ? { householdLifestyle: amount }
       : target === 'relationship' ? { relationship: amount }

@@ -225,11 +225,11 @@ test('parent career growth previews and updates shared household lifestyle for m
   const before = copy(state);
   const preview = annualForecast(state);
   assert.equal(preview.lifestyle.before, 4);
-  assert.equal(preview.lifestyle.after, 4.5432);
+  assert.equal(preview.lifestyle.after, 4.5345);
   assert.deepEqual(state, before, 'career forecasting never changes RNG, household support, or parent career state');
   quietYear(state);
-  assert.equal(state.lifestyle, 4.5432);
-  assert.equal(householdLifestyle(state), 4.5432);
+  assert.equal(state.lifestyle, 4.5345);
+  assert.equal(householdLifestyle(state), 4.5345);
   assert.ok(state.parents.every(parent => parent.lifestyle === state.lifestyle && parent.career.progress > 4.45));
   assert.deepEqual(state.yearSummary.lifestyle, preview.lifestyle);
   assert.equal(validateSave(state), true);

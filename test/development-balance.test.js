@@ -43,8 +43,8 @@ test('all seven newborn ratings follow parental ratings with broad variation and
       const parentMean = state.parents.reduce((sum, parent) => sum + parent.stats[key], 0) / state.parents.length;
       samples[key].all.push(value);
       samples[key].parents.push(parentMean);
-      if (parentMean >= 6) samples[key].high.push(value);
-      if (parentMean <= 4) samples[key].low.push(value);
+      if (parentMean >= 5.5) samples[key].high.push(value);
+      if (parentMean <= 4.5) samples[key].low.push(value);
     }
   }
   const mean = values => values.reduce((sum, value) => sum + value, 0) / values.length;
@@ -60,12 +60,12 @@ test('all seven newborn ratings follow parental ratings with broad variation and
     // old independent newborn distribution's standard-deviation ceiling.
     assert.ok(sd ** 2 > parentVariance, `${key} varies beyond the parents' mean alone`);
     assert.ok(sd ** 2 < parentVariance + GENETICS_BALANCE.ratingDeviation ** 2 + .7, `${key} spread fits parental variation plus inheritance randomness`);
-    assert.equal(Math.min(...values.all), 0, `${key} can start at the bottom of the scale`);
-    assert.equal(Math.max(...values.all), 10, `${key} can start at the top of the scale`);
+    assert.ok(Math.min(...values.all) < 2 && Math.min(...values.all) >= 0, `${key} can rarely start far below the middle`);
+    assert.ok(Math.max(...values.all) > 8 && Math.max(...values.all) <= 10, `${key} can rarely start far above the middle`);
     assert.ok(values.high.length > 300 && values.low.length > 300, `${key} has substantial parental comparison groups`);
-    assert.ok(mean(values.high) > mean(values.low) + 2.5, `${key} higher-rated parents shift the distribution`);
-    assert.ok(values.high.some(value => value < 3), `${key} high-rated parents can have a low-rated newborn`);
-    assert.ok(values.low.some(value => value > 7), `${key} low-rated parents can have a high-rated newborn`);
+    assert.ok(mean(values.high) > mean(values.low) + 1.25, `${key} higher-rated parents shift the distribution`);
+    assert.ok(values.high.some(value => value < 3.5), `${key} high-rated parents can have a low-rated newborn`);
+    assert.ok(values.low.some(value => value > 6.5), `${key} low-rated parents can have a high-rated newborn`);
   }
 });
 
@@ -117,9 +117,9 @@ test('aptitude helps learning and retention while care and older-age focus still
 });
 
 test('aptitude has a gentler influence on starting ratings, practice and routine resilience', () => {
-  assert.equal(naturalSkillRating(-3), 3.2);
+  assert.equal(naturalSkillRating(-3), 4.1);
   assert.equal(naturalSkillRating(0), 5);
-  assert.equal(naturalSkillRating(3), 6.8);
+  assert.equal(naturalSkillRating(3), 5.9);
   for (const aptitude of [-3, 0, 3]) {
     const person = { age: 25, stats: { strength: naturalSkillRating(aptitude) }, aptitudes: { strength: aptitude, health: aptitude }, focus: { self: 4 } };
     assert.ok(Math.abs(skillChanges(person).strength - .225 * (1 + aptitude * .08)) < 1e-12);

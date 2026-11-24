@@ -1,9 +1,9 @@
 // Household career progression is a fictional game model, not measured employment
 // or income data. Continuous progress supports the visible 0–10 lifestyle score.
 // Keep random draws caller-owned so saves and annual previews stay deterministic.
-import { JOBS } from './jobs.js?v=short-events-toddler-order';
-import { careerYear, initialCareerProgress } from './career-rules.js?v=short-events-toddler-order';
-import { lifestyleChange, roundLifestyle } from './lifestyle.js?v=short-events-toddler-order';
+import { JOBS } from './jobs.js?v=stat-driven-events';
+import { careerYear, initialCareerProgress } from './career-rules.js?v=stat-driven-events';
+import { lifestyleChange, roundLifestyle } from './lifestyle.js?v=stat-driven-events';
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
 const finite = (value, fallback) => Number.isFinite(value) ? value : fallback;
 const round = roundLifestyle;

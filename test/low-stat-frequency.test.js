@@ -5,6 +5,8 @@ import { createGame, advanceYear, resolveEventChoice, chooseEducation, needsEduc
 import { defaultFocus } from '../focus-rules.js';
 import { eventChances } from '../events.js';
 import { effectiveStats } from '../engine.js';
+import { lowStatEventTarget } from '../event-rates.js';
+import { EVENT_BALANCE } from '../balance.js';
 
 const calm = { mortalityRandom: () => 1, growthRandom: () => 0, parentCareerRandom: () => 1 };
 const stats = ['health', 'stability', 'intelligence', 'strength', 'social', 'creativity', 'attractiveness', 'lifestyle'];
@@ -88,12 +90,16 @@ test('isolated very-low player stats retain surviving event probabilities withou
 
 test('a very-low parental mental-stability rating creates frequent events for that named parent', t => {
   const frequencies = [];
+  // A relative's pool is a fraction of the player's own floor.
+  const floor = EVENT_BALANCE.relativePoolScale * lowStatEventTarget(1);
   for (const age of [1, 3, 15]) {
     const state = fixture(age), parent = state.parents[0];
     parent.stats.stability = 1;
     const before = copy(state), related = relatedIds(state, 'stability', parent.id);
-    const frequency = observe(state, related);
-    assert.ok(frequency >= .47 && frequency <= .7, `${age}: observed ${frequency}`);
+    const combined = 1 - eventOdds(state).filter(roll => related.has(roll.id)).reduce((none, roll) => none * (1 - roll.chance), 1);
+    assert.ok(combined >= floor - 1e-9, `${age}: combined ${combined} versus floor ${floor}`);
+    const frequency = observe(state, related), sampling = 4 * Math.sqrt(combined * (1 - combined) / 800);
+    assert.ok(frequency >= combined - sampling - .04 && frequency <= combined + sampling, `${age}: observed ${frequency}, combined ${combined}`);
     assert.deepEqual(state, before);
     frequencies.push(`child age ${age}: ${(frequency * 100).toFixed(1)}%`);
   }
@@ -105,7 +111,7 @@ test('several very-low stats coexist without bypassing five events or mutating s
   state.lifestyle = 0;
   for (const person of [state, ...state.parents]) for (const key of Object.keys(person.stats)) person.stats[key] = 0;
   const before = copy(state), odds = eventOdds(state);
-  assert.ok(odds.every(roll => Number.isFinite(roll.chance) && roll.chance >= 0 && roll.chance <= .6));
+  assert.ok(odds.every(roll => Number.isFinite(roll.chance) && roll.chance >= 0 && roll.chance <= EVENT_BALANCE.poolEventCap + 1e-12));
   assert.deepEqual(state, before);
   let reachedMaximum = false;
   for (let index = 0; index < 200; index++) {

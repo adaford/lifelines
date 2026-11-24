@@ -1,4 +1,4 @@
-// node scripts/audit-careers.mjs --baseline .git/career-realism-baseline/jobs.json --output test-artifacts/careers-audit.json
+// node scripts/audit-careers.mjs --baseline .baselines/career-realism/jobs.json --output test-artifacts/careers-audit.json
 import { readFile, writeFile } from 'node:fs/promises';
 import { JOBS } from '../jobs.js';
 import { CAREER_SOURCES } from '../career-profiles.js';

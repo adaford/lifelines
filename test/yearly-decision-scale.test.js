@@ -70,13 +70,14 @@ test('stronger toddler activity effects retain proportional signs and unused poi
   const coefficients = {
     work: { strength: .3, social: .165 },
     social: { intelligence: .27, social: -.165 },
-    family: { social: .165 },
+    family: {},
     self: { health: .3, stability: .24 },
     creative: { creativity: .33, intelligence: .27 },
   };
   for (const [activity, stats] of Object.entries(coefficients)) {
     for (const points of [0, 1, 2, 3, 4]) {
       const effects = toddlerActivityEffects({ ...state, focus: { ...state.focus, [activity]: points } })[activity];
+      if (activity === 'family') assert.ok(Object.values(effects).every(amount => amount === 0), 'Family time changes none of your ratings');
       for (const [stat, coefficient] of Object.entries(stats)) {
         const contributionSteps = activity === 'social' ? (points - 2) * (stat === 'intelligence' ? 2 : 1) : activity === 'creative' && stat === 'intelligence'
           ? [-1, 0, 0, 0, 1][points] : focusEffect(points);
@@ -89,6 +90,7 @@ test('stronger toddler activity effects retain proportional signs and unused poi
   const lowerFamily = { ...state, focus: { ...state.focus, family: 1 } };
   for (const parent of annualForecast(lowerFamily).parents) {
     assert.equal(parent.relationship.change, -.02);
+    assert.equal(parent.health.change, -.02, 'less Family time costs each caregiver Health');
     assert.equal(parent.stability.change, -.01);
   }
 });
@@ -96,7 +98,7 @@ test('stronger toddler activity effects retain proportional signs and unused poi
 test('school, career, and later-life practice produce gains and losses without background development', () => {
   const focused = { work: 4, social: 0, family: 0, self: 4 };
   const neglected = { work: 0, social: 4, family: 4, self: 0 };
-  const practice = { intelligence: .675, strength: .45, social: -.72, creativity: 0 };
+  const practice = { intelligence: .675, strength: .45, social: -.54, creativity: .36 }; // Friends trains Social only; Family trains nothing
   for (const [age, flexibility] of [[10, 1.15], [25, 1], [50, .85], [75, .65]]) {
     const state = stateAt(age);
     state.stats.intelligence = 8;
@@ -106,7 +108,7 @@ test('school, career, and later-life practice produce gains and losses without b
     close(baseline.intelligence - background.intelligence, age < 18 ? -.225 * .25 * flexibility : 0, 'unjoined extracurricular Intelligence loss receives the yearly factor once');
     for (const [focus, sign] of [[focused, 1], [neglected, -1]]) {
       const changed = skillChanges({ ...state, focus });
-      for (const key of learned) close(changed[key] - baseline[key], (age < 18 ? { intelligence: .3375, strength: 0, social: -1.08, creativity: .24 } : practice)[key] * .5 * flexibility * sign, `${age} ${key}`);
+      for (const key of learned) close(changed[key] - baseline[key], (age < 18 ? { intelligence: .3375, strength: 0, social: -.9, creativity: .24 } : practice)[key] * .5 * flexibility * sign, `${age} ${key}`);
     }
     if (age >= 18) {
       const working = { ...state, focus: focused };
@@ -127,7 +129,7 @@ test('school, career, and later-life practice produce gains and losses without b
   adult.focus = { work: 4, social: 2, family: 0, self: 0 };
   const adultForecast = annualForecast(adult);
   assert.equal(adultForecast.stats.health.after, 4.92, 'adult self-focus health loss is substantial before rounding');
-  assert.equal(adultForecast.stats.stability.after, changedRating(changedRating(5, -.675), -.1125), 'focus strain is stronger while the unemployment penalty retains its existing scale');
+  assert.equal(adultForecast.stats.stability.after, changedRating(changedRating(5, -.45), -.1125), 'focus strain is stronger while the unemployment penalty retains its existing scale');
 });
 
 test('stronger child focus practice preserves caregiver strain and family relationship pacing', () => {
@@ -138,7 +140,7 @@ test('stronger child focus practice preserves caregiver strain and family relati
     state.partner = { ...copy(state.parents[0]), id: 'partner', age: 30, canGestate: false, married: true, yearsTogether: 2, lastProposalAge: -1 };
     state.children = [0, 3, 12, 25].map((age, i) => ({ ...copy(state.parents[0]), id: `child-${i}`, age, canGestate: false }));
     const result = quietMean(state);
-    assert.equal(result.stats.stability, round(5 + (-.3 * focusEffect(state.focus.work) + .3 * effort) * .25), 'adult focus wellbeing uses the stronger coefficients');
+    assert.equal(result.stats.stability, round(5 - .3 * focusEffect(state.focus.work) * .25), 'adult focus wellbeing uses the stronger coefficients; Family adds none');
     for (const parent of result.parents) {
       assert.equal(parent.relationship, round(5 + effort * .02));
       assert.equal(parent.stats.stability, round(5 + effort * .00625));
@@ -156,16 +158,13 @@ test('stronger child focus practice preserves caregiver strain and family relati
         assert.equal(grown.stats.intelligence, round(5 + (.24 + carePractice * .5) * .575));
       } else {
         const toddler = child.age < 5;
-        const skillPractice = toddler
-          ? { intelligence: 0, strength: 0, social: .165 * effort, creativity: 0 }
-          : { intelligence: 0, strength: 0, social: .24 * effort, creativity: 0 };
+        // A school-age child's care runs through Friends (Social only) and Yourself.
+        const skillPractice = { intelligence: 0, strength: 0, social: toddler ? 0 : .36 * effort, creativity: 0 };
         for (const key of learned) {
           assert.equal(grown.stats[key], round(5 + skillPractice[key] * .2875), `${child.age}-year-old child ${key} care`);
         }
         const healthPractice = (toddler ? .3 : .105) * effort;
-        const stabilityPractice = toddler
-          ? .24 * effort
-          : .6 * effort;
+        const stabilityPractice = (toddler ? .24 : .3) * effort; // Yourself only
         assert.equal(grown.stats.health, round(5 + healthPractice * .25));
         assert.equal(grown.stats.stability, round(5 + stabilityPractice * .25));
       }
@@ -177,6 +176,7 @@ test('stronger child focus practice preserves caregiver strain and family relati
   child.focus.family = 0;
   const guardian = annualForecast(child).parents.find(parent => parent.id === 'guardian');
   assert.equal(guardian.relationship.change, -.06);
+  assert.equal(guardian.health.change, -.06);
   assert.equal(guardian.stability.change, -.02);
 });
 

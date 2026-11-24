@@ -36,8 +36,8 @@ function fixture(age) {
 
 test('catalog uses signed capacity changes and concrete minimum commitments without changing decision counts', () => {
   const events = [...PERSONAL_EVENTS, ...FAMILY_EVENTS];
-  assert.equal(events.filter(event => !event.supplemental).length, 352, 'all original definitions remain');
-  assert.equal(events.filter(event => event.choices).length, 73);
+  assert.equal(events.filter(event => !event.supplemental).length, 356, 'all original definitions remain, with four school milestones');
+  assert.equal(events.filter(event => event.choices).length, 75);
   for (const event of events) for (const outcome of [event, ...(event.choices || [])]) {
     assert.equal(outcome.focusLimits, undefined, `${event.id} no longer authors absolute event caps`);
     for (const [field, minimum] of [['focusCapacity', false], ['focusMinimums', true]]) {
@@ -77,8 +77,10 @@ test('new automatic minimum and capacity events roll and survive reload with a c
     const event = PERSONAL_EVENTS.find(event => event.id === id);
     const original = fixture(event.minAge);
     if (id === 'school_catch_up_sessions') original.focus.work = 0;
+    // Focus-only events are random-class: year balancing keeps them well below
+    // their raw chance, so some need several thousand sampled years.
     let found;
-    for (let seed = 1; seed <= 1000; seed++) {
+    for (let seed = 1; seed <= 6000; seed++) {
       const state = structuredClone(original);
       state.rng = Math.imul(seed, 2654435761) >>> 0;
       assert.equal(advanceYear(state, calm).ok, true);

@@ -44,13 +44,10 @@ test('household catalog keeps distinct choices without replacing removed causal-
     'household_partner_learning:household_partner_learning',
     'household_partner_illness:household_partner_illness',
     'household_partner_creative:household_partner_creative',
-    'household_partner_argument:dismiss',
-    'household_partner_offer:back',
     'household_partner_anniversary:household_partner_anniversary',
     'household_child_friend:household_child_friend',
     'household_child_art:household_child_art',
     'household_child_illness:household_child_illness',
-    'household_partner_roof_leak:hire',
   ], 'an event may remain without rating changes after its causal-stat effect is removed');
 });
 
@@ -126,7 +123,8 @@ test('all retained subject traits influence events, with more frequent but bound
     assert.equal(JSON.stringify(state), before, 'viewing chances does not mutate the save');
     assert.ok(rolls.every(roll => Number.isFinite(roll.chance) && roll.chance >= 0 && roll.chance <= .12));
     const expected = rolls.filter(roll => !roll.eventId.startsWith('life_')).reduce((sum, roll) => sum + roll.chance, 0);
-    assert.ok(expected >= .35 && expected <= .75, `ordinary household expectation ${expected}`);
+    // Near-neutral ratings are quiet (stat factor .4 at 5), so the expectation sits below the old .35-.75 band.
+    assert.ok(expected >= .2 && expected <= .5, `ordinary household expectation ${expected}`);
   }
 });
 

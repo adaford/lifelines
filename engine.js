@@ -1,53 +1,41 @@
 // Lifelines: deterministic, browser-independent simulation rules.
 // All public actions mutate their state and return { ok, reason? }.
-import { createSaveValidator } from './save-schema.js?v=short-events-toddler-order';
-import { JOBS } from './jobs.js?v=short-events-toddler-order';
-import { careerFit, careerYear } from './career-rules.js?v=short-events-toddler-order';
-import { collegeById, createCollegeOffers, collegeGradeScore, graduateJobOffers } from './college.js?v=short-events-toddler-order';
-import { collegeSportSuccessAfterYear, collegeSportFameChance, professionalSportChance } from './college-sports.js?v=short-events-toddler-order';
-import { HOUSING_BALANCE, nextHousing, housingLifestyle, housingChanges } from './housing.js?v=short-events-toddler-order';
-import { MAX_RESOURCES, lifestyleFromResources, changedLifestyle } from './lifestyle.js?v=short-events-toddler-order';
-import { GENETICS_BALANCE, inheritRatings, inheritAffinities, inheritedGrowthFactor } from './genetics.js?v=short-events-toddler-order';
+import { createSaveValidator } from './save-schema.js?v=stat-driven-events';
+import { JOBS } from './jobs.js?v=stat-driven-events';
+import { careerFit, careerYear } from './career-rules.js?v=stat-driven-events';
+import { collegeById, createCollegeOffers, collegeGradeScore, graduateJobOffers } from './college.js?v=stat-driven-events';
+import { collegeSportSuccessAfterYear, collegeSportFameChance, professionalSportChance } from './college-sports.js?v=stat-driven-events';
+import { HOUSING_BALANCE, nextHousing, housingLifestyle, housingChanges } from './housing.js?v=stat-driven-events';
+import { MAX_RESOURCES, lifestyleFromResources, changedLifestyle } from './lifestyle.js?v=stat-driven-events';
+import { GENETICS_BALANCE, inheritRatings, inheritAffinities, inheritedGrowthFactor } from './genetics.js?v=stat-driven-events';
 export { GENETICS_BALANCE };
 export { lifestyleFromResources };
-import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=short-events-toddler-order';
-import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=short-events-toddler-order';
-import { FAME_EVENTS, fameEventChances } from './fame-events.js?v=short-events-toddler-order';
-import { hasFame, fameFocusKey, fameActivityMatches, fameStartingRating, fameNextRating, fameLossChance, fameLifestyleBonus } from './fame.js?v=short-events-toddler-order';
-import { eventStatCause } from './event-causes.js?v=short-events-toddler-order';
-import { eventDescriptionAtAge } from './life-events.js?v=short-events-toddler-order';
-import { mortalityRisk, rollMortality } from './mortality.js?v=short-events-toddler-order';
-import { heightReference, advanceGrowth } from './growth.js?v=short-events-toddler-order';
-import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=short-events-toddler-order';
-import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, caregiverCryEffects, unemploymentStabilityChange, standardFocusPractice, schoolAppearanceChange, DEVELOPMENT_BALANCE, BIRTH_VARIATION, SKILL_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, PARENT_FAMILY_STABILITY_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=short-events-toddler-order';
-import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=short-events-toddler-order';
-import { normalPercentile } from './percentiles.js?v=short-events-toddler-order';
-import { changedRating } from './rating-changes.js?v=short-events-toddler-order';
-import { MAX_FOCUS, DEFAULT_FOCUS, focusMaxFor, focusNeutralFor, isSchoolActivityFocus, focusEffect, focusKeysForAge, focusBudget, temporaryFocusPoints, defaultFocus, legacyFocusValue } from './focus-rules.js?v=short-events-toddler-order';
-import { SCHOOL_OFFER_COUNT, schoolActivity, currentSchoolEnrollment, currentSchoolActivity, gradeScore, gradeLetter, activityGradeLetter, activitySuccessAfterYear, activityEligible, annualSchoolOffers, createSchoolRecord } from './school.js?v=short-events-toddler-order';
-import { assignBirthConditions, applyBirthConditions, getBirthConditions, conditionFocusLimits, aptitudeBounds } from './birth-conditions.js?v=short-events-toddler-order';
+import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=stat-driven-events';
+import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=stat-driven-events';
+import { FAME_EVENTS, fameEventChances } from './fame-events.js?v=stat-driven-events';
+import { hasFame, fameFocusKey, fameActivityMatches, fameStartingRating, fameNextRating, fameLossChance, fameLifestyleBonus } from './fame.js?v=stat-driven-events';
+import { eventStatCause } from './event-causes.js?v=stat-driven-events';
+import { eventDescriptionAtAge } from './life-events.js?v=stat-driven-events';
+import { authoredConsequence, eventHasConsequence, balanceEventOdds } from './event-rates.js?v=stat-driven-events';
+import { mortalityRisk, rollMortality } from './mortality.js?v=stat-driven-events';
+import { heightReference, advanceGrowth } from './growth.js?v=stat-driven-events';
+import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=stat-driven-events';
+import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, caregiverCryEffects, caregiverFamilyEffects, unemploymentStabilityChange, standardFocusPractice, schoolAppearanceChange, DEVELOPMENT_BALANCE, BIRTH_VARIATION, SKILL_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, PARENT_FAMILY_STABILITY_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=stat-driven-events';
+import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=stat-driven-events';
+import { normalPercentile } from './percentiles.js?v=stat-driven-events';
+import { changedRating } from './rating-changes.js?v=stat-driven-events';
+import { MAX_FOCUS, DEFAULT_FOCUS, focusMaxFor, focusNeutralFor, isSchoolActivityFocus, focusEffect, focusKeysForAge, focusBudget, temporaryFocusPoints, defaultFocus, legacyFocusValue } from './focus-rules.js?v=stat-driven-events';
+import { SCHOOL_OFFER_COUNT, schoolActivity, currentSchoolEnrollment, currentSchoolActivity, gradeScore, gradeLetter, activityGradeLetter, activitySuccessAfterYear, activityEligible, annualSchoolOffers, createSchoolRecord, schoolStage, recordStageGrade } from './school.js?v=stat-driven-events';
+import { SCHOOL_BALANCE } from './balance.js?v=stat-driven-events';
+import { assignBirthConditions, applyBirthConditions, getBirthConditions, conditionFocusLimits, aptitudeBounds } from './birth-conditions.js?v=stat-driven-events';
 export { DEVELOPMENT_BALANCE };
-export { heightPercentile } from './growth.js?v=short-events-toddler-order';
-export { mortalityRisk } from './mortality.js?v=short-events-toddler-order';
-import { datingPotential as datingPotentialRules, meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=short-events-toddler-order';
-export { JOBS, JOB_CATEGORIES } from './jobs.js?v=short-events-toddler-order';
+export { heightPercentile } from './growth.js?v=stat-driven-events';
+export { mortalityRisk } from './mortality.js?v=stat-driven-events';
+import { datingPotential as datingPotentialRules, meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=stat-driven-events';
+export { JOBS, JOB_CATEGORIES } from './jobs.js?v=stat-driven-events';
 export const EVENTS = [...PERSONAL_EVENTS, ...FAMILY_EVENTS, ...FAME_EVENTS];
 const EVENT_BY_ID = new Map(EVENTS.map(event => [event.id, event]));
 
-// Keep retired definitions available for saved history and pending decisions.
-// Only future rolls require an authored consequence; a choice may still offer
-// declining an otherwise meaningful opportunity without a rating change.
-function authoredConsequence(outcome) {
-  if (['statChanges', 'playerChanges', 'subjectChanges', 'aptitudeChanges', 'modifiers']
-    .some(field => Object.values(outcome[field] || {}).some(Boolean))) return true;
-  if (outcome.relationship || outcome.fameChange || outcome.fameSupport || outcome.fameAction) return true;
-  return outcome.years > 0 && (outcome.householdLifestyle || outcome.focusPoints
-    || ['focusLimits', 'focusCapacity', 'focusMinimums'].some(field => Object.values(outcome[field] || {}).some(stage => Object.keys(stage).length)));
-}
-function eventHasConsequence(event) {
-  return event.id === 'household_parent_abandonment'
-    || (event.choices?.length ? event.choices.some(authoredConsequence) : authoredConsequence(event));
-}
 function effectMechanics(effect) {
   const entries = value => Object.entries(value || {}).sort(([a], [b]) => a.localeCompare(b));
   const stages = field => entries(effect[field]).map(([stage, values]) => [stage, entries(values)]);
@@ -188,6 +176,8 @@ function datingHelpers(state) {
 }
 const livingPartner = state => state.partner?.alive !== false ? state.partner : null;
 const dependents = state => state.children.filter(child => child.alive !== false && child.age < 18);
+// Everyone sharing the player's home: caregivers while a minor, then partner and minor children.
+const householdMembers = state => state.age < 18 ? caregivers(state) : [livingPartner(state), ...dependents(state)].filter(Boolean);
 // Biological parents remain in family history after leaving. Care, routine
 // relationship changes and household support follow the people still present.
 export function caregivers(state) {
@@ -608,7 +598,8 @@ export function eventOdds(state) {
     if (kind && kind !== 'personal' && !activityEligible(state, currentSchoolActivity(state, kind))) return { ...roll, chance: 0 };
     return roll;
   });
-  return [...own, ...family, ...fame].map(roll => eventHasConsequence(EVENT_BY_ID.get(roll.eventId || roll.id)) ? roll : { ...roll, chance: 0 });
+  const live = [...own, ...family, ...fame].map(roll => eventHasConsequence(EVENT_BY_ID.get(roll.eventId || roll.id)) ? roll : { ...roll, chance: 0 });
+  return balanceEventOdds(live, roll => EVENT_BY_ID.get(roll.eventId || roll.id), state.lastYearEvents || []);
 }
 
 function endFame(state, title, text) {
@@ -644,6 +635,7 @@ function growYear(state) {
     for (const parent of caregivers(state)) {
       const effects = caregiverCryEffects(parent, state.cryLevel);
       addStat(parent, 'stability', effects.stability);
+      addStat(parent, 'health', effects.health);
       parent.relationship = round(clamp(parent.relationship + effects.relationship, 0, 10));
     }
     return;
@@ -661,8 +653,10 @@ function growYear(state) {
   }
   if (studying) state.schoolProgress = round(clamp(state.schoolProgress + legacyFocusValue(f.work) * .9, 0, 100));
   for (const parent of caregivers(state)) {
-    addStat(parent, 'stability', wellbeingResponse(parent, 'stability', focusEffect(f.family) * PARENT_FAMILY_STABILITY_GAIN));
-    parent.relationship = round(clamp(parent.relationship + focusEffect(f.family) * PARENT_FAMILY_RELATIONSHIP_GAIN, 0, 10));
+    const effects = caregiverFamilyEffects(parent, f.family);
+    addStat(parent, 'health', effects.health);
+    addStat(parent, 'stability', effects.stability);
+    parent.relationship = round(clamp(parent.relationship + effects.relationship, 0, 10));
   }
 }
 // Money remains internal: the player sees only a 0–10 lifestyle score.
@@ -777,7 +771,8 @@ function ageFamily(state) {
   }
   for (const child of state.children) {
     if (child.alive === false) continue;
-    const care = { ...child, cryLevel: 3, careFocus: state.focus.family, focus: { ...defaultFocus(child.age), family: state.focus.family, self: state.focus.family } };
+    // Your Family focus is a school-age child's social and personal care.
+    const care = { ...child, cryLevel: 3, careFocus: state.focus.family, focus: { ...defaultFocus(child.age), family: state.focus.family, self: state.focus.family, ...(child.age >= 5 ? { social: state.focus.family } : {}) } };
     developSkills(child, care);
     const appearance = appearanceChange(care);
     child.age += 1;
@@ -814,7 +809,10 @@ export function pendingEventSubject(state, pending) {
 }
 function applyOutcome(state, event, outcome = event, context = {}) {
   const subject = pendingEventSubject(state, context);
-  const before = { stats: effectiveStats(state), baseStats: { ...state.stats }, aptitudes: { ...state.aptitudes }, lifestyle: state.lifestyle, subjectStats: subject ? { ...subject.stats } : {}, relationship: subject?.relationship };
+  // A household event changes every caregiver at home, not just the one it rolled for.
+  const targets = event.household ? householdMembers(state) : subject && subject !== state ? [subject] : [];
+  const named = event.household ? '' : context.subjectId ? `${subject.name}: ` : '';
+  const before = { stats: effectiveStats(state), baseStats: { ...state.stats }, aptitudes: { ...state.aptitudes }, lifestyle: state.lifestyle, targets: targets.map(person => ({ stats: { ...person.stats }, relationship: person.relationship })) };
   const key = eventKey({ eventId: event.id, ...context });
   const description = (outcome === event ? eventDescriptionAtAge(event, (subject?.age ?? state.age) - 1) : outcome.description || eventDescriptionAtAge(event, (subject?.age ?? state.age) - 1)).replaceAll('{name}', subject?.name || 'Your family member');
   const fameBefore = state.fame ? clone(state.fame) : null;
@@ -843,9 +841,9 @@ function applyOutcome(state, event, outcome = event, context = {}) {
       state.aptitudes[key] = clamp(state.aptitudes[key] + amount, min, max);
     }
   }
-  if (subject && subject !== state) {
-    for (const [key, amount] of Object.entries(outcome.subjectChanges || {})) addStat(subject, key, amount);
-    if (outcome.relationship) subject.relationship = round(clamp(subject.relationship + outcome.relationship, 0, 10));
+  for (const person of targets) {
+    for (const [key, amount] of Object.entries(outcome.subjectChanges || {})) addStat(person, key, amount);
+    if (outcome.relationship) person.relationship = round(clamp(person.relationship + outcome.relationship, 0, 10));
   }
   const afterPermanent = effectiveStats(state);
   let temporaryYears = 0;
@@ -866,7 +864,7 @@ function applyOutcome(state, event, outcome = event, context = {}) {
       while (state.effects.some(effect => effect.id === restrictionKey)) restrictionKey = `${base}:stack:${copy++}`;
     }
     const old = stacks ? null : state.effects.find(effect => effect.id === restrictionKey);
-    const effect = { id: restrictionKey, name: `${context.subjectId ? `${subject.name}: ` : ''}${event.name}`.slice(0, 100), description, years: Math.max(old?.years || 0, outcome.years), modifiers: timedStatsEnabled ? { ...outcome.modifiers } : {}, kind: event.kind };
+    const effect = { id: restrictionKey, name: `${named}${event.name}`.slice(0, 100), description, years: Math.max(old?.years || 0, outcome.years), modifiers: timedStatsEnabled ? { ...outcome.modifiers } : {}, kind: event.kind };
     if (timedStatsEnabled && outcome.lifestyle) effect.lifestyle = outcome.lifestyle;
     if (outcome.householdLifestyle) effect.householdLifestyle = outcome.householdLifestyle;
     if (outcome.focusLimits) effect.focusLimits = clone(outcome.focusLimits);
@@ -910,12 +908,13 @@ function applyOutcome(state, event, outcome = event, context = {}) {
   if (timedStatsEnabled && temporaryYears) for (const [key, amount] of Object.entries(outcome.modifiers || {})) {
     if (amount) changes.push(`${signed(amount)} ${label(key)}`);
   }
-  if (subject && subject !== state) {
-    for (const key of Object.keys(outcome.subjectChanges || {})) if (before.subjectStats[key] !== subject.stats[key]) changes.push(`${subject.name}: ${label(key)} ${before.subjectStats[key]} → ${subject.stats[key]}`);
-    if (outcome.relationship && before.relationship !== subject.relationship) changes.push(`${subject.name}: Relationship ${before.relationship} → ${subject.relationship}`);
+  for (const [index, person] of targets.entries()) {
+    const previous = before.targets[index];
+    for (const key of Object.keys(outcome.subjectChanges || {})) if (previous.stats[key] !== person.stats[key]) changes.push(`${person.name}: ${label(key)} ${previous.stats[key]} → ${person.stats[key]}`);
+    if (outcome.relationship && previous.relationship !== person.relationship) changes.push(`${person.name}: Relationship ${previous.relationship} → ${person.relationship}`);
   }
   if (timedStatsEnabled && temporaryYears && outcome.lifestyle && state.age >= 18) changes.push(`${signed(outcome.lifestyle)} Lifestyle`);
-  const decision = outcome === event ? '' : `${outcome.label}. `;
+  const decision = outcome === event || outcome.automatic ? '' : `${outcome.label}. `;
   const duration = temporaryYears ? ` Temporary effects: ${temporaryYears} ${temporaryYears === 1 ? 'year' : 'years'}.` : '';
   const limits = activeFocusCaps(state, temporaryYears ? outcome.focusLimits?.[focusStage(state)] : undefined)
     .map(([key, max]) => `${focusLabel(state, key)} max ${max}`);
@@ -938,7 +937,7 @@ function applyOutcome(state, event, outcome = event, context = {}) {
   // Keep the event context separate from the concise journal outcome. The year
   // review can explain what happened without restoring flavor to saved results.
   const eventDescription = eventDescriptionAtAge(event, (subject?.age ?? state.age) - 1).replaceAll('{name}', subject?.name || 'Your family member');
-  log(state, `${context.subjectId ? `${subject.name}: ` : ''}${event.name}`, `${decision}${result}${duration}`, event.kind, eventDescription, context.cause);
+  log(state, `${named}${event.name}`, `${decision}${result}${duration}`, event.kind, eventDescription, context.cause);
   return true;
 }
 
@@ -997,7 +996,7 @@ export function resolveEventChoice(state, choiceId, expectedEventId, expectedSub
   if (expectedEventId !== undefined && pending.eventId !== expectedEventId) return fail('That event has already been resolved.');
   if (expectedSubjectId !== undefined && (pending.subjectId || '') !== expectedSubjectId) return fail('That family event has already been resolved.');
   const event = EVENTS.find(candidate => candidate.id === pending.eventId);
-  const choice = event?.choices?.find(candidate => candidate.id === choiceId);
+  const choice = pendingEventChoices(event, pending).find(candidate => candidate.id === choiceId);
   if (!choice) return fail('Choose one of the options for this event.');
   if (!pendingEventSubject(state, pending)) return fail('That family member is unavailable.');
   if (choice.fameAction === 'start') {
@@ -1024,9 +1023,49 @@ function schoolYear(state, growthRandom) {
     }
     report.activities.push({ kind, id: activity.id, name: activity.name, focus: state.focus[kind], before, after: enrollment.success });
   }
+  Object.assign(report, recordStageGrade(state.school, state.age, gpa));
   state.school.gpa = gpa;
   state.school.reportedAge = state.age + 1;
   return report;
+}
+// A local seeded order of stats for a school milestone. It never reads or
+// advances the gameplay RNG, so the options are fixed once the year is played.
+function milestoneStats(state, stage, kind, stats) {
+  let seed = 2166136261;
+  for (const letter of `${state.seed}:${state.id}:${state.generation}:${stage}:${kind}`) seed = Math.imul(seed ^ letter.charCodeAt(0), 16777619) >>> 0;
+  const draw = () => { seed = (seed + 0x6D2B79F5) >>> 0; let value = Math.imul(seed ^ seed >>> 15, seed | 1); value ^= value + Math.imul(value ^ value >>> 7, value | 61); return ((value ^ value >>> 14) >>> 0) / 4294967296; };
+  const result = [...stats];
+  for (let index = result.length - 1; index > 0; index--) { const other = Math.floor(draw() * (index + 1)); [result[index], result[other]] = [result[other], result[index]]; }
+  return result;
+}
+const MILESTONE_COPY = {
+  strength: ['Summer sports camp', 'A sports camp leaves you stronger.'], attractiveness: ['A new wardrobe', 'New clothes and a haircut suit you.'],
+  social: ['A big party', 'A celebration with friends brings you closer.'], creativity: ['An art and music kit', 'Hours of making things follow.'],
+  health: ['A family hiking trip', 'Long hikes leave you fitter.'],
+};
+// The concrete options of a pending choice. School honors resolve their saved
+// stats; every other event uses its catalog choices.
+export function pendingEventChoices(event, pending) {
+  if (!event?.scheduled || !Array.isArray(pending?.options)) return event?.choices || [];
+  return pending.options.map((stat, index) => ({ id: event.choices[index].id, label: MILESTONE_COPY[stat][0], description: MILESTONE_COPY[stat][1], statChanges: { [stat]: SCHOOL_BALANCE.honorsReward } }));
+}
+// End of elementary and middle school: honors offer a choice of rewards; poor
+// grades bring a row at home. Deterministic, outside the five-event limit.
+function schoolMilestone(state) {
+  const age = state.age - 1, stage = schoolStage(age);
+  const gpa = state.school?.stages?.[stage?.id]?.gpa;
+  if (!state.alive || !stage || stage.to !== age || stage === SCHOOL_BALANCE.stages.at(-1) || !Number.isFinite(gpa)) return;
+  if (gpa >= SCHOOL_BALANCE.honorsGpa) {
+    const options = milestoneStats(state, stage.id, 'honors', SCHOOL_BALANCE.honorsStats.filter(key => state.stats[key] < 10)).slice(0, SCHOOL_BALANCE.honorsOptions);
+    const event = EVENT_BY_ID.get(`school_${stage.id}_honors`);
+    if (!options.length) return;
+    state.pendingEvents.push({ eventId: event.id, age: state.age, options });
+    log(state, event.name, event.description, 'choice', event.description);
+  } else if (gpa < SCHOOL_BALANCE.warningGpa && caregivers(state).length) {
+    const [stat] = milestoneStats(state, stage.id, 'warning', SCHOOL_BALANCE.warningStats.filter(key => state.stats[key] > 0));
+    const event = EVENT_BY_ID.get(`school_${stage.id}_warning`);
+    if (stat) applyOutcome(state, event, { ...event, statChanges: { [stat]: -SCHOOL_BALANCE.warningPenalty }, automatic: true });
+  }
 }
 function logSchoolOffers(state) {
   for (const kind of ['sports', 'extracurricular']) {
@@ -1119,7 +1158,7 @@ function routineYear(state, growthRandom, careerRandom, fameRandom) {
 }
 function yearSnapshot(state) {
   return { age: state.age, height: state.height, stats: effectiveStats(state), lifestyle: state.lifestyle, fame: state.fame ? clone(state.fame) : null,
-    parents: [...state.parents, state.guardian].filter(Boolean).map(p => ({ id: p.id, name: p.name, lifestyle: familyLifestyle(state, p), stability: p.stats.stability, relationship: p.relationship })) };
+    parents: [...state.parents, state.guardian].filter(Boolean).map(p => ({ id: p.id, name: p.name, lifestyle: familyLifestyle(state, p), health: p.stats.health, stability: p.stats.stability, relationship: p.relationship })) };
 }
 function yearChanges(before, state) {
   const after = yearSnapshot(state);
@@ -1131,7 +1170,7 @@ function yearChanges(before, state) {
     lifestyle: delta(before.lifestyle, after.lifestyle),
     parents: before.parents.map(parent => {
       const next = after.parents.find(p => p.id === parent.id) || parent;
-      return { id: parent.id, name: parent.name, lifestyle: delta(parent.lifestyle, next.lifestyle), stability: delta(parent.stability, next.stability), relationship: delta(parent.relationship, next.relationship) };
+      return { id: parent.id, name: parent.name, lifestyle: delta(parent.lifestyle, next.lifestyle), health: delta(parent.health, next.health), stability: delta(parent.stability, next.stability), relationship: delta(parent.relationship, next.relationship) };
     }) };
 }
 // A pure preview of routine growth, finances, aging and expiring effects.
@@ -1280,6 +1319,7 @@ export function advanceYear(state, { mortalityRandom, growthRandom, parentCareer
     } else if (applyOutcome(state, event, event, context)) completed.push(roll);
   }
   selected = completed;
+  schoolMilestone(state);
   state.lastYearEvents = selected.map(roll => roll.id);
   syncFamilyLifestyles(state);
   if (state.age === 2) log(state, 'Toddler activities unlocked', 'You can now choose your toddler activities.', 'milestone');

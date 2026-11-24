@@ -1,6 +1,6 @@
 // Audit every exported event, choice and age-specific narrative. Optional
 // frozen-runtime comparison proves that only description strings changed.
-// node scripts/audit-event-copy.mjs --baseline .git/short-event-copy-baseline --output test-artifacts/short-event-copy-catalog.json
+// node scripts/audit-event-copy.mjs --baseline .baselines/short-event-copy --output test-artifacts/short-event-copy-catalog.json
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -20,11 +20,13 @@ export async function loadCatalog(directory) {
   const [personal, family, fame] = await Promise.all([load('events.js'), load('family-events.js'), load('fame-events.js')]);
   return [...personal.EVENTS, ...family.FAMILY_EVENTS, ...fame.FAME_EVENTS];
 }
+// Scheduled events (school milestones) carry placeholder choices; their shown
+// copy comes from the saved options (engine.js pendingEventChoices).
 export function narrativeEntries(events) {
   return events.flatMap(event => [
     { eventId: event.id, path: 'description', text: event.description },
     ...Object.entries(event.descriptionsByStage || {}).map(([stage, text]) => ({ eventId: event.id, path: `descriptionsByStage.${stage}`, text })),
-    ...(event.choices || []).flatMap(choice => [
+    ...(event.scheduled ? [] : event.choices || []).flatMap(choice => [
       { eventId: event.id, choiceId: choice.id, path: `choices.${choice.id}.description`, text: choice.description },
       ...Object.entries(choice.descriptionsByStage || {}).map(([stage, text]) => ({ eventId: event.id, choiceId: choice.id, path: `choices.${choice.id}.descriptionsByStage.${stage}`, text })),
     ]),

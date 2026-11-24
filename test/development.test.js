@@ -68,8 +68,8 @@ test('new families have mom and dad relationships with mean seven and standard d
     appearances.push(state.stats.attractiveness);
     const parentalAppearance = average(state.parents.map(parent => parent.stats.attractiveness));
     parentalAppearances.push(parentalAppearance);
-    if (parentalAppearance >= 6) higherParentAppearances.push(state.stats.attractiveness);
-    if (parentalAppearance <= 4) lowerParentAppearances.push(state.stats.attractiveness);
+    if (parentalAppearance >= 5.5) higherParentAppearances.push(state.stats.attractiveness);
+    if (parentalAppearance <= 4.5) lowerParentAppearances.push(state.stats.attractiveness);
     heights.add(state.height);
     assert.equal(validateSave(state), true, `seed ${seed}`);
   }
@@ -85,9 +85,9 @@ test('new families have mom and dad relationships with mean seven and standard d
   assert.ok(median(appearances) >= 4 && median(appearances) <= 8);
   assert.ok(standardDeviation(appearances) > standardDeviation(parentalAppearances), 'appearance has variation beyond the parental mean');
   assert.ok(higherParentAppearances.length > 100 && lowerParentAppearances.length > 100);
-  assert.ok(average(higherParentAppearances) > average(lowerParentAppearances) + 2.5, 'appearance inherits a tendency from both parents');
-  assert.ok(higherParentAppearances.some(value => value < 3) && lowerParentAppearances.some(value => value > 7), 'parental appearance does not predetermine the child');
-  assert.ok(appearances.some(value => value <= 2) && appearances.some(value => value >= 9));
+  assert.ok(average(higherParentAppearances) > average(lowerParentAppearances) + 1.25, 'appearance inherits a tendency from both parents');
+  assert.ok(higherParentAppearances.some(value => value < 4) && lowerParentAppearances.some(value => value > 6), 'parental appearance does not predetermine the child');
+  assert.ok(appearances.some(value => value <= 2) && appearances.some(value => value >= 8));
   assert.ok(heights.size > 50, 'newborn length varies instead of always being 50cm');
 });
 

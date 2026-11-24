@@ -28,7 +28,7 @@ test('only the matching famous activity gains a third point and follows its owne
   assert.equal(focusMaxFor(state, 'extracurricular'), 3);
   assert.equal(focusMaxFor(state, 'sports'), 2);
   assert.equal(focusMaxFor(state, 'self'), 4);
-  assert.equal(focusBudget(state), 10);
+  assert.equal(focusBudget(state), 9);
   assert.deepEqual(focusKeysForAge(state), [...coreKeys, 'sports', 'extracurricular']);
   state.age = 18;
   assert.deepEqual(focusKeysForAge(state), [...coreKeys, 'extracurricular']);
@@ -71,11 +71,11 @@ test('the third source point improves success before and after school while othe
   assert.equal(activityEligible(state, lacrosse), false, 'a retained fame ID cannot substitute for current enrollment');
 });
 
-test('every source training map uses three full units and adds Social training even when the sport already teaches it', () => {
+test('every source training map uses three full units and adds one Social unit to the activity training', () => {
   const cases = [
-    ['sports', 'soccer', { strength: .3, social: .48 }],
-    ['sports', 'fencing', { strength: .3, intelligence: .225, social: .48 }],
-    ['sports', 'gymnastics', { strength: .3, creativity: .24, social: .48 }],
+    ['sports', 'soccer', { strength: .3, social: .24 }],
+    ['sports', 'fencing', { strength: .15, intelligence: .1125, social: .24 }],
+    ['sports', 'gymnastics', { strength: .15, creativity: .12, social: .24 }],
     ['extracurricular', 'chess', { intelligence: .225, social: .24 }],
     ['extracurricular', 'modeling', { attractiveness: .225, social: .24 }],
   ];
@@ -122,7 +122,7 @@ test('fame adds five to effective Social learning above the natural cap without 
   assert.equal(effectiveAptitude(state, 'intelligence'), 0);
   assert.ok(Object.values(skillChanges(state)).every(value => value === 0), 'fame alone creates no Social gain');
   const before = copy(state);
-  for (const [points, expected] of [[3, .24 * .25 * 1.64], [1, -.24 * .25 * .44]]) {
+  for (const [points, expected] of [[3, .36 * .25 * 1.64], [1, -.36 * .25 * .44]]) { // Friends' Social unit is .06 raw
     const candidate = { ...state, focus: { ...state.focus, social: points } };
     near(skillChanges(candidate).social, expected, 'routine Social learning uses aptitude 8');
     near(focusChoiceEffects(candidate).social, expected, 'preview uses the same effective learning ability');

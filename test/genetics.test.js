@@ -42,14 +42,14 @@ test('the shared randomness setting scales ratings, affinities and growth while 
     assert.deepEqual(inheritAffinities(parents, () => .5), values(0));
     assert.equal(inheritedGrowthFactor(parents, () => .5), 1);
     GENETICS_BALANCE.randomness = 1;
-    assert.deepEqual(inheritRatings(parents, () => .5), values(6.25));
+    assert.deepEqual(inheritRatings(parents, () => .5), values(5.5));
     assert.deepEqual(inheritAffinities(parents, () => .5), values(1));
     assert.equal(inheritedGrowthFactor(parents, () => .5), 1.0235);
     GENETICS_BALANCE.randomness = 2;
-    assert.deepEqual(inheritRatings(parents, () => .5), values(7.5));
+    assert.deepEqual(inheritRatings(parents, () => .5), values(6));
     assert.deepEqual(inheritAffinities(parents, () => .5), values(2));
     assert.equal(inheritedGrowthFactor(parents, () => .5), 1.047);
-    assert.deepEqual(inheritRatings(parents, () => .5, 1), values(6.25));
+    assert.deepEqual(inheritRatings(parents, () => .5, 1), values(5.5));
   } finally { GENETICS_BALANCE.randomness = previous; }
 });
 
@@ -159,8 +159,8 @@ test('seeded offspring cohorts preserve parental ordering with low-from-high and
   for (const key of KEYS) {
     const means = ['low', 'mixed', 'high'].map(group => average(cohorts[group].ratings[key]));
     assert.ok(means[0] < means[1] - 2 && means[1] < means[2] - 2, `${key}: ${means}`);
-    assert.ok(cohorts.high.ratings[key].some(value => value < 3), `${key}: low child from high parents`);
-    assert.ok(cohorts.low.ratings[key].some(value => value > 7), `${key}: high child from low parents`);
+    assert.ok(cohorts.high.ratings[key].some(value => value < 7), `${key}: low child from high parents`);
+    assert.ok(cohorts.low.ratings[key].some(value => value > 3), `${key}: high child from low parents`);
     assert.ok(cohorts.high.affinities[key].some(value => value < 0), `${key}: negative affinity from positive parents`);
     assert.ok(cohorts.low.affinities[key].some(value => value > 0), `${key}: positive affinity from negative parents`);
     assert.ok(average(cohorts.low.affinities[key]) < -1.5 && average(cohorts.high.affinities[key]) > 1.5);

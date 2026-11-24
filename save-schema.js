@@ -1,16 +1,17 @@
 // Read-only validation for current and legacy saves. Migration stays in the
 // engine, where it can use the same generation and progression rules.
-import { JOBS } from './jobs.js?v=short-events-toddler-order';
-import { EVENTS as PERSONAL_EVENTS } from './events.js?v=short-events-toddler-order';
-import { FAMILY_EVENTS } from './family-events.js?v=short-events-toddler-order';
-import { FAME_EVENTS } from './fame-events.js?v=short-events-toddler-order';
-import { MAX_FOCUS, DEFAULT_FOCUS, SCHOOL_FOCUS_KEYS, focusMaxFor, focusBudget } from './focus-rules.js?v=short-events-toddler-order';
-import { SCHOOL_OFFER_COUNT, MAX_SCHOOL_OFFERS, schoolActivity, currentSchoolEnrollment } from './school.js?v=short-events-toddler-order';
-import { conditionFocusPoints, conditionFocusLimits, validateBirthConditions, aptitudeBounds } from './birth-conditions.js?v=short-events-toddler-order';
-import { gestatingActor } from './relationships.js?v=short-events-toddler-order';
-import { COLLEGES, COLLEGE_BALANCE, collegeById } from './college.js?v=short-events-toddler-order';
-import { HOUSING_BALANCE } from './housing.js?v=short-events-toddler-order';
-import { MAX_RESOURCES } from './lifestyle.js?v=short-events-toddler-order';
+import { JOBS } from './jobs.js?v=stat-driven-events';
+import { EVENTS as PERSONAL_EVENTS } from './events.js?v=stat-driven-events';
+import { FAMILY_EVENTS } from './family-events.js?v=stat-driven-events';
+import { FAME_EVENTS } from './fame-events.js?v=stat-driven-events';
+import { MAX_FOCUS, DEFAULT_FOCUS, SCHOOL_FOCUS_KEYS, focusMaxFor, focusBudget } from './focus-rules.js?v=stat-driven-events';
+import { FOCUS_BALANCE, SCHOOL_BALANCE } from './balance.js?v=stat-driven-events';
+import { SCHOOL_OFFER_COUNT, MAX_SCHOOL_OFFERS, schoolActivity, currentSchoolEnrollment } from './school.js?v=stat-driven-events';
+import { conditionFocusPoints, conditionFocusLimits, validateBirthConditions, aptitudeBounds } from './birth-conditions.js?v=stat-driven-events';
+import { gestatingActor } from './relationships.js?v=stat-driven-events';
+import { COLLEGES, COLLEGE_BALANCE, collegeById } from './college.js?v=stat-driven-events';
+import { HOUSING_BALANCE } from './housing.js?v=stat-driven-events';
+import { MAX_RESOURCES } from './lifestyle.js?v=stat-driven-events';
 
 // Inject engine-owned helpers rather than importing the engine back here.
 // Keeping these references shared prevents validation rules from drifting.
@@ -72,15 +73,22 @@ export function createSaveValidator({
       if (!finite(raw.height, heightBound(40), heightBound(version >= 9 ? 240 : 210)) || !validAdultHeight(raw)) return false;
       const validFocus = (focus, keys, maximum = version >= 17 ? MAX_FOCUS : 5, budget = version >= 17 ? DEFAULT_FOCUS * keys.length : 12) => focus && Object.keys(focus).length === keys.length && keys.every(key => Number.isInteger(focus[key]) && finite(focus[key], 0, typeof maximum === 'object' ? maximum[key] : maximum)) && keys.reduce((sum, key) => sum + focus[key], 0) <= budget;
       const currentFocusKeys = version >= 20 ? focusKeys(raw) : version >= 18 ? focusKeys(raw.age) : version >= 17 || version >= 11 && raw.age >= 2 && raw.age < 5 && Object.hasOwn(raw.focus || {}, 'creative') ? legacyFocusKeys(raw.age) : FOCUS_KEYS;
-      const currentBudget = version >= 19 ? focusBudget(raw) : version >= 17 ? Math.max(0, DEFAULT_FOCUS * currentFocusKeys.length + conditionFocusPoints(raw)) : 12;
+      const currentBudget = version >= 19 ? focusBudget(raw, FOCUS_BALANCE.legacySchoolBudget) : version >= 17 ? Math.max(0, DEFAULT_FOCUS * currentFocusKeys.length + conditionFocusPoints(raw)) : 12;
       const currentMaximum = version >= 19 ? Object.fromEntries(currentFocusKeys.map(key => [key, focusMaxFor(raw, key)])) : version >= 17 ? MAX_FOCUS : 5;
       if (!validFocus(raw.focus, currentFocusKeys, currentMaximum, currentBudget)) return false;
       if (version >= 19) {
         const school = raw.school;
         const validEnrollment = (entry, kind) => entry === null || entry && Object.keys(entry).length === 2 && Boolean(schoolActivity(kind, entry.id)) && (entry.success === null || finite(entry.success, 0, 10));
         const validOffers = (ids, kind) => Array.isArray(ids) && (schoolOfferCount === null ? ids.length <= MAX_SCHOOL_OFFERS : ids.length === schoolOfferCount) && new Set(ids).size === ids.length && ids.every(id => Boolean(schoolActivity(kind, id)));
+        // Optional since record 042: each stage's running GPA, { gpa, years }.
+        const validStages = stages => stages === undefined || version >= 20 && stages && typeof stages === 'object' && !Array.isArray(stages)
+          && Object.entries(stages).every(([id, entry]) => {
+            const stage = SCHOOL_BALANCE.stages.find(candidate => candidate.id === id);
+            return stage && raw.age > stage.from && entry && Object.keys(entry).length === 2 && finite(entry.gpa, 50, 100)
+              && Number.isInteger(entry.years) && finite(entry.years, 1, stage.to - stage.from + 1);
+          });
         if (school === null) { if (raw.age >= 5 && raw.age < 18) return false; }
-        else if (raw.age < 5 || !school || Object.keys(school).length !== 6 || !finite(school.gpa, 50, 100)
+        else if (raw.age < 5 || !school || Object.keys(school).length !== (school.stages === undefined ? 6 : 7) || !validStages(school.stages) || !finite(school.gpa, 50, 100)
           || !(school.reportedAge === null || Number.isInteger(school.reportedAge) && finite(school.reportedAge, 6, Math.min(18, raw.age)))
           || !Number.isInteger(school.offersAge) || school.offersAge !== Math.min(raw.age, 17)
           || !school.offers || Object.keys(school.offers).length !== 2
@@ -132,8 +140,8 @@ export function createSaveValidator({
             // modifier-count limit rejecting valid scheduling records.
             const maximumPointModifier = 4 * (2 ** 32 - 1);
             if (hasPointModifier && (version < 20 || !currentRules || !Number.isInteger(decisions.focusPointModifier) || !finite(decisions.focusPointModifier, -maximumPointModifier, maximumPointModifier) || decisions.focusPointModifier === 0)) return false;
-            const recordedBudget = Math.max(0, (mixedSchool ? 10 : adultActivities.length ? 8 : DEFAULT_FOCUS * keys.length) + conditionFocusPoints(raw) + (hasPointModifier ? decisions.focusPointModifier : 0));
-            if (currentRules && (version < 17 || decisions.focusMax !== MAX_FOCUS || decisions.focusBudget !== recordedBudget)) return false;
+            const recordedBudget = schoolBase => Math.max(0, (mixedSchool ? schoolBase : adultActivities.length ? 8 : DEFAULT_FOCUS * keys.length) + conditionFocusPoints(raw) + (hasPointModifier ? decisions.focusPointModifier : 0));
+            if (currentRules && (version < 17 || decisions.focusMax !== MAX_FOCUS || ![FOCUS_BALANCE.schoolBudget, FOCUS_BALANCE.legacySchoolBudget].some(base => decisions.focusBudget === recordedBudget(base)))) return false;
             const recordedMaximum = mixedSchool ? Object.fromEntries(keys.map(key => [key, decisions.focusCaps[key] ?? MAX_FOCUS])) : adultActivities.length ? Object.fromEntries(keys.map(key => [key, key === fameActivity && (key !== 'sports' || !hasCollegeSport || decisions.fame.activityId === decisions.collegeSport) ? 3 : key === 'sports' && hasCollegeSport ? 2 : MAX_FOCUS])) : currentRules ? MAX_FOCUS : 5;
             if (summary.fromAge < (version >= 10 ? 2 : 3) || Object.keys(decisions).length !== (currentRules ? mixedSchool ? 5 : 4 : 2) + Number(hasPointModifier) + Number(hasRecordedFame) + Number(hasCollegeSport) || !(version >= 10 ? ['Play', 'School', 'College', 'Career'] : ['School', 'College', 'Career']).includes(decisions.workLabel) || !validFocus(focus, keys, recordedMaximum, currentRules ? decisions.focusBudget : 12)) return false;
           }
@@ -153,7 +161,7 @@ export function createSaveValidator({
               && (activity.after === null ? activity.before === null && activity.focus === 0 : finite(activity.after, 0, 10)))) return false;
         }
         if (summary?.height !== undefined && (!finite(summary.height.before, heightBound(40), heightBound(240)) || !finite(summary.height.after, heightBound(40), heightBound(240)) || !finite(summary.height.change, 0, heightBound(200)) || Math.abs(round(summary.height.after - summary.height.before) - summary.height.change) > .001)) return false;
-        if (summary !== null && (!summary || typeof summary.dismissed !== 'boolean' || summary.toAge !== raw.age || summary.fromAge !== raw.age - 1 || !summary.stats || Object.keys(summary.stats).length !== STAT_KEYS.length || !STAT_KEYS.every(key => validDelta(summary.stats[key], true)) || !validDelta(summary.lifestyle, true) || !Array.isArray(summary.parents) || summary.parents.length > (version >= 15 ? 3 : 2) || !summary.parents.every(parent => text(parent.id, 100) && text(parent.name, 50) && validDelta(parent.stability) && validDelta(parent.relationship) && (parent.lifestyle === undefined || validDelta(parent.lifestyle, true))) || !Array.isArray(summary.events) || summary.events.length > 30 || !summary.events.every(event => text(event.title, 200) && text(event.text, 2000) && text(event.kind, 50) && validCause(event) && (event.description === undefined || text(event.description, 1000))))) return false;
+        if (summary !== null && (!summary || typeof summary.dismissed !== 'boolean' || summary.toAge !== raw.age || summary.fromAge !== raw.age - 1 || !summary.stats || Object.keys(summary.stats).length !== STAT_KEYS.length || !STAT_KEYS.every(key => validDelta(summary.stats[key], true)) || !validDelta(summary.lifestyle, true) || !Array.isArray(summary.parents) || summary.parents.length > (version >= 15 ? 3 : 2) || !summary.parents.every(parent => text(parent.id, 100) && text(parent.name, 50) && validDelta(parent.stability) && validDelta(parent.relationship) && (parent.health === undefined || validDelta(parent.health)) && (parent.lifestyle === undefined || validDelta(parent.lifestyle, true))) || !Array.isArray(summary.events) || summary.events.length > 30 || !summary.events.every(event => text(event.title, 200) && text(event.text, 2000) && text(event.kind, 50) && validCause(event) && (event.description === undefined || text(event.description, 1000))))) return false;
       }
       if (!Array.isArray(raw.parents) || raw.parents.length > 2 || !raw.parents.every(person => validPerson(person) && validLivingAge(person) && (!person.alive || person.age > raw.age))) return false;
       if (version >= 7 && !raw.parents.every(person => finite(person.relationship, ratingFloor, 10))) return false;
@@ -282,11 +290,14 @@ export function createSaveValidator({
       if (!legacy) {
         const knownKey = key => typeof key === 'string' && (PERSONAL_EVENTS.some(event => event.id === key) || version >= 20 && FAME_EVENTS.some(event => event.id === key) || version >= 5 && FAMILY_EVENTS.some(event => key.startsWith(`${event.id}:`) && key.length <= 200));
         if (!Array.isArray(raw.lastYearEvents) || raw.lastYearEvents.length > 5 || new Set(raw.lastYearEvents).size !== raw.lastYearEvents.length || !raw.lastYearEvents.every(knownKey)) return false;
-        if (!Array.isArray(raw.pendingEvents) || raw.pendingEvents.length > 5 || new Set(raw.pendingEvents.map(pending => pending && eventKey(pending))).size !== raw.pendingEvents.length) return false;
+        if (!Array.isArray(raw.pendingEvents) || raw.pendingEvents.length > 6 || new Set(raw.pendingEvents.map(pending => pending && eventKey(pending))).size !== raw.pendingEvents.length) return false;
         if (!raw.pendingEvents.every(pending => {
-          if (!pending || !validCause(pending) || pending.age !== raw.age || !raw.lastYearEvents.includes(eventKey(pending))) return false;
           const event = EVENTS.find(event => event.id === pending.eventId);
+          // School milestones are scheduled, not rolled, and save their offered stats.
+          const options = pending?.options;
+          if (!pending || !validCause(pending) || pending.age !== raw.age || !(event?.scheduled || raw.lastYearEvents.includes(eventKey(pending)))) return false;
           if (!event?.choices?.length) return false;
+          if (event.scheduled ? version < 20 || !Array.isArray(options) || !options.length || options.length > event.choices.length || new Set(options).size !== options.length || !options.every(key => SCHOOL_BALANCE.honorsStats.includes(key)) : options !== undefined) return false;
           const invitationKind = ['sports', 'extracurricular'].includes(event.fameKind) ? event.fameKind : null;
           const collegeInvitation = invitationKind === 'sports' && raw.age - 1 >= 18 && raw.age - 1 <= 84
             && ['college', 'graduate'].includes(raw.education?.status) && raw.education.sport?.seasons > 0

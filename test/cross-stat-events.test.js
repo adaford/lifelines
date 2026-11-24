@@ -15,8 +15,8 @@ test('personal ratings are permanent while activity restrictions and explicit ho
       assert.equal(outcome.years > 0, Boolean(outcome.focusCapacity || outcome.focusMinimums || outcome.focusPoints || outcome.householdLifestyle), `${event.id}:${outcome.id}`);
     }
   }
-  const gossip = EVENTS.find(event => event.id === 'gossip_choice').choices.find(choice => choice.id === 'spread');
-  assert.ok(Math.abs(gossip.statChanges.social - (-.4)) < 1e-10, 'lasting and formerly timed effects merge before applying');
+  const overwork = EVENTS.find(event => event.id === 'work_boundaries').choices.find(choice => choice.id === 'continue');
+  assert.deepEqual(overwork.statChanges, { intelligence: .3, health: -.4, stability: -.5 }, 'lasting and formerly timed effects merge before applying');
   const lesson = EVENTS.find(event => event.id === 'extra_lessons').choices.find(choice => choice.id === 'study');
   assert.deepEqual(lesson.statChanges, { intelligence: .5 });
   assert.deepEqual(lesson.focusCapacity, { standard: { social: -2 } });

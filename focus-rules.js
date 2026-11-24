@@ -1,6 +1,7 @@
-import { conditionFocusPoints } from './birth-conditions.js?v=short-events-toddler-order';
-import { fameFocusKey, fameActivityMatches } from './fame.js?v=short-events-toddler-order';
-import { currentSchoolEnrollment } from './school.js?v=short-events-toddler-order';
+import { conditionFocusPoints } from './birth-conditions.js?v=stat-driven-events';
+import { fameFocusKey, fameActivityMatches } from './fame.js?v=stat-driven-events';
+import { currentSchoolEnrollment } from './school.js?v=stat-driven-events';
+import { FOCUS_BALANCE } from './balance.js?v=stat-driven-events';
 
 // One shared allocation scale for all playable focus stages.
 export const MAX_FOCUS = 4;
@@ -30,10 +31,12 @@ export const focusNeutralFor = (ageOrPerson, key) => isSchoolActivityFocus(ageOr
 export const temporaryFocusPoints = person => (person?.effects || []).reduce((sum, effect) => sum + (
   effect.years > 0 && Number.isInteger(effect.focusPoints) && Math.abs(effect.focusPoints) <= 4 ? effect.focusPoints : 0
 ), 0);
-export function focusBudget(ageOrPerson) {
+// Saves from releases with a 10-point school budget stay readable; the player
+// lowers the extra point before the next year (validation uses the legacy base).
+export function focusBudget(ageOrPerson, schoolBase = FOCUS_BALANCE.schoolBudget) {
   const person = ageOrPerson && typeof ageOrPerson === 'object' ? ageOrPerson : null;
   const age = person ? person.age : ageOrPerson;
-  const base = age >= 5 && age < 18 ? 10 : DEFAULT_FOCUS * focusKeysForAge(age).length;
+  const base = age >= 5 && age < 18 ? schoolBase : DEFAULT_FOCUS * focusKeysForAge(age).length;
   return Math.max(0, base + (person ? conditionFocusPoints(person) + temporaryFocusPoints(person) : 0));
 }
 export const defaultFocus = ageOrPerson => Object.fromEntries(focusKeysForAge(ageOrPerson).map(key => [key,

@@ -1,0 +1,6 @@
+# Current event and rating rules (1 November 2026)
+
+- New events make permanent stat changes; only activity restrictions create timed effects. Preserve the legacy temporary effect code, active saved effects, history, and pending decisions. High/low-stat automatic events generally affect a different stat. Injuries affect appearance and/or physical-activity caps.
+- Rare events cover all 42 ordered pairs of different personal stats, with positive and negative variants. Source stats influence odds; target aptitude moves exactly one integer step within -3 to +3 and target rating changes by base +/-0.3. Keep their rare rates separate from ordinary event multipliers. Record actual signed before/after learning ability in event results.
+- All seven personal rating changes use `0.35 + 0.65 * log1p(distance) / log(6)` with distance toward the relevant boundary. Apply once per change, then round and bound. Initial stats and loaded saves do not rescale. Aptitudes, height, lifestyle, relationships, and legacy temporary modifiers do not use this multiplier.
+- Activity signs represent proportional raw contributions for a personal stat across activities before aptitude, age, directional damping, and rounding. Share coefficients with simulation; do not approximate unequal raw ratios with identical signs. Current focus rules below define neutral points, curve, and budgets.

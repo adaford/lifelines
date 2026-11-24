@@ -1,12 +1,13 @@
-import { heightReference } from './growth.js?v=short-events-toddler-order';
-import { aptitudeBounds } from './birth-conditions.js?v=short-events-toddler-order';
+import { heightReference } from './growth.js?v=stat-driven-events';
+import { aptitudeBounds } from './birth-conditions.js?v=stat-driven-events';
+import { BIRTH_BALANCE } from './balance.js?v=stat-driven-events';
 
 // Fictional inheritance settings for the game, not claims about human genetics.
 // One shared scalar controls the spread around the parents' mean. Zero removes
 // this variation; larger values broaden it without changing the parental mean.
 export const GENETICS_BALANCE = {
   randomness: 1,
-  ratingDeviation: 2.5,
+  ratingDeviation: BIRTH_BALANCE.inheritedNoise,
   affinityDeviation: 1.6,
   growthDeviation: .047,
 };

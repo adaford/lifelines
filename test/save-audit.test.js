@@ -160,7 +160,7 @@ test('adult new random draws are limited to each college report and the single f
   assert.equal(countedYear(next).calls.recruitmentOrFame, 0, 'graduation never rerolls recruitment');
 });
 
-const frozenEngine = new URL('../.git/college-resume-baseline/engine.js', import.meta.url);
+const frozenEngine = new URL('../.baselines/college-resume/engine.js', import.meta.url);
 test('modern scheduling records preserve aggregate budget history after their expiry', () => {
   const state = applicant();
   assert.equal(engine.chooseEducation(state, 'work').ok, true);
@@ -220,5 +220,5 @@ test('genuine pre-college runtime saves load exactly and remain playable through
     }
     assert.ok(checkpoints >= 48);
     assert.ok(pendingChoices > 20);
-    t.diagnostic(JSON.stringify({ checkpoints, pendingChoices, transitions, provenance: '.git/college-resume-baseline/engine.js (unmodified historical runtime)' }));
+    t.diagnostic(JSON.stringify({ checkpoints, pendingChoices, transitions, provenance: '.baselines/college-resume/engine.js (unmodified historical runtime)' }));
   });

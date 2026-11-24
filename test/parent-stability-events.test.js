@@ -5,6 +5,7 @@ import { createGame, advanceYear, validateSave, migrateSave, focusLimits } from 
 import { defaultFocus } from '../focus-rules.js';
 import { createSchoolRecord } from '../school.js';
 import { changedRating } from '../rating-changes.js';
+import { statEventFactor } from '../event-rates.js';
 
 const additions = FAMILY_EVENTS.filter(event => event.category === 'Parent mental stability');
 const copy = value => structuredClone(value);
@@ -75,8 +76,9 @@ test('mental-stability thresholds use the named parent and retain curved odds wi
   }
   const state = fixture(), parent = state.parents[0];
   const old = FAMILY_EVENTS.find(event => event.id === 'household_parent_missed_pickup');
-  const factor = .08 + 3.68 * ((10 - parent.stats.stability) / 9) ** 2;
-  assert.equal(chance(state, old), old.baseChance * FAMILY_EVENT_RATE_MULTIPLIER * factor, 'older event rates retain their formula');
+  const factor = statEventFactor(parent.stats.stability, 'low');
+  assert.equal(factor, .4, 'a neutral rating keeps the quiet base factor');
+  assert.equal(chance(state, old), old.baseChance * FAMILY_EVENT_RATE_MULTIPLIER * factor, 'older event rates use the shared stat factor');
 });
 
 test('parent mental-stability events respect age, presence, death, and guardianship', () => {

@@ -64,7 +64,8 @@ test('a rolled club deadline removes one total point for the next full year, inc
   const event = additions.find(event => event.id === 'club_deadline_pressure');
   for (const age of [12, 17]) {
     const original = pupil(age);
-    original.focus = { work: 2, social: 2, family: 2, self: 2, sports: 0, extracurricular: 2 };
+    // The lost point comes from School (3 -> 2), keeping the middle-school GPA clear of the honors and warning milestones.
+    original.focus = { work: 3, social: 2, family: 1, self: 1, sports: 0, extracurricular: 2 };
     const legacy = { id: event.id, name: event.name, description: 'A saved old penalty.', kind: 'negative', years: 3, modifiers: { stability: -.2 } };
     if (age === 12) original.effects = [copy(legacy)];
     assert.deepEqual(migrateSave(copy(original)), original, 'an existing timed mental effect is preserved on load');
@@ -79,7 +80,7 @@ test('a rolled club deadline removes one total point for the next full year, inc
     assert.ok(received, `an isolated automatic deadline event can roll at ${age}`);
     assert.equal(received.age, age + 1);
     assert.deepEqual(received.yearSummary.stats, forecast.stats, 'the deadline itself changes no rating, including mental stability');
-    assert.equal(received.yearSummary.decisions.focusBudget, 10, 'the triggering school year used its original budget');
+    assert.equal(received.yearSummary.decisions.focusBudget, 9, 'the triggering school year used its original budget');
     assert.equal(received.yearSummary.decisions.focusPointModifier, undefined);
     const pointEffect = received.effects.find(effect => effect.focusPoints === -1);
     assert.ok(pointEffect);
@@ -87,7 +88,7 @@ test('a rolled club deadline removes one total point for the next full year, inc
     assert.equal(pointEffect.years, 1, 'the new effect still has one complete playable year');
     assert.deepEqual(pointEffect.modifiers, {});
     assert.equal(temporaryFocusPoints(received), -1);
-    assert.equal(focusBudget(received), age === 17 ? 7 : 9);
+    assert.equal(focusBudget(received), age === 17 ? 7 : 8);
     assert.equal(Object.values(received.focus).reduce((sum, points) => sum + points, 0), focusBudget(received));
     if (age === 12) assert.deepEqual(received.effects.find(effect => effect.id === event.id), { ...legacy, years: 2 }, 'the point loss coexists with the old stat effect');
     const entry = received.history.find(entry => entry.title === event.name);
@@ -107,11 +108,11 @@ test('a rolled club deadline removes one total point for the next full year, inc
     assert.ok(completed, 'an event-free next year isolates expiry');
     assert.deepEqual(completed.yearSummary.stats, nextForecast.stats, 'the complete next routine uses the reduced allocation');
     assert.deepEqual(completed.yearSummary.decisions.focus, allocated);
-    assert.equal(completed.yearSummary.decisions.focusBudget, age === 17 ? 7 : 9);
+    assert.equal(completed.yearSummary.decisions.focusBudget, age === 17 ? 7 : 8);
     assert.equal(completed.yearSummary.decisions.focusPointModifier, -1);
     assert.equal(completed.effects.some(effect => effect.id === pointEffect.id && effect.focusPoints === -1), false);
     assert.equal(temporaryFocusPoints(completed), 0);
-    assert.equal(focusBudget(completed), age === 17 ? 8 : 10);
+    assert.equal(focusBudget(completed), age === 17 ? 8 : 9);
     assert.deepEqual(completed.focus, allocated, 'expiry restores the total budget without allocating the recovered point');
     assert.equal(validateSave(completed), true);
     assert.deepEqual(migrateSave(copy(completed)), completed, 'the expired effect leaves its historical decision budget valid');

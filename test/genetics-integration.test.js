@@ -192,7 +192,7 @@ test('genetic spread changes new outcomes reproducibly without changing the seed
 });
 
 test('genuine pre-genetics lives and saved pregnancies remain exact on current reads and reloads', async t => {
-  const path = new URL('../.git/dating-genetics-baseline/engine.js', import.meta.url);
+  const path = new URL('../.baselines/dating-genetics/engine.js', import.meta.url);
   if (!existsSync(path)) return t.skip('optional complete pre-genetics baseline is not present in this checkout');
   const baseline = await import(path.href), snapshots = [];
   for (const seed of [13, 91, 1024]) {

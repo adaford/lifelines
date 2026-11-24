@@ -73,7 +73,7 @@ test('pending family choices protect the source owner at low, neutral and change
     assert.equal(resolveEventChoice(state, 'review', 'household_partner_offer', partner.id).ok, true);
     assert.equal(partner.stats.intelligence, rating);
     assert.equal(state.stats.intelligence, changedRating(before.stats.intelligence, .15));
-    assert.equal(partner.relationship, 5.2, 'a relationship unrelated to this source remains an allowed consequence');
+    assert.equal(partner.relationship, 4.9, 'a relationship unrelated to this source remains an allowed consequence');
     assert.equal(state.rng, before.rng);
     assert.doesNotMatch(state.history[0].text, /Morgan Vale: Intelligence/);
     assert.match(state.history[0].text, /Your intelligence/);
@@ -168,7 +168,8 @@ test('old same-stat rewards and active modifiers survive unchanged loads while n
   assert.equal(loaded.rng, before.rng);
   assert.deepEqual(loaded.history.find(entry => entry.id === 'old-same-stat-reward'), before.history.find(entry => entry.id === 'old-same-stat-reward'));
   assert.ok(loaded.yearSummary.events.some(entry => entry.text === historical.text && entry.cause === cause));
-  assert.match(loaded.history[0].text, /No additional effects/);
+  assert.equal(loaded.stats.intelligence, changedRating(before.stats.intelligence, .25), 'speaking now carries its own Intelligence benefit');
+  assert.match(loaded.history[0].text, /Your intelligence/);
   assert.doesNotMatch(loaded.history[0].text, /social/i);
   assert.deepEqual(migrateSave(copy(loaded)), loaded);
 });

@@ -1,0 +1,13 @@
+# Ratings require a cause (12 November 2026)
+
+Every existing rated stat now changes only when an activity, care, event, aging, or another explicit system supplies a contribution. Remove all skill movement toward innate ratings, all childhood stat calibration offsets, both childhood wellbeing target adjustments, and caregiver mental-stability recovery toward 5. This supersedes earlier passive-recovery, background-deduction, and mean-reversion rules. Birth distributions and initial affinity effects are unchanged.
+
+Keep the shared directional rating response: a positive contribution gains more at a low rating, while a negative contribution loses more at a high rating. A rating's position never supplies a contribution by itself. Routine randomness scales the already-caused net change by 1 + boundedNormalDraw * rate, with rates .1 for learned skills, .25 for Health/Mental stability and .3 for Attractiveness. Relationship variation likewise scales caused changes at .2. Zero net input remains exactly zero; bounded draws cannot reverse direction. Preserve every existing routine draw even when its contribution is zero. Appearance and late-life Health aging, school inactivity, care, activity performance, household finances and explicit events retain their causes.
+
+With neutral affinity, a caregiver at Mental stability 2.3 and Family time 0 now falls to 2.27 in a mean event-free year, then 2.24. Family time 2 is neutral; positive Family contributions and supportive events can raise stability. Other causes can still offset one another. Temporary modifiers keep their explicit effects and expiry.
+
+No save migration or schema change: preserve ratings, focus, history, pending choices, enrollment, effects and RNG on load. The percentile reference is regenerated from observed lives without fitting; --fit is disabled so calibration cannot restore passive targets. Help now explains that contributions cause movement. Cache token: `caused-stats`. Browser/visual checks remain omitted by preference.
+
+Validation in the existing workspace: all 544 tests pass on Node 24.14.0, including nine cause-driven regression tests and the independent 1,600-life cohort. The 4,000-life percentile reference reproduces exactly without fitting; all 25 local HTTP assets match source.
+
+Published the cause-driven rating update separately from pre-existing local work as `ca45476210eb9d3ce5fb8bf3a9316ba7d1af511b`. Its isolated release passed 504 tests; GitHub Pages built that commit and all 24 live assets matched it. Local main is aligned with the release and all 92 existing workspace files were preserved byte-for-byte before this handoff note.

@@ -1,12 +1,13 @@
 // Fictional life-sim probabilities and consequences, not real-world risk estimates.
 // Each eligible event gets an independent yearly roll. The engine caps a year at five.
 // Low/high factors are curved so extreme traits matter much more than small changes.
-import { legacyFocusValue, focusMaxFor } from './focus-rules.js?v=short-events-toddler-order';
-import { APTITUDE_EVENTS } from './cross-aptitude-events.js?v=short-events-toddler-order';
-import { schoolActivity, activityEligible, gradeScore } from './school.js?v=short-events-toddler-order';
-import { boostLowStatRates } from './event-rates.js?v=short-events-toddler-order';
-import { LIFE_PERSONAL_EVENTS } from './life-events.js?v=short-events-toddler-order';
-import { aptitudeBounds } from './birth-conditions.js?v=short-events-toddler-order';
+import { legacyFocusValue, focusMaxFor } from './focus-rules.js?v=stat-driven-events';
+import { APTITUDE_EVENTS } from './cross-aptitude-events.js?v=stat-driven-events';
+import { schoolActivity, activityEligible, gradeScore } from './school.js?v=stat-driven-events';
+import { boostStatRates, statEventFactor } from './event-rates.js?v=stat-driven-events';
+import { LIFE_PERSONAL_EVENTS } from './life-events.js?v=stat-driven-events';
+import { aptitudeBounds } from './birth-conditions.js?v=stat-driven-events';
+import { SCHOOL_BALANCE } from './balance.js?v=stat-driven-events';
 
 const low = key => [key, 'low'];
 const high = key => [key, 'high'];
@@ -16,7 +17,7 @@ const temporary = (modifiers, years = 1, lifestyle = 0) => ({ modifiers, years, 
 const change = statChanges => ({ statChanges });
 const choice = (id, label, description, outcome) => ({ id, label, description, ...outcome });
 function permanentOutcome(outcome) {
-  const result = { ...outcome, statChanges: { ...outcome.statChanges }, modifiers: {}, years: outcome.focusCapacity || outcome.focusMinimums || outcome.focusPoints ? outcome.years || 1 : 0 };
+  const result = { ...outcome, statChanges: { ...outcome.statChanges }, modifiers: {}, years: outcome.focusCapacity || outcome.focusMinimums || outcome.focusPoints || outcome.householdLifestyle ? outcome.years || 1 : 0 };
   for (const [key, amount] of Object.entries(outcome.modifiers || {})) result.statChanges[key] = (result.statChanges[key] || 0) + amount;
   // Legacy material fields do not imply a permanent mental-stability change.
   result.statChanges = Object.fromEntries(Object.entries(result.statChanges).filter(([, amount]) => amount));
@@ -61,7 +62,7 @@ export const EVENTS = [
       choice('lead', 'Lead the project', 'Build skills with less time for family.', { ...change({ intelligence: .4, social: .2 }), ...temporary({ stability: -.2 }), focusCapacity: { standard: { family: -2 } } }),
       choice('share', 'Share the workload', 'Develop your skills with a lighter commitment.', change({ intelligence: .2 })),
     ] },
-    { id: 'disrupted_sleep', name: 'Construction outside your window', description: 'Early construction noise carries through your poorly insulated home, and you have no affordable quieter place to sleep. Repeated waking leaves less energy for school or work.', minAge: 5, baseChance: .012, kind: 'negative', statFactors: [low('lifestyle')], ...temporary({ health: -.3 }), focusCapacity: { standard: { work: -2 } } },
+    { id: 'disrupted_sleep', name: 'Construction outside your window', description: 'Early construction noise keeps your whole household awake. Everyone has less energy for the day.', minAge: 5, baseChance: .012, kind: 'negative', household: true, statFactors: [low('lifestyle')], ...temporary({ health: -.3 }), subjectChanges: { health: -.15 }, focusCapacity: { standard: { work: -2 } } },
     { id: 'relative_needs_help', name: 'A relative needs help after surgery', description: 'A relative recovering from surgery asks for regular help during your usual working hours.', minAge: 18, focusFactors: ['family'], choices: [
       choice('help', 'Help regularly', 'Support your relative with less time for work.', { ...change({ social: .4 }), ...temporary({}), focusCapacity: { standard: { work: -2 } } }),
       choice('arrange', 'Arrange other support', 'Find help while keeping your routine.', change({ social: .15 })),
@@ -74,7 +75,7 @@ export const EVENTS = [
     { id: 'musical_baby', name: 'A musician develops your rhythms', description: 'You invent playful rhythms during a visiting musician\'s playgroup session, and they spend extra time helping you build on your ideas with songs and rattles.', statFactors: [high('creativity')], ...change({}) },
     { id: 'gentle_playgroup', name: 'An invitation to baby group', description: 'A neighbor invites your caregiver to a small baby group, giving you new children to play beside.', ...change({ social: .2 }) },
     { id: 'baby_cold', name: 'A cold interrupts feeding and sleep', description: 'You catch a cold at a playgroup gathering, and a blocked nose makes feeding and sleep uncomfortable.', kind: 'negative', statFactors: [low('health')], ...temporary({}) },
-    { id: 'teething', name: 'A noisy building repair', description: 'Long-delayed building repairs fill your home with drilling and unfamiliar workers. With no quieter place available, the disruption leaves you distressed.', statFactors: [low('lifestyle')], kind: 'negative', ...temporary({ stability: -.4 }) },
+    { id: 'teething', name: 'A noisy building repair', description: 'Weeks of drilling fill your home, with nowhere quieter to go. The whole family is worn out.', statFactors: [low('lifestyle')], kind: 'negative', household: true, ...temporary({ stability: -.4 }), subjectChanges: { health: -.15 } },
     { id: 'sleepless_baby', name: 'A broken nursery fan', description: 'The nursery fan breaks during hot weather, and your household cannot replace it promptly. Repeated sleepless nights leave you worn out.', kind: 'negative', statFactors: [low('lifestyle')], ...temporary({ health: -.3 }) },
     { id: 'sensory_discovery', name: 'A handmade discovery blanket', description: 'A family friend gives you a blanket with safe fabric flaps and hidden pictures, then shows you how to explore it.', ...change({ creativity: .25, intelligence: .2 }) },
     { id: 'baby_tumble', name: 'A bump against the cot', description: 'While pushing yourself up during play, you cannot quite support your weight and bump your head against the cot, leaving a bruise and a fright.', kind: 'negative', statFactors: [low('strength')], ...temporary({ health: -.15 }) },
@@ -91,7 +92,7 @@ export const EVENTS = [
     { id: 'child_pet', name: 'A neighbor needs a pet sitter', description: 'A neighbor asks whether you would like to help care for their pet.', minAge: 3, conditions: ['schoolAge'], focusFactors: ['family'], choices: [choice('help', 'Help with the pet', 'The routine teaches patience and brings a new connection.', change({ social: .25 })), choice('decline', 'Keep your own time', 'You put the spare time into an imaginative hobby.', change({ creativity: .25 }))] },
     { id: 'birthday_left_out', name: 'An invitation never comes', description: 'Being left out of a birthday gathering stings.', kind: 'negative', focusFactors: ['social'], toddlerFocusFactors: ['work'], statFactors: [low('social')], ...temporary({}) },
     { id: 'child_kindness', name: 'A new child joins your game', description: 'A child who has just moved nearby asks to join your game, and the afternoon starts a friendship.', focusFactors: ['social'], toddlerFocusFactors: ['work'], ...change({ social: .2 }) },
-    { id: 'child_argument', name: 'A game turns into an argument', description: 'When the rules of a game seem unfair, you struggle to keep your frustration in check and the disagreement becomes an argument.', minAge: 3, conditions: ['schoolAge'], kind: 'negative', focusFactors: ['social'], statFactors: [low('stability')], choices: [choice('listen', 'Hear everyone out', 'It takes effort to settle down and find common ground.', change({ social: .3 })), choice('leave', 'Leave the game', 'Space helps you calm down, but the others feel distant.', { ...change({}), ...temporary({ social: -.25 }) })] },
+    { id: 'child_argument', name: 'A game turns into an argument', description: 'When the rules of a game seem unfair, you struggle to keep your frustration in check and the disagreement becomes an argument.', minAge: 3, conditions: ['schoolAge'], kind: 'negative', focusFactors: ['social'], statFactors: [low('stability')], choices: [choice('listen', 'Hear everyone out', 'It takes effort to settle down and find common ground.', change({ social: .3 })), choice('leave', 'Leave the game', 'You invent a new game on your own instead.', change({ creativity: .25 }))] },
     { id: 'family_outing', name: 'A surprise picnic', description: 'Your family packs a surprise picnic and takes you to watch boats on the river.', focusFactors: ['family'], ...change({}) },
     { id: 'child_art', name: 'Your art goes on display', description: 'The local library displays your picture, and visitors stop to ask you about it.', schoolFocusFactors: ['extracurricular'], statFactors: [high('creativity')], focusFactors: ['self'], toddlerFocusFactors: ['creative'], ...change({ social: .2 }) },
   ]),
@@ -100,7 +101,7 @@ export const EVENTS = [
     { id: 'poor_grades', name: 'A difficult report card', description: 'Your report card arrives with failed assignments and a request for a meeting with your caregiver.', kind: 'negative', statFactors: [low('intelligence')], neglectFactors: ['work'], ...temporary({}) },
     { id: 'science_prize', name: 'A prize at the science fair', description: 'Judges award your experiment a prize and ask you to demonstrate it to visiting families.', statFactors: [high('intelligence'), high('creativity')], focusFactors: ['work'], ...change({ social: .2 }) },
     { id: 'reading_award', name: 'A reading prize at assembly', description: 'Your teacher presents you with a reading prize at assembly and praises the effort you put in.', statFactors: [high('intelligence')], focusFactors: ['work'], ...change({}) },
-    { id: 'school_team', name: 'A place on the school team', description: 'A coach asks you to try out for the team.', statFactors: [high('strength')], choices: [choice('join', 'Join the team', 'Training builds strength, while the busy schedule adds pressure.', { ...change({}), ...temporary({}) }), choice('skip', 'Keep time for studying', 'You spend the extra time on a subject you enjoy.', change({ intelligence: .3 }))] },
+    { id: 'school_team', name: 'A place on the school team', description: 'A coach asks you to try out for the team.', statFactors: [high('strength')], choices: [choice('join', 'Join the team', 'Regular training keeps you fit and among teammates.', change({ health: .2, social: .15 })), choice('skip', 'Keep time for studying', 'You spend the extra time on a subject you enjoy.', change({ intelligence: .3 }))] },
     { id: 'test_anxiety', name: 'Panic during a surprise test', description: 'During an unexpected test, you become too anxious to settle into the questions. The pressure keeps disrupting your concentration well beyond the lesson.', kind: 'negative', statFactors: [low('stability')], focusFactors: ['work'], ...temporary({ intelligence: -.3 }) },
     { id: 'group_project', name: 'A group project needs a plan', description: 'Your teacher assigns a local-history display, but your group cannot agree how to divide the work.', focusFactors: ['social'], choices: [choice('lead', 'Bring the group together', 'Organizing everyone gives your social skills a workout.', change({ social: .45 })), choice('research', 'Focus on the research', 'You learn more about the subject while others coordinate.', change({ intelligence: .35 }))] },
     { id: 'school_bullying', name: 'A classmate keeps picking on you', description: 'Repeated unkind comments make school feel harder.', kind: 'negative', choices: [choice('support', 'Tell a trusted adult', 'You get support, though the experience still takes time to process.', { ...change({ stability: .25 }), ...temporary({ social: -.2 }) }), choice('friends', 'Ask friends to stand with you', 'Leaning on friends builds connection while you work through the stress.', { ...change({ social: .35 }), ...temporary({ stability: -.2 }) })] },
@@ -108,7 +109,7 @@ export const EVENTS = [
     { id: 'school_music', name: 'Asked to join the school concert', description: 'The music teacher hears you practicing and invites you to rehearse with the concert group.', schoolFocusFactors: ['extracurricular'], statFactors: [high('creativity')], focusFactors: ['self'], ...change({ social: .2 }) },
     { id: 'missed_homework', name: 'Misread homework instructions', description: 'After leaving your homework until the last minute, you misunderstand the submission instructions and miss the deadline. Explaining the mistake in class leaves you unsettled.', kind: 'negative', neglectFactors: ['work'], statFactors: [low('intelligence')], ...temporary({}) },
     { id: 'study_buddy', name: 'A classmate offers to study together', description: 'A classmate invites you to weekly study sessions where you explain tricky problems to each other.', focusFactors: ['social', 'work'], ...change({ intelligence: .2, social: .1 }) },
-    { id: 'school_speech', name: 'An unexpected speech', description: 'You are asked to say a few words in front of your class.', statFactors: [high('social')], choices: [choice('speak', 'Give it a try', 'You gain confidence through a nervous moment.', { ...change({}), ...temporary({}) }), choice('written', 'Offer a written piece', 'You express your thoughts in a form that suits you.', change({ creativity: .35 }))] },
+    { id: 'school_speech', name: 'An unexpected speech', description: 'You are asked to say a few words in front of your class.', statFactors: [high('social')], choices: [choice('speak', 'Give it a try', 'Preparing the talk makes you organize your ideas.', change({ intelligence: .25 })), choice('written', 'Offer a written piece', 'You express your thoughts in a form that suits you.', change({ creativity: .35 }))] },
     { id: 'school_exchange', name: 'A visiting student joins your class', description: 'Your teacher pairs you with a visiting student, who shares stories and games from home.', focusFactors: ['social'], ...change({ social: .3, intelligence: .2 }) },
     { id: 'school_mistake', name: 'A wrong answer shakes your confidence', description: 'After classmates laugh at a wrong answer, you find it hard to regain your composure. Worry about another mistake keeps you from speaking in later group discussions.', kind: 'negative', statFactors: [low('stability')], ...temporary({ social: -.3 }) },
     { id: 'teacher_feedback', name: 'A teacher stays after class', description: 'A teacher offers to stay after class and help you rework a project that did not go as planned.', focusFactors: ['work'], choices: [choice('revise', 'Try another draft', 'Working through the feedback develops your understanding.', change({ intelligence: .4 })), choice('newidea', 'Start a fresh idea', 'A different approach gets your imagination moving.', change({ creativity: .3 }))] },
@@ -119,15 +120,15 @@ export const EVENTS = [
     { id: 'teen_crush', name: 'Your crush sits beside you', description: 'The person you like takes the empty seat beside you at a gathering, giving you a chance to talk.', focusFactors: ['social'], statFactors: [high('attractiveness')], choices: [choice('talk', 'Start a conversation', 'Making the effort builds confidence and brings some nerves.', { ...change({ social: .45 }), ...temporary({}) }), choice('private', 'Keep it to yourself', 'You channel the feeling into something creative.', change({ creativity: .3 }))] },
     { id: 'teen_rumor', name: 'A rumor spreads', description: 'Someone invents a story about who you are dating and shares it around your friend group.', kind: 'negative', focusFactors: ['social'], ...temporary({ stability: -.3 }) },
     { id: 'online_dare', name: 'A dare puts you under pressure', description: 'A group asks you to attempt an uncomfortable stunt for the camera. Their taunts leave you too unsettled to think clearly about how to respond.', focusFactors: ['social'], statFactors: [low('stability')], choices: [choice('attempt', 'Attempt the dare', 'The attention comes with a painful lesson.', change({ social: .5, health: -.7, strength: -.3 })), choice('refuse', 'Suggest a safer idea', 'Your alternative wins fewer cheers but leaves you feeling more grounded.', change({ creativity: .3, social: -.1 }))] },
-    { id: 'teen_style', name: 'A friend offers a makeover', description: 'A friend who customizes clothes brings a bag of outfits and offers to help you try a different look.', focusFactors: ['self'], choices: [choice('bold', 'Try something bold', 'Experimenting sharpens your eye and attracts attention.', change({ attractiveness: .4, creativity: .2 })), choice('comfortable', 'Choose what feels comfortable', 'Feeling like yourself helps you feel settled.', change({}))] },
+    { id: 'teen_style', name: 'A friend offers a makeover', description: 'A friend who customizes clothes brings a bag of outfits and offers to help you try a different look.', focusFactors: ['self'], choices: [choice('bold', 'Try something bold', 'The new look attracts attention.', change({ attractiveness: .4 })), choice('comfortable', 'Choose what feels comfortable', 'You and your friend restyle old clothes together.', change({ creativity: .25, social: .1 }))] },
     { id: 'teen_club', name: 'Invited to a costume-making club', description: 'A classmate invites you to a costume-making club where others share your unusual ideas.', focusFactors: ['social'], kind: 'positive', ...change({ social: .2, creativity: .15 }) },
     { id: 'teen_body_image', name: 'An unkind photo comparison', description: 'Someone posts your photo beside an edited image and makes fun of the difference in a group chat.', kind: 'negative', statFactors: [low('attractiveness')], focusFactors: ['social'], ...temporary({ stability: -.6, social: -.3 }) },
-    { id: 'teen_volunteer', name: 'A weekend volunteering offer', description: 'A relative who volunteers at a local food bank asks you to help unload deliveries and greet people at a weekend collection.', focusFactors: ['family'], choices: [choice('volunteer', 'Spend the weekend helping', 'Meeting people through shared work broadens your world.', change({ social: .35, strength: .15 })), choice('recharge', 'Keep a quiet weekend', 'Some time to yourself restores your balance.', change({}))] },
+    { id: 'teen_volunteer', name: 'A weekend volunteering offer', description: 'A relative who volunteers at a local food bank asks you to help unload deliveries and greet people at a weekend collection.', focusFactors: ['family'], choices: [choice('volunteer', 'Spend the weekend helping', 'Meeting people through shared work broadens your world.', change({ social: .35, strength: .15 })), choice('recharge', 'Keep a quiet weekend', 'Rest and long walks leave you healthier.', change({ health: .25 }))] },
     { id: 'teen_talent', name: 'A sound engineer offers lessons', description: 'A sound engineer notices your creative experiments and offers to teach you how recording equipment works.', schoolFocusFactors: ['extracurricular'], kind: 'positive', focusFactors: ['self'], statFactors: [high('creativity')], ...change({ intelligence: .3 }) },
   ]),
   ...group('College', { minAge: 18, conditions: ['college'], baseChance: .012, kind: 'positive' }, [
     { id: 'college_honors', name: 'Academic honors', description: 'The college invites you to an honors reception, where lecturers introduce you to other students.', statFactors: [high('intelligence')], focusFactors: ['work'], ...change({ social: .25 }) },
-    { id: 'college_research', name: 'A research invitation', description: 'A lecturer invites you to help interview residents for a research project beyond the syllabus.', statFactors: [high('intelligence')], focusFactors: ['work'], choices: [choice('research', 'Join the project', 'You learn a great deal, though the extra work is demanding.', { ...change({}), ...temporary({}) }), choice('balance', 'Keep your current schedule', 'You protect time for yourself and your friends.', change({ social: .15 }))] },
+    { id: 'college_research', name: 'A research invitation', description: 'A lecturer invites you to help interview residents for a research project beyond the syllabus.', statFactors: [high('intelligence')], focusFactors: ['work'], choices: [choice('research', 'Join the project', 'Interviewing residents teaches you to ask better questions.', change({ creativity: .3 })), choice('balance', 'Keep your current schedule', 'You protect time for yourself and your friends.', change({ social: .15 }))] },
     { id: 'college_exam_failure', name: 'An exam goes badly', description: 'Your exam result falls below the pass mark, and the college schedules a resit.', kind: 'negative', statFactors: [low('intelligence')], neglectFactors: ['work'], ...temporary({}) },
     { id: 'college_roommate', name: 'A roommate disagreement', description: 'You have trouble explaining your need for quiet to your roommate. Unclear requests and frustrated replies turn the guest schedule into a disagreement.', kind: 'negative', statFactors: [low('social')], choices: [choice('discuss', 'Talk through the problem', 'An uncomfortable conversation improves your ability to work with others.', change({})), choice('space', 'Spend more time elsewhere', 'The distance brings relief but weakens the connection.', change({}))] },
     { id: 'college_society', name: 'A society welcomes you', description: 'A campus society invites you to its welcome meal and saves you a seat with the regulars.', focusFactors: ['social'], ...change({ social: .2 }) },
@@ -139,7 +140,7 @@ export const EVENTS = [
   ]),
   ...group('Adult life', { minAge: 18, baseChance: .008, kind: 'negative' }, [
     { id: 'financial_scam', name: 'A fake rental listing', description: 'A convincing rental listing turns out to be fake, leaving you shaken after trusting the supposed owner.', statFactors: [low('intelligence')], ...temporary({ stability: -.4 }, 2, -1) },
-    { id: 'investment_pitch', name: 'A too-good offer', description: 'An acquaintance pitches a business scheme. You struggle to make sense of its warning signs while they insist you must decide before checking the details.', focusFactors: ['social'], statFactors: [low('intelligence')], kind: 'neutral', choices: [choice('accept', 'Take the chance', 'The promise falls apart, leaving an expensive lesson.', { ...temporary({ stability: -.4 }, 2, -1), ...change({}) }), choice('check', 'Ask questions and walk away', 'Looking closely teaches you what to watch for.', change({}))] },
+    { id: 'investment_pitch', name: 'A too-good offer', description: 'An acquaintance pitches a business scheme. You struggle to make sense of its warning signs while they insist you must decide before checking the details.', focusFactors: ['social'], statFactors: [low('intelligence')], kind: 'neutral', choices: [choice('accept', 'Take the chance', 'The scheme collapses, but you stay part of the group.', change({ stability: -.4, social: .2 })), choice('check', 'Ask questions and walk away', 'Your questions annoy the group, who stop inviting you.', change({ social: -.15 }))] },
     { id: 'identity_mixup', name: 'Mistaken for someone else', description: 'An official letter accuses you of someone else\'s unpaid obligation, and repeated calls are needed to correct it.', ...temporary({}, 1, -1) },
     { id: 'smart_purchase', name: 'A housing offer comes through', description: 'A housing application you carefully compared and checked is accepted, easing a long-running worry.', kind: 'positive', statFactors: [high('intelligence')], focusFactors: ['self'], ...temporary({ stability: .2 }, 2, 1) },
     { id: 'impulse_purchase', name: 'A pushy sales demonstration', description: 'At a sales demonstration, you buy equipment you do not need and spend weeks distracted by trying to undo the purchase.', statFactors: [low('stability')], ...temporary({ intelligence: -.2 }, 2, -1) },
@@ -181,14 +182,14 @@ export const EVENTS = [
   ...group('Social life', { minAge: 6, baseChance: .008, kind: 'positive' }, [
     { id: 'friendship', name: 'Befriending a new artist nearby', description: 'You strike up an easy conversation with a new neighbor who makes art. They invite you to draw together, beginning a friendship that encourages your ideas.', focusFactors: ['social'], statFactors: [high('social')], ...change({ creativity: .2 }) },
     { id: 'conflict', name: 'A friend cancels and goes without you', description: 'A friend cancels your plans, then you learn they spent the afternoon with the same group without inviting you.', kind: 'negative', focusFactors: ['social'], ...temporary({}) },
-    { id: 'social_invitation', name: 'Invited to a neighborhood gathering', description: 'A neighbor invites you to a gathering where most of the guests will be strangers.', focusFactors: ['social'], kind: 'neutral', choices: [choice('join', 'Go along', 'Meeting new people stretches your confidence.', { ...change({ social: .4 }), ...temporary({}) }), choice('quiet', 'Choose a quiet evening', 'Time to yourself helps you feel settled.', change({}))] },
+    { id: 'social_invitation', name: 'Invited to a neighborhood gathering', description: 'A neighbor invites you to a gathering where most of the guests will be strangers.', focusFactors: ['social'], kind: 'neutral', choices: [choice('join', 'Go along', 'Meeting new people stretches your confidence.', { ...change({ social: .4 }), ...temporary({}) }), choice('quiet', 'Choose a quiet evening', 'You spend the evening on a project of your own.', change({ creativity: .25 }))] },
     { id: 'friend_reunion', name: 'An old friend returns', description: 'An old friend returns to town and invites you to revisit a place where you used to spend time together.', minAge: 18, focusFactors: ['social'], ...change({ social: .15 }) },
     { id: 'social_misread', name: 'A joke lands badly', description: 'A social cue passes you by, and a joke hurts someone’s feelings.', kind: 'negative', focusFactors: ['social'], statFactors: [low('social')], ...temporary({}) },
     { id: 'trusted_friend', name: 'A friend asks you to mediate', description: 'Two friends disagree over a shared project, and one asks you to help them talk it through.', focusFactors: ['social'], statFactors: [high('social')], ...change({}) },
-    { id: 'gossip_choice', name: 'A rumor worth repeating?', description: 'Someone shares a private story and waits for your reaction.', minAge: 13, focusFactors: ['social'], kind: 'neutral', choices: [choice('spread', 'Pass the story along', 'The attention is immediate, but trust takes a hit.', { ...change({ social: .3 }), ...temporary({ social: -.7 }, 2) }), choice('private', 'Keep it private', 'Resisting the attention leaves you feeling more grounded.', change({}))] },
+    { id: 'gossip_choice', name: 'A rumor worth repeating?', description: 'Someone shares a private story and waits for your reaction.', minAge: 13, focusFactors: ['social'], kind: 'neutral', choices: [choice('spread', 'Pass the story along', 'Everyone wants to hear it from you.', change({ social: .25 })), choice('private', 'Keep it private', 'You think about why people share secrets.', change({ intelligence: .2 }))] },
     { id: 'welcoming_presence', name: 'Asked to welcome a new arrival', description: 'At a community gathering, the organizer asks you to show a newcomer around and introduce them to people.', statFactors: [high('social')], focusFactors: ['social'], ...change({}) },
     { id: 'social_comparison', name: 'Left out of the group photo', description: 'At a gathering, a group makes an unkind comment about your looks and leaves you out of its photograph. The appearance-based exclusion hurts your confidence and sense of belonging.', kind: 'negative', statFactors: [low('attractiveness')], focusFactors: ['social'], ...temporary({ social: -.3 }) },
-    { id: 'friend_repair', name: 'An apology from an old friend', description: 'A friend sends an apology for an old argument and asks to meet so you can clear the air.', focusFactors: ['social'], kind: 'neutral', choices: [choice('apologize', 'Own your part', 'A sincere conversation makes connection easier.', change({ social: .4 })), choice('space', 'Ask for more time', 'You create room to settle your thoughts, though distance remains.', change({ social: -.15 }))] },
+    { id: 'friend_repair', name: 'An apology from an old friend', description: 'A friend sends an apology for an old argument and asks to meet so you can clear the air.', focusFactors: ['social'], kind: 'neutral', choices: [choice('apologize', 'Own your part', 'A sincere conversation makes connection easier.', change({ social: .4 })), choice('space', 'Ask for more time', 'You write down what happened and see it more clearly.', change({ intelligence: .2 }))] },
   ]),
   ...group('Health and movement', { minAge: 2, baseChance: .007, kind: 'negative' }, [
     { id: 'injury', name: 'A fall on a rough path', description: 'Feeling weak and lightheaded on an outing, you stumble on a rough path and scrape your face. You have to cut back on active outings while you recover.', statFactors: [low('health')], jobFactors: { athlete: 5, dance_instructor: 3, firefighter: 2 }, ...change({ attractiveness: -.1 }), years: 2, focusCapacity: { toddler: { work: -2 }, standard: { self: -2, sports: -1 } } },
@@ -244,7 +245,7 @@ export const EVENTS = [
     ] },
     { id: 'toddler_new_playmate', name: 'A new playmate', description: 'Another child wants to use your favorite toys.', toddlerFocusFactors: ['work'], choices: [
       choice('share', 'Take turns', 'Practice sharing even when waiting is frustrating.', change({ social: .4 })),
-      choice('separate', 'Play separately', 'Keep your own toys but miss time together.', change({ social: -.15 })),
+      choice('separate', 'Play separately', 'You build something new with your own toys.', change({ creativity: .25 })),
     ] },
     { id: 'toddler_nursery_days', name: 'A nursery place opens up', description: 'A local nursery offers you longer days with its play group, which would reduce your time at home.', choices: [
       choice('full_days', 'Try full days', 'Spend more time playing with other children.', { ...change({ social: .4, strength: .2 }), ...temporary({}), focusCapacity: { toddler: { family: -3 } } }),
@@ -278,10 +279,10 @@ export const EVENTS = [
     ] },
     { id: 'teen_band_disagreement', name: 'An invitation to perform divides the band', description: 'Friends invite you to perform with their band at a school show, but disagree about which song to play.', schoolFocusFactors: ['extracurricular'], focusFactors: ['self'], statFactors: [high('creativity')], choices: [
       choice('compromise', 'Work on a compromise', 'Combine ideas through stressful rehearsals.', { ...change({ social: .2 }), ...temporary({}) }),
-      choice('solo', 'Make music alone', 'Keep creative control with less time around friends.', change({ social: -.2 })),
+      choice('solo', 'Make music alone', 'Hours of solo practice sharpen your technique.', change({ intelligence: .2 })),
     ] },
     { id: 'teen_group_chat', name: 'An overwhelming group chat', description: 'Constant messages interrupt your downtime.', focusFactors: ['social'], kind: 'negative', choices: [
-      choice('mute', 'Mute the chat', 'Protect your downtime and step back from the group.', { ...change({}), ...temporary({}), focusCapacity: { standard: { social: -3 } } }),
+      choice('mute', 'Mute the chat', 'Quiet evenings let you rest properly.', change({ health: .25 })),
       choice('reply', 'Keep replying', 'Stay involved while the interruptions continue.', { ...change({ social: .3 }), ...temporary({}) }),
     ] },
     { id: 'teen_first_aid', name: 'A first-aid course at the fire station', description: 'The fire station offers a first-aid course during your free afternoons.', focusFactors: ['self'], choices: [
@@ -350,6 +351,19 @@ export const EVENTS = [
     { id: 'mental_counseling_place', name: 'A counselor offers regular support', description: 'After you seek help for distress disrupting your days, a counselor offers regular appointments and helps you make a plan. The sessions bring relief and reserve time for your recovery.', minAge: 13, baseChance: .006, severity: 'moderate', ...change({}), focusMinimums: { standard: { self: 1 } }, years: 1 },
     { id: 'mental_supported_return', name: 'Support for returning to a group', description: 'A support worker and a trusted friend arrange to accompany you back to a community group after a difficult period. Regular check-ins and a welcoming place to return to help you rebuild stability and connections.', minAge: 13, maxStability: 3, baseChance: .003, severity: 'major', ...change({ social: .45 }), focusCapacity: { standard: { social: 1 } }, years: 1 },
   ]),
+  // Scheduled at the end of elementary and middle school, never rolled
+  // (baseChance 0). An honors entry saves its three offered stats; each
+  // placeholder choice resolves to one of them (pendingEventChoices).
+  ...group('School milestones', { baseChance: 0, scheduled: true, severity: 'moderate' }, [
+    ...['elementary', 'middle'].flatMap(stage => {
+      const { name, to } = SCHOOL_BALANCE.stages.find(entry => entry.id === stage);
+      return [
+        { id: `school_${stage}_honors`, name: `${name} honors`, description: `You finish ${name.toLowerCase()} with top grades. Choose your reward.`, minAge: to, maxAge: to, kind: 'positive',
+          choices: ['first', 'second', 'third'].map(id => choice(id, 'Reward', 'A reward for your grades.', {})) },
+        { id: `school_${stage}_warning`, name: `Shouting about ${name.toLowerCase()} grades`, description: `Your poor ${name.toLowerCase()} grades start a shouting match at home. It stays with you.`, minAge: to, maxAge: to, kind: 'negative' },
+      ];
+    }),
+  ]),
 ];
 
 const SPORTS_JOBS = new Set(['athlete', 'personal_trainer', 'sports_coach', 'yoga_instructor', 'lifeguard', 'dance_instructor', 'outdoor_guide']);
@@ -412,13 +426,9 @@ export function eventChances(state, stats, job) {
       || state.age >= 5 && state.age < 18 && event.schoolFocusFactors || event.focusFactors || [];
     for (const key of focusFactors) chance *= .4 + (focus[key] ?? 0) * .25;
     for (const key of event.neglectFactors || []) chance *= .25 + (5 - focus[key]) * .35;
-    for (const [key, direction] of event.statFactors || []) {
-      const value = Math.max(0, Math.min(10, key === 'lifestyle' ? state.lifestyle : stats[key]));
-      const fraction = direction === 'low' ? (10 - value) / 9 : Math.max(0, (value - 1) / 9);
-      chance *= direction === 'low' ? .08 + 3.68 * fraction ** 2 : .12 + 3.52 * fraction ** 2;
-    }
+    for (const [key, direction] of event.statFactors || []) chance *= statEventFactor(Math.max(0, Math.min(10, key === 'lifestyle' ? state.lifestyle : stats[key])), direction);
     if (job && event.jobFactors?.[job.id]) chance *= event.jobFactors[job.id];
     return { id: event.id, name: event.name, chance: Math.min(event.rare ? .0006 : .18, chance) };
   });
-  return boostLowStatRates(EVENTS, rates, { ...stats, lifestyle: state.lifestyle });
+  return boostStatRates(EVENTS, rates, { ...stats, lifestyle: state.lifestyle });
 }

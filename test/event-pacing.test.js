@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { EVENTS, eventChances } from '../events.js';
 import { FAMILY_EVENTS, familyEventChances } from '../family-events.js';
 import { JOBS } from '../jobs.js';
+import { LOW_STAT_EVENT_CAP } from '../event-rates.js';
 
 const keys = ['health', 'stability', 'intelligence', 'strength', 'social', 'creativity', 'attractiveness'];
 function balancedLife(age) {
@@ -22,7 +23,7 @@ const retail = JOBS.find(job => job.id === 'retail');
 const chances = state => eventChances(state, state.stats, state.age >= 18 ? retail : null);
 const chanceOf = (state, id, job = null) => eventChances(state, state.stats, job).find(event => event.id === id).chance;
 
-test('ordinary events occur in most balanced years without approaching the five-event limit', () => {
+test('ordinary events occur in many balanced years without approaching the five-event limit', () => {
   for (const age of [0, 2, 4, 8, 15, 25, 50]) {
     const state = balancedLife(age);
     const before = structuredClone(state);
@@ -38,7 +39,8 @@ test('ordinary events occur in most balanced years without approaching the five-
       }
     }
     const capped = 1-countMass.reduce((sum,mass)=>sum+mass,0);
-    assert.ok(any >= .6 && any < .92, `age ${age}: ${any}`);
+    // Neutral ratings are deliberately quiet (stat factor .4 at 5).
+    assert.ok(any >= .4 && any < .92, `age ${age}: ${any}`);
     assert.ok(countMass[0] > .05, `age ${age}: quiet years remain possible (${countMass[0]})`);
     assert.ok(expected < 2.5, `age ${age}: ${expected} expected rolls`);
     assert.ok(capped < .1, `age ${age}: five-event cap probability ${capped}`);
@@ -52,16 +54,17 @@ test('higher rates retain hard probability caps and inactive or ineligible event
     for (const person of [state, ...state.parents]) for (const key of keys) person.stats[key] = rating;
     const personal = chances(state);
     const household = familyEventChances(state);
-    assert.ok(personal.every(event => Number.isFinite(event.chance) && event.chance >= 0 && event.chance <= .6));
-    assert.ok(household.every(event => Number.isFinite(event.chance) && event.chance >= 0 && event.chance <= .6));
+    assert.ok(personal.every(event => Number.isFinite(event.chance) && event.chance >= 0 && event.chance <= LOW_STAT_EVENT_CAP));
+    assert.ok(household.every(event => Number.isFinite(event.chance) && event.chance >= 0 && event.chance <= LOW_STAT_EVENT_CAP));
+    // Only rating pools (low or high) may lift an ordinary event past its own cap.
     for (const roll of personal) {
       const definition = EVENTS.find(event => event.id === roll.id);
       if (definition.rare) assert.ok(roll.chance <= .0006);
-      else if (definition.severity === 'major' || !definition.statFactors?.some(([,direction]) => direction === 'low')) assert.ok(roll.chance <= .18);
+      else if (definition.severity === 'major' || !definition.statFactors?.length) assert.ok(roll.chance <= .18, roll.id);
     }
     for (const roll of household) {
       const definition = FAMILY_EVENTS.find(event => event.id === roll.eventId);
-      if (definition.severity === 'major' || !definition.statFactors?.some(([,direction]) => direction === 'low')) assert.ok(roll.chance <= .12);
+      if (definition.severity === 'major' || !definition.statFactors?.length) assert.ok(roll.chance <= .12, roll.id);
     }
     state.ended = true;
     assert.ok(chances(state).every(event => event.chance === 0));

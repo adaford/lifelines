@@ -103,9 +103,9 @@ test('direct over-budget allocations cannot advance and forecast reads do not mu
   state.school = createSchoolRecord(state);
   const before = copy(state);
   assert.equal(validateSave(state), false);
-  assert.match(advanceYear(state).reason, /10 focus points/);
+  assert.match(advanceYear(state).reason, /9 focus points/);
   assert.deepEqual(state, before);
-  state.focus.family = 2;
+  state.focus.family = 1;
   const legal = copy(state);
   annualForecast(state);
   assert.deepEqual(state, legal);

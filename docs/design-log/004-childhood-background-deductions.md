@@ -1,0 +1,5 @@
+# Childhood background deductions (1 November 2026)
+
+- Retain the background adjustment, but apply `CHILDHOOD_DEDUCTION_SCALE = 0.1` only to negative `DEVELOPMENT_BALANCE.childhoodBias` values. Effective yearly offsets before directional response are Intelligence -0.006525, Social -0.0085835, and Creativity -0.0082402. Keep the positive Strength offset +0.008169 unchanged.
+- The deduction reduction affects future childhood development only and remains separate from the stronger choice contributions and smaller skill residuals. Preserve innate tendency, wellbeing targets, schema 17, saved ratings, and the crafts Intelligence endpoint rule.
+- Regenerate the simulation reference without `--fit`. Optional fitting may adjust only wellbeing targets; it must never restore the stronger skill deductions or otherwise force the intentionally higher skill means back to 5. Independent cohorts compare learned-skill means with the generated observed reference, retaining the existing variation checks.

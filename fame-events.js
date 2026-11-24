@@ -1,4 +1,4 @@
-import { fameOpportunityChance, hasFame } from './fame.js?v=short-events-toddler-order';
+import { fameOpportunityChance, hasFame } from './fame.js?v=stat-driven-events';
 
 // Fictional encounters unlocked by public recognition. Rewards describe the
 // encounter itself; routine praise, inconvenience and money never imply a
@@ -16,7 +16,7 @@ const invitation = (kind, name, description) => event({
     choice('pursue', { sports: 'Pursue the sports invitation', extracurricular: 'Pursue the activity invitation', personal: 'Become a public face' }[kind],
       'You accept the public opportunity and begin building a reputation.', { fameAction: 'start', fameKind: kind }),
     choice('decline', { sports: 'Keep sport out of the spotlight', extracurricular: 'Keep the activity private', personal: 'Keep your public profile private' }[kind],
-      'You decline the invitation and keep your life out of the spotlight.'),
+      'You keep your time and practice quietly on your own terms.', { statChanges: { creativity: .2 } }),
   ],
 });
 

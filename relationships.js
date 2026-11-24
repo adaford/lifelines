@@ -1,9 +1,9 @@
-import { assignBirthConditions } from './birth-conditions.js?v=short-events-toddler-order';
-import { legacyFocusValue } from './focus-rules.js?v=short-events-toddler-order';
-import { naturalSkillRating, BIRTH_VARIATION } from './development.js?v=short-events-toddler-order';
-import { housingMeetingMultiplier } from './housing.js?v=short-events-toddler-order';
-import { heightReference } from './growth.js?v=short-events-toddler-order';
-import { normalPercentile } from './percentiles.js?v=short-events-toddler-order';
+import { assignBirthConditions } from './birth-conditions.js?v=stat-driven-events';
+import { legacyFocusValue } from './focus-rules.js?v=stat-driven-events';
+import { naturalSkillRating, BIRTH_VARIATION } from './development.js?v=stat-driven-events';
+import { housingMeetingMultiplier } from './housing.js?v=stat-driven-events';
+import { heightReference } from './growth.js?v=stat-driven-events';
+import { normalPercentile } from './percentiles.js?v=stat-driven-events';
 // Fictional relationship balance. These are game rules, not real-world estimates.
 // Actor identity and pregnancy capability are separate so future playable genders
 // can use the same relationship system. The current default is men meeting women.

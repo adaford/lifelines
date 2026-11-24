@@ -1,19 +1,27 @@
-import { heightReference } from './growth.js?v=short-events-toddler-order';
-import { fameActivityMatches } from './fame.js?v=short-events-toddler-order';
+import { heightReference } from './growth.js?v=stat-driven-events';
+import { fameActivityMatches } from './fame.js?v=stat-driven-events';
+import { SCHOOL_BALANCE } from './balance.js?v=stat-driven-events';
 
 // Fictional school activities and success rules, independent of save mutation
 // and the gameplay RNG. The engine supplies effective ratings and any draw.
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
 const finite = (value, fallback = 0) => Number.isFinite(value) ? value : fallback;
 const round = (value, places) => Math.round(value * 10 ** places) / 10 ** places;
-const activity = (id, name, weights, training, minLifestyle, heightPreference) => Object.freeze({
-  id, name, weights: Object.freeze(weights), training: Object.freeze(training),
+// An activity trains the stats that grade it; height cannot be trained. A unit
+// is shared between the trained stats (record 042).
+export function activityTraining(weights) {
+  const stats = Object.keys(weights).filter(key => key !== 'height');
+  const share = stats.length ** SCHOOL_BALANCE.trainingSplit;
+  return Object.fromEntries(stats.map(key => [key, round(SCHOOL_BALANCE.trainingUnits[key] / share, 6)]));
+}
+const activity = (id, name, weights, minLifestyle, heightPreference) => Object.freeze({
+  id, name, weights: Object.freeze(weights), training: Object.freeze(activityTraining(weights)),
   ...(minLifestyle === undefined ? {} : { minLifestyle }),
   ...(heightPreference === undefined ? {} : { heightPreference }),
 });
 const sport = (id, name, weights = { strength: 1 }, extraTraining = {}, minLifestyle, heightPreference) =>
-  activity(id, name, weights, { strength: .3, social: .24, ...extraTraining }, minLifestyle, heightPreference);
-const instrument = (id, name) => activity(id, name, { creativity: 1 }, { creativity: .24 });
+  activity(id, name, weights, minLifestyle, heightPreference);
+const instrument = (id, name) => activity(id, name, { creativity: 1 });
 // Retained only for pre-update save validation/migration.
 export const SCHOOL_OFFER_COUNT = 3;
 export const MAX_SCHOOL_OFFERS = 10;
@@ -55,28 +63,28 @@ export const SPORTS = Object.freeze([
 ]);
 
 export const EXTRACURRICULARS = Object.freeze([
-  activity('chess', 'Chess club', { intelligence: 1 }, { intelligence: .225 }),
+  activity('chess', 'Chess club', { intelligence: 1 }),
   instrument('piano', 'Piano'),
   instrument('violin', 'Violin'),
   instrument('guitar', 'Guitar'),
   instrument('drums', 'Drums'),
   instrument('flute', 'Flute'),
   instrument('choir', 'Choir'),
-  activity('modeling', 'Modeling', { attractiveness: 1 }, { attractiveness: .225 }),
-  activity('debate', 'Debate club', { intelligence: .6, social: .4 }, { intelligence: .225, social: .24 }),
-  activity('drama', 'Drama club', { creativity: .6, social: .4 }, { creativity: .24, social: .24 }),
-  activity('robotics', 'Robotics club', { intelligence: .7, creativity: .3 }, { intelligence: .225, creativity: .24 }),
-  activity('coding', 'Coding club', { intelligence: 1 }, { intelligence: .225 }),
-  activity('math_club', 'Math club', { intelligence: 1 }, { intelligence: .225 }),
-  activity('science_club', 'Science club', { intelligence: 1 }, { intelligence: .225 }),
-  activity('art', 'Art club', { creativity: 1 }, { creativity: .24 }),
-  activity('creative_writing', 'Creative writing', { creativity: 1 }, { creativity: .24 }),
-  activity('photography', 'Photography club', { creativity: 1 }, { creativity: .24 }),
-  activity('school_newspaper', 'School newspaper', { intelligence: .5, creativity: .5 }, { intelligence: .225, creativity: .24 }),
-  activity('student_council', 'Student council', { social: .7, intelligence: .3 }, { social: .24, intelligence: .225 }),
-  activity('volunteering', 'Volunteering', { social: 1 }, { social: .24 }),
-  activity('language_club', 'Language club', { intelligence: .6, social: .4 }, { intelligence: .225, social: .24 }),
-  activity('film_club', 'Film club', { creativity: .7, social: .3 }, { creativity: .24, social: .24 }),
+  activity('modeling', 'Modeling', { attractiveness: 1 }),
+  activity('debate', 'Debate club', { intelligence: .6, social: .4 }),
+  activity('drama', 'Drama club', { creativity: .6, social: .4 }),
+  activity('robotics', 'Robotics club', { intelligence: .7, creativity: .3 }),
+  activity('coding', 'Coding club', { intelligence: 1 }),
+  activity('math_club', 'Math club', { intelligence: 1 }),
+  activity('science_club', 'Science club', { intelligence: 1 }),
+  activity('art', 'Art club', { creativity: 1 }),
+  activity('creative_writing', 'Creative writing', { creativity: 1 }),
+  activity('photography', 'Photography club', { creativity: 1 }),
+  activity('school_newspaper', 'School newspaper', { intelligence: .5, creativity: .5 }),
+  activity('student_council', 'Student council', { social: .7, intelligence: .3 }),
+  activity('volunteering', 'Volunteering', { social: 1 }),
+  activity('language_club', 'Language club', { intelligence: .6, social: .4 }),
+  activity('film_club', 'Film club', { creativity: .7, social: .3 }),
 ]);
 
 const catalog = kind => kind === 'sports' ? SPORTS : kind === 'extracurricular' ? EXTRACURRICULARS : [];
@@ -181,7 +189,8 @@ export function annualSchoolOffers(person, kind, previousIds = []) {
     value ^= value + Math.imul(value ^ value >>> 7, value | 61);
     return ((value ^ value >>> 14) >>> 0) / 4294967296;
   };
-  if (draw() >= chance) return [];
+  // The first school year always brings offers; the draw is still taken.
+  if (draw() >= chance && person.age !== SCHOOL_BALANCE.guaranteedOfferAge) return [];
   // Lifestyle centers the distribution; each invitation gets its own size.
   // Symmetric offsets preserve the median, including at the 1/10 bounds.
   const sizeRoll = draw();
@@ -194,6 +203,29 @@ export function annualSchoolOffers(person, kind, previousIds = []) {
     [candidates[index], candidates[other]] = [candidates[other], candidates[index]];
   }
   return candidates.slice(0, count).map(entry => entry.id);
+}
+
+// School stages and their running GPAs. A stage record is { gpa, years }.
+export const SCHOOL_STAGES = SCHOOL_BALANCE.stages;
+export const schoolStage = age => SCHOOL_STAGES.find(stage => age >= stage.from && age <= stage.to) || null;
+// Pure read: a stage's GPA, or for saves made before stage records, the latest
+// report when it belongs to that stage. Null when the stage has no report yet.
+export function stageGpa(school, stageId) {
+  if (!school) return null;
+  if (school.stages?.[stageId]) return school.stages[stageId].gpa;
+  return school.reportedAge !== null && !school.stages && schoolStage(school.reportedAge - 1)?.id === stageId ? school.gpa : null;
+}
+// Add one completed year's grade to its stage. Old saves seed the stage with
+// their latest report when it belongs to the same stage.
+export function recordStageGrade(school, age, gpa) {
+  const stage = schoolStage(age);
+  if (!stage) return null;
+  const legacy = !school.stages && school.reportedAge !== null && schoolStage(school.reportedAge - 1)?.id === stage.id;
+  school.stages ??= {};
+  const entry = school.stages[stage.id] ??= legacy ? { gpa: school.gpa, years: 1 } : { gpa, years: 0 };
+  entry.gpa = round((entry.gpa * entry.years + gpa) / (entry.years + 1), 2);
+  entry.years += 1;
+  return { stage: stage.id, stageGpa: entry.gpa };
 }
 
 export function createSchoolRecord(person) {

@@ -101,7 +101,6 @@ test('ordinary personal and family choices change practiced skills and relations
 
 test('paid repair help and driving lessons have no hidden material-to-mental penalty', () => {
   for (const [id, choice, type, age] of [
-    ['household_partner_roof_leak', 'hire', 'partner', 40],
     ['household_child_driving', 'instructor', 'child', 17],
   ]) {
     const state = fixture(40), subject = addRelative(state, type, age);

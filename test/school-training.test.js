@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createGame, enrollSchoolActivity, leaveSchoolActivity, setFocus, focusLimits, annualForecast, advanceYear, validateSave, migrateSave } from '../engine.js';
 import { defaultFocus, focusBudget, focusMaxFor, focusNeutralFor } from '../focus-rules.js';
-import { SPORTS, EXTRACURRICULARS, createSchoolRecord } from '../school.js';
+import { SPORTS, EXTRACURRICULARS, createSchoolRecord, activityTraining } from '../school.js';
 import { standardFocusCoefficients, standardFocusPractice, schoolFocusSteps, schoolFocusEffects, schoolAppearanceChange, focusChoiceEffects } from '../development.js';
 import { schoolChoiceImpacts } from '../choice-impacts.js';
 import { changedRating } from '../rating-changes.js';
@@ -42,7 +42,7 @@ function quietMean(state) {
   assert.fail('Could not isolate a mean school year without random events');
 }
 
-test('unjoined activities incur their fixed penalties and default enrolled allocations use ten points', () => {
+test('unjoined activities incur their fixed penalties and the nine-point budget fits one activity beside the defaults', () => {
   const state = student();
   assert.deepEqual(state.focus, { work: 2, social: 2, family: 2, self: 2, sports: 0, extracurricular: 0 });
   for (const area of ['sports', 'extracurricular']) {
@@ -58,12 +58,17 @@ test('unjoined activities incur their fixed penalties and default enrolled alloc
     }
   }
   join(state, 'sports', 'basketball');
+  assert.deepEqual(state.focus, { work: 2, social: 2, family: 2, self: 2, sports: 1, extracurricular: 0 });
+  assert.equal(focusBudget(state), 9);
+  state.school.offers.extracurricular = ['chess', ...state.school.offers.extracurricular.filter(id => id !== 'chess')].slice(0, 3);
+  assert.equal(enrollSchoolActivity(state, 'extracurricular', 'chess').ok, false, 'a second activity needs a point freed first');
+  assert.equal(setFocus(state, 'social', 1).ok, true);
   join(state, 'extracurricular', 'chess');
-  assert.deepEqual(state.focus, { work: 2, social: 2, family: 2, self: 2, sports: 1, extracurricular: 1 });
-  assert.equal(focusBudget(state), 10);
-  assert.equal(Object.values(state.focus).reduce((sum, value) => sum + value), 10);
+  assert.deepEqual(state.focus, { work: 2, social: 1, family: 2, self: 2, sports: 1, extracurricular: 1 });
+  assert.equal(Object.values(state.focus).reduce((sum, value) => sum + value), 9);
   assert.deepEqual(affected(focusChoiceEffects(state)), ['intelligence', 'social', 'strength']);
-  for (const area of ['work', 'social', 'family', 'self']) assert.deepEqual(schoolChoiceImpacts(state, area), []);
+  for (const area of ['work', 'family', 'self']) assert.deepEqual(schoolChoiceImpacts(state, area), []);
+  assert.deepEqual(schoolChoiceImpacts(state, 'social').map(entry => [entry.stat, Math.sign(entry.change)]), [['social', -1]], 'Friends changes only Social');
   for (const area of ['sports', 'extracurricular']) assert.ok(schoolChoiceImpacts(state, area).every(entry => entry.level === 1 && entry.change > 0));
   assert.equal(setFocus(state, 'sports', 2).ok, false, 'the full default schedule needs a point freed first');
   assert.equal(setFocus(state, 'work', 1).ok, true);
@@ -82,7 +87,7 @@ test('unjoined activities incur their fixed penalties and default enrolled alloc
 test('basketball, chess, instruments, and modeling use fixed zero-point losses and their own positive training', () => {
   for (const kind of ['sports', 'extracurricular']) assert.deepEqual([0, 1, 2].map(points => schoolFocusSteps(kind, 'social', points)), [-1, 1, 2]);
   const cases = [
-    ['sports', 'basketball', { strength: .3, social: .24 }],
+    ['sports', 'basketball', { strength: .3 }], // height grades basketball but is never trained
     ['extracurricular', 'chess', { intelligence: .225 }],
     ...['piano', 'violin', 'guitar', 'drums', 'flute', 'choir'].map(id => ['extracurricular', id, { creativity: .24 }]),
     ['extracurricular', 'modeling', { attractiveness: .225 }],
@@ -152,11 +157,8 @@ test('school-age family members outside the enrollment system retain their exist
 test('every catalog activity uses fixed inactivity losses at zero and its own positive training map', () => {
   for (const [kind, catalog] of [['sports', SPORTS], ['extracurricular', EXTRACURRICULARS]]) for (const activity of catalog) {
     const state = join(student(), kind, activity.id);
-    if (kind === 'sports') {
-      assert.equal(activity.training.health, undefined);
-      assert.equal(activity.training.strength, .3);
-      assert.equal(activity.training.social, .24);
-    }
+    assert.deepEqual(activity.training, activityTraining(activity.weights));
+    if (kind === 'sports') near(activity.training.strength, .3 / Object.keys(activity.training).length, `${activity.id} shares the Strength unit`);
     for (const points of [0, 1, 2]) {
       state.focus[kind] = points;
       const entries = schoolChoiceImpacts(state, kind);
@@ -174,7 +176,7 @@ test('activity previews honor restrictions, rating bounds, and lifestyle without
   const before = copy(state);
   assert.equal(focusLimits(state).sports, 1);
   const capped = schoolChoiceImpacts(state, 'sports');
-  assert.deepEqual(capped.map(entry => entry.stat).sort(), ['social', 'strength']);
+  assert.deepEqual(capped.map(entry => entry.stat).sort(), ['strength']);
   assert.ok(capped.every(entry => entry.level === 1 && entry.change > 0), 'a cap of one retains one positive training unit');
   assert.deepEqual(state, before, 'a preview does not apply its cap to saved allocations');
   state.effects = [];
@@ -240,6 +242,7 @@ test('enrolled training forecasts match completed mean years and preserve activi
   for (const [kind, id] of [['sports', 'basketball'], ['extracurricular', 'chess'], ['extracurricular', 'violin'], ['extracurricular', 'modeling']]) for (const points of [0, 1, 2]) {
     const state = join(student(), kind, id);
     state.focus[kind] = points;
+    if (points === 2) state.focus.family = 1; // the 9-point budget needs a point freed
     const before = copy(state);
     const forecast = annualForecast(state);
     assert.deepEqual(state, before, 'forecast preserves enrollment, success, offers, and RNG');

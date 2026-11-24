@@ -1,7 +1,8 @@
-import { legacyFocusValue } from './focus-rules.js?v=short-events-toddler-order';
-import { gradeScore } from './school.js?v=short-events-toddler-order';
-import { boostLowStatRates } from './event-rates.js?v=short-events-toddler-order';
-import { LIFE_FAMILY_EVENTS } from './life-events.js?v=short-events-toddler-order';
+import { legacyFocusValue } from './focus-rules.js?v=stat-driven-events';
+import { gradeScore } from './school.js?v=stat-driven-events';
+import { boostStatRates, statEventFactor } from './event-rates.js?v=stat-driven-events';
+import { EVENT_BALANCE } from './balance.js?v=stat-driven-events';
+import { LIFE_FAMILY_EVENTS } from './life-events.js?v=stat-driven-events';
 // Fictional household events. Subject changes affect the named person; player
 // changes affect you. Relationship changes affect your bond with that person.
 // Individual rolls join the ordinary event pool and share its five-event cap.
@@ -10,7 +11,7 @@ const high = key => [key, 'high'];
 export const FAMILY_EVENT_RATE_MULTIPLIER = 2.5;
 const option = (id, label, description, outcome) => ({ id, label, description, ...outcome });
 function permanentOutcome(outcome) {
-  const result = { ...outcome, playerChanges: { ...outcome.playerChanges }, modifiers: {}, years: outcome.focusCapacity || outcome.focusMinimums || outcome.focusPoints ? outcome.years || 1 : 0 };
+  const result = { ...outcome, playerChanges: { ...outcome.playerChanges }, modifiers: {}, years: outcome.focusCapacity || outcome.focusMinimums || outcome.focusPoints || outcome.householdLifestyle ? outcome.years || 1 : 0 };
   for (const [key, amount] of Object.entries(outcome.modifiers || {})) result.playerChanges[key] = (result.playerChanges[key] || 0) + amount;
   result.playerChanges = Object.fromEntries(Object.entries(result.playerChanges).filter(([, amount]) => amount));
   if (!Object.keys(result.playerChanges).length) delete result.playerChanges;
@@ -58,7 +59,7 @@ export const FAMILY_EVENTS = [
   // Stability represents the caregiver's current stress and capacity; support
   // can help an overwhelmed parent recover, and no outcome is inevitable.
   ...group('parent', { minAge: 0, maxAge: 120, minPlayerAge: 0, maxPlayerAge: 17, baseChance: .012 }, [
-    { id: 'household_parent_sleepless', name: 'Night works outside your window', description: 'Overnight road repairs carry through the thin windows of your small home. With no quiet room to move to, you and {name} keep waking; lost sleep leaves home tense and exhausting.', maxPlayerAge: 2, kind: 'negative', statFactors: [low('lifestyle')], subjectChanges: { stability: -.3, health: -.1 }, playerChanges: { stability: -.2 } },
+    { id: 'household_parent_sleepless', name: 'Night works outside your window', description: 'Overnight road works keep the whole family awake. Home feels tense and exhausting.', maxPlayerAge: 2, kind: 'negative', household: true, statFactors: [low('lifestyle')], subjectChanges: { stability: -.3, health: -.1 }, playerChanges: { stability: -.2 } },
     { id: 'household_parent_soothing', name: 'A noisy reunion, a quiet corner', description: 'When a family reunion overwhelms you, {name} takes you somewhere quiet and helps you greet relatives one at a time.', maxPlayerAge: 2, statFactors: [high('stability')], playerChanges: { social: .15 }, relationship: .3 },
     { id: 'household_parent_overloaded', name: 'An argument on the way home', description: '{name} snaps at you after you both miss the bus, and the argument continues all the way home.', minPlayerAge: 3, kind: 'negative', statFactors: [low('stability')], relationshipFactor: 'low' },
     { id: 'household_parent_routine', name: 'A family nurse visits', description: '{name} arranges a home visit with a family nurse, who helps make your meals and bedtime more comfortable.', statFactors: [high('stability')], playerChanges: { health: .1 }, relationship: .2 },
@@ -76,21 +77,21 @@ export const FAMILY_EVENTS = [
     { id: 'household_partner_confidence', name: 'An invitation to a portrait exhibition', description: 'A photographer invites {name} to appear in a neighborhood portrait exhibition; you attend together and meet the other participants.', statFactors: [high('attractiveness')], subjectChanges: { social: .15 }, relationship: .15 },
     { id: 'household_partner_insecurity', name: 'An unkind comment in a group photo', description: 'Someone posts a cruel comment about {name} beneath a group photo, and they ask how you see them.', kind: 'neutral', statFactors: [low('attractiveness')], choices: [
       option('reassure', 'Make time for reassurance', 'You remind {name} of the things you value about them.', { relationship: .4 }),
-      option('space', 'Respect a little space', '{name} takes time to reflect while you clear your own head.', { relationship: .1 }),
+      option('space', 'Respect a little space', '{name} spends the time with friends who cheer them up.', { subjectChanges: { social: .2 }, relationship: .1 }),
     ] },
     { id: 'household_partner_argument', name: 'Two invitations, one argument', description: 'You and {name} accept invitations for the same evening. Already overwhelmed, {name} struggles to discuss a compromise, and the scheduling clash becomes an argument.', kind: 'negative', statFactors: [low('stability')], relationshipFactor: 'low', choices: [
       option('listen', 'Slow down and listen', 'You and {name} make room to explain what is really wrong.', { subjectChanges: { social: .2 }, playerChanges: { social: .2 } }),
-      option('dismiss', 'Insist on your own view', 'You avoid a difficult conversation, but {name} feels unheard.', {  }),
+      option('dismiss', 'Insist on your own view', 'You go to your event and enjoy a creative evening.', { playerChanges: { creativity: .25 } }),
     ] },
     { id: 'household_partner_offer', name: 'A suspicious business seminar', description: '{name} is persuaded by an easy-money business seminar and wants to sign up without understanding how the business works. The organizer avoids questions about what participants actually do.', kind: 'neutral', statFactors: [low('intelligence')], choices: [
-      option('review', 'Look through it together', 'Careful questions help {name} recognize the weak points.', { playerChanges: { intelligence: .15 }, relationship: .2 }),
-      option('back', 'Back the plan', 'The promise falls short, leaving {name} discouraged and your household stretched.', { lifestyle: -1, years: 2 }),
+      option('review', 'Look through it together', 'Your questions expose the scheme, though {name} feels doubted.', { playerChanges: { intelligence: .15 }, relationship: -.1 }),
+      option('back', 'Back the plan', 'It falls through, but {name} feels trusted.', { relationship: .3 }),
     ] },
     { id: 'household_partner_overwhelmed', name: 'Hospital visits become overwhelming', description: 'While a relative is in hospital, {name} struggles to cope with visits and worry. Sleep unravels, and with little time to support each other, exhaustion and canceled plans strain your relationship.', kind: 'negative', statFactors: [low('stability')], neglectFactors: ['family'], subjectChanges: { health: -.3 }, playerChanges: { stability: -.2 }, relationship: -.2 },
     { id: 'household_partner_forgotten', name: 'A missed dinner reservation', description: 'You forget a dinner reservation with {name}, leaving them waiting alone and both of you upset.', kind: 'negative', neglectFactors: ['family'], relationship: -.6 },
     { id: 'household_partner_weekend', name: 'A weekend together at a lakeside cabin', description: 'You and {name} make time for a weekend together and accept an invitation to stay at a friend\'s lakeside cabin.', focusFactors: ['family'], choices: [
       option('outdoors', 'Go somewhere active', 'A shared outing gives you and {name} a chance to move and reconnect.', { subjectChanges: { strength: .2 }, playerChanges: { strength: .2 }, relationship: .4 }),
-      option('quiet', 'Enjoy a quiet day', 'You and {name} settle into an easy day without a demanding schedule.', { relationship: .3 }),
+      option('quiet', 'Enjoy a quiet day', 'You and {name} paint by the lake all afternoon.', { subjectChanges: { creativity: .2 }, playerChanges: { creativity: .2 }, relationship: .3 }),
     ] },
     { id: 'household_partner_open', name: 'A letter in an old box', description: 'Finding an old letter prompts {name} to tell you about a painful friendship they had never discussed, bringing you closer.', focusFactors: ['family'], statFactors: [high('social')], subjectChanges: { stability: .2 }, relationship: .5 },
     { id: 'household_partner_hobby', name: 'Two places in a pottery class', description: 'After seeing {name} experiment with clay at an open session, a pottery teacher offers two places in a beginners class. {name} invites you along.', statFactors: [high('creativity')], choices: [
@@ -108,18 +109,18 @@ export const FAMILY_EVENTS = [
     { id: 'household_child_words', name: 'A relative brings harder picture games', description: 'During a visit, {name} quickly picks up a picture-naming game. A relative who used to teach starts bringing harder word games and picture books, giving you a welcome hand too.', minAge: 1, maxAge: 2, statFactors: [high('intelligence')], subjectChanges: { social: .2 } },
     { id: 'household_child_curiosity', name: 'Imaginative play at a nature exhibit', description: 'At a neighborhood nature exhibit, {name} turns the animal models into make-believe games and eagerly joins the hands-on sessions.', minAge: 1, maxAge: 5, statFactors: [high('creativity')], choices: [
       option('explore', 'Join the hands-on sessions', 'You help {name} investigate the displays and make animal models, though the busy visits take energy.', { subjectChanges: { intelligence: .3 }, relationship: .3 }),
-      option('routine', 'Visit during a quiet hour', 'A short, unhurried visit gives you and {name} a reassuring outing together.', { relationship: .2 }),
+      option('routine', 'Visit during a quiet hour', 'A calm walk around the exhibit tires {name} out happily.', { subjectChanges: { health: .2 }, relationship: .2 }),
     ] },
     { id: 'household_child_tumble', name: 'A playground tumble', description: '{name} struggles to hold their weight on the playground climbing bars, loses their grip and falls. They need a gentler stretch of days to recover.', minAge: 3, maxAge: 12, kind: 'negative', statFactors: [low('strength')], subjectChanges: { health: -.4 } },
     { id: 'household_child_friend', name: 'A new neighbor becomes a playmate', description: '{name} greets a new child next door and draws them into a game. They begin inviting each other over, and a friendship takes shape.', minAge: 3, maxAge: 17, statFactors: [high('social')] },
     { id: 'household_child_left_out', name: 'Left off the party invitations', description: 'After struggling to join conversations with classmates, {name} learns about a party they were not invited to and comes home upset.', minAge: 5, maxAge: 17, kind: 'negative', statFactors: [low('social')], choices: [
       option('listen', 'Listen without rushing', 'Feeling heard helps {name} recover some confidence.', { relationship: .5 }),
-      option('activity', 'Find a welcoming activity', '{name} gets another chance to connect, while you make room to help.', { relationship: .3 }),
+      option('activity', 'Find a welcoming activity', '{name} joins an art group and enjoys it.', { subjectChanges: { creativity: .25 }, relationship: .2 }),
     ] },
     { id: 'household_child_grades', name: 'Invited to lead a class demonstration', description: 'After {name} explains a tricky science problem clearly, a teacher asks them to demonstrate an experiment to classmates. Preparing and presenting it builds skills and makes you proud.', minAge: 6, maxAge: 17, statFactors: [high('intelligence')], focusFactors: ['family'], subjectChanges: { social: .2 } },
     { id: 'household_child_school', name: 'A teacher calls about missed work', description: '{name} has trouble understanding several assignments and leaves them unfinished. A teacher contacts you to arrange extra explanations and a support plan.', minAge: 6, maxAge: 17, kind: 'neutral', statFactors: [low('intelligence')], neglectFactors: ['family'], choices: [
       option('home', 'Work through it together', 'Patient practice helps {name} understand, even if the evenings become demanding.', { relationship: .4 }),
-      option('teacher', 'Ask the teacher for support', '{name} gets a clearer plan and feels less alone with the problem.', { relationship: .2 }),
+      option('teacher', 'Ask the teacher for support', '{name} joins a study group and makes friends there.', { subjectChanges: { social: .2 }, relationship: .1 }),
     ] },
     { id: 'household_child_art', name: 'The library exhibits their artwork', description: 'The library selects a picture by {name} for its exhibition and invites them to an artist-led workshop.', minAge: 6, maxAge: 17, statFactors: [high('creativity')] },
     { id: 'household_child_team', name: 'A chance to join the team', description: 'After {name} performs strongly in a school practice, a coach invites them to try the team, adding another demand to the calendar.', minAge: 6, maxAge: 17, statFactors: [high('strength')], choices: [
@@ -155,7 +156,7 @@ export const FAMILY_EVENTS = [
     ] },
     { id: 'household_partner_roof_leak', name: 'A leaking roof', description: 'A roof leak disrupts your home with {name}.', kind: 'negative', baseChance: .005, choices: [
       option('repair', 'Handle the repairs together', 'Repair work uses your spare evenings.', { subjectChanges: { strength: .2 }, playerChanges: { strength: .25, health: -.15 }, relationship: .25, years: 1, focusCapacity: { standard: { social: -3 } } }),
-      option('hire', 'Hire repair help', 'Outside help protects your time, though arranging it is stressful.', { lifestyle: -1, years: 1 }),
+      option('hire', 'Hire repair help', 'The bill strains your budget, but your evenings stay free.', { householdLifestyle: -.18, years: 1 }),
     ] },
     { id: 'household_partner_travel_plans', name: 'Two trips on the same dates', description: '{name} is invited on an art retreat during a history tour you want to take, and you need to decide whether to travel together.', kind: 'neutral', choices: [
       option('together', 'Plan a shared trip', 'A longer trip leaves less time for work.', { playerChanges: { creativity: .25 }, relationship: .4, years: 1, focusCapacity: { standard: { work: -1 } } }),
@@ -181,10 +182,7 @@ export const FAMILY_EVENTS = [
 ];
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
-function traitFactor(value, direction) {
-  const scaled = direction === 'low' ? (10 - clamp(value, 0, 10)) / 9 : Math.max(0, (clamp(value, 0, 10) - 1) / 9);
-  return direction === 'low' ? .08 + 3.68 * scaled ** 2 : .12 + 3.52 * scaled ** 2;
-}
+const traitFactor = (value, direction) => statEventFactor(clamp(value, 0, 10), direction);
 function eligible(event, state, subject, playerStats = state.stats) {
   if (subject.alive === false || subject.age < event.minAge || subject.age > event.maxAge) return false;
   if (event.subjectType === 'parent' && subject.abandonedAt !== undefined) return false;
@@ -225,6 +223,9 @@ export function familyEventChances(state, playerStats = state.stats) {
   ];
   const focus = Object.fromEntries(['work', 'social', 'family', 'self'].map(key => [key, legacyFocusValue(state.focus?.[key], state.age >= 2 && state.age < 5 && !['work', 'self'].includes(key) ? 2 : 3)]));
   const result = [];
+  // A household event (noise outside, a burst pipe) reaches every caregiver at
+  // once, so it rolls once, for the first caregiver still at home.
+  const householdActor = actors.find(({ subjectType, person }) => subjectType === 'parent' && person.alive !== false && person.abandonedAt === undefined)?.person;
   for (const { subjectType, person } of actors) {
     // Housing and access describe the player's household, not a relative's
     // individual earnings or a child's personal rating.
@@ -232,14 +233,14 @@ export function familyEventChances(state, playerStats = state.stats) {
     const catalog = FAMILY_EVENTS.filter(event => event.subjectType === subjectType);
     const rates = [];
     for (const event of catalog) {
-      let chance = eligible(event, state, person, playerStats) ? event.id === 'household_parent_abandonment' ? abandonmentChance(state, person) : event.baseChance * FAMILY_EVENT_RATE_MULTIPLIER : 0;
+      let chance = event.household && person !== householdActor || !eligible(event, state, person, playerStats) ? 0 : event.id === 'household_parent_abandonment' ? abandonmentChance(state, person) : event.baseChance * FAMILY_EVENT_RATE_MULTIPLIER;
       for (const [key, direction] of chance > 0 ? event.statFactors || [] : []) chance *= traitFactor(eventStats[key], direction);
       for (const key of event.focusFactors || []) chance *= .4 + focus[key] * .25;
       for (const key of event.neglectFactors || []) chance *= .25 + (5 - focus[key]) * .35;
       if (event.relationshipFactor) chance *= traitFactor(person.relationship ?? 5, event.relationshipFactor);
-      rates.push({ id: `${event.id}:${person.id}`, eventId: event.id, name: `${person.name}: ${event.name}`, chance: clamp(chance, 0, .12), subjectType, subjectId: person.id });
+      rates.push({ id: `${event.id}:${person.id}`, eventId: event.id, name: event.household ? event.name : `${person.name}: ${event.name}`, chance: clamp(chance, 0, .12), subjectType, subjectId: person.id });
     }
-    result.push(...boostLowStatRates(catalog, rates, eventStats));
+    result.push(...boostStatRates(catalog, rates, eventStats, EVENT_BALANCE.relativePoolScale));
   }
   return result;
 }

@@ -44,13 +44,13 @@ test('routine household progress changes lifestyle by fractions and its forecast
   const before = structuredClone(state);
   assert.equal(householdLifestyle(state), 4.2);
   const forecast = annualForecast(state);
-  assert.deepEqual(forecast.lifestyle, { before: 4.2, after: 4.2253, change: .03 });
-  assert.ok(forecast.parents.every(parent => parent.lifestyle.after === 4.2253));
+  assert.deepEqual(forecast.lifestyle, { before: 4.2, after: 4.2247, change: .02 });
+  assert.ok(forecast.parents.every(parent => parent.lifestyle.after === 4.2247));
   assert.deepEqual(state, before, 'forecast must not alter saved ratings or RNG');
   assert.equal(advanceYear(state, ordinaryYear).ok, true);
-  assert.equal(state.lifestyle, 4.2253);
-  assert.ok(state.parents.every(parent => parent.lifestyle === 4.2253));
-  assert.equal(state.siblings[0].lifestyle, 4.2253);
+  assert.equal(state.lifestyle, 4.2247);
+  assert.ok(state.parents.every(parent => parent.lifestyle === 4.2247));
+  assert.equal(state.siblings[0].lifestyle, 4.2247);
   assert.deepEqual(state.yearSummary.lifestyle, forecast.lifestyle);
 });
 

@@ -10,7 +10,7 @@ const values = value => Object.fromEntries(keys.map(key => [key, value]));
 const calm = { eventRandom: () => 1, mortalityRandom: () => 1, growthRandom: () => 0, parentCareerRandom: () => 1, fameRandom: () => 1 };
 const positive = ['rapid_processing', 'strong_working_memory', 'verbal_aptitude', 'spatial_reasoning', 'number_sense'];
 const negative = ['deliberate_processing', 'working_memory_difficulty', 'slow_learner', 'forgetful', 'spatial_difficulty'];
-const baselineUrl = new URL('../.git/affinity-overflow-baseline/engine.js', import.meta.url);
+const baselineUrl = new URL('../.baselines/affinity-overflow/engine.js', import.meta.url);
 const baseline = existsSync(baselineUrl) ? await import(baselineUrl.href) : null;
 function lifeAt(runtime, age, seed = 71026) {
   const state = runtime.createGame({ seed });

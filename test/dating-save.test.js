@@ -7,7 +7,7 @@ import * as current from '../engine.js';
 const copy = value => structuredClone(value);
 const noDeaths = { mortalityRandom: () => 1 };
 const calm = { mortalityRandom: () => 1, growthRandom: () => 0, eventRandom: () => 1, parentCareerRandom: () => 1, fameRandom: () => 1 };
-const baselineUrl = new URL('../.git/dating-genetics-baseline/engine.js', import.meta.url);
+const baselineUrl = new URL('../.baselines/dating-genetics/engine.js', import.meta.url);
 let baseline;
 try {
   await access(baselineUrl);
@@ -162,7 +162,7 @@ test('portable dating and genetics save records survive load, previews and menus
   t.diagnostic(`${fixtures.length} portable saves; nine menu paths; repeated reads preserve every saved field.`);
 });
 
-test('independent pre-change runtime saves retain all ratings, family genetics, encounters and RNG',{skip:baseline?false:'Optional .git/dating-genetics-baseline is absent'},async t=>{
+test('independent pre-change runtime saves retain all ratings, family genetics, encounters and RNG',{skip:baseline?false:'Optional .baselines/dating-genetics is absent'},async t=>{
   const fixtures=representativeSaves(baseline);
   for(const fixture of fixtures) verifyReads(fixture);
   for(const fixture of fixtures) await verifyMenus(fixture);

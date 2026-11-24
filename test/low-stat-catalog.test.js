@@ -5,6 +5,7 @@ import { EVENTS, createGame, advanceYear, eventOdds, effectiveStats, validateSav
 import { defaultFocus } from '../focus-rules.js';
 import { createSchoolRecord } from '../school.js';
 import { changedRating } from '../rating-changes.js';
+import { lowStatEventTarget, eventHasConsequence, LOW_STAT_EVENT_CAP } from '../event-rates.js';
 
 const stats = ['health', 'stability', 'intelligence', 'strength', 'social', 'creativity', 'attractiveness', 'lifestyle'];
 const additions = PERSONAL_EVENTS.filter(event => event.id.startsWith('low_stat_'));
@@ -46,8 +47,8 @@ const anyChance = rates => 1 - rates.reduce((none, rate) => none * (1 - rate.cha
 test('six original minor definitions remain available without inventing consequences for retired incidents', () => {
   assert.equal(additions.length, 6);
   const ordinaryCatalog = EVENTS.filter(event => event.category !== 'Fame' && !event.supplemental);
-  assert.equal(ordinaryCatalog.length, 352);
-  assert.equal(ordinaryCatalog.filter(event => event.choices).length, 73);
+  assert.equal(ordinaryCatalog.length, 356, 'including four scheduled school milestones');
+  assert.equal(ordinaryCatalog.filter(event => event.choices).length, 75);
   for (const event of additions) {
     assert.equal(event.category, 'Everyday setbacks');
     assert.equal(event.severity, 'minor');
@@ -73,14 +74,17 @@ test('retained raw catalog probability rules preserve their low-stat floor witho
       setRating(state, key, rating);
       const before = copy(state);
       const rates = eventChances(state, effectiveStats(state));
-      const pool = related(rates, key);
+      const pool = related(rates, key).filter(rate => eventHasConsequence(metadata.get(rate.id)));
       if (rating <= 2) {
         assert.ok(pool.length > 0, `${age}/${key}: an eligible pool exists`);
-        assert.ok(anyChance(pool) >= (rating === 0 ? .6 : .5) - 1e-9, `${age}/${key}/${rating}: ${anyChance(pool)}`);
+        // A thin pool saturates once every adjustable member reaches the per-event cap.
+        const adjustable = pool.filter(rate => metadata.get(rate.id).severity !== 'major').length;
+        const floor = Math.min(lowStatEventTarget(rating), 1 - (1 - LOW_STAT_EVENT_CAP) ** adjustable);
+        assert.ok(anyChance(pool) >= floor - 1e-9, `${age}/${key}/${rating}: ${anyChance(pool)} versus ${floor}`);
       }
       if (rating < 4) assert.ok(pool.length > 0);
       if (rating === 5) assert.ok(rates.filter(rate => rate.id.startsWith('low_stat_')).every(rate => rate.chance === 0));
-      assert.ok(rates.every(rate => Number.isFinite(rate.chance) && rate.chance >= 0 && rate.chance <= .6));
+      assert.ok(rates.every(rate => Number.isFinite(rate.chance) && rate.chance >= 0 && rate.chance <= LOW_STAT_EVENT_CAP + 1e-12));
       assert.deepEqual(state, before, 'odds never modify stats, allocations, history, or RNG');
     }
   }
@@ -104,7 +108,8 @@ test('new maximum-stat gates use effective values and preserve age and inactivit
   const child = fixture(3);
   child.effects = [{ id: 'saved-confusion', name: 'Saved modifier', description: '', years: 1, modifiers: { intelligence: -4 }, kind: 'negative' }];
   const before = copy(child);
-  assert.ok(eventChances(child, effectiveStats(child)).find(rate => rate.id === 'low_stat_confusing_toy').chance >= .55 - 1e-9, 'its historical catalog gate still reads effective Intelligence');
+  assert.ok(eventChances(child, effectiveStats(child)).find(rate => rate.id === 'low_stat_confusing_toy').chance > 0, 'its historical catalog gate still reads effective Intelligence');
+  assert.equal(eventChances(fixture(3), effectiveStats(fixture(3))).find(rate => rate.id === 'low_stat_confusing_toy').chance, 0);
   assert.equal(eventOdds(child).find(rate => rate.id === 'low_stat_confusing_toy').chance, 0, 'a consequence-free definition cannot roll in new play');
   assert.deepEqual(child, before);
   assert.deepEqual(migrateSave(copy(child)), child);

@@ -120,7 +120,8 @@ test('actual noise rolls capture starting household Lifestyle before careers upd
     const state = copy(original);
     state.rng = Math.imul(index, 2654435761) >>> 0;
     assert.equal(advanceYear(state, steady).ok, true);
-    const entry = state.history.find(entry => entry.title.endsWith(`: ${event.name}`));
+    // A household event reaches every caregiver, so its title names no one.
+    const entry = state.history.find(entry => entry.title === event.name);
     if (entry) found = { state, entry };
   }
   assert.ok(found, 'a seeded noise event actually occurs');

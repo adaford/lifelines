@@ -1,0 +1,9 @@
+# One line per event effect (12 November 2026)
+
+Show every event effect on its own line in pending choices, completed year reviews, the journal and active effects. This includes personal/family rating changes, affinity changes, temporary modifiers, focus restrictions/points, fame and duration. Render absolute activity limits as 'Yourself' focus max 2 (using the appropriate focus name); keep signed capacity/minimum effects distinct. The displayed legacy Yourself-to-Sports translation follows the existing engine rule, including famous adult activities.
+
+Structured previews render one escaped item per line. Saved prose is split only at recognized effect boundaries, so decimal numbers, names, selected choices and custom narrative punctuation remain intact. Apply these changes at render time to both old and new events. Preserve all saved text, outcomes, ratings, restrictions, history, RNG, event rules and schema 20. No percentile recalibration is needed. Cache token: event-effect-lines. Browser/visual checks remain omitted by preference.
+
+Validation: all 611 workspace tests pass (129 DOM checks) and all 571 release tests pass (125 DOM checks), including mixed legacy effect lists, the playground-fall regression, pending/active effect lines, safe escaping and unchanged saves across reloads. All 30 workspace and 29 release HTTP assets match source; temporary preview servers were stopped after verification. Simulation, catalogs, save validation and percentile references compare unchanged after excluding cache query strings.
+
+Published as `fc692eaa6267bea804566c7f233cebe4dd3f3997` to main. GitHub Pages successfully built the intended commit and all 29 live assets match committed bytes. All 104 working files were preserved byte-for-byte while aligning main; earlier unpublished work remains local. No local preview servers remain running. Verification logs and the initial task snapshot are under `.git/event-effect-lines-snapshots/`.

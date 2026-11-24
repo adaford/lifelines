@@ -82,7 +82,7 @@ test('crafts intelligence changes only at zero or four points by half an adjacen
   }
 });
 
-test('toddler social practice has equal signed units while family time builds parent relationships', () => {
+test('toddler social practice has equal signed units while family time builds only the parents', () => {
   for (const age of [2, 3, 4]) {
     const state = toddler();
     state.age = age;
@@ -98,17 +98,19 @@ test('toddler social practice has equal signed units while family time builds pa
     const playGain = play.social - baseline.social;
     const electronicsGain = electronics.social - baseline.social;
     const familyGain = family.social - baseline.social;
-    assert.ok(playGain > 0 && electronicsGain < 0 && familyGain > 0);
+    assert.ok(playGain > 0 && electronicsGain < 0);
     assert.ok(Math.abs(electronicsGain * -1 - playGain) < 1e-12);
-    assert.ok(Math.abs(familyGain - playGain) < 1e-12);
-    assert.equal(family.intelligence, baseline.intelligence);
-    assert.equal(Object.hasOwn(toddlerActivityEffects(state).family, 'intelligence'), false);
+    assert.equal(familyGain, 0, 'Family time changes none of your ratings');
+    assert.deepEqual(family, baseline);
+    assert.deepEqual(toddlerActivityEffects(more('family')).family, {});
     const neutral = annualForecast(state);
     const closer = annualForecast(more('family'));
     for (const parent of neutral.parents) {
       const next = closer.parents.find(person => person.id === parent.id);
       assert.equal(parent.relationship.change, 0);
       assert.equal(next.relationship.change, .02);
+      assert.equal(parent.health.change, 0);
+      assert.equal(next.health.change, .02, 'Family time raises each caregiver Health');
     }
     assert.deepEqual(state, before, 'practice and forecast reads preserve the save and RNG');
   }

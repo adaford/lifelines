@@ -2,10 +2,11 @@ import { changedRating } from '../rating-changes.js';
 import { changedLifestyle } from '../lifestyle.js';
 import { createCollegeOffers } from '../college.js';
 import { getBirthConditions, aptitudeBounds } from '../birth-conditions.js';
+import { BIRTH_BALANCE } from '../balance.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { toLegacyCentimeters, neutralWellbeingAptitudes, integerLifestyleForLegacy, legacyRatingFloor } from './helpers/legacy-height.js';
-import { SKILLS, JOBS, EVENTS, createGame, stage, advanceYear as advanceYearAction, setBabyChoice, setFocus, effectiveStats, currentEffects, eventOdds, jobFit, canTakeJob, takeJob, quitJob, haveChild, successionInfo, succeed, lifestyleFromResources, householdLifestyle, validateSave, migrateSave, chooseEducation, needsEducationChoice, offeredJobs, resolveEventChoice, respondToEncounter, proposeMarriage, endRelationship, relationshipOdds, oneNightChance, meetingChances, proposalChance, pregnancyChance, pendingEventSubject, normalizeSurname } from '../engine.js';
+import { SKILLS, JOBS, EVENTS, createGame, stage, advanceYear as advanceYearAction, setBabyChoice, setFocus, effectiveStats, currentEffects, eventOdds, jobFit, canTakeJob, takeJob, quitJob, haveChild, successionInfo, succeed, lifestyleFromResources, householdLifestyle, validateSave, migrateSave, chooseEducation, needsEducationChoice, offeredJobs, resolveEventChoice, respondToEncounter, proposeMarriage, endRelationship, relationshipOdds, oneNightChance, meetingChances, proposalChance, pregnancyChance, pendingEventSubject, normalizeSurname, pendingEventChoices } from '../engine.js';
 
 const copy = value => JSON.parse(JSON.stringify(value));
 const finishChoices = state => {
@@ -138,7 +139,8 @@ test('births reflect parental ratings while adoption retains the independent apt
     const high = children.filter(child => origin === 'birth' ? parentMean(child) >= 6 : child.aptitudes[key] >= 2).map(child => child.stats[key]);
     const low = children.filter(child => origin === 'birth' ? parentMean(child) <= 4 : child.aptitudes[key] <= -2).map(child => child.stats[key]);
     assert.ok(high.length > 10 && low.length > 10);
-    assert.ok(average(high) - average(low) > 2, `${origin} ${key} reflects ${origin === 'birth' ? 'parental ratings' : 'population aptitude'} immediately`);
+    // Each affinity step shifts a newborn rating by BIRTH_BALANCE.affinityShift, so aptitudes 2+ and -2- sit at least four steps apart.
+    assert.ok(average(high) - average(low) > (origin === 'birth' ? 2 : 4 * BIRTH_BALANCE.affinityShift), `${origin} ${key} reflects ${origin === 'birth' ? 'parental ratings' : 'population aptitude'} immediately`);
   }
 });
 
@@ -841,14 +843,14 @@ test('long simulations retain bounds and mix quiet years with at most five uniqu
 test('event catalogue has unique authored outcomes and only supported traits', () => {
   assert.ok(EVENTS.length >= 100);
   assert.equal(new Set(EVENTS.map(event => event.id)).size, EVENTS.length);
-  assert.equal(new Set(EVENTS.map(event => `${event.subjectType || 'player'}:${event.name}`)).size, EVENTS.length);
   assert.ok(EVENTS.filter(event => event.choices?.length).length >= 25);
   const traits = new Set([...SKILLS.map(skill => skill.key), 'health', 'stability']);
   for (const event of EVENTS) {
     assert.ok(event.description.length > 20);
     assert.ok(Number.isInteger(event.minAge) && event.minAge >= 0);
     assert.ok(event.maxAge === undefined || event.maxAge >= event.minAge);
-    const outcomes = event.choices || [event];
+    // Scheduled school honors author their concrete options when queued; the catalog holds placeholders.
+    const outcomes = event.scheduled && event.choices ? pendingEventChoices(event, { options: ['strength', 'social', 'health'] }) : event.choices || [event];
     if (event.choices) {
       assert.ok(event.choices.length >= 2);
       assert.equal(new Set(event.choices.map(choice => choice.id)).size, event.choices.length);
@@ -863,6 +865,7 @@ test('event catalogue has unique authored outcomes and only supported traits', (
       if (Object.keys(outcome.modifiers || {}).length || outcome.lifestyle || outcome.focusLimits || outcome.focusCapacity || outcome.focusMinimums || outcome.focusPoints) assert.ok(Number.isInteger(outcome.years) && outcome.years >= 1 && outcome.years <= 5);
     }
   }
+  assert.equal(new Set(EVENTS.map(event => `${event.subjectType || 'player'}:${event.name}`)).size, EVENTS.length, 'every event has a distinct journal title');
 });
 
 test('age gates apply to the year being played and every retained stat affects some event odds', () => {

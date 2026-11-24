@@ -1,7 +1,7 @@
-import { gradeScore } from './school.js?v=short-events-toddler-order';
-import { incomeForLifestyle, lifestyleFromResources } from './lifestyle.js?v=short-events-toddler-order';
-import { careerFit } from './career-rules.js?v=short-events-toddler-order';
-import { JOBS } from './jobs.js?v=short-events-toddler-order';
+import { gradeScore } from './school.js?v=stat-driven-events';
+import { incomeForLifestyle, lifestyleFromResources } from './lifestyle.js?v=stat-driven-events';
+import { careerFit } from './career-rules.js?v=stat-driven-events';
+import { JOBS } from './jobs.js?v=stat-driven-events';
 
 // Fictional four-year routes, not rankings of actual institutions. College
 // changes the distribution of opportunities, never a career's absolute cap.
@@ -120,7 +120,8 @@ function scholarshipFor(state, college, gpa) {
 // Capture this result once at the end of grade 12. Rendering and reloading
 // should use the captured result, never roll funding or admissions again.
 export function createCollegeOffers(state) {
-  const schoolGpa = clamp(finite(state.school?.gpa, 50), 50, 100);
+  // Only high school counts; saves from before stage records use their last report.
+  const schoolGpa = clamp(finite(state.school?.stages?.high?.gpa ?? state.school?.gpa, 50), 50, 100);
   const activitySuccess = Math.max(finite(state.school?.sports?.success), finite(state.school?.extracurricular?.success));
   const { familyResources, personalResources, supportedLifestyle, funding } = collegeFunding(state);
   const offers = COLLEGES.filter(college => drawFor(state, `college:${college.id}:admission`)

@@ -137,10 +137,10 @@ test('condition bonuses and lifelong limits apply to focus actions and coexist w
   state.conditions = ['autism', 'high_energy'];
   state.focus = { ...defaultFocus(6), social: 1 };
   state.school = createSchoolRecord(state);
-  assert.equal(focusBudget(state), 11);
+  assert.equal(focusBudget(state), 10);
   assert.equal(focusBudget({ ...state, age: 3 }), 11);
-  assert.equal(focusBudget({ ...state, conditions: ['low_energy'] }), 9);
-  assert.deepEqual(fitFocusBudget({ ...state, conditions: ['low_energy'] }, { ...defaultFocus(6), work: 4 }), { work: 3, social: 2, family: 2, self: 2, sports: 0, extracurricular: 0 });
+  assert.equal(focusBudget({ ...state, conditions: ['low_energy'] }), 8);
+  assert.deepEqual(fitFocusBudget({ ...state, conditions: ['low_energy'] }, { ...defaultFocus(6), work: 4 }), { work: 2, social: 2, family: 2, self: 2, sports: 0, extracurricular: 0 });
   assert.equal(setFocus(state, 'social', 2).ok, false);
   assert.equal(setFocus(state, 'work', 4).ok, true);
   assert.equal(focusLimitDetails(state)[0].permanent, true);
@@ -152,7 +152,7 @@ test('condition bonuses and lifelong limits apply to focus actions and coexist w
   assert.equal(state.effects.some(effect => effect.id === 'temporary'), false);
   assert.equal(focusLimits(state).social, 1);
   assert.deepEqual(state.conditions, ['autism', 'high_energy']);
-  assert.equal(state.yearSummary.decisions.focusBudget, 11);
+  assert.equal(state.yearSummary.decisions.focusBudget, 10);
   assert.equal(validateSave(state), true);
   assert.deepEqual(migrateSave(clone(state)), state);
 });
@@ -222,7 +222,7 @@ test('succession keeps the chosen childs conditions and applies their budget wit
   assert.deepEqual(state.conditions, ['autism', 'high_energy']);
   assert.deepEqual(state.stats, before);
   assert.deepEqual(state.aptitudes, beforeAptitudes, 'succession retains the chosen perk total without applying it again');
-  assert.equal(focusBudget(state), 11);
+  assert.equal(focusBudget(state), 10);
   assert.equal(state.focus.social, 1);
   assert.equal(validateSave(state), true);
   const noChildren = adult();

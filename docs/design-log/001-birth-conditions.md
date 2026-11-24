@@ -1,0 +1,6 @@
+# Birth conditions (1 November 2026)
+
+- Keep 100 good, bad, and mixed conditions, maximum five per person. Any condition can occur without inheritance and for any gender. Every entry has positive base chance; either biological parent gives a 1.5x chance, without compounding for both. Adoption uses independent rolls. Shuffle candidates before the cap and prevent mutually exclusive groups.
+- Apply stat changes once at creation, rounded to two decimals and bounded 0-10. Focus points/caps are lifelong. High energy adds one yearly point; Autism adds .7 Intelligence at birth and caps Friends at 1 from age 5. These effects are fictional game rules.
+- Generate/preserve conditions on players, parents, guardians, children, dating prospects, and unrelated heirs, including through relationships, aging, reload, and succession. Show compact names with inline effects. Sum point changes with base budgets; combine condition/event caps by minimum.
+- Schema 17 validates known unique condition IDs (at most five) on every person, including pregnancy/lineage copies. Older people gain empty lists without RNG or stat changes. Never reroll or reapply birth bonuses. Preserve the lifelines.save.v1 key and existing progress.

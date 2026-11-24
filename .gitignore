@@ -1,4 +1,11 @@
 node_modules/
 .DS_Store
 *.log
+
+# Local-only working files (never published)
 test-artifacts/
+.baselines/
+toDo.txt
+.claude/settings.local.json
+CLAUDE.local.md
+.release-check/

@@ -62,9 +62,10 @@ function adultFamily() {
   assert.ok(event);
   state.pendingEvents = [{ eventId: event.id, age: state.age }];
   state.lastYearEvents = [event.id];
-  // These fixtures model legacy schema-19 records with fixed three offers.
+  // These fixtures model legacy schema-19 records with fixed three offers and no stage GPAs.
   delete state.collegeApplications;
   delete state.housing;
+  delete state.school.stages;
   state.school.offers = { sports: SPORTS.slice(0, 3).map(entry => entry.id),
     extracurricular: EXTRACURRICULARS.slice(0, 3).map(entry => entry.id) };
   assert.equal(validateSave(state), true, 'the fixture has valid current person and historical records');

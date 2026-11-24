@@ -74,7 +74,8 @@ test('fame invitations persist, decline without a draw, and start exactly one re
     const restored = reloadUnchanged(original), declined = copy(restored);
     assert.equal(resolveEventChoice(declined, 'decline', original.pendingEvents[0].eventId).ok, true);
     assert.equal(declined.fame, null); assert.equal(declined.rng, original.rng);
-    assert.deepEqual(declined.stats, original.stats); assert.deepEqual(declined.aptitudes, original.aptitudes);
+    assert.deepEqual(declined.stats, { ...original.stats, creativity: Math.round((original.stats.creativity + .2) * 100) / 100 }, 'declining keeps its own Creativity benefit');
+    assert.deepEqual(declined.aptitudes, original.aptitudes);
     assert.equal(declined.pendingEvents.length, 0); reloadUnchanged(declined);
     const accepted = copy(restored), repeated = copy(restored);
     for (const state of [accepted, repeated]) assert.equal(resolveEventChoice(state, 'pursue', original.pendingEvents[0].eventId).ok, true);

@@ -61,6 +61,7 @@ test('school inactivity uses category losses while positive points retain each e
     const state = pupil();
     if (id) join(state, kind, id);
     state.focus[kind] = points;
+    if (points === 2) state.focus.family = 1; // Family changes no player rating; it frees a point of the nine
     const expected = points === 0 ? losses[kind] : schoolActivity(kind, id).training;
     const units = points === 0 ? -1 : points;
     const before = copy(state), raw = standardFocusPractice(state), without = standardFocusPractice(state, null, kind);
@@ -148,9 +149,9 @@ test('new school records contain a saved Lifestyle-dependent offer roll for each
   assert.deepEqual(migrateSave(copy(infant)), infant, 'records without school need no shortlist migration');
 });
 
-test('joining requires an offered affordable activity and unlocks one of two focus points within the ten-point budget', () => {
+test('joining requires an offered affordable activity and unlocks one of two focus points within the nine-point budget', () => {
   const state = pupil();
-  assert.equal(focusBudget(state), 10);
+  assert.equal(focusBudget(state), 9);
   assert.equal(state.focus.sports, 0);
   assert.equal(state.focus.extracurricular, 0);
   assert.equal(focusLimits(state).sports, 0);
@@ -168,10 +169,15 @@ test('joining requires an offered affordable activity and unlocks one of two foc
   assert.deepEqual(state.school.sports, { id: 'lacrosse', success: null });
   assert.equal(state.focus.sports, 1);
   assert.equal(focusLimits(state).sports, 2);
-  join(state, 'extracurricular', 'chess');
-  assert.equal(Object.values(state.focus).reduce((sum, value) => sum + value, 0), 10);
-  assert.equal(setFocus(state, 'sports', 2).ok, false, 'raising an activity still uses the shared budget');
+  offered(state, 'extracurricular', 'chess');
+  const full = copy(state);
+  assert.equal(enrollSchoolActivity(state, 'extracurricular', 'chess').ok, false, 'defaults plus one activity fill the nine points');
+  assert.deepEqual(state, full);
   assert.equal(setFocus(state, 'family', 1).ok, true);
+  join(state, 'extracurricular', 'chess');
+  assert.equal(Object.values(state.focus).reduce((sum, value) => sum + value, 0), 9);
+  assert.equal(setFocus(state, 'sports', 2).ok, false, 'raising an activity still uses the shared budget');
+  assert.equal(setFocus(state, 'self', 1).ok, true);
   assert.equal(setFocus(state, 'sports', 2).ok, true);
   assert.equal(setFocus(state, 'sports', 3).ok, false);
   assert.equal(validateSave(state), true);
@@ -208,6 +214,7 @@ test('keeping an activity preserves success, switching resets it, and leaving lo
 test('annual activity offers are fresh while enrollment, success, saved offers, and previews survive reloads', () => {
   const state = pupil();
   join(state, 'sports', 'soccer');
+  state.focus.family = 1;
   join(state, 'extracurricular', 'chess');
   const before = copy(state), offers = copy(state.school.offers);
   for (let read = 0; read < 3; read++) {
@@ -239,6 +246,7 @@ test('five-offer schema nineteen saves trim only their shortlists and keep selec
   for (const age of [12, 17]) {
     const initial = pupil(age);
     join(initial, 'sports', 'basketball');
+    initial.focus.family = 1;
     join(initial, 'extracurricular', 'chess');
     const saved = quietYear(initial);
     saved.pendingEvents = [{ eventId: 'school_team', age: saved.age }];
@@ -247,6 +255,7 @@ test('five-offer schema nineteen saves trim only their shortlists and keep selec
     saved.version = 19;
     delete saved.collegeApplications;
     delete saved.housing;
+    delete saved.school.stages; // stage GPAs arrived with schema 20
     for (const person of [saved, ...saved.parents, ...saved.encounters]) person.conditions = [];
     saved.school.offers = {
       sports: ['soccer', 'football', 'tennis', 'basketball', 'cheerleading'],
@@ -428,6 +437,7 @@ test('activity success uses starting weighted performance, one supplied draw, an
   const state = pupil();
   join(state, 'sports', 'basketball');
   state.stats.strength = 8;
+  assert.equal(setFocus(state, 'family', 1).ok, true);
   assert.equal(setFocus(state, 'sports', 2).ok, true);
   const activity = schoolActivity('sports', 'basketball');
   for (const draw of [-3, 0, 3]) {
@@ -446,6 +456,7 @@ test('activity success uses starting weighted performance, one supplied draw, an
   for (const kinds of [[], ['sports'], ['sports', 'extracurricular']]) {
     const candidate = pupil();
     if (kinds.includes('sports')) join(candidate, 'sports', 'soccer');
+    candidate.focus.family = 1;
     if (kinds.includes('extracurricular')) join(candidate, 'extracurricular', 'chess');
     let draws = 0;
     assert.equal(advanceYear(candidate, { ...steady, growthRandom: () => { draws++; return 0; } }).ok, true);
@@ -557,7 +568,7 @@ test('version eighteen migration preserves existing progress, history and pendin
   large.focus = { work: 4, social: 4, family: 4, self: 0, sports: 0, extracurricular: 0 };
   const normalized = migrateSave(large);
   assert.ok(normalized);
-  assert.equal(Object.values(normalized.focus).reduce((sum, value) => sum + value, 0), 10);
+  assert.equal(Object.values(normalized.focus).reduce((sum, value) => sum + value, 0), 9, 'migration fits the current nine-point school budget');
   assert.deepEqual(normalized.stats, large.stats);
   assert.equal(normalized.rng, large.rng);
 });

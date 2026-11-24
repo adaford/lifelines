@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "env": {
+    "CLAUDE_CODE_GLOB_NO_IGNORE": "false"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(npm ci)",
+      "Bash(npm test *)",
+      "Bash(npm start)",
+      "Bash(node --test *)",
+      "Bash(node scripts/*)",
+      "Bash(gh api repos/adaford/lifelines/pages/builds/latest *)",
+      "PowerShell(npm ci)",
+      "PowerShell(npm test *)",
+      "PowerShell(npm start)",
+      "PowerShell(node --test *)",
+      "PowerShell(node scripts/*)",
+      "PowerShell(gh api repos/adaford/lifelines/pages/builds/latest *)"
+    ]
+  }
+}

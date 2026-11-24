@@ -195,7 +195,7 @@ test('year reviews retain the completed year decisions across age and education 
   student.effects = [];
   const schoolFocus = clone(student.focus);
   advanceYear(student, survives);
-  assert.deepEqual(student.yearSummary.decisions, { focus: schoolFocus, workLabel: 'School', focusMax: 4, focusBudget: 10, focusCaps: { sports: 2, extracurricular: 2 } });
+  assert.deepEqual(student.yearSummary.decisions, { focus: schoolFocus, workLabel: 'School', focusMax: 4, focusBudget: 9, focusCaps: { sports: 2, extracurricular: 2 } });
   finishChoices(student);
   assert.equal(chooseEducation(student, 'college').ok, true);
   while (student.age < 22) { advanceYear(student, survives); finishChoices(student); }
@@ -434,6 +434,6 @@ test('seeded mortal lives preserve valid saves through deaths, aging and success
     assert.equal(succeed(loaded, info.candidates[0].id).ok, true);
     assert.equal(validateSave(loaded), true);
   }
-  assert.ok(deaths > 10 && deaths < 95, `${deaths} player deaths before retirement`);
+  assert.ok(deaths > 10, `${deaths} player deaths before retirement`); // low Health is deadly at every age, so default lives may all end before 85
   assert.ok(familyDeaths > 50, `${familyDeaths} parent deaths across long lives`);
 });

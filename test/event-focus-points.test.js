@@ -44,11 +44,11 @@ function quietYear(state) {
 
 test('a point-only choice immediately reduces the budget for one complete turn and preserves ratings and RNG', () => {
   const state = pupil();
-  state.focus.work = 4;
+  state.focus.work = 4; state.focus.social = 1;
   const before = copy(state), id = choice(state, { focusPoints: -1, years: 1 });
-  assert.equal(focusBudget(state), 9, 'the budget loses one whole point, without the yearly stat multiplier');
+  assert.equal(focusBudget(state), 8, 'the budget loses one whole point, without the yearly stat multiplier');
   assert.equal(temporaryFocusPoints(state), -1);
-  assert.equal(spent(state), 9);
+  assert.equal(spent(state), 8);
   assert.equal(state.focus.work, 3, 'only the excess point is removed deterministically');
   assert.deepEqual(state.stats, before.stats);
   assert.deepEqual(state.aptitudes, before.aptitudes);
@@ -66,10 +66,10 @@ test('a point-only choice immediately reduces the budget for one complete turn a
   const next = quietYear(state);
   assert.deepEqual(next.yearSummary.stats, forecast.stats);
   assert.deepEqual(next.yearSummary.decisions.focus, state.focus);
-  assert.equal(next.yearSummary.decisions.focusBudget, 9);
+  assert.equal(next.yearSummary.decisions.focusBudget, 8);
   assert.equal(next.yearSummary.decisions.focusPointModifier, -1);
   assert.equal(next.effects.some(entry => entry.id === id), false);
-  assert.equal(focusBudget(next), 10);
+  assert.equal(focusBudget(next), 9);
   assert.deepEqual(next.focus, state.focus, 'expiry restores capacity without refilling allocations');
   assert.equal(validateSave(next), true);
   assert.deepEqual(migrateSave(copy(next)), next, 'the reduced historical budget remains valid after the effect expires');
@@ -78,20 +78,20 @@ test('a point-only choice immediately reduces the budget for one complete turn a
 test('timed point changes stack with each other and lifelong budgets while caps remain independent', () => {
   const state = pupil();
   state.conditions = ['high_energy', 'autism'];
-  state.focus = { work: 4, social: 1, family: 3, self: 3, sports: 0, extracurricular: 0 };
+  state.focus = { work: 4, social: 1, family: 2, self: 3, sports: 0, extracurricular: 0 };
   state.effects = [effect('extra-time', 1, 2)];
   choice(state, { focusPoints: -2, years: 1, focusLimits: { standard: { self: 1 } } });
-  assert.equal(focusBudget(state), 10, '10 base +1 lifelong +1 temporary -2 temporary');
+  assert.equal(focusBudget(state), 9, '9 base +1 lifelong +1 temporary -2 temporary');
   assert.equal(temporaryFocusPoints(state), -1);
   assert.equal(focusLimits(state).social, 1);
   assert.equal(focusLimits(state).self, 1);
   assert.equal(state.focus.self, 1);
-  assert.equal(spent(state), 9, 'unused capacity is not redistributed after the independent cap');
+  assert.equal(spent(state), 8, 'unused capacity is not redistributed after the independent cap');
   assert.equal(validateSave(state), true);
   const next = quietYear(state);
-  assert.equal(next.yearSummary.decisions.focusBudget, 10);
+  assert.equal(next.yearSummary.decisions.focusBudget, 9);
   assert.equal(next.yearSummary.decisions.focusPointModifier, -1);
-  assert.equal(focusBudget(next), 12);
+  assert.equal(focusBudget(next), 11);
   assert.equal(temporaryFocusPoints(next), 1);
   assert.equal(focusLimits(next).self, 4);
   assert.equal(focusLimits(next).social, 1);
@@ -99,8 +99,8 @@ test('timed point changes stack with each other and lifelong budgets while caps 
   assert.equal(validateSave(next), true);
   const expired = quietYear(next);
   assert.equal(expired.yearSummary.decisions.focusPointModifier, 1);
-  assert.equal(expired.yearSummary.decisions.focusBudget, 12);
-  assert.equal(focusBudget(expired), 11);
+  assert.equal(expired.yearSummary.decisions.focusBudget, 11);
+  assert.equal(focusBudget(expired), 10);
   assert.deepEqual(expired.focus, state.focus);
   assert.equal(validateSave(expired), true);
 });
@@ -121,7 +121,7 @@ test('refreshing an event replaces stale point changes and preserves a separate 
   choice(state, { years: 1, focusLimits: { standard: { work: 1 } } });
   const refreshed = state.effects.find(entry => entry.id === 'school_team:limits');
   assert.equal(Object.hasOwn(refreshed, 'focusPoints'), false);
-  assert.equal(focusBudget(state), 10);
+  assert.equal(focusBudget(state), 9);
   assert.equal(focusLimits(state).work, 1);
   assert.equal(effectiveStats(state).intelligence, rating);
   assert.equal(validateSave(state), true);
@@ -133,7 +133,8 @@ test('current budgets enforce point losses and floor at zero, while expired effe
   state.effects = [effect('short-year', -1)];
   assert.equal(validateSave(state), false, 'existing allocations cannot exceed the reduced total');
   assert.equal(advanceYear(copy(state), calm).ok, false);
-  assert.equal(setFocus(state, 'work', 3).ok, true);
+  assert.equal(setFocus(state, 'work', 3).ok, false, 'the current 9-point school budget, not the legacy 10, limits new allocations');
+  assert.equal(setFocus(state, 'work', 2).ok, true);
   assert.equal(validateSave(state), true);
   state.effects.push(effect('another-loss', -4), effect('third-loss', -4), effect('fourth-loss', -4));
   assert.equal(focusBudget(state), 0);
@@ -142,23 +143,23 @@ test('current budgets enforce point losses and floor at zero, while expired effe
   const before = copy(state);
   const expired = { ...state, effects: state.effects.map(entry => ({ ...entry, years: 0 })) };
   assert.equal(temporaryFocusPoints(expired), 0);
-  assert.equal(focusBudget(expired), 10);
+  assert.equal(focusBudget(expired), 9);
   assert.deepEqual(state, before);
 });
 
 test('expiry of a positive point allowance trims only the newly excessive allocations', () => {
   const state = pupil();
   choice(state, { focusPoints: 4, years: 1 });
-  assert.equal(focusBudget(state), 14);
-  for (const [key, points] of Object.entries({ work: 4, social: 4, family: 4 })) assert.equal(setFocus(state, key, points).ok, true);
-  assert.equal(spent(state), 14);
+  assert.equal(focusBudget(state), 13);
+  for (const [key, points] of Object.entries({ work: 4, social: 4, family: 3 })) assert.equal(setFocus(state, key, points).ok, true);
+  assert.equal(spent(state), 13);
   const next = quietYear(state);
   assert.equal(next.yearSummary.decisions.focusPointModifier, 4);
-  assert.equal(next.yearSummary.decisions.focusBudget, 14);
+  assert.equal(next.yearSummary.decisions.focusBudget, 13);
   assert.deepEqual(next.yearSummary.decisions.focus, state.focus);
-  assert.equal(focusBudget(next), 10);
-  assert.equal(spent(next), 10);
-  assert.deepEqual(next.focus, { work: 2, social: 3, family: 3, self: 2, sports: 0, extracurricular: 0 });
+  assert.equal(focusBudget(next), 9);
+  assert.equal(spent(next), 9);
+  assert.deepEqual(next.focus, { work: 2, social: 2, family: 3, self: 2, sports: 0, extracurricular: 0 });
   assert.equal(validateSave(next), true);
   assert.deepEqual(migrateSave(copy(next)), next);
 });
@@ -172,14 +173,14 @@ test('birthday transitions preserve the recorded modifier and use the new stage 
   assert.equal(school.yearSummary.decisions.focusBudget, 9);
   assert.equal(school.yearSummary.decisions.focusPointModifier, -1);
   assert.equal(school.yearSummary.decisions.focus.creative, toddler.focus.creative);
-  assert.equal(focusBudget(school), 9);
+  assert.equal(focusBudget(school), 8);
   assert.equal(spent(school), 7, 'the removed crafts allocation remains unspent');
   assert.equal(validateSave(school), true);
   const teen = pupil(17);
-  teen.focus.work = 4;
+  teen.focus.work = 4; teen.focus.social = 1;
   choice(teen, { focusPoints: -1, years: 2 });
   const adult = quietYear(teen);
-  assert.equal(adult.yearSummary.decisions.focusBudget, 9);
+  assert.equal(adult.yearSummary.decisions.focusBudget, 8);
   assert.equal(adult.yearSummary.decisions.focusPointModifier, -1);
   assert.deepEqual(adult.yearSummary.decisions.focusCaps, { sports: 2, extracurricular: 2 });
   assert.equal(focusBudget(adult), 7, 'adult base8 minus the remaining point loss');
@@ -214,7 +215,7 @@ test('historical budgets use their recorded modifier rather than current effects
   zeroSum.effects = [effect('loss', -1), effect('gain', 1)];
   const cancelled = quietYear(zeroSum);
   assert.equal(Object.hasOwn(cancelled.yearSummary.decisions, 'focusPointModifier'), false);
-  assert.equal(cancelled.yearSummary.decisions.focusBudget, 10);
+  assert.equal(cancelled.yearSummary.decisions.focusBudget, 9);
   assert.equal(validateSave(cancelled), true);
 });
 
@@ -237,12 +238,12 @@ test('schema20 accepts bounded nonzero effect points and retains old saves witho
   const maximum = pupil();
   maximum.effects = Array.from({ length: 64 }, (_, index) => effect(`bonus-${index}`, 4));
   assert.equal(temporaryFocusPoints(maximum), 256);
-  assert.equal(focusBudget(maximum), 266);
+  assert.equal(focusBudget(maximum), 265);
   assert.equal(validateSave(maximum), true);
   const ended = quietYear(maximum);
   assert.equal(ended.yearSummary.decisions.focusPointModifier, 256);
-  assert.equal(ended.yearSummary.decisions.focusBudget, 266);
-  assert.equal(focusBudget(ended), 10);
+  assert.equal(ended.yearSummary.decisions.focusBudget, 265);
+  assert.equal(focusBudget(ended), 9);
   assert.equal(validateSave(ended), true);
 });
 
@@ -251,22 +252,22 @@ test('an actual study headache reduces the next playable total and appears in th
   for (let seed = 1; seed <= 300; seed++) {
     const state = pupil();
     state.rng = seed;
-    state.focus.work = 4;
+    state.focus.work = 4; state.focus.social = 1;
     assert.equal(advanceYear(state, calm).ok, true);
     if (state.lastYearEvents.includes('study_headache') && !state.pendingEvents.length) { headache = state; break; }
   }
   assert.ok(headache, 'the automatic headache is eligible and can roll for high study focus');
-  assert.equal(headache.yearSummary.decisions.focusBudget, 10);
+  assert.equal(headache.yearSummary.decisions.focusBudget, 9);
   assert.equal(Object.hasOwn(headache.yearSummary.decisions, 'focusPointModifier'), false);
-  assert.equal(focusBudget(headache), 9);
+  assert.equal(focusBudget(headache), 8);
   assert.equal(headache.effects.find(entry => entry.id === 'study_headache').years, 1);
   assert.ok(headache.yearSummary.events.some(entry => entry.text.includes('-1 focus point. Temporary effects: 1 year.')));
   assert.equal(validateSave(headache), true);
   assert.deepEqual(migrateSave(copy(headache)), headache);
   const next = quietYear(headache);
   assert.equal(next.yearSummary.decisions.focusPointModifier, -1);
-  assert.equal(next.yearSummary.decisions.focusBudget, 9);
-  assert.equal(focusBudget(next), 10);
+  assert.equal(next.yearSummary.decisions.focusBudget, 8);
+  assert.equal(focusBudget(next), 9);
   assert.equal(next.effects.some(entry => entry.id === 'study_headache'), false);
   assert.equal(validateSave(next), true);
 });

@@ -1,0 +1,9 @@
+# Small structural refactor (12 November 2026)
+
+Move save validation into save-schema.js with explicit references to existing engine-owned helpers. Keep the validator body and migration behavior unchanged, retain validateSave/migrateSave exports from engine.js, and avoid circular imports. Extract pure avatar and family/gender label rendering into profile-view.js; share the unchanged HTML escape helper from display.js. Consolidate caregiver crying contributions and unemployment focus strain in development.js so simulation and previews use the same rules, preserving bounds, rounding order and all existing values.
+
+This is a structural change only. Preserve schema 20, save/history contents, RNG sequences, event and activity rules, DOM/ARIA markup and the existing percentile reference. Cache token: `small-refactor`. Browser/visual checks remain omitted by preference.
+
+Validation: all 568 workspace tests pass (119 DOM checks), and all 28 local HTTP assets match source. Differential comparison against the frozen pre-refactor modules passes 101,621 equality checks across 1,353 yearly advances, 922 resolved choices, 2,619 forecast/preview checks, 2,190 reloads, 44 schema fixtures and 31 successions. Full state, serialized saves and RNG remain identical. No circular imports or missing modules; percentile-reference.js is byte-for-byte unchanged.
+
+Published as `1ca419ce473780633ccac2f62c2ad33af255c55d` to main. Isolated release validation: 528 tests, 115 DOM checks, 102,643 differential equality checks across 1,411 yearly advances; full state and RNG match its frozen baseline. GitHub Pages built that commit successfully and all 27 live assets match. All 97 working files were preserved while aligning main; earlier unpublished work remains local, including its separately extracted save-schema.js validation branches. No tests or percentile references changed for this refactor.

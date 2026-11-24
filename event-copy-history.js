@@ -391,4 +391,8 @@ export const LEGACY_EVENT_COPY = [
   {"id":"household_child_milestone","name":"Invited to teach a community class","description":"A community center asks {name} to teach a beginner class; preparing lessons and meeting learners gives them good news to share with you."},
   {"id":"household_parent_cooking","name":"A place at a family cooking workshop","description":"A community kitchen offers you and {name} a workshop place, where you measure ingredients and invent a filling together."},
   {"id":"household_parent_missed_pickup","name":"A missed school pickup","description":"{name} arrives late to collect you from school."},
+  // Household-wide wording since record 042.
+  {"id":"disrupted_sleep","name":"Construction outside your window","description":"Early construction noise carries through your poorly insulated home, and you have no affordable quieter place to sleep. Repeated waking leaves less energy for school or work."},
+  {"id":"teething","name":"A noisy building repair","description":"Long-delayed building repairs fill your home with drilling and unfamiliar workers. With no quieter place available, the disruption leaves you distressed."},
+  {"id":"household_parent_sleepless","name":"Night works outside your window","description":"Overnight road repairs carry through the thin windows of your small home. With no quiet room to move to, you and {name} keep waking; lost sleep leaves home tense and exhausting."},
 ];

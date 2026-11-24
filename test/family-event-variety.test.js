@@ -104,7 +104,6 @@ test('every new household choice applies to its named relative and preserves a v
 test('ongoing caregiving retains strain while repairs and lessons keep only their practical time costs', () => {
   for (const [id,timeChoice,paidChoice,key,max] of [
     ['household_child_care_closure','home','replace','work',2],
-    ['household_partner_roof_leak','repair','hire','social',1],
     ['household_child_driving','teach','instructor','social',2],
   ]) {
     const event=FAMILY_EVENTS.find(event=>event.id===id);
@@ -133,4 +132,12 @@ test('ongoing caregiving retains strain while repairs and lessons keep only thei
     }
     assert.ok(branches.every(validateSave));
   }
+});
+
+test('hiring roof repair help costs a year of household lifestyle support instead of time', () => {
+  const event = FAMILY_EVENTS.find(event => event.id === 'household_partner_roof_leak');
+  const hire = event.choices.find(choice => choice.id === 'hire'), repair = event.choices.find(choice => choice.id === 'repair');
+  assert.deepEqual([hire.householdLifestyle, hire.years], [-.18, 1]);
+  assert.equal(hire.focusCapacity, undefined);
+  assert.ok(repair.focusCapacity.standard.social < 0);
 });

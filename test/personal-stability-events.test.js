@@ -6,6 +6,7 @@ import { createGame, advanceYear, chooseEducation, resolveEventChoice, EVENTS,
 import { defaultFocus } from '../focus-rules.js';
 import { createSchoolRecord } from '../school.js';
 import { changedRating } from '../rating-changes.js';
+import { LOW_STAT_EVENT_CAP } from '../event-rates.js';
 
 const additions = PERSONAL_EVENTS.filter(event => event.id.startsWith('mental_'));
 const calm = { mortalityRandom: () => 1, growthRandom: () => 0, parentCareerRandom: () => 1 };
@@ -102,7 +103,7 @@ test('low and high stability curves strengthen toward extremes while major disru
   assert.equal(chance(fixture(15, 2.01), 'mental_inpatient_admission'), 0);
   for (const value of [-2, 0, 5, 10, 12]) {
     const state = fixture(18, value);
-    for (const roll of eventChances(state, state.stats).filter(roll => roll.id.startsWith('mental_'))) assert.ok(Number.isFinite(roll.chance) && roll.chance >= 0 && roll.chance <= .18);
+    for (const roll of eventChances(state, state.stats).filter(roll => roll.id.startsWith('mental_'))) assert.ok(Number.isFinite(roll.chance) && roll.chance >= 0 && roll.chance <= LOW_STAT_EVENT_CAP);
   }
 });
 
@@ -139,12 +140,12 @@ test('all twelve new personal events can roll with directional outcomes, intact 
 
 test('an admission reserves recovery time and limits commitments for a complete playable year', () => {
   const original = fixture(15, 1);
-  original.focus = { work: 4, social: 4, family: 1, self: 1, sports: 0, extracurricular: 0 };
+  original.focus = { work: 4, social: 3, family: 1, self: 1, sports: 0, extracurricular: 0 }; // the nine-point school budget
   let admitted;
   for (let attempt = 1; attempt <= 1000; attempt++) {
     const state = copy(original);
     state.rng = Math.imul(attempt, 2654435761) >>> 0;
-    advanceYear(state, calm);
+    assert.equal(advanceYear(state, calm).ok, true);
     if (state.lastYearEvents.includes('mental_inpatient_admission')) {
       resolveChoices(state);
       // Other capacity/minimum events can offset or stack with this restriction;

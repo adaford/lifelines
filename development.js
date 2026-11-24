@@ -1,19 +1,20 @@
-import { MAX_FOCUS, DEFAULT_FOCUS, focusEffect, defaultFocus, focusMaxFor, focusNeutralFor, isSchoolActivityFocus } from './focus-rules.js?v=short-events-toddler-order';
-import { currentSchoolActivity, currentSchoolEnrollment, activityEligible } from './school.js?v=short-events-toddler-order';
-import { fameFocusKey, fameActivityMatches, fameLearningBonus } from './fame.js?v=short-events-toddler-order';
+import { MAX_FOCUS, DEFAULT_FOCUS, focusEffect, defaultFocus, focusMaxFor, focusNeutralFor, isSchoolActivityFocus } from './focus-rules.js?v=stat-driven-events';
+import { currentSchoolActivity, currentSchoolEnrollment, activityEligible } from './school.js?v=stat-driven-events';
+import { fameFocusKey, fameActivityMatches, fameLearningBonus } from './fame.js?v=stat-driven-events';
+import { FOCUS_BALANCE, BIRTH_BALANCE } from './balance.js?v=stat-driven-events';
 // Ratings use the same scale throughout life. Balanced toddler activities use
 // TODDLER_FOCUS; core areas use 2, enrolled school activities use 1.
 // Existing ratings change only through practice, care, events, or aging.
 export const BIRTH_VARIATION = {
-  skill: 2,
-  health: 2,
-  stability: 2,
-  appearance: 2,
-  inheritedAppearance: 1.5,
+  skill: BIRTH_BALANCE.noise,
+  health: BIRTH_BALANCE.noise,
+  stability: BIRTH_BALANCE.noise,
+  appearance: BIRTH_BALANCE.noise,
+  inheritedAppearance: BIRTH_BALANCE.inheritedNoise,
 };
 
 export const DEVELOPMENT_BALANCE = {
-  "innateScale": 0.6
+  "innateScale": BIRTH_BALANCE.affinityShift
 };
 
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
@@ -39,23 +40,26 @@ const choiceCoefficients = activities => Object.fromEntries(Object.entries(activ
   [area, Object.fromEntries(Object.entries(effects).map(([stat, amount]) => [stat, amount * CHOICE_STAT_MULTIPLIER]))]));
 export const PARENT_FAMILY_RELATIONSHIP_GAIN = .08 * YEARLY_DECISION_SCALE;
 export const PARENT_FAMILY_STABILITY_GAIN = .025;
+export const PARENT_FAMILY_HEALTH_GAIN = FOCUS_BALANCE.familyParentHealth;
+// Family and Family time change only the caregivers (caregiverFamilyEffects);
+// Friends changes only Social; Yourself carries the player's Mental stability.
 export const TODDLER_ACTIVITY_EFFECTS = choiceCoefficients({
   work: { strength: .05, social: .0275 },
   social: { intelligence: .045, social: -.0275 },
-  family: { social: .0275 },
+  family: {},
   self: { health: .05, stability: .04 },
   creative: { creativity: .055, intelligence: .045 },
 });
 export const STANDARD_FOCUS_EFFECTS = choiceCoefficients({
   work: { intelligence: .0375, stability: -.05 },
-  social: { social: .04, creativity: .04, stability: .05 },
-  family: { social: .04, stability: .05 },
+  social: { social: FOCUS_BALANCE.friendsSocial },
+  family: {},
   self: { intelligence: .0375, strength: .05, creativity: .04, health: .0175, stability: .05 },
 });
 export const SCHOOL_FOCUS_EFFECTS = choiceCoefficients({
   work: { intelligence: .0375, creativity: .04, social: -.04, stability: -.05 },
-  social: { social: .04, stability: .05 },
-  family: { social: .04, stability: .05 },
+  social: { social: FOCUS_BALANCE.friendsSocial },
+  family: {},
   self: { attractiveness: .0375, health: .0175, stability: .05 },
   sports: {},
   extracurricular: {},
@@ -178,7 +182,16 @@ export function wellbeingResponse(person, key, amount, scale = YEARLY_DECISION_S
 export function caregiverCryEffects(person, level) {
   return {
     stability: wellbeingResponse(person, 'stability', [.2, 0, -.6, -1.2, -1.8][level - 1], INFANT_DECISION_SCALE),
+    health: wellbeingResponse(person, 'health', FOCUS_BALANCE.cryParentHealth[level - 1], INFANT_DECISION_SCALE),
     relationship: INFANT_DECISION_SCALE * .2 * (level - 3),
+  };
+}
+export function caregiverFamilyEffects(person, points) {
+  const effort = focusEffect(points);
+  return {
+    health: wellbeingResponse(person, 'health', effort * PARENT_FAMILY_HEALTH_GAIN),
+    stability: wellbeingResponse(person, 'stability', effort * PARENT_FAMILY_STABILITY_GAIN),
+    relationship: effort * PARENT_FAMILY_RELATIONSHIP_GAIN,
   };
 }
 

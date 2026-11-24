@@ -5,6 +5,7 @@ import { MAX_FOCUS, DEFAULT_FOCUS, defaultFocus, focusBudget, focusEffect } from
 import { focusChoiceEffects, schoolFocusEffects, schoolFocusSteps, standardFocusPractice, toddlerActivityEffects, TODDLER_ACTIVITY_EFFECTS, SCHOOL_FOCUS_EFFECTS } from '../development.js';
 import { createSchoolRecord } from '../school.js';
 import { choiceImpacts, schoolChoiceImpacts, toddlerChoiceImpacts } from '../choice-impacts.js';
+import { FOCUS_BALANCE } from '../balance.js';
 
 const near = (actual, expected, context) => assert.ok(Math.abs(actual - expected) < 1e-10, `${context}: ${actual} vs ${expected}`);
 function life(age) {
@@ -28,7 +29,7 @@ test('the shared focus scale gives every stage its default allocation and endpoi
   for (const age of [2, 4, 5, 17, 18, 30, 70]) {
     const focus = defaultFocus(age);
     assert.ok(Object.entries(focus).every(([key, points]) => points === (age >= 5 && age < 18 && ['sports', 'extracurricular'].includes(key) ? 0 : 2)));
-    assert.equal(focusBudget(age), age < 18 ? 10 : 8);
+    assert.equal(focusBudget(age), age < 5 ? 10 : age < 18 ? 9 : 8, 'school shares 9 points');
     assert.equal(Object.values(focus).reduce((total, points) => total + points, 0), age >= 5 && age < 18 ? 8 : focusBudget(age));
   }
 });
@@ -111,7 +112,7 @@ test('individual effects retain their point curves, including endpoint-only craf
   }
 });
 
-test('each sign has the same raw stat magnitude across toddler and school activities', () => {
+test('each sign has the same raw stat magnitude across toddler and school activities, except the stronger Friends Social', () => {
   for (const [age, coefficients, preview] of [[3, TODDLER_ACTIVITY_EFFECTS, toddlerChoiceImpacts], [12, SCHOOL_FOCUS_EFFECTS, schoolChoiceImpacts]]) {
     const state = life(age);
     state.conditions = [];
@@ -129,10 +130,11 @@ test('each sign has the same raw stat magnitude across toddler and school activi
         }
         assert.ok(entry, `${age} ${area} ${stat} remains visible away from bounds`);
         assert.equal(Math.sign(entry.change), Math.sign(effects[stat]));
-        const magnitude = Math.abs(effects[stat]) / entry.level;
-        if (!perSign.has(stat)) perSign.set(stat, magnitude);
-        near(magnitude, perSign.get(stat), `${age}: one ${stat} sign in ${area} at ${points} points`);
+        const magnitude = Math.abs(effects[stat]) / entry.level, key = age >= 5 && area === 'social' && stat === 'social' ? 'friends' : stat;
+        if (!perSign.has(key)) perSign.set(key, magnitude);
+        near(magnitude, perSign.get(key), `${age}: one ${stat} sign in ${area} at ${points} points`);
       }
     }
+    if (age >= 5) near(perSign.get('friends'), FOCUS_BALANCE.friendsSocial / .04 * perSign.get('social'), 'Friends Social uses its own raw unit');
   }
 });

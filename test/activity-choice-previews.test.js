@@ -14,8 +14,8 @@ function toddler() {
     state.aptitudes[key] = 0;
   }
   for (const parent of state.parents) {
-    parent.stats.stability = 5;
-    parent.aptitudes.stability = 0;
+    parent.stats.stability = parent.stats.health = 5;
+    parent.aptitudes.stability = parent.aptitudes.health = 0;
     parent.relationship = 5;
   }
   return state;
@@ -172,10 +172,11 @@ test('every activity follows reduced-point ranks and increased-point endpoints a
         const steps = stat => activity === 'social' ? (points - 2) * (stat === 'intelligence' ? 2 : 1) : activity === 'creative' && stat === 'intelligence' ? [-1, 0, 0, 0, 1][points] : focusEffect(points);
         const expected = Object.entries(coefficients).map(([stat, coefficient]) => ({ stat, direction: Math.sign(coefficient) }));
         if (activity === 'family') for (const parent of state.parents) {
-          const raw = steps('stability') * .00625;
-          const aptitude = parent.aptitudes.stability;
-          const response = raw * (raw >= 0 ? 1 + aptitude * .08 : 1 - aptitude * .07);
-          if (Math.round((5 + response) * 100) / 100 !== 5) expected.push({ stat: 'stability', parentId: parent.id, direction: 1 });
+          for (const [stat, unit] of [['health', .02], ['stability', .00625]]) {
+            const raw = steps(stat) * unit, aptitude = parent.aptitudes[stat];
+            const response = raw * (raw >= 0 ? 1 + aptitude * .08 : 1 - aptitude * .07);
+            if (Math.round((5 + response) * 100) / 100 !== 5) expected.push({ stat, parentId: parent.id, direction: 1 });
+          }
           expected.push({ stat: 'relationship', parentId: parent.id, direction: 1 });
         }
         for (const { stat, parentId, direction } of expected) {
@@ -208,19 +209,20 @@ test('temporary activity caps preserve the full sign scale and static help stays
   assert.equal(helpLevel('family', 'relationship'), 1);
 });
 
-test('Family time separates personal wellbeing, parent wellbeing and relationships without intelligence', () => {
+test('Family time changes only parent wellbeing and relationships, never your own ratings', () => {
   const state = toddler();
   const high = toddlerChoiceImpacts(selected(state, 'family', 4), 'family');
-  assert.deepEqual(high.filter(entry => entry.group === 'you').map(entry => entry.stat), ['social']);
-  assert.ok(high.every(entry => entry.change > 0 && entry.level === 3));
+  assert.deepEqual(high.filter(entry => entry.group === 'you').map(entry => entry.stat), []);
+  assert.ok(high.every(entry => entry.parentId && entry.change > 0 && entry.level === 3));
   for (const parent of state.parents) {
     const entries = high.filter(entry => entry.parentId === parent.id);
-    assert.deepEqual(entries.map(entry => [entry.group, entry.stat]), [['others', 'stability'], ['relationships', 'relationship']]);
+    assert.deepEqual(entries.map(entry => [entry.group, entry.stat]), [['others', 'health'], ['others', 'stability'], ['relationships', 'relationship']]);
   }
   const two = toddlerChoiceImpacts(state, 'family');
   assert.deepEqual(two, [], 'two Family points are neutral for personal and caregiver effects');
   const one = toddlerChoiceImpacts(selected(state, 'family', 1), 'family');
   assert.ok(one.filter(entry=>entry.parentId && entry.stat==='stability').every(entry=>entry.change<0), 'one Family point reduces parent mental stability');
+  assert.ok(one.filter(entry => entry.stat === 'health').length === 2 && one.filter(entry => entry.stat === 'health').every(entry => entry.parentId && entry.change < 0), 'one Family point reduces parent Health');
   const three = toddlerChoiceImpacts(selected(state, 'family', 3), 'family');
   assert.ok(three.filter(entry => entry.parentId && entry.stat === 'relationship').every(entry => entry.change > 0 && entry.level === 1), 'three Family points start improving parent relationships');
   assert.ok(three.filter(entry=>entry.parentId && entry.stat==='stability').every(entry=>entry.change>0));
@@ -249,7 +251,7 @@ test('activity previews hide blocked effects without reranking partial gains or 
   assert.equal(nearZero.change, -.01);
   assert.equal(nearZero.level, 3, 'partial clipping near zero retains the strongest loss sign');
   const family = selected(toddler(), 'family', 4);
-  family.parents.forEach(parent => { parent.relationship = 10; parent.stats.stability = 10; });
+  family.parents.forEach(parent => { parent.relationship = 10; parent.stats.stability = parent.stats.health = 10; });
   assert.ok(toddlerChoiceImpacts(family, 'family').every(entry => !entry.parentId));
 });
 
@@ -265,7 +267,7 @@ test('family activity previews follow the remaining caregiver and adopted relati
   const before = structuredClone(state);
   entries = toddlerChoiceImpacts(state, 'family').filter(entry => entry.parentId);
   assert.deepEqual(entries.map(entry => [entry.parentId, entry.stat]), [
-    ['guardian-test', 'stability'], ['guardian-test', 'relationship'],
+    ['guardian-test', 'health'], ['guardian-test', 'stability'], ['guardian-test', 'relationship'],
   ]);
   assert.deepEqual(state, before, 'caregiver previews do not consume RNG or alter saves');
 });

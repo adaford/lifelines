@@ -32,8 +32,18 @@ const LIFE_TABLE = [
   [.762319,.762319], [.800435,.800435], [.840457,.840457], [.882480,.882480], [.926604,.926604],
 ];
 
+import { MORTALITY_BALANCE as M } from './balance.js?v=stat-driven-events';
+
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const stat = (person, key) => clamp(Number.isFinite(person.stats?.[key]) ? person.stats[key] : 5, 0, 10);
+
+// Game rule, not a medical estimate: very poor Health adds its own yearly risk.
+export function lowHealthDeathChance(health) {
+  const value = clamp(Number.isFinite(health) ? health : 5, 0, 10);
+  if (value >= M.fadeTo) return 0;
+  const chance = M.anchorChance * 2 ** ((M.anchorHealth - value) / M.doublingStep);
+  return Math.min(1, value <= M.fadeFrom ? chance : chance * (M.fadeTo - value) / (M.fadeTo - M.fadeFrom));
+}
 
 export function baselineAnnualMortality(age) {
   // Keep the final observed rate beyond the source's horizon rather than
@@ -69,11 +79,14 @@ export function mortalityRisk(person) {
   // Adult stability has a modest effect on accident hazard (0.84x..1.15x).
   // A child's own mood/crying never changes their accident risk.
   const accidentHazard = hazard * injuryShare * (age >= 18 ? Math.exp((5 - stat(person, 'stability')) * .035) : 1);
-  const combined = diseaseHazard + accidentHazard;
+  // Very poor Health is a disease risk on top of the age baseline.
+  const frailty = lowHealthDeathChance(stat(person, 'health'));
+  if (frailty >= 1) return { total: 1, disease: 1, accident: 0, baseline };
+  const combined = diseaseHazard + accidentHazard - Math.log1p(-frailty);
   const total = -Math.expm1(-combined);
   // Competing causes share ONE annual death probability, so they cannot kill
   // a person twice or accidentally add extra mortality above the baseline.
-  const disease = total * diseaseHazard / combined;
+  const disease = total * (diseaseHazard - Math.log1p(-frailty)) / combined;
   return { total, disease, accident: total - disease, baseline };
 }
 

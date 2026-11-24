@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { SPORTS, EXTRACURRICULARS, SCHOOL_OFFER_COUNT, MAX_SCHOOL_OFFERS, schoolOfferRules, schoolActivity, gradeScore, gradeLetter,
-  activityPerformance, activitySuccessChange, activityEligible, annualSchoolOffers, createSchoolRecord } from '../school.js';
+  activityPerformance, activitySuccessChange, activityEligible, annualSchoolOffers, createSchoolRecord, activityTraining } from '../school.js';
 import { heightReference } from '../growth.js';
+import { SCHOOL_BALANCE } from '../balance.js';
 
 const copy = value => structuredClone(value);
 const near = (actual, expected) => assert.ok(Math.abs(actual - expected) < 1e-10, `${actual} versus ${expected}`);
@@ -58,7 +59,7 @@ test('every A+ through F- band changes at its exact threshold', () => {
   assert.equal(gradeLetter(1000), 'A+');
 });
 
-test('activity catalogs support fresh annual offers and keep training specific to the activity', () => {
+test('activity catalogs support fresh annual offers and train exactly the stats that grade each activity', () => {
   assert.equal(SPORTS.length, 28);
   assert.equal(EXTRACURRICULARS.length, 22);
   for (const [kind, entries] of [['sports', SPORTS], ['extracurricular', EXTRACURRICULARS]]) {
@@ -70,16 +71,23 @@ test('activity catalogs support fresh annual offers and keep training specific t
       assert.ok(Object.values(entry.weights).every(weight => Number.isFinite(weight) && weight > 0));
       assert.ok(Object.values(entry.training).every(amount => Number.isFinite(amount) && amount > 0));
       near(Object.values(entry.weights).reduce((sum, weight) => sum + weight, 0), 1);
+      const trained = Object.keys(entry.weights).filter(key => key !== 'height');
+      assert.deepEqual(Object.keys(entry.training).sort(), trained.sort(), `${entry.id} trains its graded stats, never height`);
+      for (const stat of trained) near(entry.training[stat], SCHOOL_BALANCE.trainingUnits[stat] / trained.length);
     }
   }
   for (const sport of SPORTS) {
     assert.ok(sport.weights.strength > 0, `${sport.id} retains Strength in performance`);
-    assert.equal(sport.training.strength, .3);
-    assert.equal(sport.training.social, .24);
-    assert.equal(sport.training.health, undefined);
-    assert.equal(sport.training.stability, undefined);
+    assert.equal(Object.hasOwn(sport.training, 'social'), Object.hasOwn(sport.weights, 'social'), `${sport.id} trains Social only when Social grades it`);
   }
-  for (const id of ['soccer', 'football', 'tennis']) assert.deepEqual(schoolActivity('sports', id).weights, { strength: 1 });
+  for (const id of ['soccer', 'football', 'tennis']) {
+    assert.deepEqual(schoolActivity('sports', id).weights, { strength: 1 });
+    assert.deepEqual(schoolActivity('sports', id).training, { strength: .3 });
+  }
+  for (const id of ['wrestling', 'swimming']) assert.deepEqual(schoolActivity('sports', id).training, { strength: .3 }, 'height is graded but never trained');
+  assert.deepEqual(schoolActivity('sports', 'cross_country').training, { strength: .15, health: .0525 });
+  assert.deepEqual(schoolActivity('extracurricular', 'debate').training, { intelligence: .1125, social: .12 });
+  assert.deepEqual(activityTraining({ strength: .5, intelligence: .3, health: .2 }), { strength: .1, intelligence: .075, health: .035 });
   assert.deepEqual(schoolActivity('extracurricular', 'chess').training, { intelligence: .225 });
   for (const id of ['piano', 'violin', 'guitar', 'drums', 'flute']) assert.deepEqual(schoolActivity('extracurricular', id).training, { creativity: .24 });
   assert.deepEqual(schoolActivity('extracurricular', 'modeling').training, { attractiveness: .225 });
@@ -117,7 +125,7 @@ test('performance uses relevant stats and compares basketball height with same-a
   assert.equal(activityPerformance(person, null), 0);
 });
 
-test('endurance, precision, tactical, and artistic sports reward their performance stats without adding training effects', () => {
+test('endurance, precision, tactical, and artistic sports reward and train their performance stats', () => {
   const cases = [
     ['cross_country', { strength: .6, health: .4 }],
     ['rowing', { strength: .65, health: .35 }],
@@ -134,7 +142,9 @@ test('endurance, precision, tactical, and artistic sports reward their performan
   for (const [id, weights] of cases) {
     const selected = schoolActivity('sports', id), person = pupil(), before = copy(person);
     assert.deepEqual(selected.weights, weights);
-    assert.deepEqual(selected.training, { strength: .3, social: .24 }, `${id} performance factors do not become training bonuses`);
+    assert.deepEqual(selected.training, activityTraining(weights), `${id} trains its performance stats`);
+    assert.equal(selected.training.social, undefined, `${id} no longer trains Social`);
+    near(selected.training.strength, .3 / Object.keys(weights).length);
     near(activityPerformance(person, selected), 5);
     for (const stat of Object.keys(person.stats)) {
       const lower = { ...person, stats: { ...person.stats, [stat]: 2 } };
@@ -274,7 +284,8 @@ test('sampled school offers match Lifestyle rates and independently allow both, 
     const rules = schoolOfferRules(lifestyle);
     let sports = 0, extracurricular = 0, both = 0;
     for (let index = 0; index < samples; index++) {
-      const person = { ...pupil(5 + index % 13), seed: index + 1, id: `offer-sample-${index}`, lifestyle };
+      // Age 5 always brings offers; the Lifestyle rates apply from the second school year.
+      const person = { ...pupil(6 + index % 12), seed: index + 1, id: `offer-sample-${index}`, lifestyle };
       const sportOffers = annualSchoolOffers(person, 'sports');
       const clubOffers = annualSchoolOffers(person, 'extracurricular');
       for (const offers of [sportOffers, clubOffers]) assert.ok(offers.length === 0 || offers.length >= Math.max(1, rules.medianCount - 2) && offers.length <= Math.min(10, rules.medianCount + 2));
@@ -289,6 +300,10 @@ test('sampled school offers match Lifestyle rates and independently allow both, 
       assert.ok(both > 0 && sports > both && extracurricular > both);
       assert.ok(samples - sports - extracurricular + both > 0, 'some years have no offers at all');
     } else assert.equal(both, samples);
+  }
+  for (let index = 0; index < 2000; index++) for (const lifestyle of [0, 1, 5]) {
+    const person = { ...pupil(5), seed: index + 1, id: `first-year-${index}`, lifestyle };
+    for (const kind of ['sports', 'extracurricular']) assert.ok(annualSchoolOffers(person, kind).length > 0, `first school year offers ${kind} at Lifestyle ${lifestyle}`);
   }
 });
 

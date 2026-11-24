@@ -72,7 +72,7 @@ test('old generated personal and family stories keep their captured stage while 
     assert.equal(familyReview.querySelector('.year-event-description').textContent,annotateNarrative(expectedFamily,state));
     assert.ok((expectedPersonal.match(/[.!?](?=\s|$)/g)||[]).length<=2);
     assert.ok((eventDescriptionAtAge(family,39).match(/[.!?](?=\s|$)/g)||[]).length<=2);
-    assert.deepEqual(effectLines(personalReview.querySelector('.year-event-results')),['Your intelligence 5.0 → 5.2.','-1 focus point.','Temporary effects: 1 year.']);
+    assert.deepEqual(effectLines(personalReview.querySelector('.year-event-results')),['Your intelligence 5.0 → 5.2.','-1 focus point this year']);
     assert.equal(familyReview.querySelector('.year-event-results .gain').textContent,'Intelligence 5.0 → 5.3');
     assert.ok(personalReview.querySelector('.event-cause'),'a copy-only revision retains the captured cause');
     assert.ok(familyReview.querySelector('.event-cause'));
@@ -94,7 +94,7 @@ test('unknown saved descriptions and custom prose keep names, decimal punctuatio
     assert.equal(ui.query('.year-event-description').textContent,custom);
     assert.equal(ui.query('.year-event-description').querySelector('care'),null);
     for(const selector of ['.year-event-results','.journal-content > p']) {
-      assert.deepEqual(effectLines(ui.query(selector)),['A custom decision. Your health 5.3 → 5.5.','+1 focus point.','Temporary effects: 2 years.']);
+      assert.deepEqual(effectLines(ui.query(selector)),['A custom decision. Your health 5.3 → 5.5.','+1 focus point for 2 years']);
     }
     assert.deepEqual(ui.saved(),state);
     assert.equal(ui.writes(),writes);
@@ -121,12 +121,12 @@ test('concise pending stories leave all numeric choice and active-effect lines i
     }
     const join=ui.query('[data-choice="join"] .event-consequences');
     const lines=effectLines(join);
-    assert.equal(lines.length,4);
+    assert.equal(lines.length,3);
     assert.match(lines[0],/^Creativity 5\.0 → 5\.\d$/);
     assert.match(lines[1],/^Intelligence 5\.5 → 5\.\d$/);
-    assert.deepEqual(lines.slice(2),['-2 Play focus capacity','1 year']);
+    assert.deepEqual(lines.slice(2),['-2 Play focus this year']);
     assert.equal(join.querySelectorAll('.stat-change.gain').length,2);
-    assert.deepEqual(effectLines(ui.query('.effect-meta')),['-.4 Health','+.5 Intelligence','-1 focus point',"'Rest' focus max 2",'2 years remaining']);
+    assert.deepEqual(effectLines(ui.query('.effect-meta')),['-.4 Health for 2 years','+.5 Intelligence for 2 years','-1 focus point for 2 years',"'Rest' focus max 2 for 2 years"]);
     assert.equal(ui.query('.effect-title').textContent.trim(),'Saved <support>');
     assert.equal(ui.query('.effect-title').querySelector('support'),null);
     assert.deepEqual(ui.saved(),state);

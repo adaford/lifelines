@@ -18,8 +18,8 @@ function student(age = 12) {
     state.aptitudes[key] = 0;
   }
   for (const parent of state.parents) {
-    parent.stats.stability = 5;
-    parent.aptitudes.stability = 0;
+    parent.stats.stability = parent.stats.health = 5;
+    parent.aptitudes.stability = parent.aptitudes.health = 0;
     parent.relationship = 5;
   }
   return state;
@@ -38,16 +38,17 @@ function selected(state, area, points) {
   return candidate;
 }
 
+// Friends raises Social only; Family changes only the caregivers (parent rows).
 const collegeStats = {
   work: { intelligence: 1, stability: -1 },
-  social: { social: 1, creativity: 1, stability: 1 },
-  family: { social: 1, stability: 1 },
+  social: { social: 1 },
+  family: {},
   self: { intelligence: 1, strength: 1, creativity: 1, health: 1, stability: 1 },
 };
 const schoolStats = {
   work: { intelligence: 1, creativity: 1, social: -1, stability: -1 },
-  social: { social: 1, stability: 1 },
-  family: { social: 1, stability: 1 },
+  social: { social: 1 },
+  family: {},
   self: { attractiveness: 1, health: 1, stability: 1 },
 };
 
@@ -102,7 +103,13 @@ test('Family previews retain school caregiver neutral points and follow guardian
     const entries = schoolChoiceImpacts(selected(state, 'family', points), 'family');
     for (const parent of state.parents) {
       const stability = entries.find(entry => entry.parentId === parent.id && entry.stat === 'stability');
+      const health = entries.find(entry => entry.parentId === parent.id && entry.stat === 'health');
       const relationship = entries.find(entry => entry.parentId === parent.id && entry.stat === 'relationship');
+      if (points === 2) assert.equal(health, undefined);
+      else {
+        assert.ok(Math.abs(health.change - (Math.round((5 + focusEffect(points) * .02) * 100) / 100 - 5)) < 1e-10, 'Family changes each caregiver Health');
+        assert.equal(health.level, [3, 1, 0, 1, 3][points]);
+      }
       if (points === 2) assert.equal(stability, undefined);
       else {
         assert.ok(Math.abs(stability.change - (Math.round((5 + (focusEffect(points)) * .00625) * 100) / 100 - 5)) < 1e-10);
@@ -115,12 +122,13 @@ test('Family previews retain school caregiver neutral points and follow guardian
       }
     }
     assert.ok(entries.every(entry => entry.stat !== 'lifestyle'));
+    assert.ok(entries.every(entry => entry.parentId), 'Family shows no rows for your own ratings');
   }
   state.parents.forEach(parent => { parent.abandonedAt = 11; });
   state.guardian = { ...structuredClone(state.parents[0]), id: 'guardian-school', guardianRole: 'aunt', adoptedAt: 11 };
   delete state.guardian.abandonedAt;
   const entries = schoolChoiceImpacts(selected(state, 'family', 4), 'family').filter(entry => entry.parentId);
-  assert.deepEqual(entries.map(entry => [entry.parentId, entry.stat]), [['guardian-school', 'stability'], ['guardian-school', 'relationship']]);
+  assert.deepEqual(entries.map(entry => [entry.parentId, entry.stat]), [['guardian-school', 'health'], ['guardian-school', 'stability'], ['guardian-school', 'relationship']]);
 });
 
 test('school rows respect active caps and rating limits without reranking signs', () => {
@@ -147,7 +155,7 @@ test('school rows respect active caps and rating limits without reranking signs'
   low.stats.intelligence = 0;
   assert.ok(!schoolChoiceImpacts(low, 'work').some(entry => entry.stat === 'intelligence'));
   const family = selected(student(), 'family', 4);
-  family.parents.forEach(parent => { parent.stats.stability = 10; parent.relationship = 10; });
+  family.parents.forEach(parent => { parent.stats.stability = parent.stats.health = 10; parent.relationship = 10; });
   assert.ok(schoolChoiceImpacts(family, 'family').every(entry => !entry.parentId));
 });
 

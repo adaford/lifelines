@@ -40,13 +40,13 @@ const minimum = (key, amount, years = 1) => ({ years, focusMinimums: { standard:
 
 test('repeated capacity penalties stack independently and expire after complete playable years', () => {
   const state = pupil();
-  state.focus.work = 4;
+  state.focus.work = 4; state.focus.social = 1;
   const before = copy(state);
   choice(state, capacity('work', -1, 2));
   choice(state, capacity('work', -1));
   assert.equal(focusLimits(state).work, 2);
   assert.equal(state.focus.work, 2);
-  assert.equal(focusBudget(state), 10);
+  assert.equal(focusBudget(state), 9);
   assert.equal(state.effects.length, 2);
   assert.equal(new Set(state.effects.map(effect => effect.id)).size, 2);
   assert.deepEqual(state.effects.map(effect => effect.years), [2, 1]);
@@ -88,13 +88,13 @@ test('capacity buffs offset penalties but never override stage maxima or permane
 });
 
 test('minimum increases stack, reassign only required points, and prevent lowering below the floor', () => {
-  const state = pupil();
-  state.focus = { work: 4, social: 4, family: 0, self: 2, sports: 0, extracurricular: 0 };
+  const state = pupil(15); // no stage ends during these two years, so no school milestone is pending
+  state.focus = { work: 4, social: 4, family: 0, self: 1, sports: 0, extracurricular: 0 };
   choice(state, minimum('family', 1, 2));
   choice(state, minimum('family', 1));
   assert.equal(focusMinimums(state).family, 2);
-  assert.deepEqual(state.focus, { work: 3, social: 3, family: 2, self: 2, sports: 0, extracurricular: 0 });
-  assert.equal(spent(state), 10);
+  assert.deepEqual(state.focus, { work: 3, social: 3, family: 2, self: 1, sports: 0, extracurricular: 0 });
+  assert.equal(spent(state), 9);
   assert.equal(setFocus(state, 'family', 1).ok, false);
   assert.match(state.history[0].text, /\+1 Family minimum focus/);
   assert.equal(validateSave(state), true);
@@ -103,7 +103,7 @@ test('minimum increases stack, reassign only required points, and prevent loweri
   const fitted = fitFocusAllocation(state, { work: 4, social: 4, family: 0, self: 4, sports: 2, extracurricular: 2 });
   assert.equal(fitted.family, 2);
   assert.equal(fitted.sports, 0);
-  assert.equal(Object.values(fitted).reduce((sum, amount) => sum + amount, 0), 10);
+  assert.equal(Object.values(fitted).reduce((sum, amount) => sum + amount, 0), 9);
   assert.deepEqual(state, snapshot, 'all constraint and forecast reads are pure');
   const next = quietYear(state);
   assert.equal(focusMinimums(next).family, 1);
@@ -119,10 +119,10 @@ test('minimum increases stack, reassign only required points, and prevent loweri
 test('conflicting minima, capacity loss, and budget loss resolve deterministically without an impossible year', () => {
   const state = pupil();
   choice(state, { years: 2, focusMinimums: { standard: { work: 4, social: 4, family: 4, self: 4, sports: 2 } } });
-  assert.deepEqual(focusMinimums(state), { work: 4, social: 4, family: 2, self: 0, sports: 0, extracurricular: 0 });
+  assert.deepEqual(focusMinimums(state), { work: 4, social: 4, family: 1, self: 0, sports: 0, extracurricular: 0 });
   assert.deepEqual(state.focus, focusMinimums(state));
   choice(state, { ...capacity('work', -3), focusPoints: -4 });
-  assert.deepEqual(focusMinimums(state), { work: 1, social: 4, family: 1, self: 0, sports: 0, extracurricular: 0 });
+  assert.deepEqual(focusMinimums(state), { work: 1, social: 4, family: 0, self: 0, sports: 0, extracurricular: 0 });
   assert.deepEqual(state.focus, focusMinimums(state));
   assert.equal(validateSave(state), true);
   const next = quietYear(state);

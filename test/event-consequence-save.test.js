@@ -4,7 +4,7 @@ import { existsSync } from 'node:fs';
 import * as game from '../engine.js';
 import { focusBudget } from '../focus-rules.js';
 
-const baselineUrl = new URL('../.git/event-consequences-baseline/engine.js', import.meta.url);
+const baselineUrl = new URL('../.baselines/event-consequences/engine.js', import.meta.url);
 const baseline = existsSync(baselineUrl) ? await import(baselineUrl.href) : null;
 const copy = value => structuredClone(value);
 const calm = { mortalityRandom: () => 1, growthRandom: () => 0, parentCareerRandom: () => 1, fameRandom: () => 1 };
@@ -108,7 +108,7 @@ test('meaningful focus commitments survive reload, expire after a complete year 
   exactReads(state);
 });
 
-test('a meaningful public opportunity can be declined without draws or accepted into persistent status', () => {
+test('a meaningful public opportunity can be declined for Creativity without draws or accepted into persistent status', () => {
   const state = lifeAt(game, 20);
   state.stats.social = state.stats.attractiveness = 10;
   rollOnly(game, state, 'fame_personal_offer');
@@ -116,7 +116,8 @@ test('a meaningful public opportunity can be declined without draws or accepted 
   const declined = exactReads(state), before = copy(declined);
   assert.equal(game.resolveEventChoice(declined, 'decline', 'fame_personal_offer').ok, true);
   assert.equal(declined.rng, before.rng);
-  assert.deepEqual(declined.stats, before.stats);
+  assert.deepEqual({ ...declined.stats, creativity: before.stats.creativity }, before.stats);
+  assert.ok(declined.stats.creativity > before.stats.creativity, 'declining keeps its own benefit');
   assert.equal(declined.fame, null);
   exactReads(declined);
   const accepted = exactReads(state);

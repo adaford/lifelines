@@ -24,7 +24,7 @@ function adult() {
     while (state.age < 17) assert.equal(advanceYear(state, calm).ok, true);
     state.money = 1000000;
     state.stats.intelligence = 10;
-    state.focus = { work: 4, social: 2, family: 2, self: 2, sports: 0, extracurricular: 0 };
+    state.focus = { work: 4, social: 1, family: 2, self: 2, sports: 0, extracurricular: 0 };
     assert.equal(advanceYear(state, calm).ok, true);
     state.focus = defaultFocus(state);
     adultBase = state;
@@ -57,7 +57,8 @@ test('the final school year captures college offers and funding once, with uncha
   const state = adult();
   assert.equal(state.education.status, 'undecided');
   assert.equal(state.collegeApplications.offeredAge, 18);
-  assert.equal(state.collegeApplications.schoolGpa, state.school.gpa);
+  assert.equal(state.collegeApplications.schoolGpa, state.school.stages.high.gpa, 'offers use the high-school running mean, not the last report');
+  assert.equal(state.school.stages.high.years, 4);
   const initial = offeredColleges(state), before = copy(state);
   assert.ok(initial.length > 0);
   for (let repeat = 0; repeat < 3; repeat++) { assert.deepEqual(offeredColleges(state), initial); reload(state); }

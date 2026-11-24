@@ -1,0 +1,9 @@
+# Earlier extracurricular deadline has a time cost (12 November 2026)
+
+Keep An activity deadline moves forward (club_deadline_pressure). Its organizer now schedules extra preparation sessions, costing one total focus point for the next complete playable year. Use the existing focusPoints: -1 / years: 1 behavior: fit only excess allocations, retain the loss through the next routine, then restore the budget without refilling points. This is a temporary scheduling cost, with no permanent mental-stability change. Preserve the event's ID, participation gates, probability and all other catalog entries. This supersedes the previous instruction to leave this event inert.
+
+Preserve saved ratings, focus, effects, history, pending decisions and RNG on load; schema stays 20. Keep its old description for historical rendering. Cache token: deadline-effect. Browser/visual checks remain omitted by preference.
+
+Validation: all 621 workspace tests and 581 isolated-release tests pass, including the seeded deadline regression at ages 12 and 17, unchanged rating outcomes, saved legacy-effect coexistence, reload and one-year expiry without refilling. Full catalog comparison confirms no definitions were removed and only this event's description, duration and point cost changed. Both 4,000-life references reproduce unchanged, and independent 1,600-life cohorts pass. All 30 workspace and 29 release local HTTP assets match source; temporary preview servers are stopped.
+
+Published as `b3291cbb8dfdca6856822a42df215e2e2557cf97` to main. GitHub Pages built the intended commit and all 29 live assets match committed bytes. All 106 working files were preserved during main alignment; earlier unpublished work remains local. Temporary preview servers were stopped. Task baselines and validation logs are under `.git/deadline-effect-snapshots/`.

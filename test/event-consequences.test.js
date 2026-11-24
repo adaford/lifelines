@@ -194,26 +194,28 @@ test('old empty pending decisions and valid declines remain resolvable with hist
 });
 
 test('a newly rolled decision needs one possible result, while a meaningful option can retain an empty decline', () => {
+  // Teacher feedback offers Intelligence or Creativity; at 10 in both neither option can change anything.
   const state = fixture(12);
-  state.stats.intelligence = 10; state.stats.strength = 10;
+  state.stats.intelligence = 10; state.stats.creativity = 10;
   state.focus.work = 4; state.focus.self = 0;
   const quiet = copy(state);
   assert.equal(advanceYear(quiet, { ...calm, eventRandom: () => 1 }).ok, true);
   assert.equal(quiet.stats.intelligence, 10, 'the choice is fully clipped after the routine, not just at its start');
-  rollOnly(state, ['school_team']);
+  assert.equal(quiet.stats.creativity, 10);
+  rollOnly(state, ['teacher_feedback']);
   assert.deepEqual(state.pendingEvents, []);
-  assert.equal(memory(state, 'school_team'), undefined);
+  assert.equal(memory(state, 'teacher_feedback'), undefined);
   assert.deepEqual(state, quiet, 'assessing a no-result decision changes no ratings, IDs, history or random state');
   roundTrip(state);
 
   const possible = fixture(12); possible.stats.intelligence = 5;
   const expectedRng = copy(possible);
   assert.equal(advanceYear(expectedRng, { ...calm, eventRandom: () => 1 }).ok, true);
-  rollOnly(possible, ['school_team']);
-  assert.equal(possible.pendingEvents[0].eventId, 'school_team');
+  rollOnly(possible, ['extra_lessons']);
+  assert.equal(possible.pendingEvents[0].eventId, 'extra_lessons');
   assert.equal(possible.rng, expectedRng.rng, 'testing the options adds no gameplay draws');
   const before = copy(possible.stats), rng = possible.rng;
-  assert.equal(resolveEventChoice(possible, 'join', 'school_team').ok, true);
+  assert.equal(resolveEventChoice(possible, 'decline', 'extra_lessons').ok, true);
   assert.deepEqual(possible.stats, before);
   assert.equal(possible.rng, rng);
   roundTrip(possible);

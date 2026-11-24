@@ -1,4 +1,4 @@
-import { lifestyleDisplayValue } from './lifestyle.js?v=short-events-toddler-order';
+import { lifestyleDisplayValue } from './lifestyle.js?v=stat-driven-events';
 export const escapeHTML = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
 export const focusCapLabel = (label, maximum) => `'${String(label)}' focus max ${maximum}`;
@@ -110,6 +110,20 @@ export function splitEventOutcome(text) {
     source = remaining; current = next;
   }
   return lines;
+}
+
+// A recorded "Temporary effects: N years." line becomes a suffix on each timed
+// line ("-2 Play focus this year"). Before → after ratings are permanent and stay
+// as they are; household lifestyle support is the one timed before → after line.
+// Render-only: saved text keeps its original wording.
+export function timedOutcomeLines(lines) {
+  const duration = /^(?:(?:Temporary effects|Duration):\s*)?(\d+)\s+years?(?:\s+remaining)?\.?$/i.exec(String(lines.at(-1) ?? '').trim());
+  if (!duration) return lines;
+  const years = Number(duration[1]), suffix = years === 1 ? ' this year' : ` for ${years} years`;
+  const body = lines.slice(0, -1);
+  const timed = line => !/No stat changes\.?$/i.test(line) && (!/→|->/.test(line) || /Household lifestyle/i.test(line));
+  if (!body.some(timed)) return lines;
+  return body.map(line => timed(line) ? `${line.replace(/\.$/, '').replace(/ focus capacity\b/i, ' focus').replace(/ support strength\b/i, ' support')}${suffix}` : line);
 }
 
 // Retain the existing export for callers; both surfaces share one rule.
