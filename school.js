@@ -1,6 +1,6 @@
-import { heightReference } from './growth.js?v=stat-driven-events';
-import { fameActivityMatches } from './fame.js?v=stat-driven-events';
-import { SCHOOL_BALANCE } from './balance.js?v=stat-driven-events';
+import { heightReference } from './growth.js?v=realistic-lifespans';
+import { fameActivityMatches } from './fame.js?v=realistic-lifespans';
+import { SCHOOL_BALANCE } from './balance.js?v=realistic-lifespans';
 
 // Fictional school activities and success rules, independent of save mutation
 // and the gameplay RNG. The engine supplies effective ratings and any draw.

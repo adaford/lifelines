@@ -1,5 +1,5 @@
-import { lifestyleFromResources } from './lifestyle.js?v=stat-driven-events';
-import { studentLivingLifestyle } from './college.js?v=stat-driven-events';
+import { lifestyleFromResources } from './lifestyle.js?v=realistic-lifespans';
+import { studentLivingLifestyle } from './college.js?v=realistic-lifespans';
 
 // Fictional annual household budgets. Keep housing consequences explicit and
 // separate from ability, employability, and a person's worth as a partner.

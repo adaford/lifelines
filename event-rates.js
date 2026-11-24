@@ -1,6 +1,6 @@
 // Event odds shared by every catalog. Game odds, not real-world estimates; the
 // knobs live in EVENT_BALANCE (balance.js). All functions are pure.
-import { EVENT_BALANCE as B } from './balance.js?v=stat-driven-events';
+import { EVENT_BALANCE as B } from './balance.js?v=realistic-lifespans';
 
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
 const hazard = chance => -Math.log1p(-chance);

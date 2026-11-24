@@ -81,8 +81,8 @@ test('random events split evenly between good and bad and stay below a third of 
 });
 
 test('very poor Health adds its own yearly death chance at every age', () => {
-  for (const [health, chance] of [[0, .2], [1, .1], [2, .05], [4, 0], [7, 0], [10, 0]]) close(lowHealthDeathChance(health), chance, `health ${health}`);
-  assert.ok(lowHealthDeathChance(3) > 0 && lowHealthDeathChance(3) < .05, 'the extra risk fades out between 2 and 4');
+  for (const [health, chance] of [[0, .2], [1, .1], [2, .05], [2.5, 0], [3, 0], [4, 0], [7, 0], [10, 0]]) close(lowHealthDeathChance(health), chance, `health ${health}`);
+  assert.ok(lowHealthDeathChance(2.25) > 0 && lowHealthDeathChance(2.25) < .05, 'the extra risk fades out between 2 and 2.5');
   assert.equal(lowHealthDeathChance(-2), .2); assert.equal(lowHealthDeathChance(NaN), 0);
   for (const age of [0, 8, 30, 70]) for (const health of [0, 1, 2, 3, 4]) {
     const risk = mortalityRisk({ age, alive: true, stats: { health, stability: 5 } });

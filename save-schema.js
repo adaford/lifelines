@@ -1,17 +1,17 @@
 // Read-only validation for current and legacy saves. Migration stays in the
 // engine, where it can use the same generation and progression rules.
-import { JOBS } from './jobs.js?v=stat-driven-events';
-import { EVENTS as PERSONAL_EVENTS } from './events.js?v=stat-driven-events';
-import { FAMILY_EVENTS } from './family-events.js?v=stat-driven-events';
-import { FAME_EVENTS } from './fame-events.js?v=stat-driven-events';
-import { MAX_FOCUS, DEFAULT_FOCUS, SCHOOL_FOCUS_KEYS, focusMaxFor, focusBudget } from './focus-rules.js?v=stat-driven-events';
-import { FOCUS_BALANCE, SCHOOL_BALANCE } from './balance.js?v=stat-driven-events';
-import { SCHOOL_OFFER_COUNT, MAX_SCHOOL_OFFERS, schoolActivity, currentSchoolEnrollment } from './school.js?v=stat-driven-events';
-import { conditionFocusPoints, conditionFocusLimits, validateBirthConditions, aptitudeBounds } from './birth-conditions.js?v=stat-driven-events';
-import { gestatingActor } from './relationships.js?v=stat-driven-events';
-import { COLLEGES, COLLEGE_BALANCE, collegeById } from './college.js?v=stat-driven-events';
-import { HOUSING_BALANCE } from './housing.js?v=stat-driven-events';
-import { MAX_RESOURCES } from './lifestyle.js?v=stat-driven-events';
+import { JOBS } from './jobs.js?v=realistic-lifespans';
+import { EVENTS as PERSONAL_EVENTS } from './events.js?v=realistic-lifespans';
+import { FAMILY_EVENTS } from './family-events.js?v=realistic-lifespans';
+import { FAME_EVENTS } from './fame-events.js?v=realistic-lifespans';
+import { MAX_FOCUS, DEFAULT_FOCUS, SCHOOL_FOCUS_KEYS, focusMaxFor, focusBudget } from './focus-rules.js?v=realistic-lifespans';
+import { FOCUS_BALANCE, SCHOOL_BALANCE } from './balance.js?v=realistic-lifespans';
+import { SCHOOL_OFFER_COUNT, MAX_SCHOOL_OFFERS, schoolActivity, currentSchoolEnrollment } from './school.js?v=realistic-lifespans';
+import { conditionFocusPoints, conditionFocusLimits, validateBirthConditions, aptitudeBounds } from './birth-conditions.js?v=realistic-lifespans';
+import { gestatingActor } from './relationships.js?v=realistic-lifespans';
+import { COLLEGES, COLLEGE_BALANCE, collegeById } from './college.js?v=realistic-lifespans';
+import { HOUSING_BALANCE } from './housing.js?v=realistic-lifespans';
+import { MAX_RESOURCES } from './lifestyle.js?v=realistic-lifespans';
 
 // Inject engine-owned helpers rather than importing the engine back here.
 // Keeping these references shared prevents validation rules from drifting.

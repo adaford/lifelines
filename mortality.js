@@ -32,7 +32,7 @@ const LIFE_TABLE = [
   [.762319,.762319], [.800435,.800435], [.840457,.840457], [.882480,.882480], [.926604,.926604],
 ];
 
-import { MORTALITY_BALANCE as M } from './balance.js?v=stat-driven-events';
+import { MORTALITY_BALANCE as M } from './balance.js?v=realistic-lifespans';
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const stat = (person, key) => clamp(Number.isFinite(person.stats?.[key]) ? person.stats[key] : 5, 0, 10);
@@ -70,12 +70,14 @@ export function mortalityRisk(person) {
   if (!person || person.alive === false) return { total: 0, disease: 0, accident: 0, baseline: 0 };
   const age = Number.isFinite(person.age) ? Math.max(0, person.age) : 0;
   const baseline = baselineAnnualMortality(age);
-  const hazard = -Math.log1p(-baseline);
+  // The life table already includes people in poor health; the Health rules below
+  // add that risk back, so the table's age risk is scaled down first.
+  const hazard = -Math.log1p(-baseline) * M.baselineScale;
   const injuryShare = accidentShare(age);
   // Game calibration: health/stability 5 reproduce the population baseline.
   // A low health score raises disease hazard (1.75x at 1, 0.50x at 10).
   // These stat mappings are fictional, not estimates from the life table.
-  const diseaseHazard = hazard * (1 - injuryShare) * Math.exp((5 - stat(person, 'health')) * .14);
+  const diseaseHazard = hazard * (1 - injuryShare) * Math.exp((5 - stat(person, 'health')) * M.diseaseSlope);
   // Adult stability has a modest effect on accident hazard (0.84x..1.15x).
   // A child's own mood/crying never changes their accident risk.
   const accidentHazard = hazard * injuryShare * (age >= 18 ? Math.exp((5 - stat(person, 'stability')) * .035) : 1);

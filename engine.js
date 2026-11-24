@@ -1,38 +1,38 @@
 // Lifelines: deterministic, browser-independent simulation rules.
 // All public actions mutate their state and return { ok, reason? }.
-import { createSaveValidator } from './save-schema.js?v=stat-driven-events';
-import { JOBS } from './jobs.js?v=stat-driven-events';
-import { careerFit, careerYear } from './career-rules.js?v=stat-driven-events';
-import { collegeById, createCollegeOffers, collegeGradeScore, graduateJobOffers } from './college.js?v=stat-driven-events';
-import { collegeSportSuccessAfterYear, collegeSportFameChance, professionalSportChance } from './college-sports.js?v=stat-driven-events';
-import { HOUSING_BALANCE, nextHousing, housingLifestyle, housingChanges } from './housing.js?v=stat-driven-events';
-import { MAX_RESOURCES, lifestyleFromResources, changedLifestyle } from './lifestyle.js?v=stat-driven-events';
-import { GENETICS_BALANCE, inheritRatings, inheritAffinities, inheritedGrowthFactor } from './genetics.js?v=stat-driven-events';
+import { createSaveValidator } from './save-schema.js?v=realistic-lifespans';
+import { JOBS } from './jobs.js?v=realistic-lifespans';
+import { careerFit, careerYear } from './career-rules.js?v=realistic-lifespans';
+import { collegeById, createCollegeOffers, collegeGradeScore, graduateJobOffers } from './college.js?v=realistic-lifespans';
+import { collegeSportSuccessAfterYear, collegeSportFameChance, professionalSportChance } from './college-sports.js?v=realistic-lifespans';
+import { HOUSING_BALANCE, nextHousing, housingLifestyle, housingChanges } from './housing.js?v=realistic-lifespans';
+import { MAX_RESOURCES, lifestyleFromResources, changedLifestyle } from './lifestyle.js?v=realistic-lifespans';
+import { GENETICS_BALANCE, inheritRatings, inheritAffinities, inheritedGrowthFactor } from './genetics.js?v=realistic-lifespans';
 export { GENETICS_BALANCE };
 export { lifestyleFromResources };
-import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=stat-driven-events';
-import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=stat-driven-events';
-import { FAME_EVENTS, fameEventChances } from './fame-events.js?v=stat-driven-events';
-import { hasFame, fameFocusKey, fameActivityMatches, fameStartingRating, fameNextRating, fameLossChance, fameLifestyleBonus } from './fame.js?v=stat-driven-events';
-import { eventStatCause } from './event-causes.js?v=stat-driven-events';
-import { eventDescriptionAtAge } from './life-events.js?v=stat-driven-events';
-import { authoredConsequence, eventHasConsequence, balanceEventOdds } from './event-rates.js?v=stat-driven-events';
-import { mortalityRisk, rollMortality } from './mortality.js?v=stat-driven-events';
-import { heightReference, advanceGrowth } from './growth.js?v=stat-driven-events';
-import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=stat-driven-events';
-import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, caregiverCryEffects, caregiverFamilyEffects, unemploymentStabilityChange, standardFocusPractice, schoolAppearanceChange, DEVELOPMENT_BALANCE, BIRTH_VARIATION, SKILL_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, PARENT_FAMILY_STABILITY_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=stat-driven-events';
-import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=stat-driven-events';
-import { normalPercentile } from './percentiles.js?v=stat-driven-events';
-import { changedRating } from './rating-changes.js?v=stat-driven-events';
-import { MAX_FOCUS, DEFAULT_FOCUS, focusMaxFor, focusNeutralFor, isSchoolActivityFocus, focusEffect, focusKeysForAge, focusBudget, temporaryFocusPoints, defaultFocus, legacyFocusValue } from './focus-rules.js?v=stat-driven-events';
-import { SCHOOL_OFFER_COUNT, schoolActivity, currentSchoolEnrollment, currentSchoolActivity, gradeScore, gradeLetter, activityGradeLetter, activitySuccessAfterYear, activityEligible, annualSchoolOffers, createSchoolRecord, schoolStage, recordStageGrade } from './school.js?v=stat-driven-events';
-import { SCHOOL_BALANCE } from './balance.js?v=stat-driven-events';
-import { assignBirthConditions, applyBirthConditions, getBirthConditions, conditionFocusLimits, aptitudeBounds } from './birth-conditions.js?v=stat-driven-events';
+import { EVENTS as PERSONAL_EVENTS, eventChances } from './events.js?v=realistic-lifespans';
+import { FAMILY_EVENTS, familyEventChances } from './family-events.js?v=realistic-lifespans';
+import { FAME_EVENTS, fameEventChances } from './fame-events.js?v=realistic-lifespans';
+import { hasFame, fameFocusKey, fameActivityMatches, fameStartingRating, fameNextRating, fameLossChance, fameLifestyleBonus } from './fame.js?v=realistic-lifespans';
+import { eventStatCause } from './event-causes.js?v=realistic-lifespans';
+import { eventDescriptionAtAge } from './life-events.js?v=realistic-lifespans';
+import { authoredConsequence, eventHasConsequence, balanceEventOdds } from './event-rates.js?v=realistic-lifespans';
+import { mortalityRisk, rollMortality } from './mortality.js?v=realistic-lifespans';
+import { heightReference, advanceGrowth } from './growth.js?v=realistic-lifespans';
+import { initialParentCareer, careerForecast, advanceParentCareer } from './parent-careers.js?v=realistic-lifespans';
+import { naturalSkillRating, skillChanges, childhoodWellbeing, wellbeingResponse, caregiverCryEffects, caregiverFamilyEffects, unemploymentStabilityChange, standardFocusPractice, schoolAppearanceChange, DEVELOPMENT_BALANCE, BIRTH_VARIATION, SKILL_VARIATION, TODDLER_FOCUS, PARENT_FAMILY_RELATIONSHIP_GAIN, PARENT_FAMILY_STABILITY_GAIN, YEARLY_DECISION_SCALE } from './development.js?v=realistic-lifespans';
+import { PERCENTILE_REFERENCE } from './percentile-reference.js?v=realistic-lifespans';
+import { normalPercentile } from './percentiles.js?v=realistic-lifespans';
+import { changedRating } from './rating-changes.js?v=realistic-lifespans';
+import { MAX_FOCUS, DEFAULT_FOCUS, focusMaxFor, focusNeutralFor, isSchoolActivityFocus, focusEffect, focusKeysForAge, focusBudget, temporaryFocusPoints, defaultFocus, legacyFocusValue } from './focus-rules.js?v=realistic-lifespans';
+import { SCHOOL_OFFER_COUNT, schoolActivity, currentSchoolEnrollment, currentSchoolActivity, gradeScore, gradeLetter, activityGradeLetter, activitySuccessAfterYear, activityEligible, annualSchoolOffers, createSchoolRecord, schoolStage, recordStageGrade } from './school.js?v=realistic-lifespans';
+import { SCHOOL_BALANCE, AGING_BALANCE } from './balance.js?v=realistic-lifespans';
+import { assignBirthConditions, applyBirthConditions, getBirthConditions, conditionFocusLimits, aptitudeBounds } from './birth-conditions.js?v=realistic-lifespans';
 export { DEVELOPMENT_BALANCE };
-export { heightPercentile } from './growth.js?v=stat-driven-events';
-export { mortalityRisk } from './mortality.js?v=stat-driven-events';
-import { datingPotential as datingPotentialRules, meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=stat-driven-events';
-export { JOBS, JOB_CATEGORIES } from './jobs.js?v=stat-driven-events';
+export { heightPercentile } from './growth.js?v=realistic-lifespans';
+export { mortalityRisk } from './mortality.js?v=realistic-lifespans';
+import { datingPotential as datingPotentialRules, meetingChances as meetingRules, relationshipOdds as attractionRules, proposalChance as proposalRules, pregnancyChance as pregnancyRules, gestatingActor, createProspects, oneNightChance as casualRules, attractivenessAgeChange, appearanceDeclineAge } from './relationships.js?v=realistic-lifespans';
+export { JOBS, JOB_CATEGORIES } from './jobs.js?v=realistic-lifespans';
 export const EVENTS = [...PERSONAL_EVENTS, ...FAMILY_EVENTS, ...FAME_EVENTS];
 const EVENT_BY_ID = new Map(EVENTS.map(event => [event.id, event]));
 
@@ -649,7 +649,7 @@ function growYear(state) {
   } else {
     const practice = standardFocusPractice(state);
     addStat(state, 'stability', wellbeingResponse(state, 'stability', practice.stability));
-    addStat(state, 'health', wellbeingResponse(state, 'health', practice.health) - (state.age >= 65 ? .1 : 0));
+    addStat(state, 'health', wellbeingResponse(state, 'health', practice.health) - (state.age >= AGING_BALANCE.startAge ? AGING_BALANCE.playerHealthLoss : 0));
   }
   if (studying) state.schoolProgress = round(clamp(state.schoolProgress + legacyFocusValue(f.work) * .9, 0, 100));
   for (const parent of caregivers(state)) {
@@ -766,7 +766,7 @@ function ageFamily(state) {
     if (parent.alive === false) continue;
     developSkills(parent, { ...parent, autonomousFocus: true, focus: { work: parent.career?.focus ?? 3, social: 3, family: 3, self: 3 } }, null, 1);
     addStat(parent, 'attractiveness', appearanceChange({ ...parent, autonomousFocus: true }));
-    if (parent.age >= 65) addStat(parent, 'health', -.07);
+    if (parent.age >= AGING_BALANCE.startAge) addStat(parent, 'health', -AGING_BALANCE.relativeHealthLoss);
     parent.age += 1;
   }
   for (const child of state.children) {
@@ -785,16 +785,16 @@ function ageFamily(state) {
     }
     child.relationship = round(clamp(child.relationship + YEARLY_DECISION_SCALE * focusEffect(state.focus.family) * .13, 0, 10));
     if (child.age >= 18) child.money = Math.min(MAX_RESOURCES, child.money + Math.round(1500 + child.stats.intelligence * 250));
-    if (child.age >= 65) addStat(child, 'health', -.07);
+    if (child.age >= AGING_BALANCE.startAge) addStat(child, 'health', -AGING_BALANCE.relativeHealthLoss);
   }
-  for (const sibling of state.siblings) if (sibling.alive !== false) { developSkills(sibling, { ...sibling, autonomousFocus: true }, null, 1); addStat(sibling, 'attractiveness', appearanceChange({ ...sibling, autonomousFocus: true })); if (sibling.age >= 65) addStat(sibling, 'health', -.07); sibling.age += 1; }
+  for (const sibling of state.siblings) if (sibling.alive !== false) { developSkills(sibling, { ...sibling, autonomousFocus: true }, null, 1); addStat(sibling, 'attractiveness', appearanceChange({ ...sibling, autonomousFocus: true })); if (sibling.age >= AGING_BALANCE.startAge) addStat(sibling, 'health', -AGING_BALANCE.relativeHealthLoss); sibling.age += 1; }
   const partner = livingPartner(state);
   if (partner) {
     const appearance = appearanceChange(partner);
     developSkills(partner, { ...partner, focus: { ...defaultFocus(partner.age), family: state.focus.family } });
     if (appearance) addStat(partner, 'attractiveness', appearance);
     addStat(partner, 'stability', wellbeingResponse(partner, 'stability', focusEffect(state.focus.family) * .035));
-    if (partner.age >= 65) addStat(partner, 'health', -.07);
+    if (partner.age >= AGING_BALANCE.startAge) addStat(partner, 'health', -AGING_BALANCE.relativeHealthLoss);
     partner.relationship = round(clamp(partner.relationship + YEARLY_DECISION_SCALE * focusEffect(state.focus.family) * .11, 0, 10));
     partner.yearsTogether += 1; partner.age += 1;
   }

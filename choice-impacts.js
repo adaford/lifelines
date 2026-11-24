@@ -1,8 +1,8 @@
-import { annualForecast, effectiveStats, needsEducationChoice, focusLimits, caregivers, JOBS } from './engine.js?v=stat-driven-events';
-import { infantChoiceEffects, caregiverCryEffects, caregiverFamilyEffects, unemploymentFocusCoefficient, unemploymentStabilityChange, toddlerActivityEffects, toddlerActivityNeutral, toddlerActivitySteps, schoolFocusEffects, schoolFocusSteps, focusChoiceEffects, focusEffectStrength, standardFocusCoefficients, TODDLER_FOCUS, TODDLER_ACTIVITY_EFFECTS, PARENT_FAMILY_HEALTH_GAIN, PARENT_FAMILY_RELATIONSHIP_GAIN } from './development.js?v=stat-driven-events';
-import { DEFAULT_FOCUS, focusEffect, focusNeutralFor, isSchoolActivityFocus } from './focus-rules.js?v=stat-driven-events';
-import { changedRating } from './rating-changes.js?v=stat-driven-events';
-import { fameFocusKey } from './fame.js?v=stat-driven-events';
+import { annualForecast, effectiveStats, needsEducationChoice, focusLimits, caregivers, JOBS } from './engine.js?v=realistic-lifespans';
+import { infantChoiceEffects, caregiverCryEffects, caregiverFamilyEffects, unemploymentFocusCoefficient, unemploymentStabilityChange, toddlerActivityEffects, toddlerActivityNeutral, toddlerActivitySteps, schoolFocusEffects, schoolFocusSteps, focusChoiceEffects, focusEffectStrength, standardFocusCoefficients, TODDLER_FOCUS, TODDLER_ACTIVITY_EFFECTS, PARENT_FAMILY_HEALTH_GAIN, PARENT_FAMILY_RELATIONSHIP_GAIN } from './development.js?v=realistic-lifespans';
+import { DEFAULT_FOCUS, focusEffect, focusNeutralFor, isSchoolActivityFocus } from './focus-rules.js?v=realistic-lifespans';
+import { changedRating } from './rating-changes.js?v=realistic-lifespans';
+import { fameFocusKey } from './fame.js?v=realistic-lifespans';
 
 const nonzero = value => Math.abs(value) > .000001;
 const keyOf = entry => `${entry.parentId || 'you'}:${entry.stat}`;

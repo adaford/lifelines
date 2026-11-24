@@ -6,25 +6,25 @@ import {
   offeredJobs, offeredColleges, joinCollegeSport, leaveCollegeSport, needsEducationChoice, pendingEventSubject, pendingEventChoices, focusLimits, focusMinimums, focusLimitDetails, caregivers,
   relationshipOdds, meetingChances, datingPotential, proposalChance, pregnancyChance, oneNightChance,
   respondToEncounter, proposeMarriage, endRelationship, normalizeSurname, heightPercentile, statPercentiles
-} from './engine.js?v=stat-driven-events';
-import { LEGACY_EVENT_COPY } from './event-copy-history.js?v=stat-driven-events';
-import { legacyLifeEventCopies } from './life-event-copy-history.js?v=stat-driven-events';
-import { formatEventCause } from './event-causes.js?v=stat-driven-events';
-import { eventDescriptionAtAge } from './life-events.js?v=stat-driven-events';
-import { annotateNarrative } from './narrative.js?v=stat-driven-events';
-import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome, timedOutcomeLines, focusCapLabel, escapeHTML as esc } from './display.js?v=stat-driven-events';
-import { avatar, genderBadge, parentLabel } from './profile-view.js?v=stat-driven-events';
+} from './engine.js?v=realistic-lifespans';
+import { LEGACY_EVENT_COPY } from './event-copy-history.js?v=realistic-lifespans';
+import { legacyLifeEventCopies } from './life-event-copy-history.js?v=realistic-lifespans';
+import { formatEventCause } from './event-causes.js?v=realistic-lifespans';
+import { eventDescriptionAtAge } from './life-events.js?v=realistic-lifespans';
+import { annotateNarrative } from './narrative.js?v=realistic-lifespans';
+import { formatRating, formatHeight, heightDescription, formatStatNarrative, splitEventOutcome, timedOutcomeLines, focusCapLabel, escapeHTML as esc } from './display.js?v=realistic-lifespans';
+import { avatar, genderBadge, parentLabel } from './profile-view.js?v=realistic-lifespans';
 
-import { MAX_FOCUS, focusBudget, focusMaxFor, isSchoolActivityFocus } from './focus-rules.js?v=stat-driven-events';
-import { SPORTS, schoolActivity, currentSchoolEnrollment, gradeScore, gradeLetter, activityGradeLetter, activitySuccessAfterYear, activityEligible, SCHOOL_STAGES, schoolStage, stageGpa } from './school.js?v=stat-driven-events';
-import { COLLEGE_BALANCE, collegeById, collegeGradeScore, createCollegeOffers } from './college.js?v=stat-driven-events';
-import { collegeSportSuccessAfterYear } from './college-sports.js?v=stat-driven-events';
-import { housingDetails } from './housing.js?v=stat-driven-events';
-import { hasFame, fameFocusKey, fameFocusChange, fameLearningBonus, fameLossChance, fameLifestyleBonus } from './fame.js?v=stat-driven-events';
-import { getBirthConditions } from './birth-conditions.js?v=stat-driven-events';
-import { initialCareerProgress } from './career-rules.js?v=stat-driven-events';
-import { lifestyleDisplayValue } from './lifestyle.js?v=stat-driven-events';
-import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=stat-driven-events';
+import { MAX_FOCUS, focusBudget, focusMaxFor, isSchoolActivityFocus } from './focus-rules.js?v=realistic-lifespans';
+import { SPORTS, schoolActivity, currentSchoolEnrollment, gradeScore, gradeLetter, activityGradeLetter, activitySuccessAfterYear, activityEligible, SCHOOL_STAGES, schoolStage, stageGpa } from './school.js?v=realistic-lifespans';
+import { COLLEGE_BALANCE, collegeById, collegeGradeScore, createCollegeOffers } from './college.js?v=realistic-lifespans';
+import { collegeSportSuccessAfterYear } from './college-sports.js?v=realistic-lifespans';
+import { housingDetails } from './housing.js?v=realistic-lifespans';
+import { hasFame, fameFocusKey, fameFocusChange, fameLearningBonus, fameLossChance, fameLifestyleBonus } from './fame.js?v=realistic-lifespans';
+import { getBirthConditions } from './birth-conditions.js?v=realistic-lifespans';
+import { initialCareerProgress } from './career-rules.js?v=realistic-lifespans';
+import { lifestyleDisplayValue } from './lifestyle.js?v=realistic-lifespans';
+import { choiceImpacts, toddlerActivityImpacts, toddlerChoiceImpacts, schoolChoiceImpacts } from './choice-impacts.js?v=realistic-lifespans';
 
 const SAVE_KEY = 'lifelines.save.v1';
 const app = document.querySelector('#app');

@@ -1,4 +1,4 @@
-import { fameOpportunityChance, hasFame } from './fame.js?v=stat-driven-events';
+import { fameOpportunityChance, hasFame } from './fame.js?v=realistic-lifespans';
 
 // Fictional encounters unlocked by public recognition. Rewards describe the
 // encounter itself; routine praise, inconvenience and money never imply a

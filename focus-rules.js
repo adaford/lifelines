@@ -1,7 +1,7 @@
-import { conditionFocusPoints } from './birth-conditions.js?v=stat-driven-events';
-import { fameFocusKey, fameActivityMatches } from './fame.js?v=stat-driven-events';
-import { currentSchoolEnrollment } from './school.js?v=stat-driven-events';
-import { FOCUS_BALANCE } from './balance.js?v=stat-driven-events';
+import { conditionFocusPoints } from './birth-conditions.js?v=realistic-lifespans';
+import { fameFocusKey, fameActivityMatches } from './fame.js?v=realistic-lifespans';
+import { currentSchoolEnrollment } from './school.js?v=realistic-lifespans';
+import { FOCUS_BALANCE } from './balance.js?v=realistic-lifespans';
 
 // One shared allocation scale for all playable focus stages.
 export const MAX_FOCUS = 4;

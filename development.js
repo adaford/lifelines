@@ -1,7 +1,7 @@
-import { MAX_FOCUS, DEFAULT_FOCUS, focusEffect, defaultFocus, focusMaxFor, focusNeutralFor, isSchoolActivityFocus } from './focus-rules.js?v=stat-driven-events';
-import { currentSchoolActivity, currentSchoolEnrollment, activityEligible } from './school.js?v=stat-driven-events';
-import { fameFocusKey, fameActivityMatches, fameLearningBonus } from './fame.js?v=stat-driven-events';
-import { FOCUS_BALANCE, BIRTH_BALANCE } from './balance.js?v=stat-driven-events';
+import { MAX_FOCUS, DEFAULT_FOCUS, focusEffect, defaultFocus, focusMaxFor, focusNeutralFor, isSchoolActivityFocus } from './focus-rules.js?v=realistic-lifespans';
+import { currentSchoolActivity, currentSchoolEnrollment, activityEligible } from './school.js?v=realistic-lifespans';
+import { fameFocusKey, fameActivityMatches, fameLearningBonus } from './fame.js?v=realistic-lifespans';
+import { FOCUS_BALANCE, BIRTH_BALANCE } from './balance.js?v=realistic-lifespans';
 // Ratings use the same scale throughout life. Balanced toddler activities use
 // TODDLER_FOCUS; core areas use 2, enrolled school activities use 1.
 // Existing ratings change only through practice, care, events, or aging.

@@ -1,6 +1,7 @@
 import { focusEffect, defaultFocus } from '../focus-rules.js';
 import { createSchoolRecord } from '../school.js';
 import { changedRating } from '../rating-changes.js';
+import { AGING_BALANCE } from '../balance.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -122,7 +123,7 @@ test('school, career, and later-life practice produce gains and losses without b
   close(wellbeing.stability, 0, 'neutral choices do not change mental stability');
   const senior = stateAt(65);
   senior.focus.self = 2;
-  assert.equal(annualForecast(senior).stats.health.change, -.1, 'age-related health loss remains whole');
+  assert.equal(annualForecast(senior).stats.health.change, -AGING_BALANCE.playerHealthLoss, 'age-related health loss remains whole');
   assert.equal(annualForecast(senior).stats.attractiveness.change, -.12, 'age-related appearance loss remains whole');
 
   const adult = stateAt(30);

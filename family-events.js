@@ -1,8 +1,8 @@
-import { legacyFocusValue } from './focus-rules.js?v=stat-driven-events';
-import { gradeScore } from './school.js?v=stat-driven-events';
-import { boostStatRates, statEventFactor } from './event-rates.js?v=stat-driven-events';
-import { EVENT_BALANCE } from './balance.js?v=stat-driven-events';
-import { LIFE_FAMILY_EVENTS } from './life-events.js?v=stat-driven-events';
+import { legacyFocusValue } from './focus-rules.js?v=realistic-lifespans';
+import { gradeScore } from './school.js?v=realistic-lifespans';
+import { boostStatRates, statEventFactor } from './event-rates.js?v=realistic-lifespans';
+import { EVENT_BALANCE } from './balance.js?v=realistic-lifespans';
+import { LIFE_FAMILY_EVENTS } from './life-events.js?v=realistic-lifespans';
 // Fictional household events. Subject changes affect the named person; player
 // changes affect you. Relationship changes affect your bond with that person.
 // Individual rolls join the ordinary event pool and share its five-event cap.

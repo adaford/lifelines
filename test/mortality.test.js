@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { baselineAnnualMortality, mortalityRisk, rollMortality } from '../mortality.js';
+import { MORTALITY_BALANCE } from '../balance.js';
 
 const person = (age, health = 5, stability = 5) => ({ age, alive: true, stats: { health, stability } });
 const close = (actual, expected, tolerance = 1e-12) => assert.ok(Math.abs(actual - expected) < tolerance, `${actual} should equal ${expected}`);
@@ -14,12 +15,14 @@ function seededRandom(seed) {
   };
 }
 
-test('reference health reproduces observed annual rates across the lifespan', () => {
+test('reference health applies the scaled life-table rate across the lifespan', () => {
   const expected = [[0,.005570], [1,.0004355], [10,.000113], [30,.0014815], [50,.004078], [65,.0133215], [85,.082216], [100,.348124], [119,.926604]];
+  // Health 5 takes the life-table age risk scaled by MORTALITY_BALANCE.baselineScale (record 042).
+  const scaled = rate => -Math.expm1(MORTALITY_BALANCE.baselineScale * Math.log1p(-rate));
   for (const [age, rate] of expected) {
     close(baselineAnnualMortality(age), rate);
-    close(mortalityRisk(person(age)).total, rate);
-    close(mortalityRisk({ age, alive: true }).total, rate, 1e-12);
+    close(mortalityRisk(person(age)).total, scaled(rate));
+    close(mortalityRisk({ age, alive: true }).total, scaled(rate), 1e-12);
   }
   assert.ok(mortalityRisk(person(0)).total > mortalityRisk(person(1)).total);
   assert.ok(mortalityRisk(person(1)).total > mortalityRisk(person(10)).total);

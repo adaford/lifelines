@@ -1,6 +1,6 @@
-import { heightReference } from './growth.js?v=stat-driven-events';
-import { aptitudeBounds } from './birth-conditions.js?v=stat-driven-events';
-import { BIRTH_BALANCE } from './balance.js?v=stat-driven-events';
+import { heightReference } from './growth.js?v=realistic-lifespans';
+import { aptitudeBounds } from './birth-conditions.js?v=realistic-lifespans';
+import { BIRTH_BALANCE } from './balance.js?v=realistic-lifespans';
 
 // Fictional inheritance settings for the game, not claims about human genetics.
 // One shared scalar controls the spread around the parents' mean. Zero removes

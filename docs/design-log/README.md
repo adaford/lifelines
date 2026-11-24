@@ -1,6 +1,6 @@
 # Design log
 
-Every design change to Lifelines since 1 November 2026 has one record here, numbered in the order the changes were made (001 is the oldest, 042 the newest). A record says what the rule is, what it replaced, what has to be preserved, and how the change was validated. The records are the owner's decisions as they were written at the time, so their text is left alone.
+Every design change to Lifelines since 1 November 2026 has one record here, numbered in the order the changes were made (001 is the oldest, 043 the newest). A record says what the rule is, what it replaced, what has to be preserved, and how the change was validated. The records are the owner's decisions as they were written at the time, so their text is left alone.
 
 Rules that predate the log are in [`docs/original-spec/`](../original-spec/): [agent-rules.md](../original-spec/agent-rules.md), [game-rules.md](../original-spec/game-rules.md) and [handoff.md](../original-spec/handoff.md).
 
@@ -103,7 +103,7 @@ Code: `relationships.js`, `genetics.js`, `engine.js`.
 
 Code: `growth.js`, `mortality.js`, `percentiles.js`, `percentile-reference.js`, `scripts/calibrate-percentiles.mjs`.
 
-- Records: 042 (low-Health deaths at any age), 038 (height inheritance), 020 (the reference is regenerated without fitting), 008 (health and height).
+- Records: 043 (lifespans tuned to the US life table; slower old-age decline), 042 (low-Health deaths at any age), 038 (height inheritance), 020 (the reference is regenerated without fitting), 008 (health and height).
 - Original spec: the growth paragraphs of "Character development and lifestyle", plus "Simulated percentiles and calibration" and "Mortality and annual reviews", in handoff.md.
 
 ### Interface
@@ -123,6 +123,7 @@ Newest first.
 
 | No. | Date | Record | Areas |
 | --- | --- | --- | --- |
+| 043 | 24 November 2026 | [Realistic lifespans](043-realistic-lifespans.md) | Mortality, growth |
 | 042 | 24 November 2026 | [Stat-driven events, household events, low-health deaths and school stages](042-stat-driven-events-and-school-stages.md) | Events, focus, school, mortality, interface, saves |
 | 041 | 14 November 2026 | [Concise event stories and toddler activity order](041-concise-event-stories-and-toddler-order.md) | Events, focus, interface |
 | 040 | 14 November 2026 | [Perks can extend affinity beyond ±3](040-perk-affinity-overflow.md) | Perks, genetics, saves |

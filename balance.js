@@ -38,7 +38,14 @@ export const MORTALITY_BALANCE = {
   anchorChance: .1,
   doublingStep: 1,
   fadeFrom: 2,
-  fadeTo: 4,
+  fadeTo: 2.5,
+  // Disease risk is multiplied by exp((5 - Health) * diseaseSlope) at every Health.
+  diseaseSlope: .14,
+  // The US life table already includes people in poor health, and the Health
+  // rules add that risk back, so its age risk is scaled first. Tuned so default
+  // play dies roughly like the table: about 6% before 40, 18% before 65 and
+  // 57% before 85 (table: 4%, 17%, 58%; median death age 82).
+  baselineScale: .5,
 };
 
 // Ratings at birth (engine.js, relationships.js, genetics.js): median 5 with a
@@ -81,4 +88,11 @@ export const SCHOOL_BALANCE = {
   // trained stat gets its unit divided by (number of trained stats) ** trainingSplit.
   trainingUnits: { strength: .3, social: .24, creativity: .24, intelligence: .225, attractiveness: .225, health: .105, stability: .3 },
   trainingSplit: 1,
+};
+
+// Health lost each year from old age (engine.js), from startAge on.
+export const AGING_BALANCE = {
+  startAge: 65,
+  playerHealthLoss: .05,
+  relativeHealthLoss: .035,
 };

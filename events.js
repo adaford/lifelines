@@ -1,13 +1,13 @@
 // Fictional life-sim probabilities and consequences, not real-world risk estimates.
 // Each eligible event gets an independent yearly roll. The engine caps a year at five.
 // Low/high factors are curved so extreme traits matter much more than small changes.
-import { legacyFocusValue, focusMaxFor } from './focus-rules.js?v=stat-driven-events';
-import { APTITUDE_EVENTS } from './cross-aptitude-events.js?v=stat-driven-events';
-import { schoolActivity, activityEligible, gradeScore } from './school.js?v=stat-driven-events';
-import { boostStatRates, statEventFactor } from './event-rates.js?v=stat-driven-events';
-import { LIFE_PERSONAL_EVENTS } from './life-events.js?v=stat-driven-events';
-import { aptitudeBounds } from './birth-conditions.js?v=stat-driven-events';
-import { SCHOOL_BALANCE } from './balance.js?v=stat-driven-events';
+import { legacyFocusValue, focusMaxFor } from './focus-rules.js?v=realistic-lifespans';
+import { APTITUDE_EVENTS } from './cross-aptitude-events.js?v=realistic-lifespans';
+import { schoolActivity, activityEligible, gradeScore } from './school.js?v=realistic-lifespans';
+import { boostStatRates, statEventFactor } from './event-rates.js?v=realistic-lifespans';
+import { LIFE_PERSONAL_EVENTS } from './life-events.js?v=realistic-lifespans';
+import { aptitudeBounds } from './birth-conditions.js?v=realistic-lifespans';
+import { SCHOOL_BALANCE } from './balance.js?v=realistic-lifespans';
 
 const low = key => [key, 'low'];
 const high = key => [key, 'high'];

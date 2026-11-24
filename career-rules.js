@@ -1,4 +1,4 @@
-import { incomeForLifestyle } from './lifestyle.js?v=stat-driven-events';
+import { incomeForLifestyle } from './lifestyle.js?v=realistic-lifespans';
 
 // All career balance knobs live here. Potential describes the scope of the
 // career ladder; individual skill, focused work and experience determine use.
